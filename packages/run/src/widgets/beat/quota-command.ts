@@ -6,7 +6,7 @@ export type AccountReading =
   | { readonly account: string; readonly kind: "usable"; readonly remainingPercent: number; readonly resetsAt?: string }
   | { readonly account: string; readonly kind: "unusable"; readonly reason: string }
 
-type CommandFailureCause = "command-missing" | "exit" | "timeout" | "no-json" | "spawn"
+export type CommandFailureCause = "command-missing" | "exit" | "timeout" | "no-json" | "spawn"
 
 type CommandRun =
   | { readonly kind: "printed"; readonly document: unknown }

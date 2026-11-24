@@ -59,7 +59,8 @@ const AnsweredHold = Schema.Struct({
   until: Schema.NullOr(Schema.String),
   questions: Schema.Array(HoldQuestion),
   answer: Answer,
-  at: Schema.optional(Schema.String)
+  at: Schema.optional(Schema.String),
+  repeat: Schema.optional(Schema.Boolean)
 })
 
 export interface Hold {
@@ -68,6 +69,7 @@ export interface Hold {
   readonly questions: ReadonlyArray<HoldQuestion>
   readonly answer: Answer | null
   readonly at: string | null
+  readonly repeat?: boolean
   readonly history?: ReadonlyArray<typeof AnsweredHold.Type>
 }
 
@@ -75,6 +77,8 @@ const ParkedOrigin = Schema.Struct({ machine: Schema.String.check(Schema.isNonEm
 
 export interface Parked {
   readonly origin?: typeof ParkedOrigin.Type
+  readonly at?: string
+  readonly sentBackAt?: string
   readonly branch: string
   readonly questions: Arr.NonEmptyReadonlyArray<ParkedQuestion>
 }
@@ -111,9 +115,6 @@ type HeldRecord = TaskRecord & { readonly hold: Hold & { readonly answer: null }
 
 export const isHeld = (record: TaskRecord): record is HeldRecord => record.hold !== null && record.hold.answer === null
 
-const heldReason = (task: TaskRecord): string | null =>
-  isHeld(task) ? "held for the captain: " + task.hold.reason + (task.hold.until === null ? "" : ", until " + task.hold.until) : null
-
 export const openQuestions = (task: TaskRecord): ReadonlyArray<ParkedQuestion> =>
   task.parked?.questions.filter((question) => question.answer === null) ?? []
 
@@ -123,36 +124,11 @@ export const ranClosing = (task: TaskRecord): RanClosing | null =>
 export const decisionAnswer = (task: TaskRecord): Answer | null =>
   task.state.kind === "closed" && task.state.claim === null && task.state.closing.outcome === "done" ? task.state.closing.answer : null
 
-export const decisionWait = "decision for the captain"
-
 export const taskPr = (task: TaskRecord): string | null => ranClosing(task)?.pr ?? null
 
 const prUrlPattern = /^https:\/\/[^/]+\/[^/]+\/[^/]+\/pull\/\d+$/
 
 export const fullPrUrl = (pr: string | null | undefined): string | null => pr !== null && pr !== undefined && prUrlPattern.test(pr) ? pr : null
-
-export type DeciderOwns = (task: string, question: ParkedQuestion) => boolean
-
-export const answersAwaited = (captain: ReadonlyArray<string>, decider: ReadonlyArray<string>): string =>
-  [
-    ...(captain.length === 0 ? [] : ["the captain's answer to " + captain.join(", ")]),
-    ...(decider.length === 0 ? [] : ["the decider's answer to " + decider.join(", ")])
-  ].join(" and ")
-
-const parkedReason = (task: TaskRecord, deciderOwns: DeciderOwns): string | null => {
-  const open = openQuestions(task).filter((question) => question.blocks)
-  if (task.parked === null || open.length === 0) {
-    return null
-  }
-  const owned = (question: ParkedQuestion): boolean => deciderOwns(task.spec.id, question)
-  const ids = (questions: ReadonlyArray<ParkedQuestion>): ReadonlyArray<string> => questions.map((question) => question.id)
-  return "parked on " + task.parked.branch + " for " + answersAwaited(ids(open.filter((question) => !owned(question))), ids(open.filter(owned)))
-}
-
-export const answerWait = (task: TaskRecord, deciderOwns: DeciderOwns): string | null => heldReason(task) ?? parkedReason(task, deciderOwns)
-
-export const missingOriginWait = (id: string): string =>
-  "the parked task has no recorded machine and run; record them with orc backlog origin " + id + " <machine> <run-id> before resuming"
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
 
@@ -193,6 +169,7 @@ const Frontmatter = Schema.Struct({
   priority: Schema.optional(Schema.Literals(taskPriorities)),
   created: Schema.String,
   hold_reason: Schema.optional(Schema.String),
+  hold_repeat: Schema.optional(Schema.Boolean),
   hold_until: Schema.optional(Schema.String),
   held_at: Schema.optional(Schema.String),
   hold_questions: Schema.optional(Schema.Array(QuestionFront)),
@@ -201,6 +178,8 @@ const Frontmatter = Schema.Struct({
   answered_at: Schema.optional(Schema.String),
   parked_branch: Schema.optional(Schema.String),
   parked_origin: Schema.optional(ParkedOrigin),
+  parked_at: Schema.optional(Schema.String),
+  parked_sent_back_at: Schema.optional(Schema.String),
   parked_questions: Schema.optional(Schema.Array(QuestionFront)),
   beat: Schema.optional(Schema.String),
   taken_for: Schema.optional(Schema.String),
@@ -273,7 +252,7 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
     return questions
   }
   return Arr.isReadonlyArrayNonEmpty(questions)
-    ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }) }
+    ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }), ...(front.parked_at === undefined ? {} : { at: front.parked_at }), ...(front.parked_sent_back_at === undefined ? {} : { sentBackAt: front.parked_sent_back_at }) }
     : "a parked task names no question"
 }
 
@@ -283,7 +262,7 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
     return answer
   }
   if (front.hold_reason === undefined) {
-    return front.hold_until === undefined && front.held_at === undefined && front.hold_questions === undefined && front.hold_history === undefined && answer === null ? null : "a hold names no reason"
+    return front.hold_until === undefined && front.held_at === undefined && front.hold_questions === undefined && front.hold_history === undefined && front.hold_repeat === undefined && answer === null ? null : "a hold names no reason"
   }
   if (front.hold_reason.trim() === "") {
     return "a hold names no reason"
@@ -298,7 +277,7 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
   if (answer === null && questions.length > 0 && questions.every((question) => question.answer !== null)) {
     return "a hold answers every question and names no answer"
   }
-  return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer, at: front.held_at ?? null, ...(front.hold_history === undefined ? {} : { history: front.hold_history }) }
+  return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer, at: front.held_at ?? null, ...(front.hold_repeat === true ? { repeat: true } : {}), ...(front.hold_history === undefined ? {} : { history: front.hold_history }) }
 }
 
 const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {

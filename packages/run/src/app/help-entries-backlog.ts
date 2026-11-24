@@ -3,6 +3,14 @@ import { mergeBases } from "../entities/pull-request/index"
 import type { BacklogVerb } from "./dispatch-args"
 import type { HelpEntry } from "./help-format"
 
+export const quotaHelp: HelpEntry = {
+  usage: ["orc quota [--json]"],
+  summary: "Show the quota and account pick the beat reads",
+  about: "Runs the quota command from dispatch.json and shows its reading without starting tasks. Run it on the machine that runs the beat.",
+  options: [{ flag: "--json", meaning: "Print the reading as JSON, with the floor, accounts and pick, or the cause and reason the quota is unread." }],
+  examples: ["orc quota", "orc quota --json"]
+}
+
 export const backlogHelp: HelpEntry = {
   usage: ["orc backlog [--json]", "orc backlog <subcommand> [<args>]"],
   summary: "See the backlog, and add, hold, answer or close its tasks",

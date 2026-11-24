@@ -1,11 +1,17 @@
 import { Clock, DateTime, Effect, Result, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { duplicateOf } from "../../shared/config/index"
-import { type AccountReading, runQuotaCommand } from "./quota-command"
-import { decodeSubquo, isSubquoDocument } from "./subquo"
+import { type AccountReading, type CommandFailureCause, runQuotaCommand } from "./quota-command"
+import { decodeSubquo, isSubquoDocument, type SubquoFailureCause } from "./subquo"
+
+type UnreadQuota = {
+  readonly kind: "unread"
+  readonly cause: CommandFailureCause | SubquoFailureCause
+  readonly reason: string
+}
 
 export type QuotaReading =
-  | { readonly kind: "unread"; readonly reason: string }
+  | UnreadQuota
   | {
     readonly kind: "read"
     readonly floorPercent: number
@@ -74,18 +80,20 @@ const readQuotaAxiAccount = (entry: QuotaAxiProvider | undefined, account: strin
     : { account, kind: "usable", remainingPercent: every.effectivePercentRemaining, resetsAt: DateTime.formatIso(resetsAt) }
 }
 
-const assessQuotaAxi = (document: unknown, settings: QuotaSettings): QuotaReading | ReadonlyArray<AccountReading> => {
+const unreadSchema = (reason: string): UnreadQuota => ({ kind: "unread", cause: "schema", reason })
+
+const assessQuotaAxi = (document: unknown, settings: QuotaSettings): UnreadQuota | ReadonlyArray<AccountReading> => {
   const decoded = Schema.decodeUnknownResult(QuotaAxiDocument)(document, { errors: "all" })
   if (Result.isFailure(decoded)) {
-    return { kind: "unread", reason: "the quota command printed no quota-axi --json document: " + decoded.failure.message }
+    return unreadSchema("the quota command printed no quota-axi --json document: " + decoded.failure.message)
   }
   const entries = decoded.success.providers
   if (entries.every((entry) => entry.windows.length === 0)) {
-    return { kind: "unread", reason: "the quota-axi document names no window" }
+    return unreadSchema("the quota-axi document names no window")
   }
   const duplicate = duplicateOf(entries.flatMap(accountKeysOf))
   if (duplicate !== null) {
-    return { kind: "unread", reason: "the quota-axi document names the account key " + duplicate + " twice" }
+    return unreadSchema("the quota-axi document names the account key " + duplicate + " twice")
   }
   return settings.accounts.map(({ name }) => readQuotaAxiAccount(entries.find((entry) => accountKeysOf(entry).includes(name)), name))
 }
@@ -99,18 +107,18 @@ const readAccount = (entry: QuotaAccount | undefined, account: string): AccountR
     : { account, kind: "usable", remainingPercent: entry.remainingPercent }
 }
 
-const readAccounts = (document: unknown, settings: QuotaSettings): QuotaReading | ReadonlyArray<AccountReading> => {
+const readAccounts = (document: unknown, settings: QuotaSettings): UnreadQuota | ReadonlyArray<AccountReading> => {
   if (typeof document === "object" && document !== null && "providers" in document) {
     return assessQuotaAxi(document, settings)
   }
   // An entry naming both remainingPercent and unusable matches the first member unless excess keys fail it.
   const decoded = Schema.decodeUnknownResult(QuotaDocument)(document, { onExcessProperty: "error", errors: "all" })
   if (Result.isFailure(decoded)) {
-    return { kind: "unread", reason: "the quota command printed no " + QUOTA_JSON_SCHEMA + " document: " + decoded.failure.message }
+    return unreadSchema("the quota command printed no " + QUOTA_JSON_SCHEMA + " document: " + decoded.failure.message)
   }
   const duplicate = duplicateOf(decoded.success.accounts.map((entry) => entry.name))
   if (duplicate !== null) {
-    return { kind: "unread", reason: "the quota command names the account " + duplicate + " twice" }
+    return unreadSchema("the quota command names the account " + duplicate + " twice")
   }
   return settings.accounts.map(({ name }) => readAccount(decoded.success.accounts.find((entry) => entry.name === name), name))
 }
@@ -132,7 +140,7 @@ export const assessQuota = (document: unknown, settings: QuotaSettings): QuotaRe
 
 export const assessSubquo = (document: unknown, settings: QuotaSettings, nowMillis: number): QuotaReading => {
   const read = decodeSubquo(document, settings.accounts.map((account) => account.name), nowMillis)
-  return read.kind === "ok" ? choose(read.accounts, settings) : { kind: "unread", reason: read.reason }
+  return read.kind === "ok" ? choose(read.accounts, settings) : { kind: "unread", cause: read.cause, reason: read.reason }
 }
 
 export const readQuota = (
@@ -141,7 +149,7 @@ export const readQuota = (
   Effect.gen(function*() {
     const run = yield* runQuotaCommand(settings.command)
     if (run.kind === "failed") {
-      return { kind: "unread", reason: run.reason } satisfies QuotaReading
+      return { kind: "unread", cause: run.cause, reason: run.reason } satisfies QuotaReading
     }
     return isSubquoDocument(run.document)
       ? assessSubquo(run.document, settings, yield* Clock.currentTimeMillis)

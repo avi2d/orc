@@ -50,7 +50,7 @@ A project's `mode` in `projects.json` decides how its ship tasks end.
 | Mode | How a ship task ends |
 | --- | --- |
 | `no-mistakes`, the default | Checks, then the no-mistakes review, then a pull request with green CI |
-| `direct-PR` | Checks, then orc pushes the branch and opens the pull request itself |
+| `direct-PR` | Checks, then a [review turn that records findings without blocking](../run/delivery-modes.md), then orc pushes the branch and opens the pull request itself |
 | `no-mistakes-prod-only` | `direct-PR` for a task marked internal, `no-mistakes` for the rest |
 
 ## Related topics

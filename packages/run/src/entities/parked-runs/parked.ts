@@ -1,7 +1,8 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
 import type { AskOption, OpenQuestion } from "../review-gate/index"
 import { openReviewQuestions } from "../attention/index"
-import { answerDecision, choicesOf, findTask, grabIn, ranClosing, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, isDeciderAnswer, openQuestions, type Parked, type CaptainAnswer, type DeciderAnswer, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
+import { repeatHold, repeatsResume } from "./repeat-hold"
+import { answerDecision, choicesOf, findTask, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, isDeciderAnswer, openQuestions, type Parked, type CaptainAnswer, type DeciderAnswer, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
 
 // An answer handed to an asking that ended went into the run, so only one never handed out or handed to this asking still answers it.
 const answersAsking = (answer: ParkedAnswer, asking: string | null): boolean => answer.relayedTo === null || answer.relayedTo === asking
@@ -111,7 +112,8 @@ export const parkStartedTask = (
   branch: string,
   asked: Arr.NonEmptyReadonlyArray<AskedQuestion>,
   at: string,
-  run?: string
+  run?: string,
+  ended?: string
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const open = latestAskings(asked)
@@ -127,7 +129,8 @@ export const parkStartedTask = (
       yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null))
       const sentPr = record.parked?.origin?.pr
       const origin = run === undefined ? record.parked?.origin : { machine: record.state.claim.machine, run, ...(sentPr === undefined ? {} : { pr: sentPr }) }
-      const parked: TaskRecord = { ...record, parked: { branch, questions, ...(origin === undefined ? {} : { origin }) }, state: { kind: "new" } }
+      const hold = repeatsResume(record, questions) ? repeatHold(record, run, ended, at) : record.hold
+      const parked: TaskRecord = { ...record, hold, parked: { branch, questions, ...(origin === undefined ? {} : { origin }), at, ...(record.parked?.sentBackAt === undefined ? {} : { sentBackAt: record.parked.sentBackAt }) }, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(parked)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })
       }
@@ -225,16 +228,7 @@ const answerHeldQuestionOn = (id: string, words: string, at: string, fresh: Task
   }))
 }
 
-const answerOn = (id: string, words: string, at: string, expected: ExpectedDecision | undefined, by: AnswerBy) => (fresh: TaskRecord): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
-  if (fresh.parked !== null) {
-    if (expected !== undefined && expected.kind !== "parked") {
-      return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
-    }
-    return answerQuestionOn(id, words, at, { ...fresh, parked: fresh.parked }, by)
-  }
-  if (by !== "captain") {
-    return Effect.fail(new BacklogError({ detail: id + " is not parked, and the decider answers only a parked question" }))
-  }
+const answerHoldOn = (id: string, words: string, at: string, expected: ExpectedDecision | undefined, fresh: TaskRecord): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
   if (expected !== undefined && expected.kind !== "held") {
     return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
   }
@@ -255,6 +249,24 @@ const answerOn = (id: string, words: string, at: string, expected: ExpectedDecis
   return Effect.succeed({ kind: "write", record: { ...fresh, hold: answered }, result: { kind: "hold", hold: answered } })
 }
 
+const namesParkedQuestion = (words: string, questions: ReadonlyArray<ParkedQuestion>): boolean => {
+  const cut = words.indexOf("=")
+  return cut !== -1 && questions.some((question) => question.id === words.slice(0, cut))
+}
+
+const answerOn = (id: string, words: string, at: string, expected: ExpectedDecision | undefined, by: AnswerBy) => (fresh: TaskRecord): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
+  if (fresh.parked !== null && (!isHeld(fresh) || namesParkedQuestion(words, fresh.parked.questions))) {
+    if (expected !== undefined && expected.kind !== "parked") {
+      return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
+    }
+    return answerQuestionOn(id, words, at, { ...fresh, parked: fresh.parked }, by)
+  }
+  if (by !== "captain") {
+    return Effect.fail(new BacklogError({ detail: id + " is not parked, and the decider answers only a parked question" }))
+  }
+  return answerHoldOn(id, words, at, expected, fresh)
+}
+
 const relayTakenQuestions = (
   root: string,
   id: string,
@@ -271,59 +283,6 @@ const relayTakenQuestions = (
     return Effect.succeed({ kind: "write", record: { ...fresh, parked: { ...fresh.parked, questions } }, result: undefined })
   })
 
-const sendBackQuestionId = "send-back"
-
-export const isSendBackQuestion = (question: string): boolean =>
-  question === sendBackQuestionId || question.startsWith(sendBackQuestionId + "-")
-
-const sendBackQuestion = (id: string, words: string, at: string): ParkedQuestion =>
-  ({ id, text: "The captain sent the pull request back", asked: at, blocks: true, answer: { words, at, relayedTo: null } })
-
-const notSentBack = (id: string, kind: string) =>
-  new BacklogError({ detail: "orc backlog send-back refused: " + id + " is " + kind + ", and only a closed task goes back" })
-
-export const addSendBackWords = (
-  root: string,
-  id: string,
-  words: string,
-  at: string
-): Effect.Effect<NonNullable<Parked["origin"]>, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  rewriteNew(root, id, (fresh) => {
-    const parked = fresh.parked
-    if (parked === null || parked.origin === undefined || parked.branch !== taskBranch(id) || !parked.questions.every((question) => isSendBackQuestion(question.id))) {
-      return Effect.fail(notSentBack(id, fresh.state.kind))
-    }
-    const question = sendBackQuestion(sendBackQuestionId + "-" + (parked.questions.length + 1).toString(), words, at)
-    return Effect.succeed({ kind: "write", record: { ...fresh, parked: { ...parked, questions: [...parked.questions, question] } }, result: parked.origin })
-  })
-
-// link(2) publishes new/ at most once, so of two send-backs of one task exactly one moves it.
-export const sendBackClosedTask = (
-  root: string,
-  id: string,
-  words: string,
-  at: string,
-  origin: NonNullable<Parked["origin"]>
-): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const { fs, paths, file, grabbed, putBack, read } = yield* grabIn(root, "closed", id, Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" })))
-    const send = Effect.gen(function*() {
-      const record = yield* parseTaskFile(file, "closed", yield* read)
-      const ran = ranClosing(record)
-      if (ran === null) {
-        return yield* new BacklogError({ detail: id + " closed without a run, so it has no branch to send back" })
-      }
-      const parked: Parked = { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at)], origin: ran.pr === null ? origin : { ...origin, pr: ran.pr } }
-      const sent: TaskRecord = { ...record, parked, state: { kind: "new" } }
-      if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(sent)))) {
-        return yield* new BacklogError({ detail: "new/ already holds " + id })
-      }
-      return sent
-    })
-    const sent = yield* send.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
-    yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
-    return sent
-  })
 export const markAnswersRelayed = (
   root: string,
   id: string,

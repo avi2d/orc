@@ -1,6 +1,7 @@
 import { type AsyncContext } from "gpui-kit"
 import { exec, nextCommand, notify } from "herdr"
 import { type MergeOutcome } from "./agents-view"
+import { mergeArgv } from "./task"
 
 export interface Merge {
   readonly task: string
@@ -14,7 +15,7 @@ const mergeTimeoutMs = 25 * 60 * 1000
 const firstLine = (text: string): string => text.trim().split("\n")[0] ?? ""
 
 export const runMerge = (task: string): Promise<string | null> =>
-  exec("orc", ["merge", task, "--basis", "captain-word"], { timeout: mergeTimeoutMs }).then(
+  exec("orc", [...mergeArgv(task)], { timeout: mergeTimeoutMs }).then(
     (result) => result.code === 0 ? null : `orc merge ${task} exited ${result.code}: ${firstLine(result.stderr) || firstLine(result.stdout)}`,
     (reason: unknown) => {
       const said = reason instanceof Error ? reason.message : String(reason)

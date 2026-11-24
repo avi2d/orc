@@ -1,185 +1,18 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Database } from "bun:sqlite"
-import { BunServices } from "@effect/platform-bun"
-import { Effect, Exit, FileSystem, Path } from "effect"
-import { ChildProcessSpawner } from "effect/process"
-import type { AgentFile } from "../../packages/run/src/entities/agent/index"
-import { askSetupFor } from "../../packages/run/src/entities/agent/index"
-import { listRuns, openDatabase, openQuestionsForRun, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
+import { Effect, Exit } from "effect"
+import { listRuns, openQuestionsForRun, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
 import { stepsForRun } from "../../packages/run/src/entities/run-history/index"
-import {
-  recordChecksDone,
-  recordChecksStart,
-  recordFixDone,
-  recordFixStart,
-  recordImplementDone,
-  recordImplementStart,
-  recordOpenQuestion,
-  recordNoMistakesDone,
-  recordNoMistakesStart,
-  recordPullRequestDone,
-  recordPullRequestStart,
-  recordResumePublish,
-  recordStepSession
-} from "../../packages/run/src/features/running-a-task/history-write"
+import { recordFixDone, recordFixStart, recordResumePublish } from "../../packages/run/src/features/running-a-task/history-write"
 import { buildResumePlan } from "../../packages/run/src/features/running-a-task/run-resume"
-import { subprocessNoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
+import { carriedHoldReleaseId, holdReleaseId } from "../../packages/run/src/entities/review-gate/index"
 import type { HistoryRun } from "../../packages/run/src/features/running-a-task/run-record"
 import { runFull } from "../../packages/run/src/features/running-a-task/run-loop"
 import type { AgentRun, RunCheckpoints } from "../../packages/run/src/features/running-a-task/run-ops"
 import { fakeOps } from "../lib/fake-ops"
-
-const implementer: AgentFile = {
-  kind: "implementer",
-  model: "opencode-go/muse-spark",
-  thinking: "high",
-  tools: ["read"],
-  body: "Do the task.",
-  path: "bundled/implementer.md",
-  source: "bundled"
-}
-
-const fixer: AgentFile = {
-  kind: "fixer",
-  model: "opencode-go/muse-spark",
-  thinking: "high",
-  tools: ["read"],
-  body: "Fix the failure.",
-  path: "bundled/fixer.md",
-  source: "bundled"
-}
-
-const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
-  const home = await mkdtemp(join(tmpdir(), "orc-loop-"))
-  try {
-    await use(home)
-  } finally {
-    await rm(home, { recursive: true, force: true })
-  }
-}
-
-const stubGit = async (dir: string): Promise<string> => {
-  const bin = join(dir, "git-bin")
-  await mkdir(bin, { recursive: true })
-  const git = join(bin, "git")
-  await writeFile(git, [
-    "#!/bin/sh",
-    "if [ \"$1\" = \"log\" ]; then",
-    "  printf 'abc123\\037work\\n'",
-    "fi",
-    "exit 0"
-  ].join("\n") + "\n")
-  await chmod(git, 0o755)
-  return git
-}
-
-const openDb = (home: string): Promise<Database> =>
-  Effect.runPromise(openDatabase(home).pipe(Effect.provide(BunServices.layer)))
-
-const historyFor = (runId: string, home: string, projectDir: string, started: string, git: string, noMistakesPath: string) =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const path = yield* Path.Path
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const runDir = path.join(home, "runs", runId)
-    const run: HistoryRun = {
-      fs, path, spawner, git, projectDir, runId, runDir,
-      piSessionDir: path.join(runDir, "session"),
-      hostSessionsDir: path.join(runDir, "sessions"),
-      taskPath: path.join(runDir, "task.md"),
-      instructions: null,
-      agent: implementer, fixer, branch: "orc/test", sandbox: "nono", started,
-      asks: askSetupFor(runDir, path.join(runDir, "session"), 600, [], []),
-      worktreeDir: projectDir,
-      machine: null,
-      delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: noMistakesPath, git, worktreeDir: projectDir }) },
-      allow: [], answers: []
-    }
-    return run
-  }).pipe(Effect.provide(BunServices.layer))
-
-const stubNoMistakesBin = async (dir: string): Promise<string> => {
-  const bin = join(dir, "bin")
-  await mkdir(bin, { recursive: true })
-  await writeFile(join(bin, "no-mistakes"), [
-    "#!/bin/sh",
-    "cat <<'EOF'",
-    "run:",
-    "  id: \"01STUB\"",
-    "  branch: orc/test",
-    "  status: completed",
-    "  head: abc1234",
-    "  pr: \"https://github.com/o/r/pull/7\"",
-    "  findings: none",
-    "outcome: passed",
-    "steps[2]{step,status,findings,duration_ms}:",
-    "  review,completed,0,3928",
-    "  ci,completed,0,100",
-    "EOF"
-  ].join("\n") + "\n")
-  await chmod(join(bin, "no-mistakes"), 0o755)
-  return bin
-}
-
-const runLoopCheckpoints = (db: Database, run: HistoryRun): RunCheckpoints => ({
-  implementStart: (started) => recordImplementStart(db, run, started),
-  implementSession: (file) => recordStepSession(db, run.runId, "implement", 1, file),
-  implementDone: (outcome, started, ended) =>
-    recordImplementDone(db, run, {
-      agentPath: run.agent.path,
-      sessionFile: outcome.sessionFile,
-      tokens: outcome.tokens,
-      commits: outcome.commits,
-      sessionSize: outcome.sessionSize,
-      implementPassed: outcome.completed
-    }, started, ended),
-  checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
-  checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
-  fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer, started),
-  fixSession: (attempt, file) => recordStepSession(db, run.runId, "fix", attempt, file),
-  fixDone: (fix) => recordFixDone(db, run.runId, fix),
-  noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
-  noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
-  pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
-  pullRequestDone: (record) => recordPullRequestDone(db, run, record),
-  questionAsked: (step, question) => recordOpenQuestion(db, run.runId, step, question)
-})
-
-const seedRefusedPrior = async (db: Database, priorDir: string, project: string): Promise<void> => {
-  await mkdir(join(priorDir, "sessions", "enc"), { recursive: true })
-  const implementSession = join(priorDir, "sessions", "enc", "2026-10-19T09-10-00-000Z_aaa111.jsonl")
-  await writeFile(implementSession, JSON.stringify({ type: "session", id: "aaa111" }) + "\n")
-  const fixSession = join(priorDir, "sessions", "enc", "2026-10-19T09-30-00-000Z_bbb222.jsonl")
-  await writeFile(fixSession, JSON.stringify({ type: "session", id: "bbb222" }) + "\n")
-  await writeFile(join(priorDir, "task.md"), "Do the thing.\n")
-  await writeFile(join(priorDir, "checks-1.md"), "checks\n")
-  await Effect.runPromise(recordRun(db, {
-    id: "prior-a", project, branch: "orc/test", taskFile: join(priorDir, "task.md"),
-    status: "failed", started: "2026-10-19T09:00:00.000Z"
-  }).pipe(Effect.asVoid))
-  await Effect.runPromise(recordStep(db, {
-    runId: "prior-a", name: "implement", attempt: 1, status: "passed",
-    started: "2026-10-19T09:00:00.000Z", agentFile: implementer.path, piSessionFile: implementSession, model: implementer.model, thinking: implementer.thinking
-  }).pipe(Effect.asVoid))
-  await Effect.runPromise(recordChecksDone(db, "prior-a", {
-    round: 1, file: join(priorDir, "checks-1.md"),
-    started: "2026-10-19T09:20:00.000Z", ended: "2026-10-19T09:21:00.000Z",
-    passed: true, failed: [], checks: [{ name: "lint", passed: true }], refusals: []
-  }))
-  await Effect.runPromise(recordFixDone(db, "prior-a", {
-    attempt: 1, status: "passed",
-    started: "2026-10-19T09:22:00.000Z", ended: "2026-10-19T09:23:00.000Z",
-    agentFile: fixer.path, sessionFile: fixSession, model: fixer.model, thinking: fixer.thinking, evidenceIn: join(priorDir, "checks-1.md"),
-    commits: 1, tokens: { input: 10, output: 5 }
-  }))
-  await Effect.runPromise(recordStep(db, {
-    runId: "prior-a", name: "no-mistakes", attempt: 1, status: "failed",
-    started: "2026-10-19T09:24:00.000Z", agentFile: null, piSessionFile: null
-  }).pipe(Effect.asVoid))
-}
+import { fixer, historyFor, implementer, openDb, runLoopCheckpoints, seedRefusedPrior, stubGit, stubNoMistakesBin, withHome } from "../lib/run-loop-helpers"
 
 describe("resumed runs publish inherited progress atomically", () => {
   test("the new attempt records its run row and every inherited step together", async () => {
@@ -475,6 +308,225 @@ describe("a run Pi loops in", () => {
       const exit = await Effect.runPromiseExit(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
       expect(calls).toBe(0)
       expect(JSON.stringify(exit)).toContain("RunStopped")
+    })
+  })
+})
+
+const resumeAfterSpentFixes = async (db: Database, home: string, release: string): Promise<HistoryRun> => {
+  const project = join(home, "project")
+  const priorDir = join(home, "runs", "prior-a")
+  await mkdir(project, { recursive: true })
+  await mkdir(priorDir, { recursive: true })
+  const priorFix = join(priorDir, "2026-10-19T09-30-00-000Z_bbb222.jsonl")
+  await writeFile(priorFix, JSON.stringify({ type: "session", id: "bbb222" }) + "\n")
+  await Effect.runPromise(recordRun(db, {
+    id: "prior-a", project, branch: "orc/test", taskFile: join(priorDir, "task.md"),
+    status: "failed", started: "2026-10-19T09:00:00.000Z"
+  }))
+  await Effect.runPromise(recordStep(db, {
+    runId: "prior-a", name: "implement", attempt: 1, status: "passed",
+    started: "2026-10-19T09:00:00.000Z", agentFile: implementer.path, piSessionFile: null
+  }))
+  await Effect.runPromise(recordStep(db, {
+    runId: "prior-a", name: "checks", attempt: 4, status: "failed",
+    started: "2026-10-19T09:40:00.000Z", agentFile: null, piSessionFile: null
+  }))
+  for (const attempt of [1, 2, 3]) {
+    await Effect.runPromise(recordFixDone(db, "prior-a", {
+      attempt, status: "failed", started: "2026-10-19T09:22:00.000Z", ended: "2026-10-19T09:23:00.000Z",
+      agentFile: fixer.path, sessionFile: priorFix, model: fixer.model, thinking: fixer.thinking,
+      evidenceIn: join(priorDir, "checks-1.md"), commits: 0, tokens: null
+    }))
+  }
+  const git = await stubGit(home)
+  const base = await Effect.runPromise(historyFor("released-b", home, project, "2026-10-19T10:00:00.000Z", git, ""))
+  await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
+  return { ...base, answers: [{ question: release, answer: "Fix the lint failure first" }] }
+}
+
+describe("a hold release reaches the resumed worker", () => {
+  test("a resume after a release that an earlier resume already got keeps the spent fixes and the fixer session instead of a second fresh budget", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const plan = await Effect.runPromise(buildResumePlan(db, await resumeAfterSpentFixes(db, home, carriedHoldReleaseId)))
+        expect(plan.inheritedFixes).toHaveLength(3)
+        expect(plan.fixSessionId).toBe("bbb222")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a released resume with three spent fixes does not end before a fresh fixer sees the release", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const run = await resumeAfterSpentFixes(db, home, holdReleaseId)
+        await mkdir(run.piSessionDir, { recursive: true })
+        const plan = await Effect.runPromise(buildResumePlan(db, run))
+        await Effect.runPromise(recordResumePublish(db, run, plan))
+        const delivered: Array<AgentRun> = []
+        const ops = fakeOps({
+          runAgent: async (agentRun) => {
+            delivered.push(agentRun)
+            return { commits: [] }
+          },
+          execCheck: async () => ({ stdout: "lint broken", stderr: "", exitCode: 1 })
+        }, run.hostSessionsDir)
+        const report = await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+        expect(delivered.length).toBeGreaterThan(0)
+        expect(delivered[0]?.resumeSession).toBeNull()
+        expect(delivered[0]?.prompt).toContain("Fix the lint failure first")
+        expect(delivered.every((agentRun) => agentRun.agent.path === fixer.path)).toBe(true)
+        expect(report.implementPassed).toBe(true)
+        expect(report.fixAttempts).toBe(3)
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a resumed implement prompt carries the hold release instead of dropping it", async () => {
+    await withLoopRun(0, async (db, run) => {
+      const prompts: Array<string> = []
+      const ops = fakeOps({
+        runAgent: async (agentRun) => {
+          prompts.push(agentRun.prompt)
+          return { commits: [] }
+        },
+        execCheck: async () => {
+          throw new Error("checks ran before the implement finished")
+        }
+      }, run.hostSessionsDir)
+      const plan = { ...freshPlan, answers: [{ question: holdReleaseId, answer: "Fix the lint failure first" }] }
+      const report = await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+      expect(prompts.length).toBe(1)
+      expect(prompts[0]).toContain("Do the task.")
+      expect(prompts[0]).toContain("Fix the lint failure first")
+      expect(report.implementPassed).toBe(false)
+    })
+  })
+
+  test("a resumed worker continuation carries the hold release beside the worker answer", async () => {
+    await withLoopRun(0, async (db, run) => {
+      const prompts: Array<string> = []
+      const ops = fakeOps({
+        runAgent: async (agentRun) => {
+          prompts.push(agentRun.prompt)
+          return { commits: [] }
+        },
+        execCheck: async () => {
+          throw new Error("checks ran before the implement finished")
+        }
+      }, run.hostSessionsDir)
+      const plan = {
+        ...freshPlan,
+        implementSessionFile: "/sessions/first.jsonl",
+        answers: [{ question: "ask-1", answer: "Use the cache" }, { question: holdReleaseId, answer: "Fix the lint failure first" }]
+      }
+      await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+      expect(prompts.length).toBe(1)
+      expect(prompts[0]).toContain("Use the cache")
+      expect(prompts[0]).toContain("Fix the lint failure first")
+    })
+  })
+
+  test("every fresh fix attempt carries the hold release instead of starting bare", async () => {
+    await withLoopRun(0, async (db, run) => {
+      await mkdir(run.piSessionDir, { recursive: true })
+      await writeFile(join(run.worktreeDir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
+      const prompts: Array<string> = []
+      const ops = fakeOps({
+        runAgent: async (agentRun) => {
+          prompts.push(agentRun.prompt)
+          return { commits: [] }
+        },
+        execCheck: async () => ({ stdout: "lint broken", stderr: "", exitCode: 1 })
+      }, run.hostSessionsDir)
+      const plan = {
+        ...freshPlan,
+        skipImplement: true,
+        implementSessionId: "aaa111",
+        implementSessionFile: "/sessions/first.jsonl",
+        answers: [{ question: holdReleaseId, answer: "Fix the lint failure first" }]
+      }
+      const report = await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+      expect(prompts.length).toBeGreaterThan(1)
+      expect(prompts.every((prompt) => prompt.includes("Fix the lint failure first"))).toBe(true)
+      expect(report.fixAttempts).toBe(3)
+    })
+  })
+
+  test("a fresh fix attempt gets only the hold release, not loop or worker answers to a pause and a question it never had", async () => {
+    await withLoopRun(0, async (db, run) => {
+      await mkdir(run.piSessionDir, { recursive: true })
+      await writeFile(join(run.worktreeDir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
+      const prompts: Array<string> = []
+      const ops = fakeOps({
+        runAgent: async (agentRun) => {
+          prompts.push(agentRun.prompt)
+          return { commits: [] }
+        },
+        execCheck: async () => ({ stdout: "lint broken", stderr: "", exitCode: 1 })
+      }, run.hostSessionsDir)
+      const plan = {
+        ...freshPlan,
+        skipImplement: true,
+        implementSessionId: "aaa111",
+        implementSessionFile: "/sessions/first.jsonl",
+        answers: [
+          { question: "looping", answer: "continue with the new plan" },
+          { question: "ask-1", answer: "Use the cache" },
+          { question: holdReleaseId, answer: "Fix the lint failure first" }
+        ]
+      }
+      await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+      expect(prompts.length).toBeGreaterThan(1)
+      expect(prompts.every((prompt) => prompt.includes("Fix the lint failure first"))).toBe(true)
+      expect(prompts.some((prompt) => prompt.includes("orc paused you"))).toBe(false)
+      expect(prompts.some((prompt) => prompt.includes("The captain answered your question"))).toBe(false)
+    })
+  })
+
+  test("a looping-continuation retry carries the hold release beside the loop guidance, stating the loop answer once instead of twice", async () => {
+    await withLoopRun(0, async (db, run) => {
+      await mkdir(run.piSessionDir, { recursive: true })
+      await writeFile(join(run.worktreeDir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
+      const prompts: Array<string> = []
+      const ops = fakeOps({
+        runAgent: async (agentRun) => {
+          prompts.push(agentRun.prompt)
+          return { commits: [] }
+        },
+        execCheck: async () => ({ stdout: "lint broken", stderr: "", exitCode: 1 })
+      }, run.hostSessionsDir)
+      const plan = {
+        ...freshPlan,
+        skipImplement: true,
+        implementSessionId: "aaa111",
+        implementSessionFile: "/sessions/first.jsonl",
+        fixSessionId: "bbb222",
+        fixSessionFile: "/sessions/second.jsonl",
+        inheritedFixes: [{
+          attempt: 1,
+          status: "failed" as const,
+          started: "2026-10-19T09:22:00.000Z",
+          ended: "2026-10-19T09:23:00.000Z",
+          agentFile: fixer.path,
+          sessionFile: null,
+          model: fixer.model,
+          thinking: fixer.thinking,
+          evidenceIn: "checks-1.md",
+          commits: 0,
+          tokens: { input: 0, output: 0 }
+        }],
+        answers: [{ question: "looping", answer: "continue with the new plan" }, { question: holdReleaseId, answer: "Fix the lint failure first" }]
+      }
+      await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+      expect(prompts.length).toBeGreaterThan(0)
+      expect(prompts[0]).toContain("Fix the lint failure first")
+      expect(prompts[0]?.split("continue with the new plan")).toHaveLength(2)
     })
   })
 })

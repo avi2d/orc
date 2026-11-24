@@ -226,7 +226,7 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
   const gh = await stubGh(checkRuns)
   try {
     const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], (spawner, hostGit, pathEnv, worktreeDir) =>
-      ({ kind: "direct-PR", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }) }), gh.dir + ":")
+      ({ kind: "direct-PR", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer }), gh.dir + ":")
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
     await rm(gh.dir, { recursive: true, force: true })
@@ -237,7 +237,7 @@ export const runDirectPrResume = async (dir: string, home: string, sandbox: Fake
   const gh = await stubGh(checkRuns)
   try {
     const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, answers, (spawner, hostGit, pathEnv, worktreeDir) =>
-      ({ kind: "direct-PR", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }) }), gh.dir + ":", handRunFacts, { runId: "step-run-2", resumeRun: "step-run-1" })
+      ({ kind: "direct-PR", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer }), gh.dir + ":", handRunFacts, { runId: "step-run-2", resumeRun: "step-run-1" })
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
     await rm(gh.dir, { recursive: true, force: true })
@@ -297,11 +297,26 @@ const fixer: AgentFile = {
   source: "bundled"
 }
 
+const reviewer: AgentFile = {
+  kind: "reviewer",
+  model: "acme/coder",
+  thinking: "high",
+  tools: ["read", "bash"],
+  body: "Review the change.",
+  path: "bundled/reviewer.md",
+  source: "bundled"
+}
+
 const sessionFileName = "2026-10-19T10-00-00-000Z_" + sessionId + ".jsonl"
 
 export const capturedSession = (home: string, jsonl: string): Promise<void> => {
   const dir = join(home, "runs", "step-run-1", "sessions")
   return mkdir(dir, { recursive: true }).then(() => writeFile(join(dir, sessionFileName), jsonl))
+}
+
+export const recordingKinds = (agent: FakeAgent, kinds: Array<string>): FakeAgent => (run, sessionsDir) => {
+  kinds.push(run.agent.kind)
+  return agent(run, sessionsDir)
 }
 
 export const sandboxResult = (sha: string): FakeAgent => async (_run, sessionsDir) => ({

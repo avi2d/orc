@@ -32,9 +32,11 @@ const SubquoSnapshot = Schema.Struct({
 type SubquoSnapshot = typeof SubquoSnapshot.Type
 type SubquoAccount = SubquoSnapshot["accounts"][number]
 
+export type SubquoFailureCause = "schema" | "account-missing"
+
 type SubquoRead =
   | { readonly kind: "ok"; readonly accounts: ReadonlyArray<AccountReading> }
-  | { readonly kind: "error"; readonly cause: "schema" | "account-missing"; readonly reason: string }
+  | { readonly kind: "error"; readonly cause: SubquoFailureCause; readonly reason: string }
 
 const everyModel = "all"
 

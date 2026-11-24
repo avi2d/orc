@@ -26,6 +26,7 @@ export const openAgentExec = (
   plan.kind === "none"
     ? Effect.succeed(hostExec(copyDir, hostEnv, {
       GIT_CONFIG_GLOBAL: agentGitConfig(folders),
+      HEAVY_TESTS_CI_ONLY: "1",
       ...(plan.own === null ? {} : { PI_CODING_AGENT_DIR: plan.own.piAgentDir, ...plan.own.env })
     }))
     : openNonoExec({
@@ -91,6 +92,7 @@ export const agentOps = (
         logFile: run.path.join(folders.runDir, agentRun.logFile),
         failingFile: run.path.join(folders.runDir, failingFileName),
         asks,
+        withoutAsks: agentRun.withoutAsks,
         onSession: agentRun.onSession
       }, pacing)
       const commits = yield* commitsSince(run.spawner, run.git, exec.cwd, base)

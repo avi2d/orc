@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, cardPlace, filterCards, namedModels, openedFilter, opensTurns, projectsOf, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
+import { buildCards, cardAnswers, cardPlace, filterCards, namedModels, openedFilter, opensTurns, projectsOf, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
+import type { InboxAnswer, InboxApproval } from "../../../packages/herdr-app/src/inbox"
+import { askText } from "../../../packages/herdr-app/src/thread"
 
 const run = (id: string, fields: Partial<Run>): Run => ({
   id, project: "/work/orc", branch: `orc/x-${id}`, status: "running", prLink: null, title: `run ${id}`, step: null, questions: 0, endReason: null, kind: null, delivery: null, worktree: null, ...fields
@@ -14,22 +16,34 @@ const runs = (list: ReadonlyArray<Run>): Runs => ({ schema: "orc.runs.v1", runs:
 const backlog = (tasks: ReadonlyArray<Task>, merged: ReadonlyArray<string> = [], projects: Backlog["projects"] = null): Backlog => ({ schema: "orc.backlog.v1", tasks, merged, projects })
 const configured = (...names: ReadonlyArray<string>): Backlog["projects"] => names.map((name) => ({ name, paths: [] }))
 
+const answer = (id: string, who: InboxAnswer["who"] = "worker"): InboxAnswer => ({
+  key: `${id}/question`, kind: "question", task: id, title: `task ${id}`, who, asked: null,
+  ask: askText("Which layout?"), recommendation: null, action: { kind: "answer", target: { kind: "question", id: "ask-1" } }
+})
+
+const approval: InboxApproval = {
+  key: "orc-48/pr", kind: "pr", task: "orc-48", title: "task orc-48", who: "beat", asked: null,
+  link: "https://github.com/o/r/pull/48", ask: askText("Merge the PR https://github.com/o/r/pull/48?"), recommendation: null,
+  action: { kind: "merge", argv: ["merge", "orc-48", "--basis", "captain-word"] }
+}
+
 const board = buildCards(
   runs([
     run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" }),
     run("20261113-080000-bbbbbb", { status: "failed", endReason: "orc exited 1" }),
     run("20261113-070000-cccccc", { status: "running", step: { id: 4, name: "fix", attempt: 1, status: "running" } }),
-    run("20261113-060000-dddddd", { status: "running", questions: 1, project: "/work/herdr" }),
+    run("20261113-060000-dddddd", { status: "running", questions: 1, branch: "orc/herdr-1", project: "/work/herdr" }),
     run("20261113-050000-eeeeee", { status: "succeeded", prLink: "https://github.com/o/r/pull/12" })
   ]),
-  backlog([task("orc-48", { status: "closed" }), task("orc-50", {})])
+  backlog([task("orc-48", { status: "closed" }), task("orc-50", {}), task("herdr-1", { project: "herdr" })]),
+  [approval, answer("herdr-1")]
 )
 
 describe("sending a PR back", () => {
   const prRun = run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })
 
   test("a closed task's open PR offers send-back with the captain's words, not an empty review", () => {
-    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed" })]))
+    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed" })]), [approval])
     expect(card.sendBack).toBe("orc-48")
     expect(sendBackArgs({ sendBack: "orc-48" }, "  rename the flag ")).toEqual(["backlog", "send-back", "orc-48", "rename the flag"])
     expect(sendBackArgs({ sendBack: "orc-48" }, "   ")).toBeNull()
@@ -106,18 +120,39 @@ describe("the runs list", () => {
   test("a parked task with an open question keeps its own card beside its failed run", () => {
     const cards = buildCards(
       runs([run("20261113-090000-aaaaaa", { status: "failed", branch: "orc/orc-7", endReason: "old" })]),
-      backlog([task("orc-7", { status: "new", hold: 1 })])
+      backlog([task("orc-7", { status: "new", parked: 1 })]),
+      [answer("orc-7")]
     )
     expect(cards.map((card) => [card.id, card.runId, card.standing.status])).toEqual([["orc-7", null, "Awaiting you"], ["orc-7", "20261113-090000-aaaaaa", "Failed"]])
     expect(filterCards(cards, { project: null, status: "Awaiting you", allRuns: false }).map((card) => card.where)).toEqual(["Question 1"])
   })
 
-  test("a merged PR's run is Done, not still awaiting approval", () => {
-    const cards = buildCards(
-      runs([run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })]),
-      backlog([task("orc-48", { status: "closed" })], ["orc-48"])
-    )
-    expect(cards.map((card) => [card.standing.status, card.where])).toEqual([["Done", "Merged PR #48"]])
+  test("a stale run count does not leave an answered question's card Awaiting you", () => {
+    const running = run("20261113-090000-aaaaaa", { branch: "orc/orc-7", questions: 1 })
+    const [card] = buildCards(runs([running]), backlog([task("orc-7", { status: "started", parked: 1 })]), [])
+    expect(card.standing.status).toBe("Running")
+  })
+
+  test("a live question belongs to its waiting run and not also to a task card with no run", () => {
+    const running = run("20261113-090000-aaaaaa", { branch: "orc/orc-7", questions: 1 })
+    const question = answer("orc-7")
+    const cards = buildCards(runs([running]), backlog([task("orc-7", { status: "started", parked: 1 })]), [question])
+    expect(cards.map((card) => [card.runId, card.standing.status, cardAnswers(card)])).toEqual([[running.id, "Awaiting you", [question]]])
+  })
+
+  test("a running question whose thread could not be read stays Awaiting you instead of Running", () => {
+    const running = run("20261113-090000-aaaaaa", { branch: "orc/orc-7", questions: 1 })
+    const cards = buildCards(runs([running]), backlog([task("orc-7", { status: "started", parked: 1 })]), [], new Set(["orc-7"]))
+    expect(cards.map((card) => [card.runId, card.standing.status, card.where, cardAnswers(card)])).toEqual([[running.id, "Awaiting you", "Question 1", []]])
+  })
+
+  test("a parked task whose thread could not be read stays Awaiting you instead of Queued", () => {
+    const cards = buildCards(runs([]), backlog([task("orc-7", { status: "new", parked: 2 })]), [], new Set(["orc-7"]))
+    expect(cards.map((card) => [card.id, card.standing.status, card.where])).toEqual([["orc-7", "Awaiting you", "Questions 1-2"]])
+  })
+
+  test("a closed task whose PR awaits approval gets no card without a run instead of one that says it never ran", () => {
+    expect(buildCards(runs([]), backlog([task("orc-48", { status: "closed" })]), [approval])).toEqual([])
   })
 
   test("a run whose PR merged outside orc is Done, not Awaiting you", () => {
@@ -145,6 +180,14 @@ describe("the runs list", () => {
       backlog([task("orc-46", { status: "closed", prState: "closed" }), task("orc-48", { status: "closed", prState: "merged" })])
     )
     expect(cards.map((card) => [card.id, card.standing.status, card.where])).toEqual([["orc-46", "Failed", "Closed PR #46"], ["orc-48", "Done", "Merged PR #48"]])
+  })
+
+  test("a merged PR's run is Done, not still awaiting approval", () => {
+    const cards = buildCards(
+      runs([run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })]),
+      backlog([task("orc-48", { status: "closed" })], ["orc-48"])
+    )
+    expect(cards.map((card) => [card.standing.status, card.where])).toEqual([["Done", "Merged PR #48"]])
   })
 
   test("a task rerun three times shows every run, not only its newest run", () => {
@@ -182,7 +225,7 @@ describe("the selected run's steps", () => {
   })
 
   test("a running step that waits on an answer is ◆, not ●", () => {
-    const rows = stepRows({ status: "Awaiting you", waiting: { on: "answer" } }, [{ id: 1, name: "implement", attempt: 1, status: "running", from: null }], "ship", null)
+    const rows = stepRows({ status: "Awaiting you", waiting: { on: "answer", items: [answer("orc-7")] } }, [{ id: 1, name: "implement", attempt: 1, status: "running", from: null }], "ship", null)
     expect(rows.map((row) => row.mark)).toEqual(["◆", "○", "○"])
   })
 
@@ -299,7 +342,8 @@ describe("the Approve step and the Changes column of a run", () => {
   test("a Code run awaiting approval ends in Approve, not in its delivery step", () => {
     const cards = buildCards(
       runs([run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })]),
-      backlog([task("orc-48", { status: "closed" })])
+      backlog([task("orc-48", { status: "closed" })]),
+      [approval]
     )
     const standing = cards[0]?.standing ?? { status: "Queued" as const }
     const rows = stepRows(standing, [
@@ -325,7 +369,7 @@ describe("the Project row", () => {
       run("20261113-090000-aaaaaa", { status: "failed", endReason: "known failure" }),
       run("20261113-080000-bbbbbb", { status: "failed", endReason: "clone failure", project: "/work/orc-clone" })
     ]),
-    backlog([task("orc-7", { project: "tui-dash" })], [], configured("orc"))
+    backlog([task("orc-7", { project: "orc-dash" })], [], configured("orc"))
   )
 
   test("a run of a project orc does not know is hidden by default, not counted in the list", () => {
@@ -333,7 +377,7 @@ describe("the Project row", () => {
   })
 
   test("All runs still shows the runs of projects orc does not know, not only the known ones", () => {
-    expect(filterCards(mixed, { project: null, status: null, allRuns: true }).map((card) => card.project)).toEqual(["tui-dash", "orc", "orc-clone"])
+    expect(filterCards(mixed, { project: null, status: null, allRuns: true }).map((card) => card.project)).toEqual(["orc-dash", "orc", "orc-clone"])
   })
 
   test("the Project row offers only projects in orc's projects file, not every project a run names", () => {

@@ -16,6 +16,16 @@ describe("piArgv", () => {
     ])
   })
 
+  test("gives a reviewer only its read tools and neither the ask extension nor orc_ask, while an implementer keeps orc_ask", () => {
+    const reviewer: AgentFile = { ...agent, kind: "reviewer", tools: ["read", "grep", "find", "ls"] }
+    const argv = piArgv({ agent: reviewer, instructions: null, sessionDir: "/s", resumeSession: null, asks, withoutAsks: true })
+    expect(argv).toContain("read,grep,find,ls")
+    expect(argv).not.toContain("--extension")
+    expect(argv).not.toContain("--orc-ask-dir")
+    expect(argv.join(" ")).not.toContain("orc_ask")
+    expect(piArgv({ agent, instructions: null, sessionDir: "/s", resumeSession: null, asks })).toContain("read,bash,orc_ask")
+  })
+
   test("leaves out --session and --append-system-prompt when there is nothing to resume or append", () => {
     expect(piArgv({ agent, instructions: null, sessionDir: "/s", resumeSession: null, asks })).not.toContain("--session")
     expect(piArgv({ agent, instructions: null, sessionDir: "/s", resumeSession: null, asks })).not.toContain("--append-system-prompt")
