@@ -47,7 +47,7 @@ test.each(["claude", "codex", "opencode", "pi"])("%s uses the daemon's first age
     })
     expect(missing.exitCode).toBe(127)
     expect(missing.stdout.toString()).toBe("")
-    expect(missing.stderr.toString()).toBe("orc heavy: no " + agent + " on PATH after this wrapper\n")
+    expect(missing.stderr.toString()).toBe("orc heavy: no " + agent + " on PATH other than this wrapper\n")
   } finally {
     if (originalPath === undefined) {
       delete process.env.PATH

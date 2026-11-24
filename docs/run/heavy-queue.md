@@ -108,11 +108,13 @@ A wrapper sets `HEAVY_TESTS_CI_ONLY=1`, puts `~/.orc/heavy/ci-only` and `~/.orc/
 It starts the first copy of the agent on the daemon's `PATH` that is not the wrapper itself.
 If no such copy exists, it exits 127 with a line naming the agent.
 
-The review and fix agents refuse test runs only when `~/.no-mistakes/config.yaml` holds `agent_path_override.pi` pointing at orc's wrapper.
+The review and fix agents refuse test runs only when `~/.no-mistakes/config.yaml` holds `agent_path_override.<agent>` pointing at `~/.orc/heavy/agents/<agent>`, where `<agent>` is the agent no-mistakes runs.
 On the maintainer's machines, the skills repository generates that config.
 Orc never writes that global file itself.
 To check whether the key is there, run `grep agent_path_override ~/.no-mistakes/config.yaml`.
-Where that config is not generated, add the key by hand, here for a home folder of `/home/you`:
+Where that config is not generated, add the key by hand.
+The example below is for a home folder of `/home/you` whose config already chooses `agent: pi`.
+Keep your own `agent` value, and put its name in place of `pi` under `agent_path_override` and in the path:
 
 ```yaml
 agent: pi

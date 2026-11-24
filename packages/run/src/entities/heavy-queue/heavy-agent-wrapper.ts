@@ -8,7 +8,7 @@ const agentWrapperMarker = standinMarker + " agent wrapper"
 
 // The agent search walks the caller's PATH, not the stand-in folders put ahead of it, so a heavy command named like the agent never starts in its place.
 const agentWrapperScript = (agent: string, home: string): string => {
-  const missing = "orc heavy: no " + agent + " on PATH after this wrapper"
+  const missing = "orc heavy: no " + agent + " on PATH other than this wrapper"
   return `#!/bin/sh
 # ${agentWrapperMarker}. Regenerated on every run of that command.
 caller_path=$PATH
