@@ -8,10 +8,10 @@ The queue keeps two such calls from overloading the machine at the same time.
 
 ## How calls reach the queue
 `orc run` and `orc runner start` write a stand in into `~/.orc/heavy/bin` for each heavy tool and configured command.
-For `python`, `python3`, `uv`, `deno`, `go`, `cargo`, and `make`, orc writes a stand in only when the tool exists on `PATH`.
+For `python`, `python3`, `uv`, `deno`, `go`, `cargo`, and `make`, orc writes a stand in when the tool exists on `PATH` or is named in configured commands.
 Shell probes still find those tools absent when they are missing.
 Other tools get stand ins even without a `PATH` binary, so the helper can run the nearest `node_modules/.bin` copy.
-Each write removes stand ins for commands no longer configured and for those seven tools when they disappear from `PATH`.
+Each write removes stand ins for commands no longer configured and for those seven tools when they are neither configured nor on `PATH`.
 A stand in is a launcher of three shell lines that starts orc's TypeScript helper through the absolute path of its bun.
 `orc run` puts that folder on `PATH` for the agent it starts, after only `~/.orc/heavy/ci-only`.
 A stand in queues the call with `pueue add` into the `heavy` group, or hands it to the `through` command when one is set, and waits for its turn, then prints the call output and exits with its exit code.

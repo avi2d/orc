@@ -23,10 +23,11 @@ export const detectWrap = (platform: HeavyPlatform, limit: "auto" | "none"): str
   return ""
 }
 
-export const standinTools = (commands: ReadonlyArray<string>): ReadonlyArray<string> => {
-  const extra = commands.map((entry) => entry.trim().split(" ")[0] ?? "").filter((tool) => tool !== "")
-  return [...new Set([...defaultHeavyTools, ...extra])]
-}
+const configuredTools = (commands: ReadonlyArray<string>): ReadonlyArray<string> =>
+  commands.map((entry) => entry.trim().split(" ")[0] ?? "").filter((tool) => tool !== "")
+
+export const standinTools = (commands: ReadonlyArray<string>): ReadonlyArray<string> =>
+  [...new Set([...defaultHeavyTools, ...configuredTools(commands)])]
 
 const toolsRequiringPathAtWrite = new Set(["python", "python3", "uv", "deno", "go", "cargo", "make"])
 
@@ -122,9 +123,10 @@ export const standinScripts = (
 ): Effect.Effect<Record<string, string>, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const entries: Array<[string, string]> = []
+    const configured = new Set(configuredTools(commands))
     for (const tool of tools) {
       const real = yield* findRealTool(tool, Bun.env.PATH ?? "")
-      if (real !== "" || !toolsRequiringPathAtWrite.has(tool)) {
+      if (real !== "" || configured.has(tool) || !toolsRequiringPathAtWrite.has(tool)) {
         entries.push([tool, launcher(tool, settings, commands, real, timing)])
       }
     }

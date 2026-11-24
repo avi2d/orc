@@ -55,6 +55,29 @@ test("stand-in writes preserve Python fallback instead of advertising a missing 
   }
 })
 
+test("writeHeavyBin keeps a configured make stand-in when make is absent from PATH", async () => {
+  const home = await mkdtemp(join(tmpdir(), "orc-configured-standin-"))
+  const path = process.env.PATH
+  try {
+    const realBin = join(home, "real")
+    await mkdir(realBin)
+    process.env.PATH = realBin
+    const written = await Effect.runPromise(
+      writeHeavyBin(home, { ...resolveHeavy(undefined), commands: ["make test"] }, "linux").pipe(Effect.provide(BunServices.layer))
+    )
+    expect(written).toContain("make")
+    expect(await Bun.file(join(home, "heavy", "bin", "make")).exists()).toBe(true)
+    expect(await Bun.file(join(home, "heavy", "bin", "python")).exists()).toBe(false)
+  } finally {
+    if (path === undefined) {
+      delete process.env.PATH
+    } else {
+      process.env.PATH = path
+    }
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
 test("writeHeavyBin does not drop project-only tools or CI-only refusals", async () => {
   const shell = Bun.which("sh")
   if (shell === null) {
