@@ -123,6 +123,7 @@ const execTest = (args: Args): boolean => {
 export const isTestCall = (tool: string, args: Args): boolean => {
   const [sub = "", ...rest] = testArgs(args)
   switch (tool) {
+    case "checks-test":
     case "vitest":
     case "jest":
     case "pytest":

@@ -5,14 +5,22 @@ import { git, loginProvider, prUrl, runOrc, withNoSandboxFixture, writeConfig, w
 
 const forbidden = [
   "bun test", "bun test --watch", "bun run test", "bun run test:unit", "bun --cwd . run test",
+  "bunx checks-test --changed", "bun x checks-test --tier=unit", "bun checks-test",
+  "npx --yes checks-test", "npm exec -- checks-test", "pnpm exec checks-test",
+  "pnpm dlx checks-test", "yarn exec checks-test", "xcrun checks-test",
   "bunx vitest run", "bun x jest", "npm test", "npm t", "npm run test:e2e",
   "npm --prefix . run test", "npm exec -- vitest run", "npx --yes jest",
   "pnpm test", "pnpm run test:unit", "pnpm exec pytest", "yarn test",
   "vitest run", "vitest --watch", "jest", "pytest", "playwright test", "go test ./...", "cargo test",
   "xcodebuild test", "xcodebuild -scheme Example test"
 ]
-const permitted = ["bun run build", "npm run lint", "pnpm run typecheck", "playwright install"]
-const tools = ["bun", "bunx", "npm", "npx", "pnpm", "yarn", "vitest", "jest", "pytest", "playwright", "go", "cargo", "xcodebuild"]
+const permitted = [
+  "bun run build", "npm run lint", "pnpm run typecheck", "playwright install",
+  "bunx checks-lint", "bun x checks-lint", "bun checks-lint", "npx checks-lint",
+  "npm exec -- checks-lint", "pnpm exec checks-lint", "pnpm dlx checks-lint",
+  "yarn exec checks-lint", "xcrun checks-lint"
+]
+const tools = ["bun", "bunx", "npm", "npx", "pnpm", "yarn", "vitest", "jest", "pytest", "playwright", "go", "cargo", "xcodebuild", "xcrun"]
 
 const quote = (word: string): string => "'" + word.replaceAll("'", "'\\''") + "'"
 

@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { git, prUrl, runOrc, withNoSandboxFixture, writeScript } from "./no-sandbox-fixture"
 import { exerciseCiOnlyHostPi } from "./ci-only-worker-fixture"
 
-test("--sandbox none Pi test attempts never start recognized runners while permitted checks and non-worker tests still run", exerciseCiOnlyHostPi, 60_000)
+test("--sandbox none Pi never starts checks-test or other recognized runners while permitted checks and non-worker tests still run", exerciseCiOnlyHostPi, 60_000)
 
 test.each([
   { verdict: "checks-passed", exitCode: 0 },
