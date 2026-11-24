@@ -258,7 +258,7 @@ const execsTests = (args: Args): boolean => {
 
 const runsTestScript = (args: Args): boolean => {
   const [script = ""] = skipLeading(args, [...testDirectoryFlags, "--filter", "-w", "--workspace"], (word) => word.startsWith("-"))
-  return matchesAny(script, testScripts)
+  return matchesAny(script, testScripts) || testRunners.includes(script)
 }
 
 const managerTests = (aliases: Args) => (all: Args): boolean => {
