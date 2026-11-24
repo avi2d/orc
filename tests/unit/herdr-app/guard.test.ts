@@ -44,3 +44,15 @@ test("reads a step's model, thinking level and session file rather than dropping
   const guarded = guardJson(text, show)
   expect(guarded.kind === "ok" ? guarded.value.steps : guarded).toEqual([{ id: 1, name: "implement", attempt: 1, status: "passed", model: "claude-opus-5-5", thinking: "high", piSessionFile: "/home/sam/.orc/runs/r1/sessions/s.jsonl", from: null }])
 })
+
+test("reads a project's checkout paths rather than dropping them", () => {
+  const text = JSON.stringify({ schema: "orc.backlog.v1", projects: [{ name: "herdr", checkouts: { desk: "/work/herdr-app" } }], tasks: [] })
+  const guarded = guardJson(text, backlog)
+  expect(guarded.kind === "ok" ? guarded.value.projects : guarded).toEqual([{ name: "herdr", paths: ["/work/herdr-app"] }])
+})
+
+test("reads a backlog's project names and a task's PR state rather than dropping them", () => {
+  const text = JSON.stringify({ schema: "orc.backlog.v1", projects: [{ name: "orc", path: "/work/orc" }], tasks: [{ id: "orc-46", title: "t", project: "orc", kind: "ship", status: "closed", hold: null, parked: null, prState: "merged" }] })
+  const guarded = guardJson(text, backlog)
+  expect(guarded.kind === "ok" ? [guarded.value.projects?.map((project) => project.name), guarded.value.tasks[0]?.prState] : guarded).toEqual([["orc"], "merged"])
+})

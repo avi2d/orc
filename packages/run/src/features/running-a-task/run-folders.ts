@@ -1,6 +1,9 @@
 import { Console, Effect, type FileSystem, type Path } from "effect"
 import { readFailure } from "../../shared/config/index"
 import { OrcRunError } from "../../shared/lib/index"
+import type { Database } from "bun:sqlite"
+import { openQuestionsForRun, type OrcRunReport } from "../../entities/run-history/index"
+import type { HistoryRun } from "./run-record"
 
 export const runInstructions = (fs: FileSystem.FileSystem, path: Path.Path, cwd: string, named: string | undefined): Effect.Effect<string | null, OrcRunError> =>
   Effect.gen(function*() {
@@ -34,6 +37,28 @@ const copyInstructions = (
     return copy
   })
 
+const piAgentDirOf = (path: Path.Path, runDir: string): string => path.join(runDir, "session", "agent")
+
+export const dropPiAgentDir = (fs: FileSystem.FileSystem, path: Path.Path, runDir: string): Effect.Effect<void> => {
+  const dir = piAgentDirOf(path, runDir)
+  return fs.remove(dir, { recursive: true, force: true }).pipe(
+    Effect.catch((cause) => Console.log("orc: cannot remove the Pi agent folder " + dir + " after the run ended: " + String(cause)))
+  )
+}
+
+const endsParked = (db: Database, runId: string, report: OrcRunReport): Effect.Effect<boolean> =>
+  report.completed
+    ? Effect.succeed(false)
+    : openQuestionsForRun(db, runId).pipe(Effect.map((open) => open.length > 0), Effect.orElseSucceed(() => true))
+
+export const dropEndedPiAgentDir = (db: Database, run: Pick<HistoryRun, "fs" | "path" | "runDir" | "runId">, report: OrcRunReport): Effect.Effect<void> =>
+  Effect.gen(function*() {
+    if (report.waitingOnCi || (yield* endsParked(db, run.runId, report))) {
+      return
+    }
+    yield* dropPiAgentDir(run.fs, run.path, run.runDir)
+  })
+
 export interface RunFolders {
   readonly runDir: string
   readonly piSessionDir: string
@@ -53,7 +78,7 @@ export const prepareRunFolders = (
 ): Effect.Effect<RunFolders, OrcRunError> =>
   Effect.gen(function*() {
     const piSessionDir = path.join(runDir, "session")
-    const piAgentDir = path.join(piSessionDir, "agent")
+    const piAgentDir = piAgentDirOf(path, runDir)
     const hostSessionsDir = path.join(runDir, "sessions")
     yield* fs.makeDirectory(piAgentDir, { recursive: true }).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot create the run folder " + runDir + ": " + String(cause) }))

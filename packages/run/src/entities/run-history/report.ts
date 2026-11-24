@@ -81,7 +81,7 @@ export const noMistakesSignals = (record: NoMistakesRecord): ReadonlyArray<{ rea
   ...(record.gate === null ? [] : [{ name: "gate", value: record.gate }]),
   ...(record.prLink === null ? [] : [{ name: "pr-link", value: record.prLink }]),
   ...(record.reviewer === null ? [] : [{ name: "reviewer", value: record.reviewer }]),
-  ...record.openQuestions.map((question) => ({ name: openQuestionSignal, value: JSON.stringify({ id: question.id, text: question.text, ...(question.asked === undefined ? {} : { asked: question.asked }) }) }))
+  ...record.openQuestions.map((question) => ({ name: openQuestionSignal, value: JSON.stringify({ id: question.id, text: question.text, ...(question.asked === undefined ? {} : { asked: question.asked }), ...(question.asking === undefined ? {} : { asking: question.asking }), ...(question.owner === undefined ? {} : { owner: question.owner }) }) }))
 ]
 
 type ChecksLoopStep =
