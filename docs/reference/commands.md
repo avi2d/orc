@@ -73,8 +73,9 @@ Options:
                             final check. Defaults to ship.
   --delivery <no-mistakes|direct-PR>
                             How a ship task reaches its PR. Defaults to
-                            no-mistakes, and direct-PR opens the PR with no
-                            review.
+                            no-mistakes, and direct-PR opens the PR after a
+                            review turn that records findings and blocks
+                            nothing.
   --branch <name>           The branch to commit to, or to resume. Defaults to
                             orc/<run-id>.
   --sandbox <nono|none>     Where the agent runs. Defaults to nono, and none

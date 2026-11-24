@@ -302,7 +302,7 @@ const runChecksFixLoop = (
       rounds.push(summary)
       yield* checkpoints.checksRoundDone(summary)
       if (failed.length === 0) {
-        return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints)
+        return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent)
       }
       if (fixes.length >= maxFixAttempts) {
         return {
@@ -368,7 +368,7 @@ const runFullReport = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, tra
     const fixes: Array<RecordedFixAttempt> = [...plan.inheritedFixes]
     const commits = [...done.commits]
     if (plan.skipChecks) {
-      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, tracked)
+      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, tracked, ops.runAgent)
     }
     return yield* runChecksFixLoop(run, ops, base, rounds, fixes, commits, plan, tracked)
   })
