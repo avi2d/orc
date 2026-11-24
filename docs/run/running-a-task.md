@@ -42,7 +42,7 @@ Orc refuses `prepare` or a local check if it finds a test runner in the command 
 The error names the command and the test call.
 Orc follows package scripts recursively, including their `pre` and `post` scripts.
 The shared test-call rule recognizes `checks-test`, `bun test`, test executables such as Vitest and Jest, and `e2e` executable or leaf targets.
-Recognized package scripts include `test`, `tests`, `t`, `tst`, `e2e`, `coverage`, and `mutation`.
+Recognized package scripts include `test`, `tests`, `t`, `tst`, `e2e`, `coverage`, `mutation`, `vitest`, `jest`, `pytest`, and `playwright`.
 The rule also recognizes `test:*`, `tests:*`, `e2e:*`, `coverage:*`, and `mutation:*`.
 A linter argument or an ancestor directory named `e2e` is not a test target.
 Without local checks, orc records the round as `skipped`.
