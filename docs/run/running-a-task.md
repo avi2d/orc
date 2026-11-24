@@ -38,21 +38,35 @@ commands:
 Orc runs only `build`, `lint`, and `typecheck` as local checks.
 In the first checks round, orc prints a warning on stderr naming skipped commands.
 The `prepare` command runs before Pi starts.
-Orc refuses `prepare` or a local check if it finds a test runner in the command or in a package script the command calls.
-The error names the command and the test call.
-Orc follows package scripts recursively, including their `pre` and `post` scripts.
-The shared test-call rule recognizes `checks-test`, `bun test`, test executables such as Vitest and Jest, and `e2e` executable or leaf targets.
-Recognized package scripts include `test`, `tests`, `t`, `tst`, `e2e`, `coverage`, `mutation`, `vitest`, `jest`, `pytest`, and `playwright`.
-The rule also recognizes `test:*`, `tests:*`, `e2e:*`, `coverage:*`, and `mutation:*`.
-A linter argument or an ancestor directory named `e2e` is not a test target.
 Without local checks, orc records the round as `skipped`.
 Orc then hands off to no-mistakes or opens the direct PR.
 GitHub CI runs repository tests and decides completion.
-Keep test runners out of those commands and `prepare`.
-The heavy-queue stand-ins also refuse recognized test runners and test scripts in Pi sessions, `prepare`, and local checks.
-The stand-ins cannot block commands that do not use them.
 Orc tells the no-mistakes review fixer to leave tests to CI.
 Orc starts no-mistakes without its local Test step.
+
+### Test calls orc refuses
+
+Keep test runners out of `prepare`, `build`, `lint`, and `typecheck`.
+Orc reads each of these commands, and each package script it calls, for a test call.
+It follows package scripts recursively, including their `pre` and `post` scripts.
+A package manager's own command, such as `npm ci` or `bun install`, does not count as a call to the script of the same name.
+
+Orc reads all four commands before Pi starts.
+It reads `build`, `lint`, and `typecheck` again before each checks round, so a test call Pi adds is caught before it runs.
+When orc finds a test call, the run ends failed and no pull request opens.
+The error names the command and the test call.
+
+These count as test calls:
+
+- `checks-test`, `bun test`, and test executables such as Vitest and Jest.
+- An executable or a leaf target named `e2e`, such as `./scripts/e2e`.
+- The package scripts `test`, `tests`, `t`, `tst`, `e2e`, `coverage`, `mutation`, `vitest`, `jest`, `pytest`, and `playwright`.
+- The package scripts `test:*`, `tests:*`, `e2e:*`, `coverage:*`, and `mutation:*`.
+
+A linter argument or an ancestor directory named `e2e` is not a test target.
+
+The heavy-queue stand-ins also refuse these test calls in Pi sessions, `prepare`, and local checks.
+The stand-ins cannot block commands that do not use them.
 
 ## Choose the run
 

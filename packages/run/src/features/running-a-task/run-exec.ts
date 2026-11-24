@@ -57,7 +57,7 @@ export const installCopy = (
     const configured = text === null ? [] : yield* readChecksCommands(text, file).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
     )
-    const commands = yield* localRunCommands(fs, path, exec.cwd, configured.filter((check) => check.name === "prepare")).pipe(
+    const commands = yield* localRunCommands(fs, path, exec.cwd, configured).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
     )
     const prepare = prepareCommandOf(commands)

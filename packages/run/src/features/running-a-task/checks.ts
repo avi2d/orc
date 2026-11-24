@@ -178,10 +178,9 @@ export const readProjectLocalChecks = Effect.fnUntraced(function*(fs: FileSystem
   const text = yield* fs.readFileString(path.join(cwd, source)).pipe(
     Effect.mapError((cause) => new ChecksError({ message: "orc: cannot read the checks config " + source + ": " + readFailure(cause) }))
   )
-  const configured = yield* readChecksCommands(text, source)
-  const eligible = yield* localRunCommands(fs, path, cwd, configured)
-  const commands = eligible.filter((check) => check.name !== "prepare")
-  const skipped = configured.filter((check) => check.name !== "prepare" && !commands.includes(check)).map((check) => check.name)
+  const checks = (yield* readChecksCommands(text, source)).filter((check) => check.name !== "prepare")
+  const commands = yield* localRunCommands(fs, path, cwd, checks)
+  const skipped = checks.filter((check) => !commands.includes(check)).map((check) => check.name)
   return { commands, skipped }
 })
 

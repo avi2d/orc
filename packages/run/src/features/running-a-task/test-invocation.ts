@@ -11,6 +11,34 @@ type Target =
 
 const suite: Target = { kind: "suite" }
 
+const bunCommands = new Set([
+  "check", "repl", "install", "i", "ci", "add", "a", "remove", "rm", "update", "audit", "dedupe",
+  "prune", "outdated", "link", "unlink", "publish", "patch", "patch-commit", "pm", "info", "why", "build", "init", "create",
+  "c", "upgrade", "completions", "help"
+])
+const pnpmCommands = new Set([
+  "add", "install", "i", "ci", "update", "up", "upgrade", "remove", "rm", "uninstall", "un", "link", "ln", "unlink", "import",
+  "rebuild", "rb", "prune", "fetch", "install-test", "it", "patch", "patch-commit", "patch-remove", "audit", "list", "ls",
+  "outdated", "why", "licenses", "dedupe", "deploy", "pack", "publish", "root", "bin", "store", "server", "setup", "env",
+  "init", "create", "cat-file", "cat-index", "find-hash", "config", "c", "get", "set", "doctor",
+  "self-update", "approve-builds", "ignored-builds", "recursive", "m", "multi", "help"
+])
+const yarnCommands = new Set([
+  "add", "audit", "autoclean", "bin", "cache", "check", "config", "constraints", "create", "dedupe", "explain",
+  "generate-lock-entry", "global", "help", "import", "info", "init", "install", "licenses", "link", "list", "login", "logout",
+  "node", "npm", "outdated", "owner", "pack", "patch", "patch-commit", "plugin", "policies", "publish", "rebuild", "remove",
+  "search", "set", "stage", "tag", "team", "unlink", "unplug", "up", "upgrade", "upgrade-interactive", "version",
+  "versions", "why", "workspace", "workspaces"
+])
+const npmScriptCommands = new Set(["start", "stop", "restart"])
+
+const runsScriptByName: Readonly<Record<Manager, (verb: string) => boolean>> = {
+  bun: (verb) => !bunCommands.has(verb),
+  npm: (verb) => npmScriptCommands.has(verb),
+  pnpm: (verb) => !pnpmCommands.has(verb),
+  yarn: (verb) => !yarnCommands.has(verb)
+}
+
 const leafName = (word: string): string => word.split(/[/\\]/).at(-1) ?? ""
 const executableName = (word: string): string => leafName(word).replace(/@[^@]+$/, "").replace(/\.(?:exe|cmd|bat)$/, "")
 const isE2eTarget = (word: string): boolean => /(^|[:_-])e2e(?:[:_.-]|$)/.test(leafName(word))
@@ -70,6 +98,7 @@ const managerTarget = (manager: Manager, command: ShellCall, path: Path.Path): T
   if (verb === "run" || verb === "run-script") return scriptTarget(takeOptions(next, path), manager === "bun")
   if (verb === "exec" || verb === "x" || verb === "dlx") return testTargetOf(takeOptions(next, path), path)
   if (isTestCall(manager, call.words.map((word) => word ?? ""))) return suite
+  if (typeof verb !== "string" || !runsScriptByName[manager](verb)) return null
   return scriptTarget(call, manager === "bun")
 }
 

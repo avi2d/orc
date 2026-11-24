@@ -78,7 +78,7 @@ const noCheckpoints: RunCheckpoints = {
 
 const freshPlan = { implementSessionId: null, implementSessionFile: null, inheritedImplement: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null }
 
-const runPipeline = (project: string, home: string, sandbox: AgentExec["kind"]) =>
+const runPipeline = (project: string, home: string, sandbox: AgentExec["kind"], piEdits: () => Promise<void> = async () => {}) =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
@@ -104,7 +104,8 @@ const runPipeline = (project: string, home: string, sandbox: AgentExec["kind"]) 
     const ops: SandboxOps = {
       runAgent: (request) => {
         agentRuns.push(request.agent.kind)
-        return fs.writeFileString(path.join(sessionsDir, "2026-11-21T10-01-00-000Z_s1.jsonl"), JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "done\nORC_COMPLETE" }] } }) + "\n").pipe(
+        return Effect.promise(piEdits).pipe(
+          Effect.andThen(fs.writeFileString(path.join(sessionsDir, "2026-11-21T10-01-00-000Z_s1.jsonl"), JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "done\nORC_COMPLETE" }] } }) + "\n")),
           Effect.orDie,
           Effect.as({ sessionId: "s1", sessionFile: path.join(sessionsDir, "2026-11-21T10-01-00-000Z_s1.jsonl"), end: { kind: "exited", exitCode: 0 } as const, commits: [{ sha: "c1" }] })
         )
@@ -140,6 +141,9 @@ const fixtureCases = [
   { forbidden: "bun run poststage", invocation: "bun test", allowed: "bun run lint" },
   { forbidden: "bun install --frozen-lockfile && CI=1 bun test", invocation: "bun test", allowed: "bun install --frozen-lockfile" },
   { forbidden: "bun run lint && bun test", invocation: "bun test", allowed: "bun run lint" },
+  { forbidden: "npm run ci", invocation: "bun test", allowed: "npm ci" },
+  { forbidden: "bun run ci", invocation: "bun test", allowed: "bun ci" },
+  { forbidden: "pnpm stage", invocation: "bun test", allowed: "pnpm install --frozen-lockfile" },
   ...[
     "bunx vitest run", "npm t", "bun run tests", "bun run tst", "bun run tests:unit",
     "npm run e2e:smoke", "pnpm run coverage", "yarn mutation", "npx jest",
@@ -191,6 +195,7 @@ const seedProject = async (project: string, commands: Readonly<Record<string, st
       "lint:e2e": "bunx oxlint tests/e2e",
       "verify:e2e": "bun run verify-tests",
       "verify-build": "bun test",
+      ci: "bun run verify-tests",
       stage: "bun run build",
       prestage: "bun test",
       poststage: "bun test",
@@ -212,7 +217,7 @@ const shellPrefix = (sandbox: AgentExec["kind"], home: string): ReadonlyArray<st
 for (const sandbox of ["none", "nono"] as const) {
   describe("the steps of a " + sandbox + " run and its review handoff", () => {
     for (const name of ["prepare", "build", "lint", "typecheck"] as const) {
-      test.each(fixtureCases)("rejects a pipeline that spawns $forbidden in " + name + " instead of silently skipping it", async (fixture) => {
+      test.each(fixtureCases)("rejects a pipeline that spawns $forbidden in " + name + " before Pi starts instead of silently skipping it", async (fixture) => {
         const home = await mkdtemp(join(tmpdir(), "orc-spawn-"))
         try {
           const project = join(home, "project")
@@ -222,11 +227,8 @@ for (const sandbox of ["none", "nono"] as const) {
           expect(String(result.failure)).toContain("refusing " + name + " command")
           expect(String(result.failure)).toContain(JSON.stringify(fixture.forbidden))
           expect(String(result.failure)).toContain(fixture.invocation)
-          expect(spawned).toEqual(name === "prepare" ? [] : [
-            [...shellPrefix(sandbox, home), localCommands.prepare],
-            ["/usr/bin/git", "log", "-1", "--format=%s", "c1"]
-          ])
-          expect(agentRuns).toEqual(name === "prepare" ? [] : ["implementer"])
+          expect(spawned).toEqual([])
+          expect(agentRuns).toEqual([])
         } finally {
           await rm(home, { recursive: true, force: true })
         }
@@ -261,6 +263,52 @@ for (const sandbox of ["none", "nono"] as const) {
         ])
         expect(agentRuns).toEqual(["implementer"])
         expect(result.success.completed).toBe(true)
+      } finally {
+        await rm(home, { recursive: true, force: true })
+      }
+    })
+
+    test("refuses a lint script Pi changes to call bun test instead of spawning it in the checks round", async () => {
+      const home = await mkdtemp(join(tmpdir(), "orc-spawn-"))
+      try {
+        const project = join(home, "project")
+        await seedProject(project, localCommands)
+        const piEdits = async () => {
+          await writeFile(join(project, "package.json"), JSON.stringify({ scripts: { build: "bun build src/index.ts", lint: "bun test", typecheck: "tsc --noEmit" } }))
+        }
+        const { result, spawned, agentRuns } = await Effect.runPromise(runPipeline(project, home, sandbox, piEdits))
+        if (Result.isSuccess(result)) throw new Error("Test-containing lint script was accepted")
+        expect(String(result.failure)).toContain("refusing lint command " + JSON.stringify(localCommands.lint))
+        expect(String(result.failure)).toContain("bun test")
+        expect(spawned).toEqual([
+          [...shellPrefix(sandbox, home), localCommands.prepare],
+          ["/usr/bin/git", "log", "-1", "--format=%s", "c1"]
+        ])
+        expect(agentRuns).toEqual(["implementer"])
+      } finally {
+        await rm(home, { recursive: true, force: true })
+      }
+    })
+
+    test("runs the checks round when Pi changes a script only prepare calls instead of refusing prepare again", async () => {
+      const home = await mkdtemp(join(tmpdir(), "orc-spawn-"))
+      try {
+        const project = join(home, "project")
+        const commands = { ...localCommands, prepare: "bun run setup" }
+        await seedProject(project, commands)
+        await writeFile(join(project, "package.json"), JSON.stringify({ scripts: { setup: "bun install --frozen-lockfile" } }))
+        const piEdits = async () => {
+          await writeFile(join(project, "package.json"), JSON.stringify({ scripts: { setup: "bun test" } }))
+        }
+        const { result, spawned } = await Effect.runPromise(runPipeline(project, home, sandbox, piEdits))
+        if (Result.isFailure(result)) throw new Error(String(result.failure))
+        expect(spawned.slice(0, 5)).toEqual([
+          [...shellPrefix(sandbox, home), commands.prepare],
+          ["/usr/bin/git", "log", "-1", "--format=%s", "c1"],
+          [...shellPrefix(sandbox, home), commands.build],
+          [...shellPrefix(sandbox, home), commands.lint],
+          [...shellPrefix(sandbox, home), commands.typecheck]
+        ])
       } finally {
         await rm(home, { recursive: true, force: true })
       }
