@@ -1,8 +1,11 @@
 import { type Color, type Context, type Element, div } from "gpui-kit"
 import { Input, type InputState, type ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { openOverlay, settings } from "herdr"
-import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, agentLabel, approveRow, cardPlace, cardStatuses, filterCards, namedModels, opensTurns, projectsOf, railLabel, sendBackArgs, stepRows } from "./agents"
+import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, agentLabel, approveRow, cardAnswers, cardPlace, cardStatuses, filterCards, namedModels, opensTurns, prNumber, projectsOf, railLabel, sendBackArgs, stepRows } from "./agents"
 import type { Show, ShownStep } from "./guard"
+import { optionView } from "./ask-view"
+import type { InboxAnswer, InboxApproval } from "./inbox"
+import { inboxItemView } from "./inbox-view"
 import { linkedText } from "./links-view"
 import { type Reading, readText } from "./orc-read"
 import type { palette } from "./palette"
@@ -16,11 +19,6 @@ export type Chosen = { readonly kind: "step"; readonly id: number } | { readonly
 
 export type Pane = "turns" | "raw"
 
-export interface Approval {
-  readonly pr: string
-  readonly link: string
-}
-
 export type MergeOutcome = { readonly kind: "merging" } | { readonly kind: "failed"; readonly reason: string }
 
 export interface AgentsActions {
@@ -29,7 +27,7 @@ export interface AgentsActions {
   readonly setFilter: (cx: Context, filter: Filter) => void
   readonly choose: (cx: Context, chosen: Chosen) => void
   readonly setPane: (cx: Context, pane: Pane) => void
-  readonly askMerge: (card: Card, approval: Approval) => void
+  readonly askMerge: (card: Card, approval: InboxApproval) => void
 }
 
 export interface RunsShown {
@@ -40,8 +38,8 @@ export interface RunsShown {
   readonly folded: boolean
 }
 
-export const approvalOf = (card: Card): Approval | null =>
-  card.standing.status === "Awaiting you" && card.standing.waiting.on === "approval" ? card.standing.waiting : null
+export const approvalOf = (card: Card | null): InboxApproval | null =>
+  card?.standing.status === "Awaiting you" && card.standing.waiting.on === "approval" ? card.standing.waiting.item : null
 
 const statusColor = (t: Palette, status: CardStatus): Color => {
   switch (status) {
@@ -91,13 +89,14 @@ const chip = (t: Palette, id: string, label: string, on: boolean, pick: (cx: Con
     .child(label)
 
 const filters = (t: Palette, all: ReadonlyArray<Card>, filter: Filter, act: AgentsActions): Element => {
-  const byProject = filterCards(all, { project: filter.project, status: null })
+  const byProject = filterCards(all, { ...filter, status: null })
   return v_flex().gap(6).px(12).pb(8).border_b(1).border_color(t.border)
     .child(h_flex().gap(4).flex_wrap().items_center()
       .child(div().w(52).text_color(t.dim).child("Project"))
-      .child(chip(t, "project-all", "All", filter.project === null, (cx) => act.setFilter(cx, { ...filter, project: null })))
+      .child(chip(t, "project-all", "All", filter.project === null && !filter.allRuns, (cx) => act.setFilter(cx, { ...filter, project: null, allRuns: false })))
       .children(projectsOf(all).map((project) =>
-        chip(t, `project-${project}`, project, filter.project === project, (cx) => act.setFilter(cx, { ...filter, project })))))
+        chip(t, `project-${project}`, project, filter.project === project, (cx) => act.setFilter(cx, { ...filter, project, allRuns: false }))))
+      .child(chip(t, "project-all-runs", "All runs", filter.project === null && filter.allRuns, (cx) => act.setFilter(cx, { ...filter, project: null, allRuns: true }))))
     .child(h_flex().gap(4).flex_wrap().items_center()
       .child(div().w(52).text_color(t.dim).child("Status"))
       .child(chip(t, "status-all", "All", filter.status === null, (cx) => act.setFilter(cx, { ...filter, status: null })))
@@ -195,26 +194,41 @@ const rowView = (t: Palette, row: StepRow, target: Chosen | null, model: string 
     : line.cursor_pointer().hover((style) => style.bg(selected ? t.selected : t.hover)).on_click((_event, cx) => act.choose(cx, opens))
 }
 
-export const stepsColumn = (t: Palette, card: Card | null, reading: Reading<Show> | null, target: Chosen | null, changesProblem: string | null, act: AgentsActions): Element => {
-  const column = v_flex().w(240).h_full().flex_shrink_0().border_r(1).border_color(t.border)
-  if (card === null) {
-    return column
-  }
-  const header = v_flex().px(12).py(10).gap(2).border_b(1).border_color(t.border)
-    .child(div().font_semibold().truncate().child(card.title))
-    .child(div().text_size(12).text_color(t.dim).truncate().child(card.runId ?? "No run yet"))
-  if (reading?.kind === "failed") {
-    return column.child(header).child(div().p(12).text_color(t.blocked).child(reading.reason))
-  }
-  if (reading?.kind === "reading") {
-    return column.child(header).child(div().p(12).text_color(t.muted).child("Reading its steps"))
-  }
+interface StepsShown {
+  readonly reading: Reading<Show> | null
+  readonly target: Chosen | null
+  readonly answers: (item: InboxAnswer) => Element
+  readonly threadProblem: string | null
+  readonly changesProblem: string | null
+}
+
+const stepViews = (t: Palette, card: Card, shown: StepsShown, act: AgentsActions): ReadonlyArray<Element> => {
+  const { reading, target } = shown
+  if (reading?.kind === "failed") return [div().p(6).text_color(t.blocked).whitespace_normal().child(reading.reason)]
+  if (reading?.kind === "reading") return [div().p(6).text_color(t.muted).child("Reading its steps")]
   const steps = reading?.value.steps ?? []
   const models = namedModels(steps)
+  return stepRows(card.standing, steps, card.kind, card.delivery).map((row) =>
+    rowView(t, row, target, row.stepId === null ? null : models.get(row.stepId) ?? null, act))
+}
+
+export const stepsColumn = (t: Palette, card: Card | null, shown: StepsShown, act: AgentsActions): Element => {
+  const answers = cardAnswers(card)
+  const approval = approvalOf(card)
+  const waiting = card?.standing.status === "Awaiting you"
+  const column = v_flex().id("steps-column").w(waiting ? 340 : 240).h_full().flex_shrink_0().border_r(1).border_color(t.border)
+  if (card === null) return column
+  const runLabel = card.runId ?? (waiting ? null : "No run yet")
+  const header = v_flex().px(12).py(10).gap(2).border_b(1).border_color(t.border)
+    .child(div().font_semibold().truncate().child(card.title))
+    .children(runLabel === null ? [] : [div().text_size(12).text_color(t.dim).truncate().child(runLabel)])
+  const { threadProblem, changesProblem } = shown
   return column.child(header)
-    .child(v_flex().id("steps").flex_1().overflow_y_scrollbar().p(6).gap(2)
-      .children(stepRows(card.standing, steps, card.kind, card.delivery).map((row) =>
-        rowView(t, row, target, row.stepId === null ? null : models.get(row.stepId) ?? null, act))))
+    .child(v_flex().id("steps").flex_1().min_h_0().overflow_y_scrollbar().p(6).gap(4)
+      .children(answers.map(shown.answers))
+      .children(approval === null ? [] : [inboxItemView(t, approval, (option) => optionView(t, `option-${approval.key}-${option.letter}`, option), [], undefined)])
+      .children(threadProblem === null ? [] : [div().px(6).py(4).text_color(t.blocked).whitespace_normal().child(threadProblem)])
+      .children(stepViews(t, card, shown, act)))
     .children(changesProblem === null ? [] : [div().px(12).py(8).border_t(1).border_color(t.border).text_size(12).text_color(t.blocked).child(`No Changes column: ${changesProblem}`)])
 }
 
@@ -242,18 +256,19 @@ const detailPane = (t: Palette, parts: ReadonlyArray<Element>): Element =>
 const detailNote = (t: Palette, text: string): Element =>
   detailPane(t, [div().p(16).text_color(t.muted).child(text)])
 
-const approvePane = (t: Palette, card: Card, approval: Approval, merge: MergeOutcome | null, act: AgentsActions): Element => {
+const approvePane = (t: Palette, card: Card, approval: InboxApproval, merge: MergeOutcome | null, act: AgentsActions): Element => {
+  const pr = prNumber(approval.link)
   const merging = merge?.kind === "merging"
   const button = h_flex().id("approve-merge").h(32).px(14).items_center().rounded(8).text_size(13)
     .bg(merging ? t.raised : t.solid).text_color(merging ? t.dim : t.solid_foreground)
     .child(merging ? "Merging" : "Approve and merge")
   return detailPane(t, [
     h_flex().px(16).h(40).flex_shrink_0().items_center().border_b(1).border_color(t.border)
-      .child(div().font_semibold().child(`Approve ${approval.pr}`)),
+      .child(div().font_semibold().child(`Approve ${pr}`)),
     v_flex().p(16).gap(12).items_start()
       .child(div().child(card.title))
       .child(div().text_color(t.muted).child(linkedText(`approve-${card.key}`, approval.link)))
-      .child(div().text_color(t.muted).child(`The run passed and ${approval.pr} waits for your word. Merging runs orc merge ${card.id} --basis captain-word.`))
+      .child(div().text_color(t.muted).child(`${pr} waits for your approval. Merging runs orc ${approval.action.argv.join(" ")}.`))
       .child(merging ? button : button.cursor_pointer().hover((style) => style.opacity(0.88)).on_click(() => act.askMerge(card, approval)))
       .children(merge?.kind === "failed" ? [div().text_color(t.ansi1).child(merge.reason)] : [])
   ])
@@ -277,15 +292,16 @@ const logBody = (t: Palette, reading: Reading<string>, scroll: ScrollHandle): El
 const stepTitle = (card: Card, steps: ReadonlyArray<ShownStep>, stepId: number): string =>
   stepRows(card.standing, steps, card.kind, card.delivery).find((row) => row.stepId === stepId)?.label ?? "Step"
 
-export const askMerge = (card: Card, approval: Approval, command: string): void => {
+export const askMerge = (approval: InboxApproval, command: string): void => {
+  const pr = prNumber(approval.link)
   openOverlay({
     mod: "confirm",
     kind: "dialog",
     width: 440,
     height: 190,
     props: {
-      title: `Merge ${approval.pr}?`,
-      detail: `orc merge ${card.id} --basis captain-word squashes ${approval.pr} into its base branch.`,
+      title: `Merge ${pr}?`,
+      detail: `orc ${approval.action.argv.join(" ")} squashes ${pr} into its base branch.`,
       command: { name: command }
     }
   })
@@ -358,13 +374,13 @@ export const detailView = (t: Palette, card: Card | null, act: AgentsActions, sh
   if (card === null) {
     return detailNote(t, "No run selected")
   }
-  if (card.runId === null) {
-    return detailNote(t, "The task has not started a run yet")
-  }
   const approval = approvalOf(card)
   if (approval !== null && shown.target?.kind === "approve") {
     const pane = approvePane(t, card, approval, shown.merge, act)
     return shown.back.length === 0 ? pane : detailPane(t, [...shown.back, pane])
+  }
+  if (card.runId === null) {
+    return card.standing.status === "Awaiting you" ? detailPane(t, []) : detailNote(t, "The task has not started a run yet")
   }
   const step = shown.step
   if (step === null) {

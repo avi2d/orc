@@ -1,22 +1,29 @@
-import type { AskingRun, AttentionItem } from "./guard"
+import type { AskingRun, AttentionItem } from "./guard-attention"
 import { type AnswerTarget, type TaskDetail, mergeArgv } from "./task"
 import { type AskText, type Thread, type ThreadCard, type ThreadLine, askText, threadCards } from "./thread"
 
-type InboxAction =
-  | { readonly kind: "answer"; readonly target: AnswerTarget }
-  | { readonly kind: "merge"; readonly argv: ReadonlyArray<string> }
-
-export interface InboxItem {
+interface InboxEntry {
   readonly key: string
-  readonly kind: "question" | "decision" | "hold" | "pr"
   readonly task: string
   readonly title: string
   readonly who: ThreadLine["who"]
   readonly asked: string | null
   readonly ask: AskText
   readonly recommendation: string | null
-  readonly action: InboxAction | null
 }
+
+export interface InboxAnswer extends InboxEntry {
+  readonly kind: "question" | "decision" | "hold"
+  readonly action: { readonly kind: "answer"; readonly target: AnswerTarget }
+}
+
+export interface InboxApproval extends InboxEntry {
+  readonly kind: "pr"
+  readonly link: string
+  readonly action: { readonly kind: "merge"; readonly argv: ReadonlyArray<string> }
+}
+
+export type InboxItem = InboxAnswer | InboxApproval
 
 export interface InboxSources {
   readonly backlog: ReadonlyArray<TaskDetail>
@@ -26,10 +33,10 @@ export interface InboxSources {
 }
 
 const openPr = (task: TaskDetail): string | null =>
-  task.state.status === "closed" && task.state.pr !== null && task.prState === "open" ? task.state.pr : null
+  task.state.status === "closed" && task.state.pr !== null && (task.prState === "open" || task.prState === null) ? task.state.pr : null
 
 const runAsks = (runs: ReadonlyArray<AskingRun>, task: string): boolean =>
-  runs.some((run) => run.questions > 0 && (run.task === task || run.branch === `orc/${task}`))
+  runs.some((run) => run.questions > 0 && (run.task === task || run.branch === `orc/${task}` || run.branch === `orc/${task}-parent`))
 
 const holdOpen = (task: TaskDetail): boolean =>
   task.hold !== null && (task.hold.answer === null || task.hold.questions.some((question) => question.answer === null))
@@ -47,13 +54,11 @@ export const inboxTasks = (sources: Omit<InboxSources, "threads">): ReadonlyArra
 const settled = (card: ThreadCard): boolean =>
   card.answers.length > 0 || card.notes.some((note) => note.kind === "withdrawn")
 
-const answerAction = (card: ThreadCard): InboxAction | null =>
-  card.reply === null ? null : { kind: "answer", target: card.reply }
-
-const cardItem = (task: TaskDetail, card: ThreadCard, attention: ReadonlyArray<AttentionItem>): InboxItem | null => {
-  if (settled(card)) return null
-  const base = { key: `${task.id}/${card.key}`, task: task.id, title: task.title, who: card.line.who, asked: card.line.at, recommendation: null, action: answerAction(card) }
-  if (card.line.kind === "hold") return card.reply?.kind === "hold" ? { ...base, kind: "hold", ask: askText(card.line.text) } : null
+const cardItem = (task: TaskDetail, card: ThreadCard, attention: ReadonlyArray<AttentionItem>): InboxAnswer | null => {
+  if (card.reply === null || settled(card)) return null
+  const action = { kind: "answer", target: card.reply } as const
+  const base = { key: `${task.id}/${card.key}`, task: task.id, title: task.title, who: card.line.who, asked: card.line.at, recommendation: null, action }
+  if (card.line.kind === "hold") return { ...base, kind: "hold", ask: askText(card.line.text) }
   if (card.line.kind !== "question") return null
   const item = attention.find((entry) => entry.id === card.line.id)
   if (card.line.who === "beat") return null
@@ -62,20 +67,22 @@ const cardItem = (task: TaskDetail, card: ThreadCard, attention: ReadonlyArray<A
     : { ...base, kind: "question", ask: card.ask ?? askText(card.line.text) }
 }
 
-const prItem = (task: TaskDetail): InboxItem | null => {
+export const approvalItem = (task: Pick<TaskDetail, "id" | "title">, pr: string, asked: string | null): InboxApproval => ({
+  key: `${task.id}/pr`,
+  kind: "pr",
+  link: pr,
+  task: task.id,
+  title: task.title,
+  who: "beat",
+  asked,
+  ask: askText(`Merge the PR ${pr}?`),
+  recommendation: null,
+  action: { kind: "merge", argv: mergeArgv(task.id) }
+})
+
+const prItem = (task: TaskDetail): InboxApproval | null => {
   const pr = openPr(task)
-  if (pr === null || task.state.status !== "closed") return null
-  return {
-    key: `${task.id}/pr`,
-    kind: "pr",
-    task: task.id,
-    title: task.title,
-    who: "beat",
-    asked: task.state.closedAt,
-    ask: askText(`Merge the PR ${pr}?`),
-    recommendation: null,
-    action: { kind: "merge", argv: mergeArgv(task.id) }
-  }
+  return pr === null || task.state.status !== "closed" ? null : approvalItem(task, pr, task.state.closedAt)
 }
 
 const millisOf = (at: string | null): number => {

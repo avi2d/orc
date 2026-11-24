@@ -197,9 +197,10 @@ const refusedTest = (call: StandinCall, args: ReadonlyArray<string>): boolean =>
   return true
 }
 
-// The nono sandbox grants no pueue socket, so a queued call there could never start.
+const queueUnreachable = (): boolean => Bun.env.HEAVY_QUEUE_UNREACHABLE === "1"
+
 const runsUnqueued = (call: StandinCall, args: ReadonlyArray<string>): boolean =>
-  testsCiOnly() || classifyHeavyCall(call.tool, call.commands, args) === "direct"
+  queueUnreachable() || classifyHeavyCall(call.tool, call.commands, args) === "direct"
 
 export const planCall = (call: StandinCall, standin: string, args: ReadonlyArray<string>): StandinPlan => {
   if (refusedTest(call, args)) {
