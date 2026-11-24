@@ -133,6 +133,22 @@ const writeBaseRuns = (fixture: Fixture, runs: ReadonlyArray<BaseRun>): Promise<
   writeFile(join(fixture.dir, "views", "base-runs.json"), JSON.stringify({ data: { r0: baseRepository(runs) } }))
 
 describe("main CI alarms independent of the merge path", () => {
+  test("a red run at the current base head does not alarm on the first beat", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await watchProject(fixture)
+      await stubGh(fixture, {})
+      await writeBaseRuns(fixture, [{ sha: head, conclusion: "failure", updatedAt: "2026-01-01T00:00:00Z" }])
+      const chat = sessionFor(fixture)
+      const alarms = () => chat.posted.filter((post) => post.startsWith("CI alarm:"))
+      expect((await runOrc(fixture, ["beat"])).exitCode).toBe(0)
+      await chat.postClosed()
+      expect(alarms()).toEqual([])
+      expect((await runOrc(fixture, ["beat"])).exitCode).toBe(0)
+      await chat.postClosed()
+      expect(alarms()).toEqual(["CI alarm: ci failed on main at " + head + ". Run: " + ciRunUrl])
+    })
+  }, 60_000)
+
   test("a red run already superseded when Orc first sees the repository raises no alarm instead of a burst", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await watchProject(fixture)
@@ -184,6 +200,7 @@ describe("main CI alarms independent of the merge path", () => {
         data: { r0: null, r1: baseRepository([{ sha: squashHead, conclusion: "failure" }]) },
         errors: [{ type: "NOT_FOUND", path: ["r0"], message: "Could not resolve to a Repository with the name 'acme/orc'." }]
       }))
+      expect((await runOrc(fixture, ["beat"])).exitCode).toBe(0)
       expect((await runOrc(fixture, ["beat"])).exitCode).toBe(0)
       const chat = sessionFor(fixture)
       await chat.postClosed()

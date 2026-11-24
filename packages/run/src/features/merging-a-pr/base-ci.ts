@@ -94,13 +94,13 @@ const alarmRuns = (branch: Branch, seen: string): ReadonlyArray<Parameters<typeo
     })
   })
 
-const firstSight = Effect.fnUntraced(function*(root: string, remote: typeof Remote.Type, at: string) {
+const priorSight = Effect.fnUntraced(function*(root: string, remote: typeof Remote.Type, at: string) {
   const fs = yield* FileSystem.FileSystem
   const folder = root + "/base-ci"
   yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.mapError(platformFailure("make " + folder)))
   const name = new Bun.CryptoHasher("sha256").update(repositoryKey(remote)).digest("hex") + ".txt"
-  yield* publishOnce(folder, name, at)
-  return (yield* readIfPresent(folder + "/" + name)) ?? at
+  const first = yield* publishOnce(folder, name, at)
+  return first ? null : yield* readIfPresent(folder + "/" + name)
 })
 
 const readReply = (host: string, remotes: ReadonlyArray<typeof Remote.Type>) =>
@@ -119,7 +119,10 @@ const pollHost = Effect.fnUntraced(function*(root: string, host: string, remotes
     if (branch === null || branch === undefined || remote === undefined) {
       continue
     }
-    const seen = yield* firstSight(root, remote, at)
+    const seen = yield* priorSight(root, remote, at)
+    if (seen === null) {
+      continue
+    }
     for (const run of alarmRuns(branch, seen)) {
       yield* recordMainCiAlarm(root, run, at)
     }

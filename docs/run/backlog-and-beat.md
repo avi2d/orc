@@ -26,7 +26,8 @@ The query covers the latest 20 commits and at most 100 check suites per commit.
 A repository the token cannot resolve is skipped, and the other repositories on its host are still read.
 A failed run raises a CI alarm in Orc chat with a link to the run.
 A red run raises an alarm only at the current head of the default branch, or when it finished after Orc first saw the repository.
-On first sight, Orc records the repository and raises no alarm for a red run on an older commit.
+The first beat that sees a repository records when it saw it and posts no alarm from this check.
+A later beat can still report a red run at the branch head.
 After [a merge without an update](merging-a-tasks-pr.md#main-ci-alarms-after-a-merge-without-an-update), Orc also watches that PR's squash commit.
 
 ## Reference
