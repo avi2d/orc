@@ -45,10 +45,9 @@ const launchOf = (args: Args, valued: Args): Launch => {
   while (at < args.length) {
     const word = args[at] ?? ""
     if (word === "--") {
-      const file = args[at + 1]
-      return file === undefined
+      return at + 1 >= args.length
         ? { kind: "none", options: args.slice(0, at) }
-        : { kind: "script", options: args.slice(0, at), file, args: args.slice(at + 2) }
+        : { kind: "script", options: args.slice(0, at), file: args[at + 1], args: args.slice(at + 2) }
     }
     if (evalOptions.includes(word)) {
       return { kind: "none", options: args.slice(0, at) }
