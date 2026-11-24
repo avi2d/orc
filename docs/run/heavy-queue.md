@@ -108,9 +108,9 @@ A wrapper sets `HEAVY_TESTS_CI_ONLY=1`, puts `~/.orc/heavy/ci-only` and `~/.orc/
 It starts the first copy of the agent on the daemon's `PATH` that is not the wrapper itself.
 If no such copy exists, it exits 127 with a line naming the agent.
 
-The skills-generated `~/.no-mistakes/config.yaml` holds the `agent_path_override` setting that starts agents through the wrapper.
-Orc never writes that global file itself.
-For a home folder of `/home/you`, the generated config holds:
+The `agent_path_override` setting in `~/.no-mistakes/config.yaml` starts an agent through its wrapper.
+Orc never writes that global file itself, so a person adds the setting.
+For a home folder of `/home/you`, the config holds:
 
 ```yaml
 agent: pi
