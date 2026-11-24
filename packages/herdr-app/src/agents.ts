@@ -304,8 +304,11 @@ export const openedFilter = (cards: ReadonlyArray<Card>, key: string): Filter =>
 export const projectsOf = (cards: ReadonlyArray<Card>): ReadonlyArray<string> =>
   [...new Set(cards.flatMap((card) => card.known ? [card.project] : []))].sort((a, b) => a.localeCompare(b))
 
+export const recordedStatus = (status: Step["status"], standing: Standing["status"]): Step["status"] =>
+  status === "running" && (standing === "Failed" || standing === "Done") ? "failed" : status
+
 const recordedMark = (step: Step, standing: Standing): Mark => {
-  switch (step.status) {
+  switch (recordedStatus(step.status, standing.status)) {
     case "passed":
       return "✓"
     case "failed":
@@ -314,7 +317,6 @@ const recordedMark = (step: Step, standing: Standing): Mark => {
       return "○"
     case "running":
       if (standing.status === "Awaiting you" && standing.waiting.on === "answer") return "◆"
-      if (standing.status === "Failed" || standing.status === "Done") return "✗"
       return "●"
   }
 }

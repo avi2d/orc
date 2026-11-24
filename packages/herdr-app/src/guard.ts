@@ -331,6 +331,7 @@ export interface Runs {
 
 export interface Show {
   readonly schema: "orc.show.v1"
+  readonly taskFile: string
   readonly steps: ReadonlyArray<ShownStep>
 }
 
@@ -341,7 +342,11 @@ export const show: Guard<Show> = (value, at) => {
   if (schema.kind === "refused") return schema
   const steps = arrayOf(record.value, "steps", at, shownStep)
   if (steps.kind === "refused") return steps
-  return ok({ schema: schema.value, steps: steps.value })
+  const runFields = fields(record.value["run"], child(at, "run"))
+  if (runFields.kind === "refused") return runFields
+  const taskFile = string(runFields.value, "taskFile", child(at, "run"))
+  if (taskFile.kind === "refused") return taskFile
+  return ok({ schema: schema.value, taskFile: taskFile.value, steps: steps.value })
 }
 
 export const runsHead = (value: unknown, at: string): Guarded<{ schema: "orc.runs.v1"; record: Fields }> => {
