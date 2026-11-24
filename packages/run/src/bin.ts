@@ -12,6 +12,7 @@ import { type AccountName, signIn } from "./features/signing-in/index"
 import { encodeUpdateJson, formatUpdate, runUpdate } from "./features/updating-orc/index"
 import { helpText, overview, usageErrorText } from "./app/help"
 import { runDispatch } from "./app/dispatch-cli"
+import { runQuotaCli } from "./app/quota-cli"
 import { decodeJson, pueue, PueueState, queuedTasks, RunnerError } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
 import { backlogPaths, backlogRoot as backlogRootOf, type ReportKind, runDirFor } from "./entities/backlog/index"
@@ -236,6 +237,12 @@ const program = Effect.gen(function*() {
     }
     case "ListMachines": {
       return yield* printMachines()
+    }
+    case "Quota": {
+      return yield* runQuotaCli(orcHomeDir(Bun.env.ORC_HOME), args.json).pipe(
+        Effect.provide(BunServices.layer),
+        Effect.catchTag("ConfigError", (error) => Console.error("orc: " + error.file + ": " + error.detail).pipe(Effect.andThen(Effect.fail("dispatch.json unreadable"))))
+      )
     }
     case "PrintHelp": {
       yield* Console.log(helpText(args.words))

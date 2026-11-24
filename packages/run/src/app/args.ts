@@ -5,6 +5,7 @@ export type OrcArgs =
   | { readonly kind: "PrintVersion" }
   | { readonly kind: "ShowVersion" }
   | { readonly kind: "ListMachines" }
+  | { readonly kind: "Quota"; readonly json: boolean }
   | { readonly kind: "PrintHelp"; readonly words: ReadonlyArray<string> }
   | { readonly kind: "NoCommand" }
   | { readonly kind: "ListRuns"; readonly json: boolean; readonly local: boolean }
@@ -63,7 +64,7 @@ const parseScoreArgs = (rest: readonly string[]): OrcArgs => {
   return { kind: "ScoreStep", runId, step, score: Number(scoreText), note }
 }
 
-const parseJsonListArgs = (rest: readonly string[], kind: "ListRefusals" | "Update"): OrcArgs => {
+const parseJsonListArgs = (rest: readonly string[], kind: "ListRefusals" | "Quota" | "Update"): OrcArgs => {
   if (rest.length === 0) {
     return { kind, json: false }
   }
@@ -172,6 +173,7 @@ const topLevelParsers = {
   backlog: (rest: readonly string[]): OrcArgs => toDispatch("backlog", rest),
   attention: (rest: readonly string[]): OrcArgs => toDispatch("attention", rest),
   beat: (rest: readonly string[]): OrcArgs => toDispatch("beat", rest),
+  quota: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "Quota"),
   runner: (rest: readonly string[]): OrcArgs => toDispatch("runner", rest),
   merge: (rest: readonly string[]): OrcArgs => toDispatch("merge", rest),
   heavy: (rest: readonly string[]): OrcArgs => toDispatch("heavy", rest),
