@@ -36,6 +36,12 @@ const refusal = async (input: {
   }
 }
 
+const writeAgents = async (agentsDir: string): Promise<void> => {
+  await mkdir(agentsDir, { recursive: true })
+  await writeFile(join(agentsDir, "implementer.md"), "---\nmodel: example.com/other-model\nthinking: low\ntools: read\n---\nDo it.\n")
+  await writeFile(join(agentsDir, "fixer.md"), "---\nmodel: acme/coder\nthinking: high\ntools: read\n---\nFix it.\n")
+}
+
 describe("runAgentStep refusals", () => {
   test("a directory in no git checkout is refused", async () => {
     await withHome(async (home) => {
@@ -167,9 +173,7 @@ describe("runAgentStep refusals", () => {
         await writeFile(join(dir, "task.md"), "Do nothing.\n")
         git(dir, ["add", "task.md"])
         git(dir, ["commit", "-qm", "task"])
-        await mkdir(agentsDir, { recursive: true })
-        await writeFile(join(agentsDir, "implementer.md"), "---\nmodel: example.com/other-model\nthinking: low\ntools: read\n---\nDo it.\n")
-        await writeFile(join(agentsDir, "fixer.md"), "---\nmodel: acme/coder\nthinking: high\ntools: read\n---\nFix it.\n")
+        await writeAgents(agentsDir)
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain(join(home, "config.json") + " does not configure the provider for an agent model")
       })
     })
@@ -185,9 +189,7 @@ describe("runAgentStep refusals", () => {
         await writeFile(join(dir, "task.md"), "Do nothing.\n")
         git(dir, ["add", "task.md"])
         git(dir, ["commit", "-qm", "task"])
-        await mkdir(agentsDir, { recursive: true })
-        await writeFile(join(agentsDir, "implementer.md"), "---\nmodel: example.com/other-model\nthinking: low\ntools: read\n---\nDo it.\n")
-        await writeFile(join(agentsDir, "fixer.md"), "---\nmodel: acme/coder\nthinking: high\ntools: read\n---\nFix it.\n")
+        await writeAgents(agentsDir)
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain(join(home, "config.json") + " does not configure the provider for an agent model")
         expect(await exists(runDir)).toBe(false)
       })

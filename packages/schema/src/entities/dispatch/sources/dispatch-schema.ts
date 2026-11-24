@@ -15,13 +15,20 @@ const Machine = Schema.Struct({
   renew: Schema.optionalKey(Command),
 });
 
+const ModelRef = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*\/\S+$/));
+
+const route = {
+  provider: Schema.optionalKey(Name),
+  models: Schema.optionalKey(Schema.Struct({ implementer: ModelRef, fixer: ModelRef })),
+};
+
 const Account = Schema.Union([
-  Schema.Struct({ name: Name, kind: Schema.Literal("token-file"), tokenFile: AbsolutePath, tokenCommand: Schema.optionalKey(Schema.Never) }),
-  Schema.Struct({ name: Name, kind: Schema.Literal("token-command"), tokenCommand: Command, tokenFile: Schema.optionalKey(Schema.Never) }),
-  Schema.Struct({ name: Name, kind: Schema.Literal("claude-config"), configDirs: Schema.Record(Name, AbsolutePath) }),
-  Schema.Struct({ name: Name, kind: Schema.Literal("none"), tokenFile: Schema.optionalKey(Schema.Never), tokenCommand: Schema.optionalKey(Schema.Never) }),
-  Schema.Struct({ name: Name, tokenFile: AbsolutePath, tokenCommand: Schema.optionalKey(Schema.Never), kind: Schema.optionalKey(Schema.Never) }),
-  Schema.Struct({ name: Name, tokenCommand: Command, tokenFile: Schema.optionalKey(Schema.Never), kind: Schema.optionalKey(Schema.Never) }),
+  Schema.Struct({ name: Name, ...route, kind: Schema.Literal("token-file"), tokenFile: AbsolutePath, tokenCommand: Schema.optionalKey(Schema.Never) }),
+  Schema.Struct({ name: Name, ...route, kind: Schema.Literal("token-command"), tokenCommand: Command, tokenFile: Schema.optionalKey(Schema.Never) }),
+  Schema.Struct({ name: Name, ...route, kind: Schema.Literal("claude-config"), configDirs: Schema.Record(Name, AbsolutePath) }),
+  Schema.Struct({ name: Name, ...route, kind: Schema.Literal("none"), tokenFile: Schema.optionalKey(Schema.Never), tokenCommand: Schema.optionalKey(Schema.Never) }),
+  Schema.Struct({ name: Name, ...route, tokenFile: AbsolutePath, tokenCommand: Schema.optionalKey(Schema.Never), kind: Schema.optionalKey(Schema.Never) }),
+  Schema.Struct({ name: Name, ...route, tokenCommand: Command, tokenFile: Schema.optionalKey(Schema.Never), kind: Schema.optionalKey(Schema.Never) }),
 ]);
 
 export const MachinesFile = Schema.Struct({

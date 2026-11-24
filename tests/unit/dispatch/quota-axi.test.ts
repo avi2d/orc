@@ -75,7 +75,7 @@ describe("assessQuota on a quota-axi document", () => {
   })
   test("a document that names no window leaves the quota unread", () => {
     const empty = { ...codex, providers: [{ ...codex.providers[0], windows: [] }] }
-    expect(assessQuota(empty, settings("main"))).toEqual({ kind: "unread", reason: "the quota-axi document names no window" })
+    expect(assessQuota(empty, settings("main"))).toEqual({ kind: "unread", cause: "schema", reason: "the quota-axi document names no window" })
   })
   test("an entry with no all_models percent cannot run and says why", () => {
     const stale = { ...codex, providers: [{ ...codex.providers[0], state: { status: "auth_required", stale: true }, quotaSemantics: { status: "unknown", effectiveAvailability: [] } }] }

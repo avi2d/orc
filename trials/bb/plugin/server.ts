@@ -1,10 +1,8 @@
 import { execFile } from "node:child_process"
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk"
 import { Data, Effect, Schema } from "effect"
-import { boardNext, type TaskNext } from "../board-next"
+import { boardNext, type TaskNext } from "./board-next"
 
-const BoardTask = Schema.Struct({ id: Schema.String, title: Schema.String })
-const Backlog = Schema.Struct({ schema: Schema.Literal("orc.backlog.v1"), tasks: Schema.Array(BoardTask) })
 const BoardLine = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
@@ -32,7 +30,6 @@ const orcOutput = Effect.callback<string, BoardUnread>((resume) => {
 const unreadable = (reason: string) => new BoardUnread({ reason: `orc printed a backlog this page cannot read: ${reason}` })
 
 const decodeJson = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))
-const decodeBacklog = Schema.decodeUnknownEffect(Backlog)
 
 const waitsFor = ({ next }: TaskNext): string => {
   switch (next.waits) {
@@ -50,15 +47,13 @@ const waitsFor = ({ next }: TaskNext): string => {
   }
 }
 
-const boardLines = (value: unknown) => Effect.gen(function*() {
-  const { tasks } = yield* decodeBacklog(value).pipe(Effect.mapError((error) => unreadable(error.message)))
-  const nexts = boardNext(value, "")
-  if (nexts.kind === "refused") return yield* Effect.fail(unreadable(nexts.reason))
-  return tasks.map(({ id, title }, index): BoardLine => {
-    const next = nexts.value[index]
-    return { id, title, waits: waitsFor(next), actor: "actor" in next.next ? next.next.actor : null, pr: next.pr }
-  })
-})
+const boardLine = (task: TaskNext): BoardLine =>
+  ({ id: task.id, title: task.title, waits: waitsFor(task), actor: "actor" in task.next ? task.next.actor : null, pr: task.pr })
+
+const boardLines = (value: unknown) => boardNext(value).pipe(
+  Effect.map((tasks) => tasks.map(boardLine)),
+  Effect.mapError((error) => unreadable(error.message))
+)
 
 const readBoard: Effect.Effect<BoardReading> = orcOutput.pipe(
   Effect.flatMap((stdout) => decodeJson(stdout).pipe(Effect.mapError((error) => unreadable(error.message)))),

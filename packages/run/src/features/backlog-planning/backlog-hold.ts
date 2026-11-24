@@ -1,5 +1,5 @@
 import { DateTime, Effect, FileSystem } from "effect"
-import { newTaskRefusal, findTask, type Rewrite, rewriteNew, type Hold, type HoldQuestion, type TaskFileError, type TaskRecord, BacklogError } from "../../entities/backlog/index"
+import { newTaskRefusal, nextHold, findTask, type Rewrite, rewriteNew, type Hold, type HoldQuestion, type TaskFileError, type TaskRecord, BacklogError } from "../../entities/backlog/index"
 
 export type HoldOutcome = { readonly kind: "held" | "already held"; readonly hold: Hold }
 
@@ -36,15 +36,7 @@ const holdOn = (id: string, ask: HoldAsk, at: string) => (fresh: TaskRecord): Ef
   if (fresh.hold !== null && fresh.hold.answer === null) {
     return holdAgain(id, fresh.hold, ask)
   }
-  const previous = fresh.hold
-  const history = previous === null || previous.answer === null ? [] : [
-    ...previous.history ?? [],
-    { reason: previous.reason, until: previous.until, questions: previous.questions, answer: previous.answer, ...(previous.at === null ? {} : { at: previous.at }) }
-  ]
-  const held: Hold = {
-    reason: ask.reason, until: ask.until, questions: askedQuestions(ask.questions), answer: null, at,
-    ...(history.length === 0 ? {} : { history })
-  }
+  const held = nextHold(fresh.hold, { reason: ask.reason, until: ask.until, questions: askedQuestions(ask.questions), answer: null, at })
   return Effect.succeed({ kind: "write", record: { ...fresh, hold: held }, result: { kind: "held", hold: held } })
 }
 

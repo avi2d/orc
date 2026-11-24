@@ -93,6 +93,15 @@ describe("routeOfAgents", () => {
   test("--provider naming the implementer's provider routes as without it", () => {
     expect(routeOfAgents(config, { agent: "keyed/one", fixer: "keyed/two" }, "keyed")).toEqual(Result.succeed(keyed))
   })
+
+  test("a reviewer on the implementer's provider routes as without it", () => {
+    expect(routeOfAgents(config, { agent: model, fixer: model, reviewer: "acme/coder-small" }, undefined)).toEqual(Result.succeed(login))
+  })
+
+  test("a reviewer on another provider than the implementer's is refused rather than run on a second route", () => {
+    const routed = routeOfAgents(config, { agent: model, fixer: model, reviewer: "keyed/two" }, undefined)
+    expect(Result.isFailure(routed) ? routed.failure : "").toContain("name models from one provider")
+  })
 })
 
 describe("tokenFileSource", () => {

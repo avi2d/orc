@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
-import { type AskingRun, type AttentionItem, askingRuns, attention, guardJson } from "../../../packages/herdr-app/src/guard"
+import { guardJson } from "../../../packages/herdr-app/src/guard"
+import { type AskingRun, type AttentionItem, askingRuns, attention } from "../../../packages/herdr-app/src/guard-attention"
 import { type InboxSources, inboxItems, inboxTasks } from "../../../packages/herdr-app/src/inbox"
 import type { TaskDetail } from "../../../packages/herdr-app/src/task"
 import type { Thread, ThreadLine } from "../../../packages/herdr-app/src/thread"
@@ -39,7 +40,8 @@ test("lists a question on a run kept on another machine instead of missing it fr
   const document = JSON.stringify({ schema: "orc.runs.v1", runs: [{ id: "r1", branch: "orc/orc-60", task: "orc-60", machine: "mac", questions: 1 }], machines: [] })
   const runs = guardJson(document, askingRuns)
   expect(runs).toEqual({ kind: "ok", value: [remoteRun] })
-  const [item] = inboxItems(sources([ask]))
+  if (runs.kind !== "ok") throw new Error(runs.reason)
+  const [item] = inboxItems(sources([ask], { runs: runs.value }))
   expect(item).toMatchObject({ kind: "question", task: "orc-60", title: "Pick a layout", who: "worker", recommendation: null, action: { kind: "answer", target: { kind: "question", id: "ask-1" } } })
   expect(item.ask.options.map((option) => option.text)).toEqual(["Wide", "Narrow"])
 })
@@ -82,6 +84,10 @@ test("drops a merged PR instead of still asking to merge it", () => {
   expect(inboxItems({ backlog: [delivered("merged")], attention: [], runs: [], threads: new Map() })).toEqual([])
   const [open] = inboxItems({ backlog: [delivered("open")], attention: [], runs: [], threads: new Map() })
   expect(open.action).toEqual({ kind: "merge", argv: ["merge", "orc-61", "--basis", "captain-word"] })
+})
+
+test("lists a closed task's PR whose state orc has not read instead of dropping it", () => {
+  expect(inboxItems({ backlog: [delivered(null)], attention: [], runs: [], threads: new Map() }).map((item) => item.key)).toEqual(["orc-61/pr"])
 })
 
 test("sorts items oldest first instead of by task", () => {

@@ -9,16 +9,17 @@ The written rules are what a review already holds a change to: keep the change s
 
 ## Rules
 
-When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure.
+When a review question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure.
 
 ## How to answer
 
-The two escalation bullets for open product choices and uncertainty apply only to a question that names no recommended option.
-When you answer with the recommended option of a question, put the sentence that starts with "When a question names a recommended option" in rule, and quote in reason the words of the question that name the option.
+A line of a review question that starts with "Recommended:" names its recommended option, and the words after it are that option.
+The two escalation bullets for open product choices and uncertainty apply to worker questions and to review questions that name no recommended option.
+When you answer with the recommended option of a review question, put the sentence that starts with "When a review question names a recommended option" in rule, and quote in reason the words of the question that name the option.
 
 ## Escalation
 
-Escalate it to the owner when any of these holds:
+Escalate it to the owner when any of these holds, and put the one bullet your escalation rests on in rule, word for word:
 - It picks between product choices that the intent leaves open.
 - It would widen the task beyond its intent.
 - It asks for an account or a name the intent does not give.
@@ -43,7 +44,7 @@ Duplicate, when an answered question of this task already asked the same thing. 
 
 Escalate, for everything else:
 
-{"decision":"escalate","reason":"<the note the owner reads with the question>","recommendation":"<the option you recommend>"}
+{"decision":"escalate","reason":"<the note the owner reads with the question>","rule":"<the bullet of the Escalation list it rests on, word for word>","recommendation":"<the option you recommend>"}
 
 Give recommendation only when the question lists lettered options and you recommend one of them.
 Copy the text of that option word for word, without its letter.

@@ -107,7 +107,7 @@ describe("why a new task waits in backlog --json", () => {
       await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }], quota: { ...config.quota, floorPercent: 90 } }))
       const second = await beat()
       const waits = await run(readBeatWaits(root))
-      expect([waits?.at, waits?.reasons.get("orc-1")]).toEqual([second.at, "no keyed account has room"])
+      expect([waits?.at, waits?.reasons.get("orc-1")]).toEqual([second.at, "no account has room"])
     })
   })
 })

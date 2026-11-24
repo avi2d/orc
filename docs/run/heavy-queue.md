@@ -64,11 +64,22 @@ With `through` set, orc makes no pueue group and arms no watchdog.
 With `through` set, `orc heavy watch` prints a line naming the through command and arms no watchdog.
 With `through` set, `orc heavy check` and `orc heavy watch-once` fail with a line naming the through command.
 
+## Test runs in agent sessions
+`orc run` sets `HEAVY_TESTS_CI_ONLY=1` for the Pi agent it starts, under the [nono](https://nono.sh) sandbox and under `--sandbox none`.
+Under that variable a stand in refuses a test run with exit 1 and a line naming the command, and leaves the tests to GitHub CI.
+A test run is one of these calls, watch and UI runs included:
+- `bun test`, `npm t`, `go test`, `cargo test` and `cargo t`.
+- A `test`, `tests`, `test:*`, `e2e` or `e2e:*` script, or a script named `vitest`, `jest` or `pytest`, through `bun`, `npm`, `pnpm` or `yarn`.
+- `vitest`, `jest`, `pytest` or `playwright test`, directly or through `bunx`, `npx`, `bun x`, or a manager's `exec` or `dlx`.
+
+Under `--sandbox none` every other call, such as a build, a lint or a typecheck, queues as it does without the variable.
+Under the nono sandbox it runs at once, as the next section says.
+The checks of a run go through the same stand ins, so a check command that starts a test run fails.
+
 ## Sandboxed runs
-Under the default [nono](https://nono.sh) sandbox, orc puts `~/.orc/heavy/bin` first on the agent's `PATH`, ahead of the runtime folders.
+Under the default nono sandbox, orc puts `~/.orc/heavy/bin` first on the agent's `PATH`, ahead of the runtime folders.
 The nono profile grants read and no write of `~/.orc/heavy/bin`, the helper's folder and the bun file that starts the helper.
-The sandbox sets `HEAVY_TESTS_CI_ONLY=1`, so a stand in refuses a test run such as `bun test`, `bun run test`, `bunx vitest`, `npm test` or `npx jest` with exit 1, and leaves the tests to GitHub CI.
-Under `HEAVY_TESTS_CI_ONLY=1` every other call, such as a build, a lint or a typecheck, runs at once, because the sandbox cannot reach pueue.
+The sandbox grants no pueue socket, so it also sets `HEAVY_QUEUE_UNREACHABLE=1`, and under that variable a call that is not refused runs at once.
 
 ## Watch the queue
 `orc runner start` arms the watchdog beside the alert stream unless `through` is set.

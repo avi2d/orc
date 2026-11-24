@@ -73,6 +73,7 @@ You can also select **Send back** beside a PR awaiting approval in the Agents ta
 
 Orc moves the task to `new` and parks it on `orc/<task-id>`.
 It records your words as the answer to `send-back` and saves the closing machine, run, and PR in `parked_origin`.
+It sets `parked_at` and `parked_sent_back_at` to the send-back time.
 The next beat resumes the implementer's session on the same machine and branch with your review.
 Checks run again and the push updates the same PR.
 The PR remains recorded even if the resumed run closes before pushing.
@@ -109,6 +110,8 @@ The date is a reminder, not an automatic release.
 Run `orc backlog answer <task-id> <words>` to release the hold.
 Orc records the answer and `answered_at`, and a later beat may start the task.
 The run receives the task body followed by hold reasons and answers in chronological order.
+A hold the beat places on a [resume that parks again](parked-runs.md#a-resume-that-parks-again) is the exception.
+Its releases travel with the resume as guidance instead of in the body.
 Orc refuses holds on taken, started, closed, or parked tasks, and answers when no question is open.
 Holding a held task again keeps its first reason.
 

@@ -29,6 +29,7 @@ The backlog and the beat:
   backlog    See the backlog, and add, hold, answer or close its tasks
   attention  See everything that waits on you or the decider
   beat       Start what can start and close what finished
+  quota      Show the quota and account pick the beat reads
   merge      Merge a closed task's PR once its checks are green
 
 The runner:
@@ -73,8 +74,9 @@ Options:
                             final check. Defaults to ship.
   --delivery <no-mistakes|direct-PR>
                             How a ship task reaches its PR. Defaults to
-                            no-mistakes, and direct-PR opens the PR with no
-                            review.
+                            no-mistakes, and direct-PR opens the PR after a
+                            review turn that records findings and blocks
+                            nothing.
   --branch <name>           The branch to commit to, or to resume. Defaults to
                             orc/<run-id>.
   --sandbox <nono|none>     Where the agent runs. Defaults to nono, and none
@@ -506,6 +508,23 @@ Options:
 
 Examples:
   orc beat
+```
+
+### orc quota
+
+```text
+Usage: orc quota [--json]
+
+Runs the quota command from dispatch.json and shows its reading without starting
+tasks. Run it on the machine that runs the beat.
+
+Options:
+  --json  Print the reading as JSON, with the floor, accounts and pick, or the
+          cause and reason the quota is unread.
+
+Examples:
+  orc quota
+  orc quota --json
 ```
 
 ### orc merge

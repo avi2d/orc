@@ -11,6 +11,8 @@ To inspect tasks and the last recorded wait reasons without starting work, run `
 
 A task starts when it has a priority, no unanswered hold or question, and its dependencies are done.
 A ship prerequisite must also have its PR merged.
+No beat reopens a closed task, so a prerequisite that closed failed, stopped, start-failed or dropped holds its dependents until you change their dependencies with `orc backlog depend`.
+Their wait names it, as in `waits on orc-2, and orc-2 closed failed, which no beat reopens`.
 A parent waits for its report children to finish and its ship children's PRs to merge.
 A decision never starts.
 
@@ -32,8 +34,10 @@ A result that remains unreadable for 10 minutes also closes failed.
 A run still waiting for an answer stays started and the beat relays the answer.
 To stop a task yourself, run `orc backlog stop <task-id>` where the backlog lives, as [Stop a task](backlog-tasks.md#stop-a-task) describes.
 
-Custom start commands receive `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT`, `ORC_TASK_TOKEN_FILE`, `ORC_TASK_CLAUDE_CONFIG_DIR`, and `ORC_TASK_INSTRUCTIONS`.
+Custom start commands receive `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT`, `ORC_TASK_IMPLEMENTER_MODEL`, `ORC_TASK_FIXER_MODEL`, `ORC_TASK_TOKEN_FILE`, `ORC_TASK_CLAUDE_CONFIG_DIR`, and `ORC_TASK_INSTRUCTIONS`.
 `ORC_TASK_LOG` names the log path, and `ORC_RUN_MACHINE` names the machine.
+`ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` hold the picked account's models, or empty strings when the account names no `models`.
+If your custom start command forwards the task to another machine, forward both model variables with it.
 `ORC_TASK_TOKEN_FILE` holds a path, not a token.
 For a token-command account, the token arrives as `orc.token.v1` on standard input.
 For a `none` account, standard input is empty.

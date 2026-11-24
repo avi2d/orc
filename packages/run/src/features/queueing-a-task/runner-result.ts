@@ -23,7 +23,7 @@ const RunSummary = Schema.Struct({
   status: RunStatusSchema,
   prLink: Schema.NullOr(Schema.String),
   endReason: Schema.NullOr(Schema.String),
-  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String), blocks: Schema.optional(Schema.Boolean), options: Schema.optional(Schema.Array(AskOption)), recommendation: Schema.optional(Schema.String) })),
+  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String), asking: Schema.optional(Schema.String), blocks: Schema.optional(Schema.Boolean), options: Schema.optional(Schema.Array(AskOption)), recommendation: Schema.optional(Schema.String), owner: Schema.optional(Schema.Literal("user")) })),
   report: Schema.optional(Schema.String),
   asking: Schema.optional(Asking),
   failing: Schema.optional(FailingMark),
@@ -70,7 +70,7 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
 
 export type RunEnding =
   | { readonly kind: "close"; readonly outcome: "done" | "failed" | "stopped"; readonly reason: string; readonly pr: string | null; readonly report: string | null }
-  | { readonly kind: "park"; readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion> }
+  | { readonly kind: "park"; readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion>; readonly reason: string }
   | { readonly kind: "split"; readonly plan: SplitPlan }
 
 type FinishedResult = Extract<RunnerResult, { readonly status: "succeeded" | "failed" }>
@@ -110,7 +110,7 @@ export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEndin
   }
   const questions = result.run?.openQuestions ?? []
   return Arr.isReadonlyArrayNonEmpty(questions)
-    ? { kind: "park", questions }
+    ? { kind: "park", questions, reason: result.run?.endReason ?? result.reason }
     : { kind: "close", outcome: "failed", reason: result.run?.endReason ?? result.reason, pr: result.run?.prLink ?? null, report: null }
 }
 

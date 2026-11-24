@@ -1,5 +1,7 @@
 import { expect, mock, test } from "bun:test"
-import type { Card } from "../../../packages/herdr-app/src/agents"
+import type { Context } from "gpui-kit"
+import { buildCards, cardAnswers, type Card } from "../../../packages/herdr-app/src/agents"
+import { inboxItems } from "../../../packages/herdr-app/src/inbox"
 import type { BoardTask } from "../../../packages/herdr-app/src/board"
 
 interface Node {
@@ -36,9 +38,21 @@ const find = (element: object | string, id: string): Node | null => {
   return null
 }
 
+const documents = new Map<string, unknown>()
 const ran: Array<{ readonly name: string; readonly args: unknown }> = []
 const stopped: Array<true> = []
-const cx = { stop_propagation: () => stopped.push(true), notify: () => undefined }
+const unused = (): never => { throw new Error("Unexpected App context call") }
+const idleTask = () => ({ cancel: () => undefined, is_done: () => true })
+class IdleEntity {
+  set_props = unused
+  release = unused
+}
+const cx = Object.assign(IdleEntity, {
+  stop_propagation: () => { stopped.push(true) }, notify: () => undefined, spawn: idleTask,
+  bind_keys: unused, propagate: unused, phase: unused, theme: unused, open_url: unused,
+  read_from_clipboard: unused, write_to_clipboard: unused, focus_handle: unused, sleep: unused,
+  timer: { after: unused, every: unused }
+}) satisfies Context
 
 const click = (element: Node | null): void => {
   const handler = element?.calls.find((call) => call.name === "on_click")?.args[0]
@@ -48,13 +62,66 @@ const click = (element: Node | null): void => {
 void mock.module("gpui-kit", () => ({ View: Object, div: node }))
 void mock.module("gpui-base", () => ({
   h_flex: node, v_flex: node, Input: node, Avatar: node, AvatarFallback: node, AvatarImage: node,
-  ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) }
+  ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
+  InputState: { new: () => ({ value: () => "", set_value: () => undefined }) }
 }))
 void mock.module("herdr", () => ({
-  shared: () => null, setShared: () => undefined, layout: () => null, exec: () => undefined, theme: () => ({}),
-  settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined,
+  shared: () => null, setShared: () => undefined, layout: () => null, theme: () => ({}),
+  exec: (command: string, args: ReadonlyArray<string>) => {
+    const line = [command, ...args].join(" ")
+    const document = documents.get(line)
+    return Promise.resolve(document === undefined
+      ? { code: 1, stdout: "", stderr: `Unexpected command: ${line}` }
+      : { code: 0, stdout: JSON.stringify(document), stderr: "" })
+  },
+  settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined, readTextFile: () => undefined,
   run: (name: string, args: unknown) => ran.push({ name, args })
 }))
+
+test("a question on a remote run does not disappear because the Inbox reads local runs only", async () => {
+  documents.set("orc backlog --json", { schema: "orc.backlog.v1", tasks: [{
+    id: "orc-60", title: "Pick a layout", kind: "ship", body: "", created: "2026-11-13T10:00:00Z",
+    priority: null, dependsOn: [], prState: null, status: "new", hold: null, parked: null
+  }] })
+  documents.set("orc attention --json", { schema: "orc.attention.v1", items: [] })
+  documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [] })
+  documents.set("orc runs --json", { schema: "orc.runs.v1", runs: [{ branch: "orc/orc-60", task: "orc-60", machine: "mac", questions: 1 }] })
+  documents.set("orc backlog thread orc-60 --json", { schema: "orc.thread.v1", task: "orc-60", entries: [{
+    at: "2026-11-13T11:00:00Z", who: "worker", kind: "question", id: "orc-60.ask-1.fixture", text: "Which layout?\nA) Wide\nB) Narrow"
+  }] })
+  const { readInbox } = await import("../../../packages/herdr-app/src/inbox-read")
+  try {
+    const reading = await readInbox()
+    expect(reading).toMatchObject({ kind: "ok", value: { items: [{
+      kind: "question", task: "orc-60", title: "Pick a layout", who: "worker", ask: { question: "Which layout?", options: [{ text: "Wide" }, { text: "Narrow" }] },
+      action: { kind: "answer", target: { kind: "question", id: "ask-1" } }
+    }] } })
+  } finally {
+    documents.clear()
+  }
+})
+
+test("a question on a remote run puts its Agents card Awaiting you instead of Queued because the tab reads local runs only", async () => {
+  documents.set("orc backlog --json", { schema: "orc.backlog.v1", tasks: [{
+    id: "orc-60", title: "Pick a layout", project: "orc", kind: "ship", body: "", created: "2026-11-13T10:00:00Z",
+    priority: null, dependsOn: [], prState: null, status: "new", hold: null, parked: null
+  }] })
+  documents.set("orc attention --json", { schema: "orc.attention.v1", items: [] })
+  documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [] })
+  documents.set("orc runs --json", { schema: "orc.runs.v1", runs: [{ branch: "orc/orc-60", task: "orc-60", machine: "mac", questions: 1 }] })
+  documents.set("orc backlog thread orc-60 --json", { schema: "orc.thread.v1", task: "orc-60", entries: [{
+    at: "2026-11-13T11:00:00Z", who: "worker", kind: "question", id: "orc-60.ask-1.fixture", text: "Which layout?\nA) Wide\nB) Narrow"
+  }] })
+  const { readAgents } = await import("../../../packages/herdr-app/src/agents-read")
+  try {
+    const reading = await readAgents()
+    if (reading.kind !== "ok") throw new Error(reading.kind === "failed" ? reading.reason : reading.kind)
+    expect(reading.value.cards.map((card) => [card.id, card.standing.status, card.where, cardAnswers(card).map((item) => item.ask.question)]))
+      .toEqual([["orc-60", "Awaiting you", "Question 1", ["Which layout?"]]])
+  } finally {
+    documents.clear()
+  }
+})
 
 const cmd4 = { name: "layout.select", args: { stack: "orc-views", child: "orc-inbox" } }
 
@@ -73,9 +140,26 @@ test("the Awaiting you lane count on the Board opens the Inbox as cmd-4 does ins
   expect(stopped.length).toBe(1)
 })
 
-const card: Card = {
-  key: "orc-1", id: "orc-1", kind: "ship", delivery: null, title: "A task", project: "orc",
-  standing: { status: "Awaiting you", waiting: { on: "answer" } }, where: "Question 1", runId: null, checkout: null, sendBack: null
+const items = inboxItems({
+  backlog: [{
+    id: "orc-1", title: "A task", kind: "ship", body: "", created: "2026-01-01", priority: null, dependsOn: [], prState: null,
+    state: { status: "new" }, hold: null, parked: { branch: "orc/orc-1", questions: [{ id: "ask-1", text: "Which layout?", asked: null, answer: null }] }
+  }],
+  runs: [], attention: [],
+  threads: new Map([["orc-1", { task: "orc-1", entries: [{
+    kind: "question", who: "worker", id: "orc-1.ask-1.fixture", text: "Which layout?\nA) Wide\nB) Narrow", at: null
+  }] }]])
+})
+
+const [card] = buildCards({ schema: "orc.runs.v1", runs: [] }, {
+  schema: "orc.backlog.v1", merged: [], projects: null, tasks: [
+    { id: "orc-1", title: "A task", project: "orc", kind: "ship", status: "new", hold: null, parked: 1, parkedOrigin: null, reason: null, prState: null }
+  ]
+}, items)
+
+const queued: Card = {
+  key: "orc-2", id: "orc-2", kind: "ship", delivery: null, title: "Another task", project: "orc", known: true,
+  standing: { status: "Queued" }, where: "Waiting to start", runId: null, checkout: null, sendBack: null
 }
 
 test("the Awaiting you count on the Agents tab opens the Inbox as cmd-4 does instead of filtering the runs", async () => {
@@ -88,11 +172,30 @@ test("the Awaiting you count on the Agents tab opens the Inbox as cmd-4 does ins
   }
   ran.length = 0
   stopped.length = 0
-  const column: object = runsColumn(palette(), { cards: { kind: "ok", value: [card] }, filter: { project: null, status: null }, selectedKey: null, agents: new Map(), folded: false }, act)
+  const column: object = runsColumn(palette(), { cards: { kind: "ok", value: [card] }, filter: { project: null, status: null, allRuns: false }, selectedKey: null, agents: new Map(), folded: false }, act)
   const count = find(column, "inbox-count")
   expect(count?.kids).toEqual(["1"])
   click(count)
   expect(ran).toEqual([cmd4])
   expect(stopped.length).toBe(1)
   expect(filtered).toEqual([])
+})
+
+const wordsOf = (element: object | string): ReadonlyArray<string> =>
+  typeof element === "string" ? [element] : (nodes.get(element)?.kids ?? []).flatMap(wordsOf)
+
+test("opening an Awaiting you card shows its open question above the steps instead of only No run yet", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const agents = new OrcAgents()
+  agents.cards = { kind: "ok", value: [card, queued] }
+  agents.selectedKey = queued.key
+  expect(wordsOf(agents.render(cx))).not.toContain("Which layout?")
+  click(find(agents.render(cx), "card-orc-1"))
+  const opened = agents.render(cx)
+  const steps = find(opened, "steps")
+  const words = steps?.kids.flatMap(wordsOf) ?? []
+  expect(words).toContain("A) Wide")
+  expect(words.indexOf("Which layout?")).toBeGreaterThanOrEqual(0)
+  expect(words.indexOf("Agent")).toBeGreaterThan(words.indexOf("Which layout?"))
+  expect(wordsOf(opened)).not.toContain("No run yet")
 })

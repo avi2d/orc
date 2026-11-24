@@ -32,6 +32,7 @@ interface PlanDirs {
 interface AgentModels {
   readonly agent: string
   readonly fixer: string
+  readonly reviewer?: string | undefined
 }
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
@@ -83,7 +84,7 @@ const checkedAgentWindows = (
   extraEnv: Readonly<Record<string, string>> = {}
 ): Effect.Effect<ReadonlyArray<CheckedModelWindow>, OrcRunError> =>
   readModelWindows(spawner, host, runDir, probe, extraEnv).pipe(
-    Effect.flatMap((windows) => Effect.fromResult(checkedModelWindows([models.agent, models.fixer], windows)).pipe(
+    Effect.flatMap((windows) => Effect.fromResult(checkedModelWindows([models.agent, models.fixer, ...(models.reviewer === undefined ? [] : [models.reviewer])], windows)).pipe(
       Effect.mapError((message) => new OrcRunError({ message }))
     ))
   )

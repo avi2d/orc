@@ -32,8 +32,14 @@ Without a `floorPercent` there is no floor.
 Among the accounts that can run, the beat picks the one with the most room, and the tasks that beat starts take it.
 An account an `orc.quota.v1` or quota-axi document does not name cannot run.
 
-The quota names one provider, and every account in it belongs to that provider.
-That provider is one `~/.orc/config.json` defines on each machine that runs tasks.
+The quota names a default provider, and an account may name its own, so one quota can hold Claude, OpenAI and OpenCode accounts.
+The beat compares every account in the quota, whatever its provider, and the run it starts takes the picked account's provider.
+Each provider is one `~/.orc/config.json` defines on each machine that runs tasks.
+An account's provider comes from its `provider` in `dispatch.json`, never from the vendor a `subquo.v1` snapshot names for it.
+
+The models in `~/.orc/config.json` serve the quota's provider.
+An account on another provider names its own implementer and fixer models from that provider, and the run it starts takes them.
+Orc refuses a `dispatch.json` with an account on another provider that names no models, or a model from a provider other than the account's.
 
 ## How the credential reaches the run
 

@@ -8,7 +8,7 @@ Both files live in `$ORC_HOME/backlog`, or `~/.orc/backlog` when `ORC_HOME` is u
 
 ## Dispatch configuration
 
-`dispatch.json` defines machines, their slot limits and commands, and the provider's quota and accounts.
+`dispatch.json` defines machines, their slot limits and commands, and the quota and accounts.
 Each slot limit also sets the pueue `orc` group's parallel limit when `orc runner start` queues a task.
 
 Each account has one credential kind:
@@ -48,7 +48,7 @@ The start command must run `orc runner start`.
 On a machine whose start command runs `orc runner start`, the beat also pauses starts when its heavy queue has at least three calls.
 An unread heavy queue does not hold starts.
 
-The provider must be defined in `config.json` on each machine that runs tasks.
+Each provider must be defined in `config.json` on each machine that runs tasks.
 Token file paths in `dispatch.json` must exist on those machines.
 Token-command accounts store tokens in each machine's runner token folder instead.
 Orc runs the quota command with no input and reads its standard output as this document:
@@ -65,6 +65,25 @@ Orc runs the quota command with no input and reads its standard output as this d
 
 Each entry gives remaining quota from 0 to 100, or why the account cannot run.
 An account missing from the document cannot run.
+
+### Accounts on other providers
+
+An account may name its own `provider`, and the `models` its runs take from that provider:
+
+```json
+{
+  "name": "openai",
+  "provider": "codex",
+  "models": { "implementer": "codex/gpt-5.5", "fixer": "codex/gpt-5.5" },
+  "tokenFile": "/Users/me/.secrets/openai-token"
+}
+```
+
+The beat then picks the roomiest account across every provider.
+The run it starts takes that account's provider and models, through `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL`.
+An account without a `provider` takes the quota's `provider`, and without `models` the run takes the models of `config.json` or the agent files.
+An account whose provider differs from the quota's must name `models`, and each model must come from the account's provider.
+A model an agent file names still takes precedence, so the agent files of a project that runs on several providers name no model.
 
 ### Quota from quota-axi
 
@@ -83,6 +102,18 @@ An account with a stale or unavailable reading, a fresh reading past its `validU
 A snapshot that names no quota account, names one account twice, or breaks the `subquo.v1` shape leaves the whole quota unread.
 
 A command that is not installed, exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
+
+### Reading quota without running the beat
+
+Run `orc quota` on the machine that runs the beat to see its quota line without starting tasks.
+For example, set `quota.command` to `["subquo", "read", "--json"]` and run `orc quota --json` to read your configured accounts.
+
+A JSON reading with `kind: "read"` gives `floorPercent`, `accounts` in configuration order, and `pick`, which is the chosen account name or `null`.
+Each usable account gives `remainingPercent` and, if the source supplies it, `resetsAt`.
+Each unusable account gives its `reason`.
+A reading with `kind: "unread"` gives `reason` and a machine-readable `cause`: `command-missing`, `exit`, `timeout`, `no-json`, `spawn`, `schema`, or `account-missing`.
+Both kinds of reading exit successfully.
+If Orc cannot read `dispatch.json`, the command reports the configuration error on standard error and exits non-zero.
 
 ### Token command accounts
 

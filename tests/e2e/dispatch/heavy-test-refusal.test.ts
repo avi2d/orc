@@ -80,7 +80,7 @@ describe("test refusal through the heavy stand-in", () => {
     "yarn --cwd test run build"
   ])("%s delegates unchanged instead of refusing a non-test command", async (command) => {
     const [tool = "", ...args] = command.split(" ")
-    const result = run(harness, tool, args, { HEAVY_TESTS_CI_ONLY: "1" })
+    const result = run(harness, tool, args, { HEAVY_TESTS_CI_ONLY: "1", HEAVY_QUEUE_UNREACHABLE: "1" })
     expect(result.code).toBe(0)
     expect(result.stderr).not.toContain("starts a test run")
     expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain(command + "\n")
