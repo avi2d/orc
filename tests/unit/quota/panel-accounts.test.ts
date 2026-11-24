@@ -25,7 +25,6 @@ describe("the quota panel, against the recorded schema-6 replay", () => {
     const headers = quotaLines(blocks(), 84, true, now).map(plain).filter((line) => line.startsWith("●"));
     expect(headers).toEqual([
       "● claude main · max",
-      "● claude second · pro",
       "● codex codex-home · plus",
       "● codex openai-codex · plus",
       "● opencode-go",

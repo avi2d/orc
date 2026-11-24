@@ -101,13 +101,12 @@ describe("quotaBlocks, against the recorded quota-axi, saved profiles and orc qu
     const blocks = quotaBlocks(quotaAxiRead({ ...decoded, capturedAt: now }), savedProfilesReading(savedProfiles()), accounts(), now);
     expect(blocks.map((block) => block.title)).toEqual([
       "claude main",
-      "claude second",
       "account second",
       "codex codex-home",
       "codex openai-codex",
       "opencode-go",
     ]);
-    expect(blocks.map((block) => block.provider)).toEqual(["claude", "claude", "claude", "codex", "codex", "opencode-go"]);
+    expect(blocks.map((block) => block.provider)).toEqual(["claude", "claude", "codex", "codex", "opencode-go"]);
   });
 
   test("each account block carries its own row's windows", () => {

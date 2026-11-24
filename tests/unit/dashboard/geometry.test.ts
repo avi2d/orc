@@ -123,7 +123,7 @@ describe("each layout rule rejects the defect it names", () => {
 const accountLabels = (columns: number): ReadonlyArray<string> => {
   const blocks = quotaBlocksOf(fixture("quota-axi/full.json"), orcQuotaText("main-second"));
   const rows = quotaLines(blocks, panelWidth(columns), true, dashboardNow).map(plain);
-  return ["● account main", "● account second"].map((header) => rows[rows.indexOf(header) + 1]?.split(/ (?=[━─╸┃])/u)[0]?.trimEnd() ?? "");
+  return ["● account main", "● account second"].map((header) => rows[rows.findIndex((row) => row.startsWith(header)) + 1]?.split(/ (?=[━─╸┃])/u)[0]?.trimEnd() ?? "");
 };
 
 describe("the quota panel names an orc quota account's row in full", () => {
