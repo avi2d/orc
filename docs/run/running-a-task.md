@@ -45,6 +45,7 @@ Keep test runners out of those commands and `prepare`.
 In Pi sessions, `prepare` and local checks, stand-ins first on `PATH`, and under `--sandbox none` a `BASH_ENV` guard for runners called by path, refuse a test run when it starts, directly or through a script, as [Test runs in agent sessions](heavy-queue.md#test-runs-in-agent-sessions) lists.
 A `node` runner started from a Yarn script is not confirmed as refused, as [What is not blocked](heavy-queue.md#what-is-not-blocked) says.
 The no-mistakes review runs under the daemon's own `PATH`, so Orc starts no-mistakes with its local Test step skipped.
+The no-mistakes review and fix agents refuse test runs only when `~/.no-mistakes/config.yaml` holds `agent_path_override.<agent>` pointing at `~/.orc/heavy/agents/<agent>` for the agent no-mistakes runs, as [The no-mistakes review and fix agents](heavy-queue.md#the-no-mistakes-review-and-fix-agents) says.
 
 ## Base updates and CI waits
 

@@ -1,5 +1,5 @@
 import type { HeavyConfig } from "../../shared/config/index"
-import { ciOnlyDirSuffix, heavyDirSuffix } from "../../shared/sandbox/index"
+import { agentWrapperDirSuffix, ciOnlyDirSuffix, heavyDirSuffix } from "../../shared/sandbox/index"
 
 export const heavyGroup = "heavy"
 
@@ -8,6 +8,7 @@ export const heavyBinDir = (home: string): string => home + heavyDirSuffix
 export const ciOnlyBinDir = (home: string): string => home + ciOnlyDirSuffix
 
 export const ciOnlyBashFile = (home: string): string => home + "/heavy/ci-only.bash"
+export const agentWrapperDir = (home: string): string => home + agentWrapperDirSuffix
 
 export const withHeavyPath = (home: string, path: string): string => heavyBinDir(home) + ":" + path
 

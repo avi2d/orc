@@ -106,7 +106,34 @@ Every other file call is refused, such as `bun run` on a bare path or `bun` on a
 - A runner started through a runtime's absolute path.
 - A runner called by path from a shell that does not read `BASH_ENV`, such as `sh`, or from a program that starts it without a shell.
 - A runner the list does not name.
-- The [no-mistakes](https://github.com/kunchenguid/no-mistakes) review, which the shared daemon runs under its own `PATH`.
+- The [no-mistakes](https://github.com/kunchenguid/no-mistakes) review and fix agents, unless the no-mistakes config starts them through orc's agent wrapper, as the next section says.
+
+## The no-mistakes review and fix agents
+The no-mistakes daemon starts its review and fix agents with the daemon's own environment, never with the environment of the shell that runs `no-mistakes axi run`.
+So `HEAVY_TESTS_CI_ONLY=1` and the stand-in folders that `orc run` sets for its own steps never reach those agents.
+
+`orc heavy path`, `orc run` and `orc runner start` write an agent wrapper for `claude`, `codex`, `opencode` and `pi` into `~/.orc/heavy/agents`.
+A wrapper sets `HEAVY_TESTS_CI_ONLY=1`, puts `~/.orc/heavy/ci-only` and `~/.orc/heavy/bin` first on `PATH`, and starts the real agent.
+It starts the first copy of the agent on the daemon's `PATH` that is not the wrapper itself.
+If no such copy exists, it exits 127 with a line naming the agent.
+
+The review and fix agents refuse test runs only when `~/.no-mistakes/config.yaml` holds `agent_path_override.<agent>` pointing at `~/.orc/heavy/agents/<agent>`, where `<agent>` is the agent no-mistakes runs.
+On the maintainer's machines, the skills repository generates that config.
+Orc never writes that global file itself.
+To check whether the key is there, run `grep agent_path_override ~/.no-mistakes/config.yaml`.
+Where that config is not generated, add the key by hand.
+The example below is for a home folder of `/home/you` whose config already chooses `agent: pi`.
+Keep your own `agent` value, and put its name in place of `pi` under `agent_path_override` and in the path:
+
+```yaml
+agent: pi
+agent_path_override:
+  pi: /home/you/.orc/heavy/agents/pi
+```
+
+no-mistakes reads `agent_path_override` only from that global file, so it applies to every repository the daemon gates on the machine.
+Every review and fix agent it starts then refuses a test run as the list above says, and its builds, lints and typechecks queue through the stand-ins.
+Run `orc heavy path` once before the next no-mistakes run, so the wrapper exists.
 
 ## Sandboxed runs
 Under the default nono sandbox, orc puts `~/.orc/heavy/ci-only` and `~/.orc/heavy/bin` first on the agent's `PATH`, ahead of the runtime folders.

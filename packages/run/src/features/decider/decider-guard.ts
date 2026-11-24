@@ -48,5 +48,22 @@ export const neverDecidedReason = (question: string): string | null => {
   return null
 }
 
+const routineAction = "none"
+
+const actionWords: ReadonlyMap<string, string> = new Map([["merge", "merge"], ["delete", "delete unlanded work"], ["login", "log in"], ["push", "push"], ["release", "release"]])
+
+const askedActionReason = (asks: string): string | null => {
+  if (asks === routineAction) {
+    return null
+  }
+  const named = actionWords.get(asks)
+  return named === undefined
+    ? "the review question asks the owner for the action " + JSON.stringify(asks) + ", which orc does not know, so orc hands it to the owner"
+    : "the review question asks the owner to " + named + ", and orc hands every asked action to the owner"
+}
+
+export const guardReason = (question: { readonly text: string; readonly asks?: string | undefined }): string | null =>
+  question.asks === undefined ? neverDecidedReason(question.text) : askedActionReason(question.asks)
+
 export const askBackWords = (question: string): string =>
   "Before it answers, orc's decider asks you: " + question + "\nPut your reply in a new orc_ask question."

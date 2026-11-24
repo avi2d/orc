@@ -1,7 +1,8 @@
 import { Effect, FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { readOrcConfig } from "../../shared/config/index"
-import { ciOnlyBashFile, ciOnlyBinDir, heavyBinDir, resolveHeavy, type HeavySettings } from "./heavy"
+import { agentWrapperDir, ciOnlyBashFile, ciOnlyBinDir, heavyBinDir, resolveHeavy, type HeavySettings } from "./heavy"
+import { agentWrapperScripts } from "./heavy-agent-wrapper"
 import { ciOnlyBashScript, ciOnlyScript, ciOnlyTools, detectWrap, standinScripts, type HeavyPlatform, type StandinSettings } from "./heavy-standin"
 import { RunnerError } from "../../shared/process/index"
 import { ensureGroup } from "../../shared/process/index"
@@ -67,6 +68,7 @@ export const writeHeavyBin = (
       Effect.andThen(fs.rename(staging, bashFile)),
       Effect.mapError((error) => new RunnerError({ detail: "cannot write " + bashFile + ": " + error.message }))
     )
+    yield* writeStandinDir(agentWrapperDir(home), agentWrapperScripts(home))
     return yield* writeStandinDir(heavyBinDir(home), yield* standinScripts(standins, settings.commands))
   })
 

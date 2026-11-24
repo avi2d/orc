@@ -753,7 +753,8 @@ Run orc heavy <subcommand> --help for one subcommand.
 Usage: orc heavy path
 
 Writes a stand-in for each heavy tool into ~/.orc/heavy/bin and prints that
-folder.
+folder. Also writes the agent wrappers into ~/.orc/heavy/agents that no-mistakes
+agent_path_override can point at.
 
 Examples:
   orc heavy path
