@@ -110,8 +110,7 @@ Run `orc backlog answer <task-id> <words>` to release the hold.
 Orc records the answer and `answered_at`, and a later beat may start the task.
 The run receives the task body followed by hold reasons and answers in chronological order.
 A hold the beat places on a [resume that parks again](parked-runs.md#a-resume-that-parks-again) is the exception.
-Every release of those holds travels with the resume as guidance instead of in the body.
-The releases arrive oldest first, with the latest marked current.
+Its releases travel with the resume as guidance instead of in the body.
 Orc refuses holds on taken, started, closed, or parked tasks, and answers when no question is open.
 Holding a held task again keeps its first reason.
 

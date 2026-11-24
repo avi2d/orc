@@ -9,7 +9,7 @@ import { OrcRunError } from "../../shared/lib/index"
 import { askOnLoop, loopAnswerOf, loopContinuePrompt, loopGuidance, loopingNote, RunStopped } from "./loop-pause"
 import { askedNote, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, workerAnswersOf, workerContinuePrompt, workerGuidance } from "./worker-question"
 import { holdReleaseGuidance, holdReleaseWordsOf } from "../../entities/review-gate/index"
-import { freshFixOf, resumedFix } from "./fix-guidance"
+import { freshFixOf, releaseGuidanceOf, resumedFix } from "./fix-guidance"
 import { finishAfterChecks } from "./run-finish"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
@@ -252,13 +252,13 @@ type ImplementBase = Parameters<typeof finishAfterChecks>[1]
 
 const retryParkedFix = (run: HistoryRun, ops: SandboxOps, base: ImplementBase, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, commits: Array<OrcRunCommit>, plan: ResumePlan, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport | null, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
-    const pending = resumedFix(plan)
+    const session = plan.fixSessionFile
     const loop = loopAnswerOf(plan.answers)
     const prior = fixes.length > 0 ? fixes[fixes.length - 1] : undefined
-    if (prior === undefined || prior.status !== "failed" || loop?.kind !== "continue" || pending === null) return null
+    if (prior === undefined || prior.status !== "failed" || loop?.kind !== "continue" || session === null) return null
     fixes.pop()
     yield* checkpoints.fixStart(prior.attempt, new Date().toISOString())
-    const retried = yield* fixOnce(run, ops.runAgent, prior.evidenceIn, prior.attempt, pending, checkpoints, loop.words)
+    const retried = yield* fixOnce(run, ops.runAgent, prior.evidenceIn, prior.attempt, { session, guidance: releaseGuidanceOf(plan.answers) }, checkpoints, loop.words)
     fixes.push(retried.fix)
     yield* checkpoints.fixDone(retried.fix)
     commits.push(...retried.commits)

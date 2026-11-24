@@ -1,7 +1,7 @@
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { AbsolutePath, readDispatchConfig, readFailure } from "../../shared/config/index"
 import { ModelRef, ProviderId } from "../../shared/config/index"
-import { TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type TaskRecord, withDecisions } from "../../entities/backlog/index"
+import { TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type Parked, type TaskRecord, withDecisions } from "../../entities/backlog/index"
 import { latestPerId } from "../../entities/parked-runs/index"
 import { carriedHoldReleaseId, holdReleaseId } from "../../entities/review-gate/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
@@ -94,19 +94,23 @@ const timeOf = (at: string): number => {
   return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time
 }
 
-const parkedSince = (record: TaskRecord): number =>
-  Math.max(Number.NEGATIVE_INFINITY, ...(record.parked?.questions ?? []).flatMap((question) =>
+const parkedSince = (parked: Parked): number =>
+  Math.max(Number.NEGATIVE_INFINITY, ...parked.questions.flatMap((question) =>
     [timeOf(question.asked), ...(question.answer === null ? [] : [timeOf(question.answer.at)])]))
 
+const parkOpened = (parked: Parked): number =>
+  Math.min(Number.POSITIVE_INFINITY, ...parked.questions.map((question) => timeOf(question.asked)))
+
+// A send-back opens a new park, so a release older than the park's first question answered a failure this park does not hold.
 // A run that parks after a release asks or is answered after it, so a release later than all of the park is one no resume has seen.
-const releaseAnswerOf = (record: TaskRecord): ReadonlyArray<typeof AnswerArg.Type> => {
-  const hold = record.hold
+const releaseAnswerOf = (hold: TaskRecord["hold"], parked: Parked): ReadonlyArray<typeof AnswerArg.Type> => {
   const decisions = hold === null ? [] : [...hold.history ?? [], hold]
+  const opened = parkOpened(parked)
   const releases = decisions.flatMap((decision) =>
-    decision.repeat === true && decision.answer !== null && decision.answer.words.trim() !== "" ? [decision.answer] : [])
+    decision.repeat === true && decision.answer !== null && decision.answer.words.trim() !== "" && timeOf(decision.answer.at) > opened ? [decision.answer] : [])
   const latest = releases.at(-1)
   return latest === undefined ? [] : [{
-    question: timeOf(latest.at) > parkedSince(record) ? holdReleaseId : carriedHoldReleaseId,
+    question: timeOf(latest.at) > parkedSince(parked) ? holdReleaseId : carriedHoldReleaseId,
     answer: releases.map((release, index) => (index === releases.length - 1 ? "Current guidance: " : "Earlier repeat hold release: ") + release.words).join("\n")
   }]
 }
@@ -120,7 +124,7 @@ const takenResume = (task: string, record: TaskRecord): Effect.Effect<Record<str
     : {
       branch: record.parked.branch,
       resumeRun: record.parked.origin?.run,
-      answers: [...latestPerId(record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ ...question, answer: question.answer }])).map((question) => ({ question: question.id, answer: question.answer.words })), ...releaseAnswerOf(record)]
+      answers: [...latestPerId(record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ ...question, answer: question.answer }])).map((question) => ({ question: question.id, answer: question.answer.words })), ...releaseAnswerOf(record.hold, record.parked)]
     })
 }
 

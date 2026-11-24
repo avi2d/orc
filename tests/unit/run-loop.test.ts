@@ -489,7 +489,7 @@ describe("a hold release reaches the resumed worker", () => {
     })
   })
 
-  test("a looping-continuation retry carries the hold release beside the loop guidance", async () => {
+  test("a looping-continuation retry carries the hold release beside the loop guidance, stating the loop answer once instead of twice", async () => {
     await withLoopRun(0, async (db, run) => {
       await mkdir(run.piSessionDir, { recursive: true })
       await writeFile(join(run.worktreeDir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
@@ -525,8 +525,8 @@ describe("a hold release reaches the resumed worker", () => {
       }
       await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
       expect(prompts.length).toBeGreaterThan(0)
-      expect(prompts[0]).toContain("continue with the new plan")
       expect(prompts[0]).toContain("Fix the lint failure first")
+      expect(prompts[0]?.split("continue with the new plan")).toHaveLength(2)
     })
   })
 })

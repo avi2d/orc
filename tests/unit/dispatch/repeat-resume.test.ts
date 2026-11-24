@@ -4,8 +4,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { addTask, answerWait, claimTask, listTasks, renderTaskFile, writeTaken, type ParkedQuestion, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
-import { answerTask, askStartedTask, handAnswersToResume, parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
+import { addTask, answerWait, claimTask, closeStartedTask, listTasks, renderTaskFile, writeTaken, type ParkedQuestion, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
+import { answerTask, askStartedTask, handAnswersToResume, parkStartedTask, sendBackClosedTask } from "../../../packages/run/src/entities/parked-runs/index"
 import { readRequest, type QueueRequest } from "../../../packages/run/src/features/queueing-a-task/runner-request"
 import { parseRunArgs } from "../../../packages/run/src/features/running-a-task/run-args"
 import { buildResumePlan } from "../../../packages/run/src/features/running-a-task/run-resume"
@@ -214,6 +214,19 @@ describe("a resumed run that parks again", () => {
         { question: "ask-1", answer: "Pin it" },
         { question: "hold-release-carried", answer: "Current guidance: fix the lint finding first" }
       ])
+    })
+  })
+  test("a send-back hands its resume only the review instead of an old release as current guidance", async () => {
+    await withResumed(async (root) => {
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }], "2026-10-27T10:35:00.000Z", "run-2", lint))
+      await run(answerTask(root, "orc-1", "fix the lint finding first", "2026-10-27T10:40:00.000Z"))
+      await run(claimTask(root, "orc-1"))
+      await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:45:00.000Z", log: root + "/logs/orc-1.log" } } }))
+      await run(closeStartedTask(root, "orc-1", "done", "", { pr: "https://github.com/acme/orc/pull/8", report: null }, "2026-10-27T11:00:00.000Z"))
+      await run(sendBackClosedTask(root, "orc-1", "rename the flag", "2026-10-27T12:00:00.000Z", { machine: "mac", run: "run-3" }))
+      const file = join(root, "new", "orc-1.md")
+      const queued = await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: file, ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))
+      expect(queued.answers).toEqual([{ question: "send-back", answer: "rename the flag" }])
     })
   })
   test("an answer to a non-blocking question given during the run resumes it instead of holding it", async () => {
