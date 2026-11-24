@@ -324,7 +324,7 @@ describe("a run sent back with the captain's review", () => {
       try {
         const project = join(home, "project")
         await mkdir(project, { recursive: true })
-        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
+        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
         const git = await stubGit(home)
         const priorDir = join(home, "runs", "prior-a")
         await seedRefusedPrior(db, priorDir, project)

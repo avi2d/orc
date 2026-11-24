@@ -8,13 +8,13 @@ Orc runs only Pi, and it starts Pi itself as `pi -p --mode json` in the task cop
 
 - Orc passes the agent file's model, thinking level and tools, and the run's `sessions` folder as `--session-dir`.
 - Orc writes the prompt to Pi’s standard input, and the prompt asks the agent to print `ORC_COMPLETE` on its own line once the work is committed.
-- The prompt also asks the agent to print `ORC_SPLIT` on its own line and then a JSON document when the change outgrows the budget.
+- The prompt also tells the agent to leave repository tests to GitHub CI, to run only `build`, `lint`, or `typecheck` locally, and to print `ORC_SPLIT` on its own line and then a JSON document when the change outgrows the budget.
 - Pi prints one JSON event per line, and its first line is the `session` header with the session id and timestamp.
 - On that header orc records the session file, named after the timestamp and the id with `.jsonl`, so `orc show` names it while the step runs.
 - Orc writes each assistant message to the step's log on its own line, and each command a tool starts on a line opening with `>`.
   The implement step logs to `agent.log` in the run folder, and each fix to `fix-<n>.log`.
 - While a tool runs, orc writes `orc: still running <command> (N min)` to that log each minute.
-- Orc stops Pi only after the idle limit passes with no output and no tool running, so a quiet test command is never cut off.
+- Orc stops Pi only after the idle limit passes with no output and no tool running, so a quiet build, lint, or typecheck command is never cut off.
 
 ## Failed commands
 

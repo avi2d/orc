@@ -110,7 +110,7 @@ const latestSessionFile = (run: HistoryRun, dirs: ReadonlyArray<string>): Effect
 interface PriorProgress {
   readonly priorId: string
   readonly implementPassed: boolean
-  readonly checksPassed: boolean
+  readonly checksComplete: boolean
   readonly implementSource: string | null
   readonly implementSessionId: string | null
   readonly implementAgent: { readonly agentFile: string | null; readonly model: string | null; readonly thinking: string | null }
@@ -125,7 +125,7 @@ const readPriorProgress = (db: Database, run: HistoryRun, prior: RunRecord): Eff
     const steps = yield* stepsForRun(db, prior.id).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
     const implementSteps = steps.filter((step) => step.name === "implement")
     const implementPassed = implementSteps.some((step) => step.status === "passed")
-    const checksPassed = steps.some((step) => step.name === "checks" && step.status === "passed")
+    const checksComplete = steps.some((step) => step.name === "checks" && (step.status === "passed" || step.status === "skipped"))
     const implementFile = implementSteps.flatMap((step) => step.piSessionFile === null ? [] : [step.piSessionFile]).at(-1) ?? null
     const implementRow = implementSteps.at(-1) ?? null
     const implementAgent = { agentFile: implementRow?.agentFile ?? null, model: implementRow?.model ?? null, thinking: implementRow?.thinking ?? null }
@@ -147,7 +147,7 @@ const readPriorProgress = (db: Database, run: HistoryRun, prior: RunRecord): Eff
       ? sessionIdFromFile(liveFile)
       : null
     const fixSource = liveFixId !== null ? liveFile : storedFixFile
-    return { priorId: prior.id, implementPassed, checksPassed, implementSource, implementSessionId, implementAgent, fixSource, fixSessionId: liveFixId ?? sessionIdFromFile(storedFixFile), fixRunning: interruptedFix, storedFixes }
+    return { priorId: prior.id, implementPassed, checksComplete, implementSource, implementSessionId, implementAgent, fixSource, fixSessionId: liveFixId ?? sessionIdFromFile(storedFixFile), fixRunning: interruptedFix, storedFixes }
   })
 
 const decodeJsonLine = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
@@ -260,7 +260,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     const sentBack = sentBackWordsOf(answers).length > 0
     const carriedFix = sentBack ? null : yield* carrySession(run, progress.fixSource, progress.fixSessionId)
     const skipImplement = progress.implementPassed && !sentBack
-    const skipChecks = skipImplement && progress.checksPassed
+    const skipChecks = skipImplement && progress.checksComplete
     const inherited = skipImplement
       ? yield* inheritedCompletion(db, run, progress.priorId, progress.storedFixes)
       : { inheritedRounds: [], inheritedFixes: [] }
