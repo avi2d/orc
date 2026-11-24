@@ -31,6 +31,7 @@ import {
   machineSchedulesLayer,
   noMistakesMachinesLayer,
   orcMachinesLayer,
+  orcQuotaSourceLayer,
   pueueMachinesLayer,
   quotaSourceLayer,
   remoteTaskHistoryLayer,
@@ -79,6 +80,7 @@ const recordedAnswers: ReadonlyArray<readonly [string, string]> = [
   [`sh -c ${tasksCommand}`, fixture("tasks/east.json")],
   ["orc heavy check --json", fixture("heavy/check.json")],
   ["orc attention --json", fixture("attention/open.json")],
+  ["orc quota --json", fixture("orc-quota/second-login-expired.json")],
   ...queueAnswers,
 ];
 
@@ -128,6 +130,7 @@ const recordedSources = (
 ) =>
   Layer.mergeAll(
     quotaSourceLayer,
+    orcQuotaSourceLayer,
     attentionSourceLayer,
     recordedSavedProfilesLayer,
     macHostSourceLayer,

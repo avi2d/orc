@@ -3,6 +3,7 @@ import { DateTime } from "effect";
 import { decodeQuota, decodeSavedProfiles, quotaBlocks } from "@avi2dg/orc-schema";
 import { plain, quotaLines, quotaPlaced, quotaSection, reserveQuotaSection } from "@avi2dg/orc-quota";
 import { fixture } from "../../lib/fixtures";
+import { noOrcAccounts } from "../../lib/orc-quota";
 import { quotaAxiRead } from "../../lib/quota-read";
 
 const now = DateTime.makeUnsafe("2026-10-13T20:18:16Z");
@@ -25,7 +26,7 @@ const blocks = () => {
   const quota = decodeQuota(noneSetUp());
   const savedProfiles = decodeSavedProfiles(JSON.stringify({ schema: 2, active_profile: null, profiles: [] }));
   if (quota.kind !== "ok" || savedProfiles.kind !== "ok") throw new Error("the fixtures do not decode");
-  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: now }), { ...savedProfiles, capturedAt: now }, now);
+  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: now }), { ...savedProfiles, capturedAt: now }, noOrcAccounts(now), now);
 };
 
 const look = { focused: false, title: undefined, below: [], alone: false };

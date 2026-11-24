@@ -18,7 +18,7 @@ A panel reports a missing tool without stopping the rest of the screen.
 | [`herdr`](https://herdr.dev) 0.9.5 | Agent sessions named by pane |
 | `pueue` 4.0.4 | Queued and running jobs |
 | [`no-mistakes`](https://github.com/kunchenguid/no-mistakes) | Full review fix stages |
-| `orc` | Orc run stages and the attention queue |
+| `orc` | Orc run stages, the attention queue and the dispatch accounts |
 | `gh` | GitHub Actions and runner repositories |
 
 Put the tools you use on `PATH`.
@@ -57,6 +57,7 @@ Each panel reads its settings from its key under `panels` in the [dashboard conf
 <div id="run-the-quota-tool"><span id="show-saved-profiles"></span><span id="show-each-claude-account"></span></div>
 
 [Quota](dash-quota.md) shows account limits.
+It shows the [dispatch accounts](dash-quota.md#show-the-dispatch-accounts) from `orc quota --json`.
 Configure [saved profiles](dash-quota.md#show-saved-profiles) or [Claude accounts](dash-quota.md#show-each-claude-account).
 
 <div id="run-the-session-quota-tool"></div>
@@ -106,7 +107,10 @@ See [Develop orc-dash](dash-development.md) for checks and source paths.
 
 The quota tool could not start `quota-axi`.
 Install it and check that it runs on the panel machine's `PATH`.
-If `claude saved` is unreachable, run `sh -c "$ORC_DASH_SAVED_PROFILES"` and check its output.
+
+### The quota panel's accounts block shows an error
+
+Run `orc quota --json` and check its output.
 
 ### The other machine's resources panel says it is unreachable
 

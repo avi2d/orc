@@ -71,6 +71,7 @@ export {
   countdown,
   failureLine,
   failureLines,
+  noteLines,
   gib,
   leftHealth,
   loadHealth,

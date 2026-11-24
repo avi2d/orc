@@ -1,0 +1,1 @@
+{"kind":"read","floorPercent":20,"accounts":[{"account":"main","kind":"usable","remainingPercent":77,"resetsAt":"2026-12-01T04:00:00.080Z"},{"account":"second","kind":"usable","remainingPercent":0,"resetsAt":"2026-11-24T21:00:00.000Z"},{"account":"third","kind":"usable","remainingPercent":-1,"resetsAt":"2026-11-24T21:00:00.000Z"}],"pick":"main"}
