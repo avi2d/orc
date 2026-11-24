@@ -39,7 +39,6 @@ const copyInstructions = (
 
 const piAgentDirOf = (path: Path.Path, runDir: string): string => path.join(runDir, "session", "agent")
 
-// A failed removal leaves only disk use behind, so it is logged and the run keeps its ending.
 export const dropPiAgentDir = (fs: FileSystem.FileSystem, path: Path.Path, runDir: string): Effect.Effect<void> => {
   const dir = piAgentDirOf(path, runDir)
   return fs.remove(dir, { recursive: true, force: true }).pipe(
@@ -47,7 +46,6 @@ export const dropPiAgentDir = (fs: FileSystem.FileSystem, path: Path.Path, runDi
   )
 }
 
-// A failed read counts as parked, so the folder stays whenever the open questions are unknown.
 const endsParked = (db: Database, runId: string, report: OrcRunReport): Effect.Effect<boolean> =>
   report.completed
     ? Effect.succeed(false)

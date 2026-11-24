@@ -115,6 +115,39 @@ describe("the Pi agent folder after a run ends", () => {
     })
   })
 
+  test("a successful run drops the agent folder without deleting the report, task, logs or sessions", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const run = await preparedRun(home, "run-success", "2026-11-24T09:00:00.000Z")
+        await writeFile(join(run.projectDir, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
+        const session = await writeSession(run, "success-1")
+        await writeFile(session, JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "ORC_COMPLETE" }] } }) + "\n")
+        const runner = {
+          start: () => Effect.succeed({ stdout: "outcome: passed\npr: https://example.com/pr/1\n", stderr: "", exitCode: 0 }),
+          reattach: Effect.die("unexpected reattach"),
+          respond: () => Effect.die("unexpected gate"),
+          answer: () => Effect.die("unexpected question"),
+          status: () => Effect.die("unexpected status"),
+          logs: () => Effect.die("unexpected logs")
+        }
+        const report = await Effect.runPromise(runWithHistory(db, { ...run, delivery: { kind: "no-mistakes", runner } }, fakeOps({
+          runAgent: async () => ({ sessionId: "success-1", commits: [{ sha: "abc1234" }] }),
+          execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
+        }, run.hostSessionsDir)))
+        expect(report.completed).toBe(true)
+        expect(await exists(join(run.piSessionDir, "agent"))).toBe(false)
+        expect(await exists(join(run.runDir, reportFileName))).toBe(true)
+        expect(await exists(run.taskPath)).toBe(true)
+        expect(await exists(join(run.runDir, "agent.log"))).toBe(true)
+        expect(await exists(join(run.runDir, "prepare.log"))).toBe(true)
+        expect(await exists(session)).toBe(true)
+      } finally {
+        db.close()
+      }
+    })
+  })
+
   test("a parked run keeps session/agent instead of dropping it, and the next run resumes its session", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)

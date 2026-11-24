@@ -141,7 +141,7 @@ export const runReport = (
       prLink: null,
       endReason: outcome.kind === "reported" ? "Pi wrote " + outcome.report : outcome.reason
     }).pipe(Effect.mapError((cause) => historyFailure("record the run in", cause)))
-    if (outcome.kind === "reported" || (outcome.kind === "unreported" && piEnd.kind !== "unanswered")) {
+    if (outcome.kind !== "stopped") {
       yield* dropPiAgentDir(fs, yield* Path.Path, run.runDir)
     }
     return outcome
