@@ -84,6 +84,7 @@ const launcher = (call: StandinCall): string => {
   return `#!/bin/sh
 # ${standinMarker}. Regenerated on every run of that command.
 [ -x ${quoteSingle(bun)} ] && [ -f ${quoteSingle(main)} ] && exec ${helperCommand.map(quoteSingle).join(" ")} ${quoteSingle(JSON.stringify(call))} "$0" "$@"
+[ "$HEAVY_TESTS_CI_ONLY" != "1" ] || { echo "orc heavy: cannot enforce CI-only tests without the stand-in helper; rerun orc to rewrite the stand-ins" >&2; exit 127; }
 echo ${quoteSingle(warning)} >&2
 [ -z "$HEAVY_CLASSIFY" ] || exit 1; ${direct}
 `

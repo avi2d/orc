@@ -22,6 +22,11 @@ On the host they get a short list that adds the shell, the temp folder, `XDG_RUN
 No `ORC_` variable reaches Pi or the checks.
 With the default sandbox, if nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc names that error in the result.
 
+Orc refuses a checkout with uncommitted changes or unsafe local git configuration.
+Set `ORC_REFUSE_MARKERS` to comma-separated names to reject a marker in the checkout or its parent.
+
+## Local checks and CI
+
 For a ship run, commit a `.no-mistakes.yaml` at the project root with at least one command.
 For example:
 
@@ -31,13 +36,13 @@ commands:
 ```
 
 Orc runs only `build`, `lint`, and `typecheck` as local checks.
-It names skipped commands, except `prepare`, which runs before Pi starts.
+It names skipped commands in the first checks round.
+The `prepare` command runs before Pi starts and is not skipped.
 Without local checks, orc skips that round and continues to CI.
 GitHub CI runs repository tests and decides completion.
 Keep test runners out of those commands and `prepare`.
+The heavy-queue stand-ins refuse test runners and test scripts in worker sessions.
 Orc starts no-mistakes without its local Test step.
-Orc refuses a checkout with uncommitted changes or unsafe local git configuration.
-Set `ORC_REFUSE_MARKERS` to comma-separated names to reject a marker in the checkout or its parent.
 
 ## Choose the run
 

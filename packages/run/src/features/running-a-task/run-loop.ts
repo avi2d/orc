@@ -228,7 +228,7 @@ const fixOnce = (
     }
   })
 
-const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
+const readProjectChecks = (run: HistoryRun, round: number): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
   Effect.gen(function*() {
     const text = yield* run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the checks config .no-mistakes.yaml: " + readFailure(cause) }))
@@ -238,7 +238,7 @@ const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksC
     )
     const local = localChecksOf(commands)
     const skipped = commands.filter((check) => check.name !== "prepare" && !local.includes(check)).map((check) => check.name)
-    if (skipped.length > 0 || local.length === 0) {
+    if (round === 1 && (skipped.length > 0 || local.length === 0)) {
       yield* Console.warn("orc: warning: " + (skipped.length === 0 ? "" : "skipped local commands: " + skipped.join(", ") + ". ") + (local.length === 0 ? "No local checks ran. " : "") + "GitHub CI decides completion.")
     }
     return local
@@ -289,7 +289,7 @@ const runChecksFixLoop = (
     for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
       const started = new Date().toISOString()
       yield* checkpoints.checksRoundStart(round, started)
-      const commands = yield* readProjectChecks(run)
+      const commands = yield* readProjectChecks(run, round)
       const outcome = yield* runChecksRound(ops.execCheck, run.fs, run.path, run.piSessionDir, round, commands).pipe(
         Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
       )

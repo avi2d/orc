@@ -21,7 +21,7 @@ import {
   type QuestionAnswer
 } from "./no-mistakes-gate"
 import { openDriveLog, type DriveLog, type Ending, type NoMistakesRecord } from "./no-mistakes-drive-log"
-import { hasTable, scalar } from "../../shared/lib/index"
+import { ciOnlyTestsEnv, hasTable, scalar } from "../../shared/lib/index"
 export { answerArgsFor, answerForGate, askUserWord, omittedQuestionIds, parseRun } from "./no-mistakes-gate"
 export type { AllowWord, NoMistakesFinding, QuestionAnswer } from "./no-mistakes-gate"
 export type { NoMistakesRecord } from "./no-mistakes-drive-log"
@@ -100,7 +100,7 @@ const spawnBinary = (options: NoMistakesHost, cwd: string, args: ReadonlyArray<s
   Effect.scoped(Effect.gen(function*() {
     const handle = yield* options.spawner.spawn(ChildProcess.make(options.binary, [...args], {
       cwd,
-      env: { ...hostGitSafetyEnv, PATH: options.git.slice(0, options.git.lastIndexOf("/")) + ":" + options.pathEnv },
+      env: { ...hostGitSafetyEnv, ...ciOnlyTestsEnv, PATH: options.git.slice(0, options.git.lastIndexOf("/")) + ":" + options.pathEnv },
       extendEnv: true
     }))
     return yield* collectOutput(handle)

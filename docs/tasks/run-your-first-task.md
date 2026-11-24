@@ -51,7 +51,7 @@ commands:
   lint: bun run lint
 ```
 
-Follow the local-check and GitHub CI policy in [Running a task](../run/running-a-task.md).
+Follow the local-check and GitHub CI policy in [Local checks and CI](../run/running-a-task.md#local-checks-and-ci).
 
 ## Run the task
 

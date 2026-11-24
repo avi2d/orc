@@ -101,6 +101,59 @@ const skipLeading = (args: Args, valued: Args, single: (word: string) => boolean
   return args.slice(at)
 }
 
+const testScripts: Args = [
+  "test", "tests", "t", "test:*", "tests:*", "e2e", "e2e:*", "coverage", "coverage:*", "mutation", "mutation:*",
+  "vitest", "jest", "pytest", "playwright"
+]
+
+const testArgs = (args: Args): Args => skipLeading(
+  args,
+  [
+    "--filter", "-F", "--cwd", "-C", "--dir", "--workspace", "-w", "--prefix", "--package", "-p", "workspace",
+    "--config", "--env-file", "--preload", "--require", "--sdk", "--toolchain"
+  ],
+  (word) => word.startsWith("-")
+)
+
+const execTest = (args: Args): boolean => {
+  const [tool = "", ...rest] = testArgs(args)
+  return isTestCall(tool, rest)
+}
+
+export const isTestCall = (tool: string, args: Args): boolean => {
+  const [sub = "", ...rest] = testArgs(args)
+  switch (tool) {
+    case "vitest":
+    case "jest":
+    case "pytest":
+      return true
+    case "bunx":
+    case "npx":
+      return execTest(args)
+    case "bun":
+    case "npm":
+    case "pnpm":
+    case "yarn":
+      if (["run", "run-script"].includes(sub)) {
+        return matchesAny(testArgs(rest)[0] ?? "", testScripts)
+      }
+      if (["exec", "x", "dlx"].includes(sub)) {
+        return execTest(rest)
+      }
+      return matchesAny(sub, testScripts) || isTestCall(sub, rest)
+    case "playwright":
+    case "go":
+    case "cargo":
+      return sub === "test"
+    case "xcodebuild":
+      return hasAny(args, ["test", "test-without-building"])
+    case "xcrun":
+      return execTest(args)
+    default:
+      return false
+  }
+}
+
 const runScript = (args: Args): HeavyDecision => {
   const [script = "", ...rest] = skipLeading(args, ["--filter", "--cwd", "-w", "--workspace", "--prefix"], (word) => word.startsWith("-"))
   if (matchesAny(script, watchScripts) || !matchesAny(script, heavyScripts) || hasAny(rest, watchFlags)) {

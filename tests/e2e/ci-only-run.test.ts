@@ -3,6 +3,9 @@ import { Database } from "bun:sqlite"
 import { readdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { git, prUrl, runOrc, withNoSandboxFixture, writeScript } from "./no-sandbox-fixture"
+import { exerciseCiOnlyWorkers } from "./ci-only-worker-fixture"
+
+test("worker test attempts never start runners while permitted checks and non-worker tests still run", exerciseCiOnlyWorkers, 60_000)
 
 test.each([
   { verdict: "checks-passed", exitCode: 0 },
