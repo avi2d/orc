@@ -1,5 +1,5 @@
-import { runStandin, waitOwned } from "./heavy-standin-exec"
-import { waiterWord } from "./heavy-standin-runtime"
+import { resolveCiOnly, runStandin, waitOwned } from "./heavy-standin-exec"
+import { ciOnlyWord, waiterWord } from "./heavy-standin-runtime"
 
 const [first = "", ...rest] = process.argv.slice(2)
-process.exitCode = (first === waiterWord ? await waitOwned(rest) : await runStandin(first, rest))
+process.exitCode = first === waiterWord ? await waitOwned(rest) : first === ciOnlyWord ? resolveCiOnly(rest) : await runStandin(first, rest)

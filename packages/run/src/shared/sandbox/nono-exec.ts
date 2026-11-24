@@ -3,7 +3,7 @@ import type { PlatformError } from "effect/PlatformError"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { homedir } from "node:os"
 import { agentEnv, type AgentExec } from "./agent-exec"
-import { standinDirSuffix } from "./standin-dir"
+import { isStandinDir } from "./standin-dir"
 import { NonoProviderError, prepareSandboxShims, resolveDeveloperDir, resolveHostBinary, resolvePiAgentDir, resolveRuntime } from "./host"
 import { buildHostGitEnv, checkProfile, refuseCredentialBearingCheckout, resolveRoots, sandboxEnv, sandboxRuntimes, standinDirsOf } from "./nono"
 import { defaultToolchainResolver, selectNonoProfile, type ModelCredential, type ToolchainResolver } from "./nono-profile"
@@ -51,7 +51,7 @@ export const toolTimeCap = (fs: FileSystem.FileSystem, path: Path.Path, home: st
   )
 
 const runtimeSearchPath = (searchPath: string): string =>
-  searchPath.split(":").filter((entry) => !entry.endsWith(standinDirSuffix)).join(":")
+  searchPath.split(":").filter((entry) => !isStandinDir(entry)).join(":")
 
 export type NonoExec = Extract<AgentExec, { readonly kind: "nono" }>
 

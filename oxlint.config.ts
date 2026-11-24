@@ -6,6 +6,7 @@ export default defineConfig({
     excludeFiles: [
       "packages/run/src/entities/agent/orc-ask-extension.ts",
       "packages/run/src/entities/heavy-queue/heavy-process-tree.ts",
+      "packages/run/src/entities/heavy-queue/heavy-runner-entry.ts",
       "packages/run/src/entities/heavy-queue/heavy-pueue-task.ts",
       "packages/run/src/entities/heavy-queue/heavy-standin-exec.ts",
       "packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts"
