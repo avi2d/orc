@@ -172,6 +172,8 @@ const expectedFiles = [
   "src/widgets/beat/load.ts",
   "src/shared/config/machine-reach.ts",
   "src/entities/pull-request/merge-basis.ts",
+  "src/features/merging-a-pr/base-ci.ts",
+  "src/features/merging-a-pr/branch-update.ts",
   "src/features/merging-a-pr/merge.ts",
   "src/features/merging-a-pr/pending-update.ts",
   "src/entities/parked-runs/parked.ts",
