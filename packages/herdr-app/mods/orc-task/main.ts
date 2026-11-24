@@ -58,6 +58,10 @@ export default class OrcTask extends View {
     cx.spawn((task) => listenFor("merge", () => this.merge(task)))
   }
 
+  reload(cx: Context): void {
+    reloadNow(cx, this)
+  }
+
   orc(cx: Context, key: string, argv: ReadonlyArray<string>, done: () => void): void {
     const issued = this.selectSeq
     sendOrc(this, cx, key, argv, done, () => issued === this.selectSeq)

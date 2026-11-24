@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, cardPlace, filterCards, namedModels, opensTurns, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
+import { buildCards, cardAnswers, cardPlace, filterCards, namedModels, opensTurns, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
+import type { InboxAnswer, InboxApproval } from "../../../packages/herdr-app/src/inbox"
+import { askText } from "../../../packages/herdr-app/src/thread"
 
 const run = (id: string, fields: Partial<Run>): Run => ({
   id, project: "/work/orc", branch: `orc/x-${id}`, status: "running", prLink: null, title: `run ${id}`, step: null, questions: 0, endReason: null, kind: null, delivery: null, worktree: null, ...fields
@@ -13,22 +15,34 @@ const task = (id: string, fields: Partial<Task>): Task => ({
 const runs = (list: ReadonlyArray<Run>): Runs => ({ schema: "orc.runs.v1", runs: list })
 const backlog = (tasks: ReadonlyArray<Task>, merged: ReadonlyArray<string> = []): Backlog => ({ schema: "orc.backlog.v1", tasks, merged })
 
+const answer = (id: string, who: InboxAnswer["who"] = "worker"): InboxAnswer => ({
+  key: `${id}/question`, kind: "question", task: id, title: `task ${id}`, who, asked: null,
+  ask: askText("Which layout?"), recommendation: null, action: { kind: "answer", target: { kind: "question", id: "ask-1" } }
+})
+
+const approval: InboxApproval = {
+  key: "orc-48/pr", kind: "pr", task: "orc-48", title: "task orc-48", who: "beat", asked: null,
+  link: "https://github.com/o/r/pull/48", ask: askText("Merge the PR https://github.com/o/r/pull/48?"), recommendation: null,
+  action: { kind: "merge", argv: ["merge", "orc-48", "--basis", "captain-word"] }
+}
+
 const board = buildCards(
   runs([
     run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" }),
     run("20261113-080000-bbbbbb", { status: "failed", endReason: "orc exited 1" }),
     run("20261113-070000-cccccc", { status: "running", step: { id: 4, name: "fix", attempt: 1, status: "running" } }),
-    run("20261113-060000-dddddd", { status: "running", questions: 1, project: "/work/herdr" }),
+    run("20261113-060000-dddddd", { status: "running", questions: 1, branch: "orc/herdr-1", project: "/work/herdr" }),
     run("20261113-050000-eeeeee", { status: "succeeded", prLink: "https://github.com/o/r/pull/12" })
   ]),
-  backlog([task("orc-48", { status: "closed" }), task("orc-50", {})])
+  backlog([task("orc-48", { status: "closed" }), task("orc-50", {}), task("herdr-1", { project: "herdr" })]),
+  [approval, answer("herdr-1")]
 )
 
 describe("sending a PR back", () => {
   const prRun = run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })
 
   test("a closed task's open PR offers send-back with the captain's words, not an empty review", () => {
-    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed" })]))
+    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed" })]), [approval])
     expect(card.sendBack).toBe("orc-48")
     expect(sendBackArgs({ sendBack: "orc-48" }, "  rename the flag ")).toEqual(["backlog", "send-back", "orc-48", "rename the flag"])
     expect(sendBackArgs({ sendBack: "orc-48" }, "   ")).toBeNull()
@@ -105,10 +119,24 @@ describe("the runs list", () => {
   test("a parked task with an open question keeps its own card beside its failed run", () => {
     const cards = buildCards(
       runs([run("20261113-090000-aaaaaa", { status: "failed", branch: "orc/orc-7", endReason: "old" })]),
-      backlog([task("orc-7", { status: "new", hold: 1 })])
+      backlog([task("orc-7", { status: "new", parked: 1 })]),
+      [answer("orc-7")]
     )
     expect(cards.map((card) => [card.id, card.runId, card.standing.status])).toEqual([["orc-7", null, "Awaiting you"], ["orc-7", "20261113-090000-aaaaaa", "Failed"]])
     expect(filterCards(cards, { project: null, status: "Awaiting you" }).map((card) => card.where)).toEqual(["Question 1"])
+  })
+
+  test("a stale run count does not leave an answered question's card Awaiting you", () => {
+    const running = run("20261113-090000-aaaaaa", { branch: "orc/orc-7", questions: 1 })
+    const [card] = buildCards(runs([running]), backlog([task("orc-7", { status: "started", parked: 1 })]), [])
+    expect(card.standing.status).toBe("Running")
+  })
+
+  test("a live question belongs to its waiting run and not also to a task card with no run", () => {
+    const running = run("20261113-090000-aaaaaa", { branch: "orc/orc-7", questions: 1 })
+    const question = answer("orc-7")
+    const cards = buildCards(runs([running]), backlog([task("orc-7", { status: "started", parked: 1 })]), [question])
+    expect(cards.map((card) => [card.runId, card.standing.status, cardAnswers(card)])).toEqual([[running.id, "Awaiting you", [question]]])
   })
 
   test("a merged PR's run is Done, not still awaiting approval", () => {
@@ -154,7 +182,7 @@ describe("the selected run's steps", () => {
   })
 
   test("a running step that waits on an answer is ◆, not ●", () => {
-    const rows = stepRows({ status: "Awaiting you", waiting: { on: "answer" } }, [{ id: 1, name: "implement", attempt: 1, status: "running", from: null }], "ship", null)
+    const rows = stepRows({ status: "Awaiting you", waiting: { on: "answer", items: [answer("orc-7")] } }, [{ id: 1, name: "implement", attempt: 1, status: "running", from: null }], "ship", null)
     expect(rows.map((row) => row.mark)).toEqual(["◆", "○", "○"])
   })
 
@@ -271,7 +299,8 @@ describe("the Approve step and the Changes column of a run", () => {
   test("a Code run awaiting approval ends in Approve, not in its delivery step", () => {
     const cards = buildCards(
       runs([run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })]),
-      backlog([task("orc-48", { status: "closed" })])
+      backlog([task("orc-48", { status: "closed" })]),
+      [approval]
     )
     const standing = cards[0]?.standing ?? { status: "Queued" as const }
     const rows = stepRows(standing, [
