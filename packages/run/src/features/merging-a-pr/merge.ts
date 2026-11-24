@@ -1,11 +1,12 @@
-import { Console, Duration, Effect, Ref, type FileSystem, type Path } from "effect"
+import { Console, Duration, Effect, Ref, Schema, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, backlogPaths, decisionRefusal, findTask, taskPr, type TaskFileError } from "../../entities/backlog/index"
 import { isYolo, readDispatchConfig, readProjects } from "../../shared/config/index"
 import type { ConfigError } from "../../shared/config/index"
 import type { RunnerError } from "../../shared/process/index"
 import type { MergeBasis } from "../../entities/pull-request/index"
-import { checkRefusals, gh, greenChecks, prPattern, type PullRequestView, readPullRequest, redChecks } from "../../entities/pull-request/index"
+import { checkRefusals, CommitSha, gh, greenChecks, prPattern, type PullRequestView, readPullRequest, redChecks } from "../../entities/pull-request/index"
+import { watchMainCi } from "./main-ci"
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
 
@@ -15,10 +16,56 @@ const refusal = (id: string, url: string, reasons: ReadonlyArray<string>): strin
 const readView = (url: string) =>
   readPullRequest(url).pipe(Effect.mapError((error) => new BacklogError({ detail: "orc merge " + error.detail })))
 
+const ChangedFiles = Schema.Array(Schema.Struct({
+  filename: Schema.NonEmptyString,
+  previous_filename: Schema.optional(Schema.NonEmptyString)
+}))
+const decodeComparison = Schema.decodeEffect(Schema.fromJsonString(Schema.Struct({
+  behind_by: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  base_commit: Schema.Struct({ sha: CommitSha }),
+  merge_base_commit: Schema.Struct({ sha: CommitSha }),
+  files: ChangedFiles
+})))
+const decodeChangedFiles = Schema.decodeEffect(Schema.fromJsonString(ChangedFiles))
+
+const compare = (url: string, from: string, to: string, jq: string, firstPageOnly: boolean) => {
+  const [, host = "", owner = "", repo = ""] = prPattern.exec(url) ?? []
+  const range = encodeURIComponent(from) + "..." + encodeURIComponent(to)
+  return gh(["api", "--hostname", host, "repos/" + owner + "/" + repo + "/compare/" + range + (firstPageOnly ? "?per_page=1" : ""), "--jq", jq])
+}
+
+const changedPaths = (files: typeof ChangedFiles.Type): ReadonlyArray<string> =>
+  files.flatMap(({ filename, previous_filename }) => previous_filename === undefined ? [filename] : [filename, previous_filename])
+
+const compareFileLimit = 300
+const selectFiles = "map({filename, previous_filename} | del(.previous_filename | nulls))"
+
+const branchUpdate = Effect.fnUntraced(function*(landing: Landing, view: PullRequestView) {
+  const { id, url } = landing
+  const unread = (said: string) => refuse(refusal(id, url, ["cannot compare its changed files with " + view.baseRefName + ": " + said]))
+  const pr = yield* compare(url, view.baseRefName, view.headRefOid, "{behind_by, base_commit: {sha: .base_commit.sha}, merge_base_commit: {sha: .merge_base_commit.sha}, files: (.files | " + selectFiles + ")}", true)
+  if (pr.exitCode !== 0) {
+    return yield* unread(pr.said)
+  }
+  const comparison = yield* decodeComparison(pr.stdout).pipe(Effect.catch((error) => unread(error.message)))
+  if (comparison.behind_by === 0) {
+    return "current" as const
+  }
+  const base = yield* compare(url, comparison.merge_base_commit.sha, comparison.base_commit.sha, ".files | " + selectFiles, true)
+  if (base.exitCode !== 0) {
+    return yield* unread(base.said)
+  }
+  const baseFiles = yield* decodeChangedFiles(base.stdout).pipe(Effect.catch((error) => unread(error.message)))
+  const prPaths = new Set(changedPaths(comparison.files))
+  // GitHub caps comparison files at 300, even when paginating commits.
+  return comparison.files.length >= compareFileLimit || baseFiles.length >= compareFileLimit || changedPaths(baseFiles).some((path) => prPaths.has(path))
+    ? "update" as const
+    : "disjoint" as const
+})
+
 const behindBy = (id: string, url: string, view: PullRequestView) =>
   Effect.gen(function*() {
-    const [, host = "", owner = "", repo = ""] = prPattern.exec(url) ?? []
-    const compared = yield* gh(["api", "--hostname", host, "repos/" + owner + "/" + repo + "/compare/" + encodeURIComponent(view.baseRefName) + "..." + view.headRefOid, "--jq", ".behind_by"])
+    const compared = yield* compare(url, view.baseRefName, view.headRefOid, ".behind_by", false)
     const behind = Number(compared.stdout.trim())
     if (compared.exitCode !== 0 || compared.stdout.trim() === "" || !Number.isInteger(behind)) {
       return yield* refuse(refusal(id, url, ["cannot tell whether it is behind " + view.baseRefName + ": " + compared.said]))
@@ -246,6 +293,15 @@ export const mergeTask = (
     if (reasons.length > 0) {
       return yield* refuse(refusal(id, url, reasons))
     }
-    const behind = yield* behindBy(id, url, view)
-    return yield* behind > 0 ? landUpdated(landing, view) : mergeAt(landing, view)
+    const update = yield* branchUpdate(landing, view)
+    if (update === "update") {
+      return yield* landUpdated(landing, view)
+    }
+    const merged = yield* mergeAt(landing, view)
+    if (update === "disjoint") {
+      yield* watchMainCi(root, { task: id, url, branch: view.baseRefName, checkedHead: view.headRefOid }).pipe(
+        Effect.catchTag("BacklogError", (error) => refuse(merged + ", but Orc could not watch main CI: " + error.detail))
+      )
+    }
+    return merged
   })

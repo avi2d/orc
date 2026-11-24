@@ -85,6 +85,7 @@ export const checkRefusals = (view: PullRequestView): ReadonlyArray<string> => {
 }
 
 export const prPattern = /^https:\/\/([^/]+)\/([^/]+)\/([^/]+)\/pull\/\d+$/
+export const CommitSha = Schema.String.check(Schema.isPattern(/^[0-9a-f]{40}$/))
 
 type Said = Captured & { readonly said: string }
 

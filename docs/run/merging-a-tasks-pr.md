@@ -14,14 +14,25 @@ Each refusal starts `orc merge refused <task-id> and merged nothing` and names e
 Otherwise orc runs `gh pr merge <url> --squash --match-head-commit <sha>` at the head it checked, so a push after the check merges nothing.
 
 ## A PR behind its base
-When the compare API's `behind_by` says an open green PR is behind its base, orc updates the branch instead of refusing it.
-It prints `Updating from main` and runs `gh api -X PUT repos/<owner>/<repo>/pulls/<n>/update-branch -f expected_head_sha=<sha>` with the head it checked.
+When an open green PR is behind its base, Orc compares the files each side changed since the merge base.
+If the two lists share no path, Orc merges at the head it checked without updating the branch.
+Orc counts both paths of a renamed file.
+If GitHub returns its limit of 300 files on either side, Orc updates the branch because the lists may be incomplete.
+When the lists share a path, Orc updates the branch before merging.
+
+To update the branch, Orc prints `Updating from main` and runs `gh api -X PUT repos/<owner>/<repo>/pulls/<n>/update-branch -f expected_head_sha=<sha>` with the head it checked.
 It then prints `Checks running` and reads the PR again with `gh pr view`, first after 1 second and then at doubling waits of at most 15 seconds.
 It waits until the head has moved, every check on the new head has reported and every check that was green on the checked head is green on the new head, for at most 20 minutes.
 A read that fails during the wait counts as no answer, and orc keeps waiting until the 20 minutes end.
 It stops waiting early once a check on the new head is red.
 It reads the new head's parents and treats a head that leaves out the checked head as changed after the approval.
 Once the new head is green and no longer behind, orc runs `gh pr merge <url> --squash --match-head-commit <new sha>`.
+
+## CI after a merge without an update
+
+When Orc merges a behind PR without updating it, the next beats look for push workflow runs on the base branch at the squash commit.
+A failed run raises a CI alarm in Orc chat with links to the PR and the run.
+A red run at another commit does not raise an alarm for this merge.
 
 ## When an update fails
 

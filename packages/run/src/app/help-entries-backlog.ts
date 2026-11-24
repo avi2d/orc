@@ -171,7 +171,7 @@ export const beatHelp: HelpEntry = {
 export const mergeHelp: HelpEntry = {
   usage: ["orc merge <task-id> [--basis <" + mergeBases.join("|") + ">]"],
   summary: "Merge a closed task's PR once its checks are green",
-  about: "Merges the PR of a closed task with a squash at the head it checked, and refuses a PR that is not open or not green. When the PR is behind its base, runs GitHub's update-branch at the checked head, waits up to 20 minutes for the checks on the new head and merges it once they are green. When update-branch reports a merge conflict or a check on the new head is red, merges nothing and sends the task back for a fix as orc backlog send-back does.",
+  about: "Merges the PR of a closed task with a squash at the head it checked, and refuses a PR that is not open or not green. When the PR is behind its base and the two sides changed no shared file, merges without updating and reports failed CI on the squash commit. When they share a changed file or GitHub caps either file list, runs GitHub's update-branch at the checked head, waits up to 20 minutes for the new checks and merges once they are green. When update-branch reports a merge conflict or a check on the new head is red, merges nothing and sends the task back for a fix as orc backlog send-back does.",
   options: [{ flag: "--basis <" + mergeBases.join("|") + ">", meaning: "Why the merge is allowed. Defaults to captain-word, and yolo-green needs a project with yolo set." }],
   examples: ["orc merge orc-9", "orc merge orc-9 --basis yolo-green"]
 }

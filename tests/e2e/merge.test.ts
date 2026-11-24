@@ -14,6 +14,15 @@ interface Rollup {
 const passed = (name: string, startedAt = "2026-11-02T10:00:00Z"): Rollup => ({ __typename: "CheckRun", name, status: "COMPLETED", conclusion: "SUCCESS", startedAt })
 
 const newHead = "fedcba9876543210fedcba9876543210fedcba98"
+const baseHead = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+const mergeBase = "cccccccccccccccccccccccccccccccccccccccc"
+const squashHead = "dddddddddddddddddddddddddddddddddddddddd"
+const ciRunUrl = "https://github.com/acme/orc/actions/runs/91"
+
+interface ChangedFile {
+  readonly filename: string
+  readonly previous_filename?: string
+}
 
 interface HeadView {
   readonly head: string
@@ -24,6 +33,8 @@ interface Forge {
   readonly state?: "OPEN" | "CLOSED" | "MERGED"
   readonly checks?: ReadonlyArray<Rollup>
   readonly behind?: number
+  readonly baseFiles?: ReadonlyArray<ChangedFile>
+  readonly mainCi?: true
   readonly update?: "updates" | "conflicts" | "head moved"
   readonly afterUpdate?: ReadonlyArray<HeadView>
   readonly parents?: string
@@ -51,6 +62,18 @@ const updateReply = (update: Forge["update"]): ReadonlyArray<string> => {
   }
 }
 
+const writeMainRuns = (fixture: Fixture, runs: ReadonlyArray<{ readonly sha: string; readonly conclusion: "failure" | "success" | null }>): Promise<void> =>
+  writeFile(join(fixture.dir, "views", "main-runs.json"), JSON.stringify([{ workflow_runs: runs.map(({ sha, conclusion }) => ({
+    id: 91,
+    name: "ci",
+    head_sha: sha,
+    head_branch: "main",
+    event: "push",
+    status: conclusion === null ? "in_progress" : "completed",
+    conclusion,
+    html_url: ciRunUrl
+  })) }]))
+
 const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
   const views = join(fixture.dir, "views")
   const state = forge.state ?? "OPEN"
@@ -59,6 +82,19 @@ const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
   await writeFile(join(views, "before.json"), viewJson(state, { head, checks: forge.checks ?? [passed("lint"), passed("test")] }))
   await Promise.all(after.map((view, index) => writeFile(join(views, "after-" + String(index + 1) + ".json"), viewJson(state, view))))
   await writeFile(join(views, "after-last.json"), viewJson(state, after.at(-1) ?? { head: newHead, checks: [] }))
+  await writeFile(join(views, "pr-comparison.json"), JSON.stringify({
+    behind_by: forge.behind ?? 0,
+    base_commit: { sha: baseHead },
+    merge_base_commit: { sha: mergeBase },
+    files: [{ filename: "shared.txt" }]
+  }))
+  await writeFile(join(views, "base-files.json"), JSON.stringify(forge.baseFiles ?? [{ filename: "shared.txt" }]))
+  if (forge.mainCi) {
+    await writeFile(join(views, "merged.json"), JSON.stringify({
+      state: "MERGED", mergeCommit: { oid: squashHead }, headRefOid: head, baseRefName: "main", statusCheckRollup: []
+    }))
+    await writeMainRuns(fixture, [])
+  }
   await writeFile(ghCalls(fixture), "")
   await writeFile(join(fixture.dir, "bin", "gh"), [
     "#!/bin/sh",
@@ -68,6 +104,7 @@ const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
     ...updateReply(forge.update),
     ";; esac",
     "if [ \"$1 $2\" = \"pr view\" ]; then",
+    "  if [ -f \"$VIEWS/merged\" ]; then cat \"$VIEWS/merged.json\"; exit 0; fi",
     "  if [ ! -f \"$VIEWS/updated\" ]; then cat \"$VIEWS/before.json\"; exit 0; fi",
     "  f=$(( $(cat \"$VIEWS/flaky\" 2>/dev/null || echo 0) + 1 )); echo $f > \"$VIEWS/flaky\"",
     "  if [ \"$f\" -le " + String(forge.flakyViews ?? 0) + " ]; then echo 'gh: Internal Server Error (HTTP 500)' >&2; exit 1; fi",
@@ -75,13 +112,18 @@ const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
     "  if [ -f \"$VIEWS/after-$n.json\" ]; then cat \"$VIEWS/after-$n.json\"; else cat \"$VIEWS/after-last.json\"; fi",
     "  exit 0",
     "fi",
-    "case \"$*\" in *compare/main..." + head + "*) echo " + String(forge.behind ?? 0) + "; exit 0;; esac",
+    "case \"$*\" in *compare/main..." + head + "*) cat \"$VIEWS/pr-comparison.json\"; exit 0;; esac",
+    "case \"$*\" in *compare/" + mergeBase + "..." + baseHead + "*) cat \"$VIEWS/base-files.json\"; exit 0;; esac",
     "case \"$*\" in *commits/*)",
     "  c=$(( $(cat \"$VIEWS/parents-flaky\" 2>/dev/null || echo 0) + 1 )); echo $c > \"$VIEWS/parents-flaky\"",
     "  if [ \"$c\" -le " + String(forge.flakyParents ?? 0) + " ]; then echo 'gh: Not Found (HTTP 404)' >&2; exit 1; fi",
     "  echo " + (forge.parents ?? head) + "; exit 0;; esac",
+    "case \"$*\" in *actions/runs*branch=main*event=push*head_sha=" + squashHead + "*) cat \"$VIEWS/main-runs.json\"; exit $?;; esac",
     "if [ \"$1\" = api ]; then echo 0; exit 0; fi",
-    "if [ \"$1 $2\" = \"pr merge\" ]; then exit 0; fi",
+    "if [ \"$1 $2\" = \"pr merge\" ]; then",
+    "  if [ -f \"$VIEWS/merged.json\" ]; then touch \"$VIEWS/merged\"; fi",
+    "  exit 0",
+    "fi",
     "echo 'unexpected gh call' >&2",
     "exit 1",
     ""
@@ -177,8 +219,41 @@ const forgeSteps = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
 
 const sentBackTask = (fixture: Fixture): Promise<string> => readFile(join(fixture.home, "backlog", "new", "orc-1.md"), "utf8")
 
-describe("orc merge updates a PR that is only behind its base", () => {
-  test("an approved PR behind main is updated instead of refused", async () => {
+describe("orc merge compares the two sides of a PR behind its base", () => {
+  test("merges at the checked head instead of updating when the changed paths are disjoint", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 3, baseFiles: [{ filename: "base-only.txt" }] })
+      const merged = await runOrc(fixture, ["merge", "orc-1"])
+      expect(merged.stderr).toBe("")
+      expect(merged.stdout.trim()).toBe("merged orc-1 " + prUrl)
+      expect(await forgeSteps(fixture)).toEqual(["view", "pr merge " + prUrl + " --squash --match-head-commit " + head])
+    })
+  }, 60_000)
+
+  test("does not treat a capped comparison as proof the changed paths are disjoint", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, baseFiles: Array.from({ length: 300 }, (_, index) => ({ filename: "base-" + index })) })
+      const merged = await runOrc(fixture, ["merge", "orc-1"])
+      expect(merged.stderr).toBe("")
+      expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+      expect(await readFile(ghCalls(fixture), "utf8")).toContain(updateCall)
+    })
+  }, 60_000)
+
+  test("updates a PR when the base renamed a path the PR changed instead of missing the overlap", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, baseFiles: [{ filename: "renamed.txt", previous_filename: "shared.txt" }] })
+      const merged = await runOrc(fixture, ["merge", "orc-1"])
+      expect(merged.stderr).toBe("")
+      expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+      expect(await readFile(ghCalls(fixture), "utf8")).toContain(updateCall)
+    })
+  }, 60_000)
+
+  test("an approved PR with a shared changed path is updated instead of merged at its old head", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 3 })
@@ -282,7 +357,7 @@ describe("orc merge lands a green PR", () => {
       expect(merged.stderr).toBe("")
       expect(merged.stdout.trim()).toBe("merged orc-1 " + prUrl)
       expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + head])
-      expect(await readFile(ghCalls(fixture), "utf8")).toContain("api --hostname github.com repos/acme/orc/compare/main..." + head + " --jq .behind_by")
+      expect(await readFile(ghCalls(fixture), "utf8")).toContain("api --hostname github.com repos/acme/orc/compare/main..." + head + "?per_page=1")
       expect(await taskFile(fixture)).toContain(prUrl)
       expect(await taskFile(fixture)).not.toContain("merged_at")
       const board = await runOrc(fixture, ["backlog"])
@@ -310,6 +385,50 @@ describe("orc merge lands a green PR", () => {
       const merged = await runOrc(fixture, ["merge", "orc-1"])
       expect(merged.stderr).toContain("orc-1 names no PR to merge")
       expect(await readFile(ghCalls(fixture), "utf8")).toBe("")
+    })
+  }, 60_000)
+})
+
+describe("CI after merging a behind PR without an update", () => {
+  test("alerts the owner once for a failed run at the squash commit, not an earlier red run", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, baseFiles: [{ filename: "base-only.txt" }], mainCi: true })
+      expect((await runOrc(fixture, ["merge", "orc-1"])).exitCode).toBe(0)
+      const chat = sessionFor(fixture)
+      const alarms = () => chat.posted.filter((post) => post.startsWith("CI alarm:"))
+      const beat = async () => {
+        expect((await runOrc(fixture, ["beat"])).exitCode).toBe(0)
+        await chat.postClosed()
+      }
+      await writeMainRuns(fixture, [{ sha: baseHead, conclusion: "failure" }])
+      await beat()
+      expect(alarms()).toEqual([])
+      await writeMainRuns(fixture, [{ sha: squashHead, conclusion: null }])
+      await beat()
+      expect(alarms()).toEqual([])
+      await writeMainRuns(fixture, [{ sha: squashHead, conclusion: "failure" }])
+      await beat()
+      await beat()
+      expect(alarms()).toEqual(["CI alarm: orc-1 ci failed on main at " + squashHead + " after merging " + prUrl + ". Run: " + ciRunUrl])
+    })
+  }, 60_000)
+
+  test("a green squash commit settles the watch without an alarm or repeated polling", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, baseFiles: [{ filename: "base-only.txt" }], mainCi: true })
+      expect((await runOrc(fixture, ["merge", "orc-1"])).exitCode).toBe(0)
+      await writeMainRuns(fixture, [{ sha: squashHead, conclusion: "success" }])
+      for (let poll = 0; poll < 2; poll++) {
+        const beat = await runOrc(fixture, ["beat"])
+        expect(beat.exitCode).toBe(0)
+        const calls = await readFile(ghCalls(fixture), "utf8")
+        expect(calls.split("\n").filter((call) => call.includes("/actions/runs?"))).toHaveLength(1)
+      }
+      const chat = sessionFor(fixture)
+      await chat.postClosed()
+      expect(chat.posted.filter((post) => post.startsWith("CI alarm:"))).toEqual([])
     })
   }, 60_000)
 })
