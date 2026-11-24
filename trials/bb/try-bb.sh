@@ -33,11 +33,11 @@ app=$scratch/bb.app
 data=$scratch/data
 user_data=$scratch/user-data
 proof=$scratch/proof
-mkdir -p "$data" "$user_data" "$proof" "$scratch/home"
+mkdir -p "$data" "$user_data" "$proof"
 snapshot() {
   for path in "${real_data[@]}"; do
     if [ -e "$path" ]; then
-      find "$path" -type f -print0 | sort -z | xargs -0 shasum -a 256
+      find -L "$path" -type f -print0 | sort -z | xargs -0 shasum -a 256
     else
       echo "missing $path"
     fi
@@ -63,15 +63,12 @@ fi
 # A scratch identifier keeps them out of the real bb's preferences, and the edited bundle needs a fresh ad-hoc signature to launch.
 if [ "$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$app/Contents/Info.plist")" != "$trial_id" ]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $trial_id" "$app/Contents/Info.plist"
-  codesign --force --deep --sign - "$app" 2>/dev/null
+fi
+if ! codesign --verify --deep "$app" 2>/dev/null; then
+  codesign --force --deep --sign - "$app"
 fi
 export ORC_HOME=${ORC_HOME:-$real_home/.orc}
-# The orc launcher can find its runtime through HOME, which the scratch home below does not hold.
-mkdir -p "$scratch/bin"
-printf '#!/bin/bash\nHOME=%q exec %q "$@"\n' "$real_home" "$(command -v orc)" > "$scratch/bin/orc"
-chmod +x "$scratch/bin/orc"
-export PATH=$scratch/bin:$PATH
-export HOME=$scratch/home
+# HOME stays the login home: a process given another HOME finds no login keychain, and macOS then offers to reset it.
 export BB_DATA_DIR=$data
 export BB_SERVER_PORT=$port
 export BB_HOST_DAEMON_PORT=$((port + 1))
@@ -111,7 +108,7 @@ cleanup() {
 }
 trap cleanup EXIT
 # Electron keeps its own state, the Connect credential cache among it, in the userData folder, which BB_DATA_DIR does not move.
-# Chromium otherwise stores its cookie key in the login keychain, which no scratch HOME reaches.
+# The mock keychain keeps Chromium's cookie key out of the login keychain.
 "$app/Contents/MacOS/bb" --user-data-dir="$user_data" --use-mock-keychain > "$proof/bb.log" 2>&1 &
 pid=$!
 cli=$data/bin/bb
@@ -159,7 +156,7 @@ else
   echo "screenshot saved to $proof/board.png"
 fi
 stop_bb
-find "$scratch/home" "$data" "$user_data" \( -name connect-credential.bin -o -name env.json \) -print > "$proof/account-files"
+find "$data" "$user_data" \( -name connect-credential.bin -o -name env.json \) -print > "$proof/account-files"
 find "$user_data" -type f -name Cookies -print0 | while IFS= read -r -d '' cookies; do
   sqlite3 -readonly "$cookies" "select host_key from cookies where host_key like '%getbb.app'" | sed "s|^|$cookies: |"
 done >> "$proof/account-files"
