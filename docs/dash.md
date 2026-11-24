@@ -25,7 +25,7 @@ Put the tools you use on `PATH`.
 For GPU usage on WSL, the panel also checks `/usr/lib/wsl/lib`.
 Sign in to `gh` with an account that can read the repository.
 
-The tasks report, second machine, and saved quota profiles each require a shell command you configure.
+The tasks report and second machine each require a shell command you configure.
 They are off until configured.
 
 ## Install
@@ -54,7 +54,7 @@ Each panel reads its settings from its key under `panels` in the [dashboard conf
 
 ## Panel guides
 
-<div id="run-the-quota-tool"><span id="show-saved-profiles"></span><span id="show-each-claude-account"></span></div>
+<div id="run-the-quota-tool"><span id="show-each-claude-account"></span></div>
 
 [Quota](dash-quota.md) shows account limits.
 It shows the [dispatch accounts](dash-quota.md#show-the-dispatch-accounts) from `orc quota --json`.
