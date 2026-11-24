@@ -264,8 +264,13 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
       return prioritizeTask(backlogRoot(place), args.id, args.priority).pipe(Effect.map((outcome) => priorityLine(args.id, args.priority, outcome)))
     }
     case "MergeTask": {
-      return mergeTask(backlogRoot(place), args.id, args.basis, (words) =>
-        DateTime.now.pipe(Effect.flatMap((now) => sendBack(backlogRoot(place), place.home, { kind: "SendBack", id: args.id, words }, DateTime.formatIso(now)))))
+      return mergeTask(
+        backlogRoot(place),
+        args.id,
+        args.basis,
+        (words) => DateTime.now.pipe(Effect.flatMap((now) => sendBack(backlogRoot(place), place.home, { kind: "SendBack", id: args.id, words }, DateTime.formatIso(now)))),
+        { noWait: args.noWait }
+      )
     }
     case "ShowPlan": {
       return planText(backlogRoot(place), args.parent)

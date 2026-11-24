@@ -23,6 +23,14 @@ It stops waiting early once a check on the new head is red.
 It reads the new head's parents and treats a head that leaves out the checked head as changed after the approval.
 Once the new head is green and no longer behind, orc runs `gh pr merge <url> --squash --match-head-commit <new sha>`.
 
+## Return without waiting for CI
+
+For a behind PR, `orc merge <task-id> --no-wait` returns after requesting the branch update, without polling the new head or merging.
+The chat always passes `--no-wait`.
+Once the new head checks are green, call `merge_task` again or run `orc merge <task-id> --no-wait` again.
+Each call reads the current head and checks before merging.
+Without `--no-wait`, the command waits as described above.
+
 ## When an update fails
 
 Orc merges nothing and refuses when any of these holds:
@@ -35,7 +43,7 @@ Orc merges nothing and refuses when any of these holds:
 - Orc still cannot read the PR when the 20 minutes end, so it cannot tell what the new head holds.
 - The new head is still behind its base, because the base moved again.
 
-After a merge conflict or a red check on the new head, orc also sends the task back as [`orc backlog send-back`](backlog-tasks.md#send-a-task-back) does, with words that name the conflict or the red check.
+After a merge conflict, or a red check observed while waiting on the new head, orc also sends the task back as [`orc backlog send-back`](backlog-tasks.md#send-a-task-back) does, with words that name the conflict or the red check.
 The next beat resumes the task's run on its branch for a fix pass.
 
 ## Choose a merge basis

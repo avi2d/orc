@@ -48,7 +48,8 @@ In the default `nono` sandbox and in no-mistakes review, Orc relies on instructi
 Orc starts no-mistakes without its local Test or preflight Rebase step.
 An existing task branch keeps its base during the run instead of rebasing just because the base moved.
 The no-mistakes CI monitor can still repair a merge conflict.
-If you want the monitor to leave clean behind branches alone, keep `ci.rebase_behind` off in `.no-mistakes.yaml`.
+By default, the monitor leaves clean behind branches alone.
+Setting `ci.rebase_behind: true` in `.no-mistakes.yaml` opts into updating them.
 When a pull request run exists, Orc tells workers not to start or rerun CI by hand.
 Orc manages the wait for CI instead of asking workers to wait in a tool call.
 

@@ -162,9 +162,12 @@ const mergeAt = (landing: Landing, view: PullRequestView) =>
     return "merged " + landing.id + " " + landing.url
   })
 
-const landUpdated = (landing: Landing, checked: PullRequestView) =>
+const landUpdated = (landing: Landing, checked: PullRequestView, noWait: boolean) =>
   Effect.gen(function*() {
     yield* updateBranch(landing, checked)
+    if (noWait) {
+      return "requested branch update for " + landing.id + " " + landing.url + "; not merged. Run orc merge " + landing.id + " --no-wait again once the new head checks are green."
+    }
     yield* Console.log("Checks running")
     const unreadable = yield* Ref.make<string | null>(null)
     const settled = yield* awaitNewHead(landing.url, checked, 0, unreadable).pipe(
@@ -216,7 +219,8 @@ export const mergeTask = (
   root: string,
   id: string,
   basis: MergeBasis,
-  sendBack: SendBackForFix
+  sendBack: SendBackForFix,
+  options: { readonly noWait: boolean } = { noWait: false }
 ): Effect.Effect<string, MergeError, MergeRequirements> =>
   Effect.gen(function*() {
     const record = yield* findTask(root, id)
@@ -247,5 +251,5 @@ export const mergeTask = (
       return yield* refuse(refusal(id, url, reasons))
     }
     const behind = yield* behindBy(id, url, view)
-    return yield* behind > 0 ? landUpdated(landing, view) : mergeAt(landing, view)
+    return yield* behind > 0 ? landUpdated(landing, view, options.noWait) : mergeAt(landing, view)
   })

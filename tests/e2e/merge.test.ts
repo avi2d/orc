@@ -177,6 +177,35 @@ const forgeSteps = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
 
 const sentBackTask = (fixture: Fixture): Promise<string> => readFile(join(fixture.home, "backlog", "new", "orc-1.md"), "utf8")
 
+describe("chat merge returns without waiting for CI", () => {
+  for (const basis of ["captain-word", "yolo-green"] as const) {
+    test(basis + " returns after requesting an update instead of polling CI or merging in the same call", async () => {
+      await withFixture(orchestratorConfig, 0, async (fixture) => {
+        await writeProject(fixture, { yolo: true })
+        await closedWithPr(fixture)
+        await stubGh(fixture, {
+          behind: 1,
+          afterUpdate: [
+            { head: newHead, checks: [passed("lint"), running("test")] },
+            { head: newHead, checks: [passed("lint"), passed("test")] }
+          ]
+        })
+        const session = sessionFor(fixture)
+        const result = await session.call("merge_task", { id: "orc-1", basis })
+        expect(result).toContain("requested branch update for orc-1 " + prUrl)
+        expect(result).toContain("not merged")
+        expect(await forgeSteps(fixture)).toEqual(["view", "update"])
+        expect(await readFile(ghCalls(fixture), "utf8")).toContain(updateCall)
+        expect(await mergeCalls(fixture)).toEqual([])
+
+        await writeFile(join(fixture.dir, "views", "after-1.json"), viewJson("OPEN", { head: newHead, checks: [passed("lint"), passed("test")] }))
+        expect(await session.call("merge_task", { id: "orc-1", basis })).toBe("merged orc-1 " + prUrl)
+        expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+      })
+    }, 60_000)
+  }
+})
+
 describe("orc merge updates a PR that is only behind its base", () => {
   test("an approved PR behind main is updated instead of refused", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {

@@ -310,8 +310,17 @@ describe("parseArgs run flags", () => {
     expect(parseArgs(["backlog", "--help"])).toEqual({ kind: "PrintHelp", words: ["backlog"] })
   })
   test("merge takes the captain's word by default instead of yolo", () => {
-    expect(parseArgs(["merge", "task-4"])).toEqual({ kind: "Dispatch", args: { kind: "MergeTask", id: "task-4", basis: "captain-word" } })
-    expect(parseArgs(["merge", "task-4", "--basis", "yolo-green"])).toEqual({ kind: "Dispatch", args: { kind: "MergeTask", id: "task-4", basis: "yolo-green" } })
+    expect(parseArgs(["merge", "task-4"])).toEqual({ kind: "Dispatch", args: { kind: "MergeTask", id: "task-4", basis: "captain-word", noWait: false } })
+    expect(parseArgs(["merge", "task-4", "--basis", "yolo-green"])).toEqual({ kind: "Dispatch", args: { kind: "MergeTask", id: "task-4", basis: "yolo-green", noWait: false } })
+  })
+  test("merge preserves no-wait instead of silently enabling a CI wait", () => {
+    expect(parseArgs(["merge", "task-4", "--no-wait"])).toEqual({ kind: "Dispatch", args: { kind: "MergeTask", id: "task-4", basis: "captain-word", noWait: true } })
+    for (const flags of [["--no-wait", "--basis", "yolo-green"], ["--basis", "yolo-green", "--no-wait"]]) {
+      expect(parseArgs(["merge", "task-4", ...flags])).toEqual({ kind: "Dispatch", args: { kind: "MergeTask", id: "task-4", basis: "yolo-green", noWait: true } })
+    }
+  })
+  test("merge refuses repeated no-wait flags instead of ignoring duplicate options", () => {
+    expect(parseArgs(["merge", "task-4", "--no-wait", "--no-wait"])).toEqual({ kind: "UsageError", detail: "orc merge takes --no-wait once" })
   })
   test("merge refuses an unknown basis or a missing task id instead of merging", () => {
     expect(parseArgs(["merge", "task-4", "--basis", "green"])).toEqual({ kind: "UsageError", detail: "orc merge takes --basis once, with captain-word or yolo-green" })

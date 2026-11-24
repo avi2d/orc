@@ -274,14 +274,19 @@ const parseMerge = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (!isTaskId(id)) {
     return { kind: "UsageError", detail: "orc merge takes a task id, got \"" + id + "\"" }
   }
-  if (flags.length === 0) {
-    return { kind: "MergeTask", id, basis: "captain-word" }
+  const noWait = flags.includes("--no-wait")
+  if (flags.filter((flag) => flag === "--no-wait").length > 1) {
+    return { kind: "UsageError", detail: "orc merge takes --no-wait once" }
   }
-  const [flag, basis = "", ...extra] = flags
+  const remaining = flags.filter((flag) => flag !== "--no-wait")
+  if (remaining.length === 0) {
+    return { kind: "MergeTask", id, basis: "captain-word", noWait }
+  }
+  const [flag, basis = "", ...extra] = remaining
   if (flag !== "--basis" || !isMergeBasis(basis)) {
     return { kind: "UsageError", detail: "orc merge takes --basis once, with " + mergeBases.join(" or ") }
   }
-  return extra.length === 0 ? { kind: "MergeTask", id, basis } : unexpected(extra[0])
+  return extra.length === 0 ? { kind: "MergeTask", id, basis, noWait } : unexpected(extra[0])
 }
 
 const attentionSubcommands = {

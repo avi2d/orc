@@ -22,7 +22,7 @@ export type DispatchArgs =
   | { readonly kind: "PrioritizeTask"; readonly id: string; readonly priority: TaskPriority | null }
   | { readonly kind: "ShowPlan"; readonly parent: string }
   | { readonly kind: "DropChild"; readonly parent: string; readonly child: string }
-  | { readonly kind: "MergeTask"; readonly id: string; readonly basis: MergeBasis }
+  | { readonly kind: "MergeTask"; readonly id: string; readonly basis: MergeBasis; readonly noWait: boolean }
   | { readonly kind: "Beat"; readonly json: boolean }
   | { readonly kind: "RunnerStart"; readonly reach: Reach }
   | { readonly kind: "RunnerQueue" }
