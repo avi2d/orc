@@ -71,6 +71,9 @@ On the Board tab, click the count in the **Awaiting you** lane header to open th
 
 [Runs and chat](herdr-app-agents.md) covers the Agents tab and chat drawer.
 On the Agents tab, click the count on the **Awaiting you** status filter to open the Inbox, as `cmd-4` does.
+The Project row shows runs for configured projects by default.
+Choose **All runs** to include runs from other projects.
+A merged PR shows its run as Done, and a closed PR shows its run as Failed.
 
 <div id="start-a-scratch-app"><span id="recapture-the-board-screenshots"></span><span id="change-the-mods"></span></div>
 
