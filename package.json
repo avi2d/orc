@@ -1,6 +1,6 @@
 {
   "name": "orc",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "private": true,
   "description": "One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.",
   "license": "MIT",
