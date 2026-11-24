@@ -44,6 +44,11 @@ GitHub CI runs repository tests and decides completion.
 Keep test runners out of those commands and `prepare`.
 In Pi sessions, `prepare`, and local checks, under either sandbox, stand-ins first on `PATH` refuse a test run when it starts, as [Test runs in agent sessions](heavy-queue.md#test-runs-in-agent-sessions) lists.
 A package script, a shell wrapper or a workspace-selected script that reaches a test runner fails the same way.
+The Bun stand-in refuses `--bun` and `-b` runtime options, including through `bun run`, `bun x`, and `bunx`.
+It also refuses script and bin calls when the project's effective `bunfig.toml` sets `[run] bun = true`.
+The check follows `--cwd` and `--config`.
+Those options put Bun's own `node` and `bun` links ahead of the stand-ins.
+Yarn Berry's temporary `PATH` wrapper for `node` is unverified and not covered.
 A runner started through a runtime's absolute path, and a runner the list does not name, is not blocked.
 Orc starts no-mistakes without its local Test step.
 The no-mistakes review runs its steps in the shared no-mistakes daemon, under the daemon's own `PATH`, so no stand-in refuses a test run there.

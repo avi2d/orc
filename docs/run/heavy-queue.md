@@ -78,6 +78,13 @@ A test run is one of these calls, watch and UI runs included:
 A package manager puts `node_modules/.bin` ahead of every stand in, so a script body that names a runner skips the runner's own stand in.
 That runner's bin file starts `bun` or `node` through its first line, and the stand in for that runtime reads the file it starts.
 So a package script, a shell wrapper or a workspace-selected script that reaches a runner is refused too.
+Under `HEAVY_TESTS_CI_ONLY=1`, the Bun stand-in also refuses `--bun` and its `-b` alias in runtime options, including `bun run`, `bun x`, and `bunx`.
+It refuses script and bin calls when the project's effective `bunfig.toml` sets `[run] bun = true`.
+The check uses the call's working directory, including `--cwd`, and any `--config` selection.
+Those options make Bun put its own `node` and `bun` links ahead of the stand-ins on `PATH`.
+Yarn Berry wraps `node` in a temporary `PATH` folder.
+That route is unverified and not covered by these stand-ins.
+A runner started through a runtime's absolute path, or a runner the list does not name, is not blocked.
 
 The no-mistakes review runs in the shared no-mistakes daemon, under the daemon's own `PATH`, so these stand ins do not reach its steps.
 

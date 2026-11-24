@@ -54,6 +54,55 @@ const scriptOf = (tool: string, args: Args): Launch => {
   }
 }
 
+const bunBuiltins: Args = [
+  "add", "a", "install", "i", "remove", "rm", "update", "audit", "dedupe", "prune", "outdated", "link", "unlink", "publish",
+  "patch", "pm", "info", "why", "build", "init", "create", "c", "upgrade", "repl", "check", "test", "help", "completions"
+]
+
+export const bunRuntimeOverride = (tool: string, args: Args, cwd: string): string | null => {
+  if (tool !== "bun" && tool !== "bunx") {
+    return null
+  }
+  const first = launchOf(args, bunValueOptions)
+  const nested = tool === "bun" && first.kind === "script" && ["run", "x", "exec"].includes(first.file)
+  const options = nested ? [...first.options, ...launchOf(first.args, bunValueOptions).options] : first.options
+  let directory = cwd
+  let config = "bunfig.toml"
+  for (let at = 0; at < options.length; at += 1) {
+    const word = options[at] ?? ""
+    if (word === "--bun" || word === "-b") {
+      return word
+    }
+    const equals = word.indexOf("=")
+    const flag = equals === -1 ? word : word.slice(0, equals)
+    const value = equals === -1 ? options[at + 1] : word.slice(equals + 1)
+    if (value !== undefined) {
+      if (flag === "--cwd") {
+        directory = resolve(cwd, value)
+      } else if (flag === "--config" || flag === "-c") {
+        config = value
+      }
+    }
+    if (bunValueOptions.includes(word)) {
+      at += 1
+    }
+  }
+  if (first.kind === "none" || (tool === "bun" && bunBuiltins.includes(first.file))) {
+    return null
+  }
+  try {
+    const file = resolve(directory, config)
+    const parsed: unknown = Bun.TOML.parse(readFileSync(file, "utf8"))
+    if (typeof parsed === "object" && parsed !== null && "run" in parsed) {
+      const run = parsed.run
+      if (typeof run === "object" && run !== null && "bun" in run && run.bun === true) {
+        return file + " sets run.bun = true"
+      }
+    }
+  } catch {}
+  return null
+}
+
 const realFile = (file: string): string | null => {
   try {
     return realpathSync(file)

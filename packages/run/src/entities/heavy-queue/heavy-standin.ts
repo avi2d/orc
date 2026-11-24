@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Option } from "effect"
 import { defaultHeavyTools } from "./heavy"
-import { ciOnlyWord, helperCommand, standinMarker, type StandinCall, type StandinTiming } from "./heavy-standin-runtime"
+import { ciOnlyMarker, ciOnlyWord, helperCommand, standinMarker, type StandinCall, type StandinTiming } from "./heavy-standin-runtime"
 
 export type { StandinTiming } from "./heavy-standin-runtime"
 
@@ -98,7 +98,7 @@ export const ciOnlyScript = (tool: string): string => {
   const main = flags.at(-1) ?? ""
   const missing = "orc heavy: no bun at " + bun + " or no stand-in helper at " + main + "; rerun orc to rewrite the stand-ins"
   return `#!/bin/sh
-# ${standinMarker}. Regenerated on every run of that command.
+# ${ciOnlyMarker}. Regenerated on every run of that command.
 [ -x ${quoteSingle(bun)} ] && [ -f ${quoteSingle(main)} ] || { echo ${quoteSingle(missing)} >&2; exit 127; }
 real=$(${helperCommand.map(quoteSingle).join(" ")} ${quoteSingle(ciOnlyWord)} ${quoteSingle(tool)} "$0" "$@") || exit "$?"
 exec "$real" "$@"

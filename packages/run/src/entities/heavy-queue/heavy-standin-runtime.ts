@@ -1,11 +1,13 @@
 import { accessSync, appendFileSync, closeSync, constants, mkdirSync, openSync, readSync, statSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { classifyHeavyCall, isTestCall } from "./heavy-classify"
-import { interpretedRunner } from "./heavy-runner-entry"
+import { bunRuntimeOverride, interpretedRunner } from "./heavy-runner-entry"
 import { ancestry, insideSlot, insideThrough, parseProcessTable } from "./heavy-process-tree"
 import { exitCodeOf, queuedAhead, slotTasks, taskState, type TaskState } from "./heavy-pueue-task"
 
 export const standinMarker = "Written by orc heavy path"
+
+export const ciOnlyMarker = standinMarker + " CI-only"
 
 // Bun would otherwise load the caller's .env and bunfig.toml preloads into the stand-in.
 export const helperCommand: ReadonlyArray<string> = [
@@ -84,27 +86,27 @@ const isExecutableFile = (path: string): boolean => {
   }
 }
 
-const isStandin = (path: string): boolean => {
+const isStandin = (path: string, marker = standinMarker): boolean => {
   try {
     const handle = openSync(path, "r")
     const head = Buffer.alloc(4096)
     const read = readSync(handle, head, 0, head.length, 0)
     closeSync(handle)
-    return head.subarray(0, read).toString("utf8").split("\n").slice(0, 2).join(" ").includes(standinMarker)
+    return head.subarray(0, read).toString("utf8").split("\n").slice(0, 2).join(" ").includes(marker)
   } catch {
     return false
   }
 }
 
 // The shell's field split on ":" keeps empty inner fields as "." and drops a trailing empty field.
-export const callerTool = (tool: string, pathValue: string, standin: string): string => {
+export const callerTool = (tool: string, pathValue: string, standin: string, marker = standinMarker): string => {
   const entries = pathValue.split(":")
   if (entries.at(-1) === "") {
     entries.pop()
   }
   for (const entry of entries) {
     const candidate = (entry === "" ? "." : entry) + "/" + tool
-    if (!sameFile(candidate, standin) && isExecutableFile(candidate) && !isStandin(candidate)) {
+    if (!sameFile(candidate, standin) && isExecutableFile(candidate) && !isStandin(candidate, marker)) {
       return candidate
     }
   }
@@ -198,6 +200,13 @@ const refusedTest = (tool: string, args: ReadonlyArray<string>): boolean => {
     return false
   }
   const command = [tool, ...args].join(" ")
+  const override = bunRuntimeOverride(tool, args, workingDirectory())
+  if (override !== null) {
+    process.stderr.write(
+      "orc heavy: refusing " + command + " because " + override + " can bypass CI-only runtime stand-ins; repository tests run only in GitHub CI\n"
+    )
+    return true
+  }
   if (isTestCall(tool, args)) {
     process.stderr.write(testRefusal(command, null) + "\n")
     return true
@@ -223,7 +232,7 @@ export const ciOnlyPlan = (
   if (refusedTest(tool, args)) {
     return { kind: "exit", code: 1 }
   }
-  const real = callerTool(tool, Bun.env.PATH ?? "", standin)
+  const real = callerTool(tool, Bun.env.PATH ?? "", standin, ciOnlyMarker)
   if (real === "") {
     process.stderr.write("orc heavy: no " + tool + " on PATH after the stand-in at " + standin + "\n")
     return { kind: "exit", code: 127 }
