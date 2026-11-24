@@ -70,6 +70,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/features/chat/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
 | `packages/run/src/features/chat/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
+| `packages/run/src/features/chat/chat-tools-bundle.ts` | The chat tools as one JavaScript file, which is `null` from source and which the compile step replaces with the embedded bundle |
 | `packages/run/src/features/chat/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
 | `packages/run/src/features/chat/chat-board.ts` | The chat's decision boards: the cards, the answers they record and the listing at each start |
 | `packages/run/src/features/chat/chat-board-page.ts` | The decision board page and the record of its cards |
