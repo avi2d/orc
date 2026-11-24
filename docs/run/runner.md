@@ -17,7 +17,7 @@ A token account also supplies `--token-file`.
 
 `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` select the run's models.
 A model in an agent file takes precedence.
-Without the variables, the run uses its config or agent files.
+When the variables are empty, the run uses its config or agent files.
 
 `ORC_TASK_IMPLEMENTER_THINKING` and `ORC_TASK_FIXER_THINKING` select the run's thinking levels.
 The runner passes them to `orc run` as `--implementer-thinking` and `--fixer-thinking`.
