@@ -19,7 +19,12 @@ const bunValueOptions: Args = [
   "--cwd", "-c", "--config", "--env-file", "-r", "--preload", "--require", "--import", "--tsconfig-override", "-d", "--define",
   "-l", "--loader", "--conditions", "--main-fields", "--extension-order", "--filter", "-F", "--shell", "--elide-lines", "--title", "--port"
 ]
-const nodeValueOptions: Args = ["-r", "--require", "--import", "--loader", "--experimental-loader", "-C", "--conditions", "--env-file", "--input-type", "--title"]
+const nodeValueOptions: Args = [
+  "-r", "--require", "--import", "--loader", "--experimental-loader", "-C", "--conditions", "--env-file", "--input-type", "--title",
+  "--test-concurrency", "--test-coverage-branches", "--test-coverage-exclude", "--test-coverage-functions", "--test-coverage-include",
+  "--test-coverage-lines", "--test-global-setup", "--test-name-pattern", "--test-random-seed", "--test-reporter", "--test-reporter-destination",
+  "--test-rerun-failures", "--test-shard", "--test-skip-pattern", "--test-timeout", "--watch-kill-signal", "--watch-path"
+]
 const evalOptions: Args = ["-e", "--eval", "-p", "--print"]
 
 type Launch =
@@ -56,7 +61,7 @@ const scriptOf = (tool: string, args: Args): Launch => {
 
 const bunBuiltins: Args = [
   "add", "a", "install", "i", "remove", "rm", "update", "audit", "dedupe", "prune", "outdated", "link", "unlink", "publish",
-  "patch", "pm", "info", "why", "build", "init", "create", "c", "upgrade", "repl", "check", "test", "help", "completions"
+  "patch", "pm", "info", "why", "build", "init", "create", "c", "upgrade", "repl", "test", "help", "completions"
 ]
 
 interface BunOptions {

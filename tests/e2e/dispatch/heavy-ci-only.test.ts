@@ -71,6 +71,14 @@ describe("CI-only runtime launchers", () => {
     expect(child.stdout.toString()).toBe(join(root, "real/bun") + "\n" + command + "\n")
   })
 
+  test("run.bun refuses bun check, because a package script named check runs in place of a Bun built-in", async () => {
+    await writeFile(join(root, "bunfig.toml"), "[run]\nbun = true\n")
+    const child = launch("bun", ["check"])
+    expect(child.exitCode).toBe(1)
+    expect(child.stdout.toString()).toBe("")
+    expect(child.stderr.toString()).toContain("sets run.bun = true")
+  })
+
   test("run.bun does not refuse an inline expression that starts no script or bin", async () => {
     await writeFile(join(root, "bunfig.toml"), "[run]\nbun = true\n")
     const child = launch("bun", ["--print", "1"])

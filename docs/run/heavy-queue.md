@@ -75,8 +75,6 @@ A test run is one of these calls, watch and UI runs included:
 - `checks-test`, `vitest`, `jest`, `pytest` or `playwright test`, directly or through `bunx`, `npx`, `bun x`, or a manager's `exec` or `dlx`.
 - `bun` or `node` starting the bin file of `checks-test`, `checks-flake`, `checks-mutation`, `stryker`, `vitest`, `jest` or `playwright test`.
 
-The [no-mistakes](https://github.com/kunchenguid/no-mistakes) review runs in the shared no-mistakes daemon, under the daemon's own `PATH`, so these stand ins do not reach its steps.
-
 Under `--sandbox none` every other call, such as a build, a lint or a typecheck, queues as it does without the variable.
 Under the nono sandbox it runs at once, as the next section says.
 The checks of a run go through the same stand ins, so a check command that starts a test run fails.
@@ -85,13 +83,18 @@ The checks of a run go through the same stand ins, so a check command that start
 A package manager puts `node_modules/.bin` ahead of every stand in, so a script body that names a runner skips the runner's own stand in.
 That runner's bin file starts `bun` or `node` through its first line, and the stand in for that runtime reads the file it starts.
 So a package script, a shell wrapper or a workspace-selected script that reaches a runner is refused too.
-Under `HEAVY_TESTS_CI_ONLY=1`, the Bun stand-in also refuses `--bun` and its `-b` alias in runtime options, including `bun run`, `bun x`, and `bunx`.
-It refuses script and bin calls when the project's effective `bunfig.toml` sets `[run] bun = true`.
-The check uses the call's working directory, including `--cwd`, and any `--config` selection.
-Those options make Bun put its own `node` and `bun` links ahead of the stand-ins on `PATH`.
-Yarn Berry wraps `node` in a temporary `PATH` folder.
-That route is unverified and not covered by these stand-ins.
-A runner started through a runtime's absolute path, or a runner the list does not name, is not blocked.
+
+### Bun runtime overrides
+`--bun`, its `-b` alias and `[run] bun = true` in `bunfig.toml` make Bun put its own `node` and `bun` links ahead of the stand-ins on `PATH`.
+Under `HEAVY_TESTS_CI_ONLY=1`, the Bun stand-in refuses `--bun` and `-b` in `bun`, `bun run`, `bun x` and `bunx`.
+It also refuses script and bin calls when the effective `bunfig.toml` sets `[run] bun = true`, `bun check` included, because a package script named `check` runs in place of Bun's built-in.
+The stand-in finds that file from the call's working directory, `--cwd` and `--config`.
+
+### What is not blocked
+- A `node` runner started from a Yarn 1 or Yarn Berry script, which puts a `node` wrapper first on the script's `PATH`, though no run has confirmed that route.
+- A runner started through a runtime's absolute path.
+- A runner the list does not name.
+- The [no-mistakes](https://github.com/kunchenguid/no-mistakes) review, which the shared daemon runs under its own `PATH`.
 
 ## Sandboxed runs
 Under the default nono sandbox, orc puts `~/.orc/heavy/ci-only` and `~/.orc/heavy/bin` first on the agent's `PATH`, ahead of the runtime folders.

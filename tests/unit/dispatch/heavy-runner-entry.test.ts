@@ -63,6 +63,20 @@ describe("the runner a bun or node call starts", () => {
     expect(interpretedRunner("node", ["--test"], root)).toBe("node --test")
   })
 
+  test.each([
+    ["--test-reporter", "spec"],
+    ["--test-reporter-destination", "stdout"],
+    ["--test-name-pattern", "x"],
+    ["--test-skip-pattern", "x"],
+    ["--test-concurrency", "2"],
+    ["--test-timeout", "100"],
+    ["--test-shard", "1/2"],
+    ["--test-coverage-include", "src"],
+    ["--watch-path", "src"]
+  ] as const)("the value of node's %s is not taken for a script, so a later --test is still a test run", (option, value) => {
+    expect(interpretedRunner("node", [option, value, "--test"], root)).toBe("node --test")
+  })
+
   test("a file argument after node -e is no script, so inline code naming a runner path is not refused", () => {
     expect(interpretedRunner("node", ["-e", "1", "node_modules/.bin/jest"], root)).toBeNull()
   })

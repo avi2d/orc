@@ -42,12 +42,8 @@ Without local checks, orc records the round as `skipped`.
 Orc then hands off to no-mistakes or opens the direct PR.
 GitHub CI runs repository tests and decides completion.
 Keep test runners out of those commands and `prepare`.
-In Pi sessions, `prepare`, and local checks, under either sandbox, stand-ins first on `PATH` refuse a test run when it starts, as [Test runs in agent sessions](heavy-queue.md#test-runs-in-agent-sessions) lists.
-A package script, a shell wrapper or a workspace-selected script that reaches a test runner fails the same way.
-The Bun stand-in also refuses `--bun` and a `bunfig.toml` that sets `[run] bun = true`, and the linked section names the Yarn Berry gap.
-A runner started through a runtime's absolute path, and a runner the list does not name, is not blocked.
-Orc starts no-mistakes without its local Test step.
-The no-mistakes review runs its steps in the shared no-mistakes daemon, under the daemon's own `PATH`, so no stand-in refuses a test run there.
+In Pi sessions, `prepare` and local checks, stand-ins first on `PATH` refuse a test run when it starts, directly or through a script, as [Test runs in agent sessions](heavy-queue.md#test-runs-in-agent-sessions) lists.
+Yarn scripts and the no-mistakes review are not covered, as [What is not blocked](heavy-queue.md#what-is-not-blocked) says, so Orc starts no-mistakes without its local Test step.
 
 ## Choose the run
 
