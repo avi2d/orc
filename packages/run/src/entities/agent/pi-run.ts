@@ -2,7 +2,7 @@ import { Effect, Fiber, FileSystem, Option, type Path, Schema, Stream } from "ef
 import type { ChildProcessSpawner } from "effect/process"
 import { agentCommand, type AgentExec, type Argv, textInput } from "../../shared/sandbox/index"
 import type { AgentFile } from "./agents"
-import { OrcRunError } from "../../shared/lib/index"
+import { ciOnlyTestsInstruction, OrcRunError } from "../../shared/lib/index"
 import { writeWhole } from "../../shared/config/index"
 import { askAfterFailures, type FailingMark, type FailureStreak, nextStreak, pauseAfterFailures } from "./failure-streak"
 import { askDirFlag, askToolName } from "./orc-ask-extension"
@@ -283,7 +283,8 @@ export const runPi = (
     )
     yield* placeAskExtension(fs, request)
     const asks = openWorkerAsks(fs, request.asks)
-    const handle = yield* spawner.spawn(agentCommand(exec, piArgv(request), textInput(request.prompt))).pipe(
+    const prompt = ciOnlyTestsInstruction + "\n\n" + request.prompt
+    const handle = yield* spawner.spawn(agentCommand(exec, piArgv(request), textInput(prompt))).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: pi did not start: " + String(cause) }))
     )
     const running = new Map<string, RunningTool>()

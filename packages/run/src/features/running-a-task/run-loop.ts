@@ -1,5 +1,5 @@
-import { Effect, FileSystem, Result } from "effect"
-import { buildFixPrompt, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
+import { Console, Effect, FileSystem, Result } from "effect"
+import { buildFixPrompt, localChecksOf, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
 import { distinctRefusals } from "../../entities/run-history/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { buildImplementPrompt, finalReplyError, finalReplyText, orcCompletionLine, orcSplitLine, sessionPrintedSignal, sumPiUsage, textAfterSignal, type PiTokenUse } from "../../entities/agent/index"
@@ -16,7 +16,6 @@ import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/
 import type { AgentOutcome, AgentRun, AgentRunResult, AgentStep, ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
 import { recordOpenAsks } from "./history-write"
 import { type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
-
 
 const collectCommits = (
   run: HistoryRun,
@@ -233,15 +232,21 @@ const fixOnce = (
     }
   })
 
-const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
-  run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
-    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the checks config .no-mistakes.yaml: " + readFailure(cause) })),
-    Effect.flatMap((text) =>
-      readChecksCommands(text, ".no-mistakes.yaml").pipe(
-        Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
-      )
+const readProjectChecks = (run: HistoryRun, round: number): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
+  Effect.gen(function*() {
+    const text = yield* run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the checks config .no-mistakes.yaml: " + readFailure(cause) }))
     )
-  )
+    const commands = yield* readChecksCommands(text, ".no-mistakes.yaml").pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
+    )
+    const local = localChecksOf(commands)
+    const skipped = commands.filter((check) => check.name !== "prepare" && !local.includes(check)).map((check) => check.name)
+    if (round === 1 && (skipped.length > 0 || local.length === 0)) {
+      yield* Console.warn("orc: warning: " + (skipped.length === 0 ? "" : "skipped local commands: " + skipped.join(", ") + ". ") + (local.length === 0 ? "No local checks ran. " : "") + "GitHub CI decides completion.")
+    }
+    return local
+  })
 
 type ImplementBase = Parameters<typeof finishAfterChecks>[1]
 
@@ -278,7 +283,7 @@ const runChecksFixLoop = (
     for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
       const started = new Date().toISOString()
       yield* checkpoints.checksRoundStart(round, started)
-      const commands = yield* readProjectChecks(run)
+      const commands = yield* readProjectChecks(run, round)
       const outcome = yield* runChecksRound(ops.execCheck, run.fs, run.path, run.piSessionDir, round, commands).pipe(
         Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
       )
@@ -289,7 +294,7 @@ const runChecksFixLoop = (
         file: outcome.file,
         started,
         ended,
-        passed: failed.length === 0,
+        passed: outcome.outcomes.length > 0 && failed.length === 0,
         failed,
         checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed })),
         refusals: distinctRefusals(outcome.outcomes.flatMap((check) => check.refusals))

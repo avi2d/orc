@@ -1,4 +1,4 @@
-import { scalar, splitRow, table, trimmedLines } from "../../shared/lib/index"
+import { ciOnlyTestsInstruction, scalar, splitRow, table, trimmedLines } from "../../shared/lib/index"
 
 export const askUserWord = "ask-user"
 export type AllowWord = typeof askUserWord
@@ -232,5 +232,5 @@ export const respondArgs = (answer: GateResponse): ReadonlyArray<string> =>
     : [
       "axi", "respond", "--action", "fix", "--findings", answer.ids.join(","),
       ...(answer.ignore.length === 0 ? [] : ["--ignore", answer.ignore.join(",")]),
-      ...(answer.instructions === undefined ? [] : ["--instructions", answer.instructions])
+      "--instructions", [ciOnlyTestsInstruction, answer.instructions].filter((entry) => entry !== undefined).join("\n\n")
     ]
