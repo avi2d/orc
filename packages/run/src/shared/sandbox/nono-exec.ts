@@ -20,7 +20,7 @@ export interface NonoExecOptions {
   readonly env: Readonly<Record<string, string>>
 }
 
-export interface StandinHelper {
+interface StandinHelper {
   readonly runtime: string
   readonly folder: string
 }
