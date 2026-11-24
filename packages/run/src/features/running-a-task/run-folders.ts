@@ -37,7 +37,7 @@ const copyInstructions = (
     return copy
   })
 
-export const piAgentDirOf = (path: Path.Path, runDir: string): string => path.join(runDir, "session", "agent")
+const piAgentDirOf = (path: Path.Path, runDir: string): string => path.join(runDir, "session", "agent")
 
 // A failed removal leaves only disk use behind, so it is logged and the run keeps its ending.
 export const dropPiAgentDir = (fs: FileSystem.FileSystem, path: Path.Path, runDir: string): Effect.Effect<void> => {
