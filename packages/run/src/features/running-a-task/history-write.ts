@@ -67,7 +67,7 @@ const planImplementDone = (
 const planChecksDone = (runId: string, round: ChecksRoundSummary): PlannedChecks => ({
   step: {
     runId, name: "checks", attempt: round.round,
-    status: round.passed ? "passed" : "failed",
+    status: round.checks.length === 0 ? "skipped" : round.passed ? "passed" : "failed",
     started: round.started, ended: round.ended, agentFile: null, piSessionFile: null
   },
   checksEvidence: { direction: "out", path: round.file, kind: "checks" },

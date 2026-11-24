@@ -41,15 +41,17 @@ To tell orc which models it may run:
 
 ## Name the project's checks
 
-To give the run something to pass:
+To name the project's checks:
 
-1. In the project, add a `.no-mistakes.yaml` file with at least one named check under `commands`.
+1. In the project, add a `.no-mistakes.yaml` file with at least one command under `commands`.
 1. Commit that file.
 
 ```yaml
 commands:
-  test: bun test
+  lint: bun run lint
 ```
+
+Follow the local-check and GitHub CI policy in [Local checks and CI](../run/running-a-task.md#local-checks-and-ci).
 
 ## Run the task
 
