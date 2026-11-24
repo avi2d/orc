@@ -61,7 +61,7 @@ const reviewPrompt = (reviewer: AgentFile, taskFile: string, diffFile: string): 
 const rerunPrompt = (problem: string): string =>
   [
     "orc could not read your findings: " + problem + ".",
-    "Print the findings again as one JSON array and print nothing after it."
+    "Print only the findings JSON array again, with nothing before or after it and no code fence."
   ].join("\n")
 
 const readReply = (run: Pick<HistoryRun, "fs">, sessionFile: string | null): Effect.Effect<string | null> =>
@@ -106,4 +106,4 @@ export const runReviewTurn = (
 export const reviewSentence = (outcome: ReviewOutcome): string =>
   outcome.status === "passed"
     ? "The review turn recorded " + outcome.findings.length.toString() + (outcome.findings.length === 1 ? " finding" : " findings") + " in " + outcome.file + ". "
-    : "The review turn failed, so the review did not pass: " + outcome.reason + ". "
+    : "The review turn failed, so the review did not pass: " + outcome.reason.replace(/\s+/g, " ").trim() + ". "

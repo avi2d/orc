@@ -6,7 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
-import { runReviewTurn, type ReviewOutcome } from "../../packages/run/src/features/running-a-task/review-turn"
+import { reviewSentence, runReviewTurn, type ReviewOutcome } from "../../packages/run/src/features/running-a-task/review-turn"
 import type { AgentRun, SandboxOps } from "../../packages/run/src/features/running-a-task/run-ops"
 
 const reviewer: AgentFile = {
@@ -80,6 +80,12 @@ const review = async (replies: ReadonlyArray<string>, branch = "orc/test"): Prom
 }
 
 describe("the direct-PR review turn decodes the reviewer's findings", () => {
+  test("multiline failure diagnostics do not split the run end reason", () => {
+    expect(reviewSentence({ status: "failed", reason: " \tMissing key\r\n  at [0][\"file\"]\n" })).toBe(
+      "The review turn failed, so the review did not pass: Missing key at [0][\"file\"]. "
+    )
+  })
+
   test("a readable first answer records its findings in review.json instead of asking again", async () => {
     const { outcome, runs, runDir, sessionDir, saved, diff } = await review([JSON.stringify([finding])])
     expect(runs).toHaveLength(1)

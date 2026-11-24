@@ -15,7 +15,7 @@ A comment stays only for one of two facts.
 It says why the code cannot be done the other way.
 It states an invariant that the types cannot hold.
 Every other comment the change adds is a finding whose action is to cut it.
-Print the findings as one JSON array and print nothing after it.
+Print only the findings JSON array, with nothing before or after it and no code fence.
 Each finding is an object with the keys id, file, line, severity, action and description.
 The id is a short slug that is unique in the array.
 The file is the path from the repository root.
