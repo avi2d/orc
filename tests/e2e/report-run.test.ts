@@ -27,7 +27,7 @@ const writeScript = async (file: string, lines: ReadonlyArray<string>): Promise<
   await chmod(file, 0o755)
 }
 
-const withReportFixture = async (writesReport: boolean, body: (fixture: ReportFixture) => Promise<void>): Promise<void> => {
+const withReportFixture = async (writesReport: boolean, body: (fixture: ReportFixture) => Promise<void>, unanswered = false): Promise<void> => {
   const root = await realpath(await mkdtemp(join(tmpdir(), "orc-report-run-")))
   const repo = join(root, "repo")
   const orcHome = join(root, "orc-home")
@@ -44,7 +44,7 @@ const withReportFixture = async (writesReport: boolean, body: (fixture: ReportFi
       "prev=''; for arg in \"$@\"; do if [ \"$prev\" = --append-system-prompt ]; then cp \"$arg\" \"" + fakeBin + "/pi-instructions\"; fi; prev=$arg; done",
       "echo \"$*\" >> \"" + fakeBin + "/pi-argv\"",
       "pwd > \"" + fakeBin + "/pi-cwd\"",
-      `if [ "\${PROOF_UNANSWERED:-}" = 1 ]; then prev=; for arg in "$@"; do if [ "$prev" = --orc-ask-dir ]; then printf '{"question":"Which answer?","blocks":true}' > "$arg/one.ask.json"; fi; prev=$arg; done; sleep 5; fi`,
+      ...(unanswered ? [`prev=; for arg in "$@"; do if [ "$prev" = --orc-ask-dir ]; then printf '{"question":"Which answer?","blocks":true}' > "$arg/one.ask.json"; fi; prev=$arg; done`, "sleep 5"] : []),
       ...(writesReport ? ["printf '# Findings\\n\\nThe checkout holds one task file.\\n' > agent-report.md"] : []),
       "echo '{\"type\":\"session\",\"id\":\"0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b\"}'"
     ])
@@ -119,7 +119,7 @@ describe("orc run --kind scout", () => {
 
   test("an unanswered question does not leave a failed report run with its Pi agent folder", async () => {
     await withReportFixture(false, async ({ repo, env, fakeBin }) => {
-      const result = await runOrc(scoutRun, repo, { ...env, PROOF_UNANSWERED: "1", ORC_ANSWER_WAIT_SECONDS: "1" })
+      const result = await runOrc(scoutRun, repo, { ...env, ORC_ANSWER_WAIT_SECONDS: "1" })
       expect(result.exitCode).not.toBe(0)
       expect(result.stdout).toContain("no answer to its question")
       const runDir = (await readFile(join(fakeBin, "pi-cwd"), "utf8")).trim()
@@ -127,7 +127,7 @@ describe("orc run --kind scout", () => {
       expect(await Bun.file(join(runDir, "agent.log")).exists()).toBe(true)
       expect(await stat(join(runDir, "sessions")).then(() => true, () => false)).toBe(true)
       expect(await stat(join(runDir, "session", "agent")).then(() => true, () => false)).toBe(false)
-    })
+    }, true)
   }, 60_000)
 
   test("does not hand Pi the commit-the-result instruction in a scout run", async () => {
