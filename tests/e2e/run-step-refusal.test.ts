@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { mkdir, readFile, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
-import { git, prUrl, runOrc, withNoSandboxFixture } from "./no-sandbox-fixture"
+import { git, keyedProvider, loginProvider, prUrl, runOrc, withNoSandboxFixture, writeConfig } from "./no-sandbox-fixture"
 
 const refusedForms: ReadonlyArray<string> = [
   "bun test",
@@ -78,6 +78,7 @@ describe("orc run refuses test runners in its own steps", () => {
     await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
       const trace = join(fakeBin, "runner-starts")
       const attempts = join(fakeBin, "attempts")
+      await writeConfig(env, { providers: [loginProvider, keyedProvider], models: { implementer: "acme-go/coder-1", fixer: "acme-go/coder-1" }, heavy: { through: ["env"] } })
       await writeRunnerProject(repo, trace)
       await writeFormsProbe(repo, attempts, join(fakeBin, "form-output"))
       await writeFile(join(repo, ".no-mistakes.yaml"), [
