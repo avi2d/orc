@@ -1,5 +1,6 @@
 import type { DateTime } from "effect";
 import { type Failed, failureOf, type Reading } from "../../../shared/lib";
+import { keysOf } from "../sources/account-join";
 import type { OrcQuota, OrcQuotaAccount, OrcQuotaUnreadCause } from "../sources/orc-quota";
 import type { QuotaAvailability, QuotaProvider, QuotaProviderId } from "../sources/quota";
 import { type AccountRead, type QuotaRead, sourcedEntries } from "../sources/quota-read";
@@ -47,15 +48,20 @@ const liveBody = (entry: SourcedProvider): QuotaBlockBody => ({
   exhaustion: entry.quotaSemantics?.effectiveAvailability ?? [],
 });
 
-// quota-axi fills "default" for single-account providers once any provider expands.
-const accountSuffix = (entry: SourcedEntry): string =>
-  entry.accountKey === undefined || entry.accountKey === "default" ? "" : ` ${entry.accountKey}`;
+const namedKey = (key: string | undefined): string | undefined => key === "default" ? undefined : key;
 
-const providerTitle = (provider: QuotaProviderId, activeClaude: string | null): string =>
-  provider === "claude" && activeClaude !== null ? `claude ${activeClaude}` : provider;
+const dispatchAccountName = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>): string | undefined => {
+  if (entry.provider !== "claude" || orcQuota.kind !== "ok" || orcQuota.value.kind !== "read") return undefined;
+  const keys = keysOf(entry);
+  // The default key does not identify a login across commands.
+  const matches = orcQuota.value.accounts.filter(({ account }) => account !== "default" && keys.includes(account));
+  return matches.length === 1 ? matches[0]?.account : undefined;
+};
 
-export const accountTitle = (entry: SourcedEntry, activeClaude: string | null): string =>
-  `${providerTitle(entry.provider, activeClaude)}${accountSuffix(entry)}`;
+export const accountTitle = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>): string => {
+  const name = dispatchAccountName(entry, orcQuota) ?? namedKey(entry.accountKey);
+  return name === undefined ? entry.provider : `${entry.provider} ${name}`;
+};
 
 // orc quota names no provider for an account, so every account block takes the Claude tint.
 const orcAccountProvider: QuotaProviderId = "claude";
@@ -124,7 +130,7 @@ export const quotaBlocks = (
   const context: LiveContext = {
     entries: sourcedEntries(read, now),
     notSetUp: read.quotaAxi.kind === "ok" ? read.quotaAxi.value.notSetUp : [],
-    title: (entry) => accountTitle(entry, null),
+    title: (entry) => accountTitle(entry, orcQuota),
   };
   return [
     ...liveBlocks("claude", "claude", context),

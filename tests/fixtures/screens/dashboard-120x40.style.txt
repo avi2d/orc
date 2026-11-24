@@ -34,10 +34,10 @@ m   ffff       sssssssssssssassu  sss  sss sssss     mm mm mm                   
 m   fffff      ssssssssssssssauu  sss  W WWWW          mmm mm                                                          m
 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm                                                          m
 mm GOOOOOOO m Gmmmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mm mmm                                                          m
-m E FFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF  mm                                                          m
-m E FFFFFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF           mm                                                          m
-m   FFFFFF FFFF                                            mm                                                          m
+m E FFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFFFF FFFF       mm                                                          m
+m E FFFFFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFFFF FFFF    mm                                                          m
 m ww wwww wwwww                                            mm                                                          m
+m                                                          mm                                                          m
 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 mm ffffffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmoo GOOOOOOO O OOOOO ooooooooooooooooooooooooooooooo m mmm oo
 m FFFFF  mmm sss  mmm ssssssssss  mmm ss  mmmm sss         mo   uuuuuuu                 uuuu uuuu uuuu uuuuu uuuu uuuu o

@@ -1,13 +1,12 @@
 import { DateTime } from "effect";
-import { type Failed, failureOf, type Outcome, type Reading } from "../../../shared/lib";
+import { type Failed, failureOf, type Outcome } from "../../../shared/lib";
 import { withCaptured } from "../sources/capture";
 import { type CountedCall, countedCalls, type Ledger } from "../sources/ledger";
 import { resolveSessions, type Session, sessionLabel, type UnmatchedRuns } from "../sources/live";
 import { sumTokens, type Tokens, tokenTotal } from "../contract/tokens";
-import type { SavedProfiles } from "../sources/saved-profiles";
 import type { HarnessProcess, HerdrPane } from "../sources/live-sessions";
 import type { QuotaAvailability, QuotaProviderId, QuotaWindow } from "../sources/quota";
-import { type QuotaRead, sourcedEntries } from "../sources/quota-read";
+import { type QuotaRead, type QuotaReadings, sourcedEntries } from "../sources/quota-read";
 import type { SessionLogs, SinceByHarness } from "../sources/session-logs";
 import { type AccountJoin, callJoin, credentialKeyOf, keysOf, sameJoin } from "../sources/account-join";
 import { byPricedShare, type Estimate, estimate, hourMillis, rateSpanHours, spendGate, verdictBeforeReset, type Weighed, weighed } from "./estimate";
@@ -121,9 +120,7 @@ export interface SessionQuotaView extends PresenceFields {
   readonly composition?: Composition;
 }
 
-export interface SessionQuotaInputs extends PresenceFields {
-  readonly quota: QuotaRead;
-  readonly savedProfiles: Reading<SavedProfiles>;
+export interface SessionQuotaInputs extends PresenceFields, QuotaReadings {
   readonly panes: Failed | undefined;
   readonly processes: Failed | undefined;
   readonly ledger: Ledger;
@@ -283,13 +280,12 @@ const windowView = (
 interface AccountContext {
   readonly inputs: SessionQuotaInputs;
   readonly sessionsById: ReadonlyMap<string, Session>;
-  readonly activeClaude: string | null;
 }
 
 const accountView = (
   entry: SourcedEntry,
   joined: ReadonlyArray<{ readonly call: CountedCall; readonly join: AccountJoin }>,
-  { inputs, sessionsById, activeClaude }: AccountContext,
+  { inputs, sessionsById }: AccountContext,
 ): AccountView => {
   const joins = joined.reduce<ReadonlyArray<AccountJoin>>(
     (seen, { join }) => (seen.some((known) => sameJoin(known, join)) ? seen : [...seen, join]),
@@ -300,7 +296,7 @@ const accountView = (
     accountKey: entry.accountKey,
     credentialKey: credentialKeyOf(entry),
     accountKeys: keysOf(entry),
-    title: accountTitle(entry, activeClaude),
+    title: accountTitle(entry, inputs.orcQuota),
     joins,
   };
   if ("kind" in entry) return { ...head, body: failureOf(entry) };
@@ -322,12 +318,10 @@ const unmeteredOf = (calls: ReadonlyArray<CountedCall>): ReadonlyArray<Unmetered
 
 export const sessionQuotaView = (inputs: SessionQuotaInputs): SessionQuotaView => {
   const { calls, ...counts } = inputs.ledger;
-  const activeClaude = inputs.savedProfiles.kind === "ok" ? inputs.savedProfiles.value.active_profile : null;
   const entries = sourcedEntries(inputs.quota, inputs.now);
   const context: AccountContext = {
     inputs,
     sessionsById: new Map(inputs.sessions.map((session) => [session.id, session])),
-    activeClaude,
   };
   const metered = calls.flatMap((call) =>
     call.quota === undefined
@@ -358,9 +352,7 @@ export const sessionQuotaView = (inputs: SessionQuotaInputs): SessionQuotaView =
   };
 };
 
-export interface SessionQuotaReadings {
-  readonly quota: QuotaRead;
-  readonly savedProfiles: Reading<SavedProfiles>;
+export interface SessionQuotaReadings extends QuotaReadings {
   readonly panes: Outcome<ReadonlyArray<HerdrPane>>;
   readonly processes: Outcome<ReadonlyArray<HarnessProcess>>;
   readonly logs: SessionLogs;
@@ -383,7 +375,7 @@ export const sessionQuotaFrom = (readings: SessionQuotaReadings): SessionQuotaVi
   const presence = presenceOf(readings.panes, readings.logs.roots, files, headless);
   return sessionQuotaView({
     quota: readings.quota,
-    savedProfiles: readings.savedProfiles,
+    orcQuota: readings.orcQuota,
     panes: failedOrNone(readings.panes),
     processes: failedOrNone(readings.processes),
     ledger,

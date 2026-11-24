@@ -1,34 +1,23 @@
 import { DateTime, Effect, Layer } from "effect";
-import type { Reading } from "../../../shared/lib";
 import { composedSessionQuota } from "./composed-session-quota";
 import { sessionLogsSince, sessionQuotaFrom, type SessionQuotaView } from "./session-quota";
-import { SavedProfilesSource, savedProfilesSourceLayer, type SavedProfiles } from "../sources/saved-profiles";
 import { HarnessProcessSource, HerdrSource, herdrSourceLayer, linuxHarnessProcessSourceLayer, macHarnessProcessSourceLayer } from "../sources/live-sessions";
 import { readBeside } from "../../../shared/config";
-import { type QuotaSource, quotaSourceLayer } from "../sources/quota";
-import type { OrcQuotaSource } from "../sources/orc-quota";
-import { type QuotaRead, readQuota } from "../sources/quota-read";
+import { quotaSourceLayer } from "../sources/quota";
+import { orcQuotaSourceLayer } from "../sources/orc-quota";
+import type { QuotaReadSources, QuotaReadings } from "../sources/quota-read";
 import { SessionMachines, sessionMachinesLayer } from "./remote-sessions";
-import { type HarvestLogSource, harvestLogSourceLayer, SessionLogSource, sessionLogSourceLayer } from "../sources/session-logs";
+import { harvestLogSourceLayer, SessionLogSource, sessionLogSourceLayer } from "../sources/session-logs";
 
 export type SessionSources = HerdrSource | HarnessProcessSource | SessionLogSource | SessionMachines;
 
-export type QuotaReadSources = QuotaSource | HarvestLogSource | SavedProfilesSource;
-
-export type QuotaPanelSources = QuotaReadSources | OrcQuotaSource;
-
 export type SessionQuotaSources = QuotaReadSources | SessionSources;
-
-export interface QuotaReadings {
-  readonly quota: QuotaRead;
-  readonly savedProfiles: Reading<SavedProfiles>;
-}
 
 const harnessProcessSourceLayer = process.platform === "darwin" ? macHarnessProcessSourceLayer : linuxHarnessProcessSourceLayer;
 
 export const sessionSourcesLayer = Layer.mergeAll(herdrSourceLayer, harnessProcessSourceLayer, sessionMachinesLayer, sessionLogSourceLayer);
 
-export const quotaReadSourcesLayer = Layer.mergeAll(quotaSourceLayer, savedProfilesSourceLayer, harvestLogSourceLayer(Effect.succeed([])));
+export const quotaReadSourcesLayer = Layer.mergeAll(quotaSourceLayer, orcQuotaSourceLayer, harvestLogSourceLayer(Effect.succeed([])));
 
 export const sessionQuotaSourcesLayer = Layer.merge(quotaReadSourcesLayer, sessionSourcesLayer);
 
@@ -43,8 +32,8 @@ export const localSessionQuotaOf = <R>(quotas: Effect.Effect<QuotaReadings, neve
       const logs = yield* logSource.read(sessionLogsSince(readings.quota, yield* DateTime.now, timeZone));
       return { ...readings, logs };
     });
-    const [panes, processes, { quota, savedProfiles, logs }] = yield* Effect.all([herdr.read, harnesses.read, logged], { concurrency: "unbounded" });
-    return sessionQuotaFrom({ quota, savedProfiles, panes, processes, logs, now: yield* DateTime.now, timeZone });
+    const [panes, processes, readings] = yield* Effect.all([herdr.read, harnesses.read, logged], { concurrency: "unbounded" });
+    return sessionQuotaFrom({ ...readings, panes, processes, now: yield* DateTime.now, timeZone });
   });
 
 export const composedSessionQuotaOf = <R>(quotas: Effect.Effect<QuotaReadings, never, R>): Effect.Effect<SessionQuotaView, never, SessionSources | R> =>
@@ -58,7 +47,3 @@ export const sessionQuotaOf = <R>(quotas: Effect.Effect<QuotaReadings, never, R>
   Effect.flatMap(SessionMachines, (machines) =>
     machines.remotes.length === 0 ? localSessionQuotaOf(quotas) : composedSessionQuotaOf(quotas),
   );
-
-export const readQuotas: Effect.Effect<QuotaReadings, never, QuotaReadSources> = Effect.flatMap(SavedProfilesSource, (savedProfiles) =>
-  Effect.all({ quota: readQuota, savedProfiles: savedProfiles.read }, { concurrency: "unbounded" }),
-);

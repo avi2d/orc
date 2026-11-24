@@ -11,6 +11,7 @@ import {
   herdrSourceLayer,
   linuxHarnessProcessSourceLayer,
   quotaSourceLayer,
+  orcQuotaSourceLayer,
   SessionQuotaAlert,
   sessionMachinesLayer,
   sessionQuotaReport,
@@ -35,7 +36,7 @@ import {
   relocated,
   unrelocated,
 } from "../../lib/session-fixture";
-import { isSavedProfilesCall, recordedSavedProfilesLayer } from "../../lib/saved-profiles";
+import { orcQuotaText } from "../../lib/orc-quota";
 
 let home = "";
 
@@ -67,7 +68,7 @@ const noRemote: Remote = { env: {}, answer: Effect.fail(new CommandUnreachable({
 const recordedReads = (herdrAnswer: Effect.Effect<void> = Effect.void, remote: Remote = noRemote) =>
   Layer.mergeAll(
     quotaSourceLayer,
-    recordedSavedProfilesLayer,
+    orcQuotaSourceLayer,
     herdrSourceLayer,
     linuxHarnessProcessSourceLayer,
     sessionMachinesLayer.pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord(remote.env)))),
@@ -81,7 +82,7 @@ const recordedReads = (herdrAnswer: Effect.Effect<void> = Effect.void, remote: R
             roundsStarted += 1;
             return Effect.succeed(fixture("quota-axi/full.json"));
           }
-          if (isSavedProfilesCall(command)) return Effect.succeed(fixture("saved-profiles/status.json"));
+          if (command.argv.join(" ") === "orc quota --json") return Effect.succeed(orcQuotaText("second-login-expired"));
           if (program === "herdr") return Effect.as(herdrAnswer, atHome(fixture("session-logs/herdr-agents.json")));
           return Effect.succeed(atHome(fixture("session-logs/harness-processes.txt")));
         },
@@ -293,14 +294,14 @@ describe("the live session quota panel", () => {
     const fiber = Effect.runFork(livePanel(setup.renderer).pipe(Effect.provide(recordedReads())));
     try {
       let frame = "";
-      for (let attempt = 0; attempt < 200 && !frame.includes("claude main"); attempt += 1) {
+      for (let attempt = 0; attempt < 200 && !frame.includes("● claude"); attempt += 1) {
         await Bun.sleep(25);
         await setup.renderOnce();
         frame = setup.captureCharFrame();
       }
       const rows = frame.split("\n").map((row) => row.trimEnd());
       expect(rows[0]).toBe("estimates from local logs, upper bounds, never quota");
-      expect(rows.some((row) => row.startsWith("● claude main"))).toBe(true);
+      expect(rows.some((row) => row.startsWith("● claude"))).toBe(true);
       expect(rows.filter((row) => row !== "").length).toBeLessThanOrEqual(24);
       setup.renderer.keyInput.processParsedKey({
         name: "q",
@@ -337,7 +338,7 @@ describe("the live session quota panel", () => {
     try {
       expect(await frameOnce("reading local session logs…")).toContain("reading local session logs…");
       releaseHerdr();
-      expect(await frameOnce("claude main")).toContain("claude main");
+      expect(await frameOnce("● claude")).toContain("● claude");
     } finally {
       releaseHerdr();
       await Effect.runPromise(Fiber.interrupt(fiber));

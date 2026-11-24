@@ -14,9 +14,9 @@
 │   month      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━─┃─────  81%  2 over          25d ││                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯│                                                                              │
 ╭─ gluttons | alerts ─────────────────────────────────────────────────── ↻ 2s ─╮│                                                                              │
-│ ⚑ shop is spending over its share of claude main's week                      ││                                                                              │
-│ ⚑ my-home is spending over its share of claude main's week                   ││                                                                              │
-│ ⚑ a no-mistakes run is spending over its share of claude main's week         ││                                                                              │
+│ ⚑ shop is spending over its share of claude's week                           ││                                                                              │
+│ ⚑ my-home is spending over its share of claude's week                        ││                                                                              │
+│ ⚑ a no-mistakes run is spending over its share of claude's week              ││                                                                              │
 │ ⚑ my-home is spending over its share of opencode-go's month                  ││                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ machines ─────────────────────────────────────────────────────────── ↻ 10s ─╮╭─ projects · today ─────────────────────────────────────────────────── ↻ 10s ─╮

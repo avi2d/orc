@@ -29,15 +29,15 @@ describe("the session quota JSON contract, version 1", () => {
   test("decodes a 23:00 read of the five-hour window reset at 21:30 with no sustainable rate and no fair share", () => {
     const late = sessionQuotaReport(fixtureSessionView("quota-axi/full.json", DateTime.makeUnsafe("2026-10-14T23:00:00Z")));
     const decoded = Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(JSON.stringify(late)));
-    const fiveHour = decoded.windows.find((window) => window.account.title === "claude main" && window.id === "five_hour");
+    const fiveHour = decoded.windows.find((window) => window.account.title === "claude" && window.id === "five_hour");
     expect([fiveHour?.sustainablePointsPerHour, fiveHour?.fairPointsPerHour]).toEqual([null, null]);
   });
 
   test("names every flag, each with its window, priced pace and fair share", () => {
     expect(report().flags.map((flag) => [flag.session, flag.account.title, flag.window])).toEqual([
-      ["pane:w1A:p2", "claude main", "seven_day"],
-      ["pane:w2B:p2", "claude main", "seven_day"],
-      ["pid:4242", "claude main", "seven_day"],
+      ["pane:w1A:p2", "claude", "seven_day"],
+      ["pane:w2B:p2", "claude", "seven_day"],
+      ["pid:4242", "claude", "seven_day"],
       ["pane:w2B:p2", "opencode-go", "monthly"],
     ]);
     for (const flag of report().flags) expect(flag.pricedPointsPerHour).toBeGreaterThan(flag.fairPointsPerHour);
@@ -46,8 +46,8 @@ describe("the session quota JSON contract, version 1", () => {
   test("carries every tracked window with its gate, measured tokens and unattributed remainder", () => {
     const windows = report().windows.map((window) => [window.account.title, window.id, window.gate.open, window.unattributedPoints]);
     expect(windows).toEqual([
-      ["claude main", "five_hour", false, 0],
-      ["claude main", "seven_day", true, 0],
+      ["claude", "five_hour", false, 0],
+      ["claude", "seven_day", true, 0],
       ["codex", "five_hour", false, 0],
       ["codex", "weekly", false, 0],
       ["opencode-go", "rolling", false, 0],
@@ -64,8 +64,8 @@ describe("the session quota JSON contract, version 1", () => {
 
   test("names quota-axi as the source of every window it read last, with the recorded report's refreshedAt time", () => {
     expect(report().windows.map((window) => [window.account.title, window.id, window.source])).toEqual([
-      ["claude main", "five_hour", { kind: "quota-axi", readAt: "2026-10-13T20:18:15.232Z" }],
-      ["claude main", "seven_day", { kind: "quota-axi", readAt: "2026-10-13T20:18:15.232Z" }],
+      ["claude", "five_hour", { kind: "quota-axi", readAt: "2026-10-13T20:18:15.232Z" }],
+      ["claude", "seven_day", { kind: "quota-axi", readAt: "2026-10-13T20:18:15.232Z" }],
       ["codex", "five_hour", { kind: "quota-axi", readAt: "2026-10-13T20:18:15.337Z" }],
       ["codex", "weekly", { kind: "quota-axi", readAt: "2026-10-13T20:18:15.337Z" }],
       ["opencode-go", "rolling", { kind: "quota-axi", readAt: "2026-10-13T20:18:15.239Z" }],
@@ -79,7 +79,7 @@ describe("the session quota JSON contract, version 1", () => {
     const harvested = decoded.windows.filter((window) => window.source?.kind === "harvested");
     expect(harvested.map((window) => [window.account.title, window.id, window.usedPoints, window.source])).toEqual([
       [
-        "claude main",
+        "claude",
         "seven_day",
         100,
         {

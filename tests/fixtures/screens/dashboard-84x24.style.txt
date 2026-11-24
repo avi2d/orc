@@ -23,9 +23,9 @@ G GGGGGGGGGGG
   f fffff    ssssssssssssssssssssa ssss ssss                        mmmmmm mm mm mmm
   ffff       sssssssssssssssassssu  sss ssss                        mmmmmm mm mm mm
   fffff      sssssssssssssssssauuu  sss ssss  WWWW WWW WW WWW       mmmmmm mm mmm
-E FFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF
-E FFFFFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF
-E F FFFFFFFFFFF FFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF
+E FFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFFFF FFFF
+E FFFFFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFFFF FFFF
+E F FFFFFFFFFFF FFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFFFF FFFF
 E FFFFFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFFFFFFFFF FFFFF
 fffff    fffff m f fffffff m f ffffff m w wwwwww m www wwwww wwwwww
 fffffff  ffffffff m f fffffff m f fffffff

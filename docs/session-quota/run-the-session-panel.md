@@ -37,6 +37,8 @@ The session panel also reads the capture ledger that its writer appends to from 
 The bridge appends headless readings to the same ledger.
 It can merge a second machine's report, so an account both machines spend shows one estimate instead of two upper bounds.
 Each account opens with the assumption that joined its calls to it, such as joined by credential key or assumed the only login.
+If exactly one name in `orc quota --json` matches a Claude credential key, the heading uses that account name.
+Otherwise it uses the `quota-axi` account key, or just `claude` for the default login.
 A window is read from a harness log when the log covered its provider within the hour, or read it later than quota-axi did.
 Such a window names that log and the reading's age, such as from codex rollout 38m ago.
 It names the reading's join too when that differs from the account's.
