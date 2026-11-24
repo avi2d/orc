@@ -60,7 +60,8 @@ export const writeHeavyBin = (
   Effect.gen(function*() {
     const wrap = detectWrap(platform, settings.limit)
     const standins: StandinSettings = { home, group: settings.group, wrap, through: settings.through }
-    yield* writeStandinDir(ciOnlyBinDir(home), Object.fromEntries(ciOnlyTools.map((tool) => [tool, ciOnlyScript(tool)])))
+    const ciOnly = Object.fromEntries(ciOnlyTools.map((tool) => [tool, ciOnlyScript(tool)]))
+    yield* writeStandinDir(ciOnlyBinDir(home), ciOnly)
     yield* writeStandinDir(agentWrapperDir(home), agentWrapperScripts(home))
     return yield* writeStandinDir(heavyBinDir(home), yield* standinScripts(standins, settings.commands))
   })

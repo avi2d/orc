@@ -23,10 +23,13 @@ export const detectWrap = (platform: HeavyPlatform, limit: "auto" | "none"): str
   return ""
 }
 
-export const standinTools = (commands: ReadonlyArray<string>): ReadonlyArray<string> => {
-  const extra = commands.map((entry) => entry.trim().split(" ")[0] ?? "").filter((tool) => tool !== "")
-  return [...new Set([...defaultHeavyTools, ...extra])]
-}
+const configuredTools = (commands: ReadonlyArray<string>): ReadonlyArray<string> =>
+  commands.map((entry) => entry.trim().split(" ")[0] ?? "").filter((tool) => tool !== "")
+
+export const standinTools = (commands: ReadonlyArray<string>): ReadonlyArray<string> =>
+  [...new Set([...defaultHeavyTools, ...configuredTools(commands)])]
+
+const toolsRequiringPathAtWrite = new Set(["python", "python3", "uv", "deno", "go", "cargo", "make"])
 
 const isExecutableFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<boolean> =>
   fs.stat(file).pipe(
@@ -72,7 +75,8 @@ const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, ne
 
 export const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 
-const launcher = (call: StandinCall): string => {
+const launcher = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, real: string, timing?: StandinTiming): string => {
+  const call = { tool, ...settings, commands, real, timing: timing ?? null } satisfies StandinCall
   const [bun = "", ...flags] = helperCommand
   const main = flags.at(-1) ?? ""
   const fallback = call.real === "" ? "running the nearest node_modules/.bin/" + call.tool + " unqueued" : "running " + call.real + " unqueued"
@@ -108,7 +112,7 @@ exec "$real" "$@"
 export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming): Effect.Effect<string, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const real = yield* findRealTool(tool, Bun.env.PATH ?? "")
-    return launcher({ tool, commands, home: settings.home, group: settings.group, wrap: settings.wrap, real, through: settings.through, timing: timing ?? null })
+    return launcher(tool, settings, commands, real, timing)
   })
 
 export const standinScripts = (
@@ -119,8 +123,12 @@ export const standinScripts = (
 ): Effect.Effect<Record<string, string>, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const entries: Array<[string, string]> = []
+    const configured = new Set(configuredTools(commands))
     for (const tool of tools) {
-      entries.push([tool, yield* standinScript(tool, settings, commands, timing)])
+      const real = yield* findRealTool(tool, Bun.env.PATH ?? "")
+      if (real !== "" || configured.has(tool) || !toolsRequiringPathAtWrite.has(tool)) {
+        entries.push([tool, launcher(tool, settings, commands, real, timing)])
+      }
     }
     return Object.fromEntries(entries)
   })
