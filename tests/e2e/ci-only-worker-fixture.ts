@@ -73,10 +73,10 @@ export const exerciseCiOnlyHostPi = async (): Promise<void> => {
     assert.equal(result.exitCode, 0, result.stdout + result.stderr)
     assert.equal(result.stdout.includes(prUrl), true)
     const statuses = (await readFile(attempts, "utf8")).trim().split("\n")
-    assert.deepEqual(statuses, Array.from({ length: 3 }, () => forbidden.map((command) => "127 " + command)).flat())
+    assert.deepEqual(statuses, Array.from({ length: 3 }, () => forbidden.map((command) => "1 " + command)).flat())
     const refusals = (await readFile(errors, "utf8")).trim().split("\n")
     assert.equal(refusals.length, statuses.length)
-    assert.equal(refusals.every((line) => line.includes("tests run in GitHub CI")), true)
+    assert.equal(refusals.every((line) => line.includes("starts a test run")), true)
     assert.deepEqual((await readFile(starts, "utf8")).trim().split("\n"), Array.from({ length: 3 }, () => permitted).flat())
     assert.equal((result.stderr.match(/skipped local commands:/g) ?? []).length, 1)
     const outside = Bun.spawn([join(env["ORC_HOME"] ?? "", "heavy", "bin", "bun"), "test"], {

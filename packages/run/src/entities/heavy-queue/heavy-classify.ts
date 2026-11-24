@@ -122,14 +122,10 @@ const testArgs = (args: Args): Args => skipLeading(
 
 const execTest = (args: Args): boolean => {
   const [tool = "", ...rest] = testArgs(args)
-  return isTestCall(packageName(tool), rest)
+  return isTestCallInner(packageName(tool), rest)
 }
 
-export const isTestCall = (tool: string, args: Args): boolean => {
-  const queryFlags = tool === "pytest" ? ["--version", "--help", "-h"] : versionFlags
-  if (args.length === 1 && queryFlags.includes(args[0] ?? "")) {
-    return false
-  }
+const isTestCallInner = (tool: string, args: Args): boolean => {
   const [sub = "", ...rest] = testArgs(args)
   switch (tool) {
     case "checks-test":
@@ -150,7 +146,7 @@ export const isTestCall = (tool: string, args: Args): boolean => {
       if (["exec", "x", "dlx"].includes(sub)) {
         return execTest(rest)
       }
-      return matchesAny(sub, testScripts) || isTestCall(packageName(sub), rest)
+      return matchesAny(sub, testScripts) || isTestCallInner(packageName(sub), rest)
     case "playwright":
     case "go":
     case "cargo":
@@ -162,6 +158,14 @@ export const isTestCall = (tool: string, args: Args): boolean => {
     default:
       return false
   }
+}
+
+export const isTestCall = (tool: string, args: Args): boolean => {
+  const queryFlags = tool === "pytest" ? ["--version", "--help", "-h"] : versionFlags
+  if (args.length === 1 && queryFlags.includes(args[0] ?? "")) {
+    return false
+  }
+  return isTestCallInner(tool, args)
 }
 
 const runScript = (args: Args): HeavyDecision => {
