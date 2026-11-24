@@ -288,13 +288,7 @@ const yoloRefusal = (place: { readonly root: string }, project: string) =>
     return isYolo(found) ? null : "the project " + project + " has no yolo true, so its PRs merge only on the captain's word"
   })
 
-export const mergeTask = (
-  root: string,
-  id: string,
-  basis: MergeBasis,
-  sendBack: SendBackForFix,
-  options: { readonly noWait: boolean } = { noWait: false }
-): Effect.Effect<string, MergeError, MergeRequirements> =>
+const openPullRequest = (root: string, id: string, basis: MergeBasis) =>
   Effect.gen(function*() {
     const record = yield* findTask(root, id)
     const decision = decisionRefusal(record, "merge")
@@ -318,6 +312,38 @@ export const mergeTask = (
     if (view.state !== "OPEN") {
       return yield* refuse(refusal(id, url, ["is " + view.state.toLowerCase() + ", not open"]))
     }
+    return { url, view }
+  })
+
+const mergeChecked = (landing: Landing, view: PullRequestView, pending: PendingUpdate | null, noWait: boolean) =>
+  Effect.gen(function*() {
+    const { id, url } = landing
+    const reasons = checkRefusals(view)
+    if (reasons.length > 0) {
+      return yield* refuse(refusal(id, url, reasons))
+    }
+    const behind = yield* behindBy(id, url, view)
+    const checked = approvedAt(view)
+    const sameHead = pending?.head === checked.head ? pending : null
+    if (behind > 0) {
+      const approved = sameHead === null ? checked : { ...checked, green: [...new Set([...sameHead.green, ...checked.green])] }
+      return yield* landUpdated(landing, view, approved, noWait)
+    }
+    if (sameHead !== null) {
+      return yield* refuse(refusal(id, url, ["its branch update has not produced a new head, so " + retryAdvice(landing)]))
+    }
+    return yield* mergeAt(landing, view)
+  })
+
+export const mergeTask = (
+  root: string,
+  id: string,
+  basis: MergeBasis,
+  sendBack: SendBackForFix,
+  options: { readonly noWait: boolean } = { noWait: false }
+): Effect.Effect<string, MergeError, MergeRequirements> =>
+  Effect.gen(function*() {
+    const { url, view } = yield* openPullRequest(root, id, basis)
     const landing: Landing = { root, id, url, basis, sendBack }
     const saved = yield* readPendingUpdate(root, id)
     const savedHere = saved?.url === url ? saved : null
@@ -331,19 +357,5 @@ export const mergeTask = (
     if (pending !== null && pending.head !== view.headRefOid) {
       yield* checkUpdatedHead(landing, pending, view)
     }
-    const reasons = checkRefusals(view)
-    if (reasons.length > 0) {
-      return yield* refuse(refusal(id, url, reasons))
-    }
-    const behind = yield* behindBy(id, url, view)
-    const checked = approvedAt(view)
-    const sameHead = pending?.head === checked.head ? pending : null
-    if (behind > 0) {
-      const approved = sameHead === null ? checked : { ...checked, green: [...new Set([...sameHead.green, ...checked.green])] }
-      return yield* landUpdated(landing, view, approved, options.noWait)
-    }
-    if (sameHead !== null) {
-      return yield* refuse(refusal(id, url, ["its branch update has not produced a new head, so " + retryAdvice(landing)]))
-    }
-    return yield* mergeAt(landing, view)
+    return yield* mergeChecked(landing, view, pending, options.noWait)
   })

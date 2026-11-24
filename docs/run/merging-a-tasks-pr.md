@@ -57,7 +57,7 @@ Orc merges nothing and refuses when any of these holds:
 - Orc still cannot read the PR when the 20 minutes end, so it cannot tell what the new head holds.
 - The new head is still behind its base, because the base moved again.
 
-After a merge conflict, or a red check observed while waiting on the new head, orc also sends the task back as [`orc backlog send-back`](backlog-tasks.md#send-a-task-back) does, with words that name the conflict or the red check.
+After a merge conflict, or a red check observed on the new head, orc also sends the task back as [`orc backlog send-back`](backlog-tasks.md#send-a-task-back) does, with words that name the conflict or the red check.
 The next beat resumes the task's run on its branch for a fix pass.
 
 ## Choose a merge basis

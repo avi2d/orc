@@ -536,8 +536,9 @@ Merges the PR of a closed task with a squash at the head it checked, and refuses
 a PR that is not open or not green. When the PR is behind its base, runs
 GitHub's update-branch at the checked head. By default, waits up to 20 minutes
 for the checks on the new head and merges it once they are green. When
-update-branch reports a merge conflict or a check turns red while waiting,
-merges nothing and sends the task back for a fix as orc backlog send-back does.
+update-branch reports a merge conflict, or a check is red on a --no-wait retry
+or turns red while waiting, merges nothing and sends the task back for a fix as
+orc backlog send-back does.
 
 Options:
   --basis <captain-word|yolo-green>

@@ -171,7 +171,7 @@ export const beatHelp: HelpEntry = {
 export const mergeHelp: HelpEntry = {
   usage: ["orc merge <task-id> [--basis <" + mergeBases.join("|") + ">] [--no-wait]"],
   summary: "Merge a closed task's PR once its checks are green",
-  about: "Merges the PR of a closed task with a squash at the head it checked, and refuses a PR that is not open or not green. When the PR is behind its base, runs GitHub's update-branch at the checked head. By default, waits up to 20 minutes for the checks on the new head and merges it once they are green. When update-branch reports a merge conflict or a check turns red while waiting, merges nothing and sends the task back for a fix as orc backlog send-back does.",
+  about: "Merges the PR of a closed task with a squash at the head it checked, and refuses a PR that is not open or not green. When the PR is behind its base, runs GitHub's update-branch at the checked head. By default, waits up to 20 minutes for the checks on the new head and merges it once they are green. When update-branch reports a merge conflict, or a check is red on a --no-wait retry or turns red while waiting, merges nothing and sends the task back for a fix as orc backlog send-back does.",
   options: [
     { flag: "--basis <" + mergeBases.join("|") + ">", meaning: "Why the merge is allowed. Defaults to captain-word, and yolo-green needs a project with yolo set." },
     { flag: "--no-wait", meaning: "When behind, return after requesting a branch update without waiting for CI or merging. Run merge again with the same basis once the new head checks are green. Without --no-wait, a later call drops the checks saved before the update and waits for the new head's own checks. The chat uses this option." }
