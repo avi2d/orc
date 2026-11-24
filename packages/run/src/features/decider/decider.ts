@@ -90,7 +90,7 @@ const collectParagraph = (out: Array<string>, paragraph: string): void => {
   if (lines.length === 0) {
     return
   }
-  const joined = spaced(lines.join(" "))
+  const joined = spaced(lines.filter((line) => !/^#{1,6}\s/.test(line)).join(" "))
   pushOnce(out, unquoted(joined))
   collectSentences(out, joined)
 }
@@ -120,9 +120,35 @@ const holdsClause = (segment: string, wanted: string): boolean => {
 
 const normalizedQuote = (quote: string): string => unquoted(stripMarker(unquoted(quote)))
 
-const quotedSource = (quote: string, sources: ReadonlyArray<RuleSource>): RuleSource | undefined => {
+const comparisonWords = (text: string): string =>
+  spaced(
+    text
+      .replace(/["'“”‘’`]/g, "")
+      .replace(/[.,;:?]+(?=\s|$)|\s[-–—]+(?=\s)/g, " ")
+  )
+
+interface Quoted {
+  readonly source: string
+  readonly quote: string
+}
+
+const quotedSource = (quote: string, sources: ReadonlyArray<RuleSource>): Quoted | undefined => {
   const wanted = normalizedQuote(quote)
-  return wanted === "" ? undefined : sources.find((source) => sentencesAndLinesOf(source.text).some((segment) => holdsClause(segment, wanted)))
+  const words = comparisonWords(wanted)
+  if (words === "") {
+    return undefined
+  }
+  for (const source of sources) {
+    for (const segment of sentencesAndLinesOf(source.text)) {
+      if (holdsClause(segment, wanted)) {
+        return { source: source.source, quote: wanted }
+      }
+      if (comparisonWords(segment) === words) {
+        return { source: source.source, quote: segment }
+      }
+    }
+  }
+  return undefined
 }
 
 interface Earlier {
@@ -174,7 +200,7 @@ const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlie
       const found = quotedSource(reply.rule, sources)
       return found === undefined
         ? { kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on a rule in none of the rules it read word for word from a clause start to a clause end: " + JSON.stringify(reply.rule) }
-        : { kind: "answered", words: reply.answer.trim(), basis: { kind: "rule", quote: normalizedQuote(reply.rule), source: found.source, reason: reply.reason } }
+        : { kind: "answered", words: reply.answer.trim(), basis: { kind: "rule", quote: found.quote, source: found.source, reason: reply.reason } }
     }
     case "duplicate": {
       const linked = earlier.find((entry) => entry.id === reply.of.trim())

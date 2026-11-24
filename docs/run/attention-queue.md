@@ -26,9 +26,10 @@ Rules and policy do not widen it.
 
 The decider can:
 
-- **Answer** with a reason and an exact rule from the task, your rules, project instructions, or the policy's Rules section.
-  Orc escalates an answer whose quote is no whole clause of them, after whitespace is collapsed and surrounding quotes and a leading list or quote marker are stripped on both sides.
-  A quote matches a whole line, a sentence within a line, a whole paragraph joined across its lines, a sentence of that joined paragraph, where the quote starts at the start or after a period, exclamation mark, question mark, colon or semicolon and ends at the end, just before one of those marks, or on one of those marks.
+- **Answer** with a reason and a rule from the task, your rules, project instructions, or the policy's Rules section.
+  Orc escalates an answer whose quote is no whole clause of them, after whitespace is collapsed and surrounding quotes and a leading list or quote marker are stripped.
+  A quote matches a whole line or paragraph, a sentence in a line, or a sentence of a paragraph joined across lines, starting at the start or after a period, exclamation mark, question mark, colon, or semicolon and ending at the end, before a mark, or on a mark.
+  Quote marks and clause punctuation may differ, orc records the source wording, and meaning-changing marks stay exact.
 - **Ask back** to a worker question.
   The worker receives the question and the item stays open.
   A review question cannot be asked back and is escalated instead.
@@ -46,7 +47,8 @@ To replace an answer the decider gave, run `orc backlog answer <task-id> <questi
 Your answer stands, and the task file keeps the decider's answer beside it under `overturned`.
 The item keeps the decider's answer under `overturned` in its `closed` state, and its `answer` is yours.
 A run that has not received the decider's answer gets only yours.
-If a run already took the decider's answer, orc queues your answer as a correction but reports it as not delivered.
+If a run already took the decider's answer, `orc backlog answer` says the next beat queues your answer as a correction and that delivery is not confirmed.
+The next beat writes the correction to `corrections.json`, and that write fails if the run has already ended.
 The task file marks it `correction_queued`, and later beats do not queue it again.
 A Pi worker may receive the correction after its next tool call.
 No Pi worker reads corrections during a [no-mistakes](https://github.com/kunchenguid/no-mistakes) gate or after the last Pi session ends.

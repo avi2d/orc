@@ -65,16 +65,18 @@ type TaskJson = {
 interface ParkedJson {
   readonly origin?: Parked["origin"]
   readonly branch: string
-  readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string; readonly answer: { readonly words: string; readonly at: string } | null }>
+  readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string; readonly blocks: boolean; readonly deciderOwns: boolean; readonly answer: { readonly words: string; readonly at: string } | null }>
 }
 
-const parkedJson = (parked: Parked): ParkedJson => ({
+const parkedJson = (task: string, parked: Parked, deciderOwns: DeciderOwns): ParkedJson => ({
   ...(parked.origin === undefined ? {} : { origin: parked.origin }),
   branch: parked.branch,
   questions: parked.questions.map((question) => ({
     id: question.id,
     text: question.text,
     asked: question.asked,
+    blocks: question.blocks,
+    deciderOwns: deciderOwns(task, question),
     answer: question.answer === null ? null : { words: question.answer.words, at: question.answer.at }
   }))
 })
@@ -149,7 +151,7 @@ const taskJson = (record: TaskRecord, view: BacklogView): TaskJson => {
     body: record.spec.body,
     prState: view.prStates.get(record.spec.id) ?? null,
     hold: record.hold,
-    parked: record.parked === null ? null : parkedJson(record.parked),
+    parked: record.parked === null ? null : parkedJson(record.spec.id, record.parked, view.deciderOwns),
     ...claimJson(record)
   }
 }
