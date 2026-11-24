@@ -234,7 +234,7 @@ describe("the dashboard fits the terminal it runs in", () => {
       for (const line of lines) expect(lineWidth(line)).toBeLessThanOrEqual(columns);
       const text = lines.map(plain).join("\n");
       for (const header of ["● claude", "● codex", "● opencode-go"]) expect(text).toContain(header);
-      expect(text.includes("● account second") || text.includes("+1 more account")).toBe(true);
+      expect(text.includes("● account main") || text.includes("+1 more account")).toBe(true);
       expect((text.match(/⚑/gu)?.length ?? 0) + Number(/^\+(\d+) more flags?$/mu.exec(text)?.[1] ?? 0)).toBe(4);
       expect(text).toContain("queue    north · 2 running");
       expect(text).toContain("actions  toolshed · 2 running");

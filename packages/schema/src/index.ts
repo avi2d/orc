@@ -13,13 +13,6 @@ export {
 export { runDecoded, sourceOf, stamped, type Source } from "./shared/lib";
 export * from "./entities/resources";
 export {
-  type SavedProfile,
-  SavedProfilesSource,
-  type SavedProfiles,
-  savedProfilesSourceLayer,
-  decodeSavedProfiles,
-} from "./entities/session-quota";
-export {
   decodeOrcQuota,
   type OrcQuota,
   type OrcQuotaAccount,
@@ -145,7 +138,7 @@ export { type TaskHistoryMachine, RemoteTaskHistory, remoteTaskHistoryLayer } fr
 export { type TaskLiveMachine, RemoteTaskLive, remoteTaskLiveLayer } from "./entities/task-board";
 export { readBeside } from "./shared/config";
 
-export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaPanelSources, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./entities/session-quota";
+export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./entities/session-quota";
 export { sessionQuotaOf, type SessionQuotaSources, sessionQuotaSourcesLayer, type SessionSources, sessionSourcesLayer } from "./entities/session-quota";
 export { ComposedSessionQuotaReport } from "./entities/session-quota";
 export { composedSessionQuotaReport } from "./entities/session-quota";

@@ -13,6 +13,8 @@ export type OrcQuotaFixture =
   | "second-used-up"
   | "second-login-expired";
 
+export const recordedOrcQuota: OrcQuotaFixture = "main";
+
 export const orcQuotaText = (name: OrcQuotaFixture): string => fixture(`orc-quota/${name}.json`);
 
 export const orcQuotaReading = (text: string, capturedAt: DateTime.Utc): Reading<OrcQuota> => {
@@ -29,5 +31,5 @@ export const noOrcAccounts = (capturedAt: DateTime.Utc): Reading<OrcQuota> => ({
   capturedAt,
 });
 
-export const recordedOrcQuotaLayer = (name: OrcQuotaFixture = "second-login-expired"): Layer.Layer<OrcQuotaSource> =>
+export const recordedOrcQuotaLayer = (name: OrcQuotaFixture = recordedOrcQuota): Layer.Layer<OrcQuotaSource> =>
   orcQuotaSourceLayer.pipe(Layer.provide(Layer.succeed(CommandRunner, { run: () => Effect.succeed(orcQuotaText(name)) })));

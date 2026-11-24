@@ -1,5 +1,5 @@
 ╭─ quota ────────────────────────────────────────── ↻ 10s ─╮╭─ ledger · today ───────────────────────────────── ↻ 10s ─╮
-│ ● claude · max · runs out in 1d 20h                      ││ ○ Ship the ledger board today. · 5h                      │
+│ ● claude main · max · runs out in 1d 20h                 ││ ○ Ship the ledger board today. · 5h                      │
 │   5 hours    ━━━━┃━━━━━━━━━━━╸  98%  +74 spare    1h 11m ││ ● The compact box keeps one line per message. · 4h       │
 │   week       ━━━━━╸─┃─────────  31%  10 over      2d 20h ││ ○ Does l open the full screen? · 2h                      │
 │   fable week ━━━━━━━┃━━━━━━━━━ 100%  +59 spare    2d 20h ││ ● Yes. l takes the full screen, and the cursor op… · 25m │
