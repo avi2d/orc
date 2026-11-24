@@ -41,7 +41,7 @@ const Remote = Schema.Struct({
 })
 
 export type BaseRemote = typeof Remote.Type
-export type BaseRepositories = typeof Reply.Type["data"]
+type BaseRepositories = typeof Reply.Type["data"]
 
 export interface ReadBaseCi {
   readonly remote: (checkout: string) => Effect.Effect<Option.Option<BaseRemote>, never, ChildProcessSpawner.ChildProcessSpawner>
