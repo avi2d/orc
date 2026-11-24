@@ -14,7 +14,8 @@ type Watch = typeof Watch.Type
 
 const MergedCommit = Schema.fromJsonString(Schema.Struct({
   state: Schema.Literals(["OPEN", "CLOSED", "MERGED"]),
-  mergeCommit: Schema.NullOr(Schema.Struct({ oid: CommitSha }))
+  mergeCommit: Schema.NullOr(Schema.Struct({ oid: CommitSha })),
+  mergedAt: Schema.NullOr(Schema.String)
 }))
 
 const WorkflowRun = Schema.Struct({
@@ -53,9 +54,18 @@ const readJson = <S extends Schema.Top & { readonly DecodingServices: never }>(a
     Effect.catchTag("RunnerError", () => Effect.succeed(Option.none()))
   )
 
+export const recordMainCiAlarm = (root: string, run: Pick<typeof WorkflowRun.Type, "status" | "conclusion" | "html_url" | "name" | "head_branch" | "head_sha">, at: string, context = "") =>
+  run.status === "completed" && run.conclusion !== null && redConclusions.has(run.conclusion)
+    ? recordEvent(root, {
+      key: "main-ci." + new Bun.CryptoHasher("sha256").update(run.html_url).digest("hex"),
+      at,
+      text: "CI alarm: " + run.name + " failed on " + run.head_branch + " at " + run.head_sha + context + ". Run: " + run.html_url
+    })
+    : Effect.succeed(false)
+
 const watchSettled = Effect.fnUntraced(function*(root: string, watch: Watch, at: string) {
   const [, host = "", owner = "", repo = ""] = prPattern.exec(watch.url) ?? []
-  const pr = yield* readJson(["pr", "view", watch.url, "--json", "state,mergeCommit"], MergedCommit)
+  const pr = yield* readJson(["pr", "view", watch.url, "--json", "state,mergeCommit,mergedAt"], MergedCommit)
   if (Option.isNone(pr)) {
     return false
   }
@@ -74,15 +84,11 @@ const watchSettled = Effect.fnUntraced(function*(root: string, watch: Watch, at:
   const runs = pages.value.flatMap((page) => page.workflow_runs).filter((run) =>
     run.head_sha === sha && run.head_branch === watch.branch && run.event === "push")
   for (const run of runs) {
-    if (run.status === "completed" && run.conclusion !== null && redConclusions.has(run.conclusion)) {
-      yield* recordEvent(root, {
-        key: watch.task + ".main-ci." + sha + "." + run.id.toString(),
-        at,
-        text: "CI alarm: " + watch.task + " " + run.name + " failed on " + watch.branch + " at " + sha + " after merging " + watch.url + ". Run: " + run.html_url
-      })
-    }
+    yield* recordMainCiAlarm(root, run, at, " after merging " + watch.url)
   }
-  return runs.length > 0 && runs.every((run) => run.status === "completed" && run.conclusion !== null)
+  return runs.length === 0
+    ? pr.value.mergedAt !== null && Date.parse(at) - Date.parse(pr.value.mergedAt) >= Duration.toMillis(Duration.minutes(30))
+    : runs.every((run) => run.status === "completed" && run.conclusion !== null)
 })
 
 const pollWatch = Effect.fnUntraced(function*(root: string, file: string, at: string) {

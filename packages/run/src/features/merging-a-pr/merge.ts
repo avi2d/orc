@@ -200,11 +200,16 @@ const awaitNewHead = (
     return yield* awaitNewHead(url, checked, poll + 1, unreadable, lineage)
   })
 
+class MergeBehind extends Schema.TaggedError<MergeBehind>()("MergeBehind", { detail: Schema.String }) {}
+
 const mergeAt = (landing: Landing, view: PullRequestView) =>
   Effect.gen(function*() {
     const merged = yield* gh(["pr", "merge", landing.url, "--squash", "--match-head-commit", view.headRefOid])
     if (merged.exitCode !== 0) {
-      return yield* refuse("gh pr merge refused " + landing.url + ": " + merged.said)
+      const detail = "gh pr merge refused " + landing.url + ": " + merged.said
+      return yield* /\b(?:head )?branch is (?:not up[- ]to[- ]date|out of date)\b/i.test(merged.said)
+        ? Effect.fail(new MergeBehind({ detail }))
+        : refuse(detail)
     }
     return "merged " + landing.id + " " + landing.url
   })
@@ -245,7 +250,7 @@ const landUpdated = (landing: Landing, checked: PullRequestView) =>
     if (behind > 0) {
       return yield* refuse(refusal(landing.id, landing.url, ["is still " + commits(behind) + " behind " + view.baseRefName + " after the update, because " + view.baseRefName + " moved again, so run orc merge again"]))
     }
-    return yield* mergeAt(landing, view)
+    return yield* mergeAt(landing, view).pipe(Effect.catchTag("MergeBehind", (error) => refuse(error.detail)))
   })
 
 const yoloRefusal = (place: { readonly root: string }, project: string) =>
@@ -297,11 +302,13 @@ export const mergeTask = (
     if (update === "update") {
       return yield* landUpdated(landing, view)
     }
-    const merged = yield* mergeAt(landing, view)
-    if (update === "disjoint") {
-      yield* watchMainCi(root, { task: id, url, branch: view.baseRefName, checkedHead: view.headRefOid }).pipe(
-        Effect.catchTag("BacklogError", (error) => refuse(merged + ", but Orc could not watch main CI: " + error.detail))
-      )
-    }
-    return merged
+    return yield* mergeAt(landing, view).pipe(
+      Effect.flatMap((merged) => update === "disjoint"
+        ? watchMainCi(root, { task: id, url, branch: view.baseRefName, checkedHead: view.headRefOid }).pipe(
+          Effect.catchTag("BacklogError", (error) => refuse(merged + ", but Orc could not watch main CI: " + error.detail)),
+          Effect.as(merged)
+        )
+        : Effect.succeed(merged)),
+      Effect.catchTag("MergeBehind", (error) => update === "disjoint" ? landUpdated(landing, view) : refuse(error.detail))
+    )
   })
