@@ -24,6 +24,8 @@ Orc sends questions about deletion, security, credentials, merging, pushing, rel
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
 Rules and policy do not widen it.
 
+### Reply to a question
+
 The decider can:
 
 - **Answer** with a reason and a rule from the task, your rules, project instructions, or the policy's Rules section.
@@ -39,12 +41,16 @@ The decider can:
   When the question lists lettered options, the decider may name the one it recommends.
   The escalated decision keeps that option's text as `recommendation`, and orc drops a recommendation that is no option of the question.
 
+### Follow the recommended option
+
 A line of a review question that starts with `Recommended:` names its recommended option, and leading whitespace before it is allowed.
 The policy tells the decider to answer such a question with that option, even when it picks between product choices the intent leaves open or the decider is not sure.
 When the decider still escalates a review question with that line on one of those two bullets, orc answers it with the recommended option and records the policy's Rules sentence as the rule.
 An escalation on any other bullet, or with no bullet, stays with you, and so does a question on the topic list above.
 Both the policy's recommendation rule and orc's override apply only to review questions.
 A worker question that leaves a product choice open or the decider unsure still escalates, even when the worker recommends an option.
+
+### Handle a failed call
 
 A failed call, unreadable reply or rules file, or missing decider model also escalates the item.
 
