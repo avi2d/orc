@@ -101,7 +101,7 @@ export const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
     "  exit 0",
     "fi",
     "case \"$*\" in *'/files '*) cat <<'J'",
-    ...(forge.files ?? ["shared.txt"]).map((path) => JSON.stringify({ status: "modified", path, version: false })),
+    ...(forge.files ?? ["shared.txt"]).map((path) => JSON.stringify({ status: "modified", path, patch: "+example" })),
     "J",
     "exit 0;; esac",
     "case \"$*\" in *compare/main..." + newHead + "*)",

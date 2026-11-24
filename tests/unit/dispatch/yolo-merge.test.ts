@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Layer, Option } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { answerItem, routePullRequest, taskItems } from "../../../packages/run/src/entities/attention/index"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { ownerWordChanges, readChangedFiles, type ChangedFile, type PullRequestView } from "../../../packages/run/src/entities/pull-request/index"
 import { beatReady } from "../../../packages/run/src/widgets/beat/yolo-merge"
@@ -30,13 +31,15 @@ const started = { at: "2026-11-18T10:02:00.000Z", log: "/tmp/task.log" }
 const pr = "https://github.com/acme/orc/pull/8"
 
 const withBacklog = async (yolo: boolean, body: (root: string) => Promise<void>): Promise<void> => {
-  const root = await mkdtemp(join(tmpdir(), "orc-yolo-"))
+  const home = await mkdtemp(join(tmpdir(), "orc-yolo-"))
+  const root = join(home, "backlog")
   try {
+    await mkdir(root)
     await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "mac", slots: 1, start: ["true"] }], quota: { provider: "acme", command: ["true"], accounts: [{ name: "main", tokenFile: "/x" }] } }))
     await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: root }, yolo }] }))
     await body(root)
   } finally {
-    await rm(root, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true })
   }
 }
 
@@ -85,7 +88,16 @@ const ghLayer = (current: PullRequestView, files: string | null, merges: Array<s
 
 const beatAction = async (root: string, current: PullRequestView, yolo: boolean, files: string | null, merges: Array<string>) => {
   const task = await taskOf(root)
-  return Effect.runPromise(prEvents(root, task, () => Effect.succeed(current), "2026-11-18T11:10:00.000Z", yolo).pipe(Effect.provide(Layer.merge(BunServices.layer, ghLayer(current, files, merges)))))
+  return Effect.runPromise(prEvents(root, task, () => Effect.succeed(current), "2026-11-18T11:10:00.000Z", yolo, dirname(root)).pipe(Effect.provide(Layer.merge(BunServices.layer, ghLayer(current, files, merges)))))
+}
+
+const holdReady = async (root: string, current: PullRequestView): Promise<void> => {
+  await run(routePullRequest(root, "task-1", pr, current, "2026-11-18T11:01:00.000Z"))
+  const ready = (await run(taskItems(root, "task-1"))).find((entry) => entry.item.kind === "pr-ready" && entry.item.state.kind === "open")
+  if (ready === undefined) {
+    throw new Error("task-1 has no open pr-ready item")
+  }
+  expect(await run(answerItem(root, ready.id, { words: "hold", at: "2026-11-18T11:02:00.000Z" }))).toBe("closed")
 }
 
 const filesOf = (rows: ReadonlyArray<Record<string, unknown>>): string => rows.map((row) => JSON.stringify(row)).join("\n")
@@ -142,19 +154,62 @@ describe("the beat merges a yolo project's green PR", () => {
     ])
   })
 
-  test("a package.json without a readable patch waits as a release instead of merging", async () => {
-    await withBacklog(true, async () => {
-      const merges: Array<string> = []
-      const layer = ghLayer(view(), filesOf([{ status: "modified", path: "package.json", previous: null, patch: null }]), merges)
+  for (const { label, patch } of [
+    { label: "missing patch", patch: undefined },
+    { label: "null patch", patch: null },
+    { label: "version patch", patch: '-  "version": "1.0.0",\n+  "version": "1.1.0",' }
+  ]) {
+    test("a package.json release with version false is not accepted as an ordinary edit: " + label, async () => {
+      const layer = ghLayer(view(), filesOf([{ status: "modified", path: "package.json", previous: null, patch, version: false }]), [])
       const files = await Effect.runPromise(readChangedFiles(pr).pipe(Effect.provide(Layer.merge(BunServices.layer, layer))))
       expect(ownerWordChanges(files)).toEqual([
         "is a release, as it changes package.json, which waits for the captain's merge word"
       ])
     })
+  }
+
+  test("a readable package.json dependency patch is not refused as a release", async () => {
+    const layer = ghLayer(view(), filesOf([{ status: "modified", path: "package.json", patch: '-  "effect": "4.0.0"\n+  "effect": "4.0.1"' }]), [])
+    const files = await Effect.runPromise(readChangedFiles(pr).pipe(Effect.provide(Layer.merge(BunServices.layer, layer))))
+    expect(ownerWordChanges(files)).toEqual([])
   })
 })
 
 describe("the beat gate around the merge", () => {
+  test("a held green PR on a yolo project is not merged", async () => {
+    await withBacklog(true, async (root) => {
+      await closeWith(root, "done")
+      await holdReady(root, view())
+      const merges: Array<string> = []
+      for (let beat = 0; beat < 2; beat += 1) {
+        expect(Option.isNone(await beatAction(root, view(), true, noFiles, merges))).toBe(true)
+      }
+      expect(merges).toEqual([])
+    })
+  })
+
+  test("a held PR is not merged when its checks turn red then green on the same head", async () => {
+    await withBacklog(true, async (root) => {
+      await closeWith(root, "done")
+      await holdReady(root, view())
+      const merges: Array<string> = []
+      await beatAction(root, view("FAILURE"), true, noFiles, merges)
+      expect(Option.isNone(await beatAction(root, view(), true, noFiles, merges))).toBe(true)
+      expect(merges).toEqual([])
+    })
+  })
+
+  test("a hold on an older head does not prevent a new green head from merging", async () => {
+    await withBacklog(true, async (root) => {
+      await closeWith(root, "done")
+      await holdReady(root, view())
+      const merges: Array<string> = []
+      const current = { ...view(), headRefOid: "1".repeat(40) }
+      await beatAction(root, current, true, noFiles, merges)
+      expect(merges).toEqual(["gh pr merge " + pr + " --squash --match-head-commit " + current.headRefOid])
+    })
+  })
+
   test("a green yolo PR merges instead of staying open", async () => {
     await withBacklog(true, async (root) => {
       await closeWith(root, "done")

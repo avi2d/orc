@@ -3,7 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, ranClosing, taskPr, type TaskRecord } from "../../entities/backlog/index"
 import type { BeatAction, StalledAction } from "../../entities/attention/index"
 import type { ChatEvent, PrState } from "../../entities/events/index"
-import { routePullRequest } from "../../entities/attention/index"
+import { pullRequestHeld, routePullRequest } from "../../entities/attention/index"
 import { eventRecorded, readPrState, recordEvent, writePrState } from "../../entities/events/index"
 import { checkRefusals, greenChecks, type PullRequestView } from "../../entities/pull-request/index"
 import type { RunnerError } from "../../shared/process/index"
@@ -88,8 +88,8 @@ export const prEvents = (
   task: TaskRecord,
   read: ReadPullRequest,
   at: string,
-  yolo = false,
-  home = root
+  yolo: boolean,
+  home: string
 ): Effect.Effect<Option.Option<BeatAction>, BacklogError, Requirements> =>
   Effect.gen(function*() {
     const pr = taskPr(task)
@@ -121,7 +121,7 @@ export const prEvents = (
     if (waits.success === null || waits.success.length > 0) {
       return Option.none()
     }
-    if (ranClosing(task)?.outcome !== "done") {
+    if (ranClosing(task)?.outcome !== "done" || (yield* pullRequestHeld(root, id, view.success.headRefOid))) {
       return Option.none()
     }
     return Option.some(yield* mergeTimed(root, id, pr, home))

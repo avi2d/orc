@@ -8,8 +8,7 @@ const RawFile = Schema.fromJsonString(Schema.Struct({
   status: Schema.String,
   path: Schema.String,
   previous: Schema.optional(Schema.NullOr(Schema.String)),
-  patch: Schema.optional(Schema.NullOr(Schema.String)),
-  version: Schema.optional(Schema.Boolean)
+  patch: Schema.optional(Schema.NullOr(Schema.String))
 }))
 
 const ChangedFile = Schema.Struct({
@@ -64,7 +63,7 @@ export const readChangedFiles = (url: string): Effect.Effect<ReadonlyArray<Chang
         status: raw.status,
         path: raw.path,
         ...(raw.previous === undefined || raw.previous === null ? {} : { previous: raw.previous }),
-        version: raw.version ?? (raw.patch === undefined || raw.patch === null ? true : versionPattern.test(raw.patch))
+        version: raw.patch === undefined || raw.patch === null || versionPattern.test(raw.patch)
       } satisfies ChangedFile))
     )).pipe(
       Effect.mapError((error) => new BacklogError({ detail: "cannot read the files of " + url + ": gh printed no file list orc reads: " + error.message }))

@@ -33,6 +33,7 @@ interface Landing {
   readonly url: string
   readonly basis: MergeBasis
   readonly sendBack: SendBackForFix
+  readonly progress: (message: string) => Effect.Effect<void>
 }
 
 interface Approved {
@@ -59,7 +60,7 @@ const updateBranch = (landing: Landing, view: PullRequestView) =>
   Effect.gen(function*() {
     const [, host = "", owner = "", repo = ""] = prPattern.exec(landing.url) ?? []
     const number = landing.url.slice(landing.url.lastIndexOf("/") + 1)
-    yield* Console.log("Updating from " + view.baseRefName)
+    yield* landing.progress("Updating from " + view.baseRefName)
     const updated = yield* gh(["api", "--hostname", host, "-X", "PUT", "repos/" + owner + "/" + repo + "/pulls/" + number + "/update-branch", "-f", "expected_head_sha=" + view.headRefOid])
     if (updated.exitCode === 0) {
       return
@@ -225,7 +226,7 @@ const retryAdvice = (landing: Landing): string =>
 
 const awaitUpdatedAndMerge = (landing: Landing, checked: PullRequestView, approved: Approved) =>
   Effect.gen(function*() {
-    yield* Console.log("Checks running")
+    yield* landing.progress("Checks running")
     const unreadable = yield* Ref.make<string | null>(null)
     const settled = yield* awaitNewHead(landing.url, approved, 0, unreadable).pipe(
       Effect.timeoutOrElse({
@@ -348,11 +349,17 @@ export const mergeTask = (
   id: string,
   basis: MergeBasis,
   sendBack: SendBackForFix,
-  options: { readonly noWait: boolean } = { noWait: false }
+  options: { readonly noWait: boolean; readonly progress?: (message: string) => Effect.Effect<void> } = { noWait: false }
 ): Effect.Effect<string, MergeError, MergeRequirements> =>
   Effect.gen(function*() {
     const { url, view } = yield* openPullRequest(root, id, basis)
-    const landing: Landing = { root, id, url, basis, sendBack }
+    const landing: Landing = { root, id, url, basis, sendBack, progress: options.progress ?? Console.log }
+    if (basis === "yolo-green") {
+      const waits = ownerWordChanges(yield* readChangedFiles(url))
+      if (waits.length > 0) {
+        return yield* refuse(refusal(id, url, [...checkRefusals(view), ...waits]))
+      }
+    }
     const saved = yield* readPendingUpdate(root, id)
     const savedHere = saved?.url === url ? saved : null
     if (!options.noWait && savedHere !== null) {

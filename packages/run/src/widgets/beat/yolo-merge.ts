@@ -23,7 +23,7 @@ export const yoloMerge = (
   pr: string,
   home: string
 ): Effect.Effect<BeatAction, never, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
-  mergeTask(root, task, "yolo-green", (words) => DateTime.now.pipe(Effect.flatMap((now) => sendBack(root, home, { kind: "SendBack", id: task, words }, DateTime.formatIso(now)))), { noWait: true }).pipe(Effect.match({
+  mergeTask(root, task, "yolo-green", (words) => DateTime.now.pipe(Effect.flatMap((now) => sendBack(root, home, { kind: "SendBack", id: task, words }, DateTime.formatIso(now)))), { noWait: true, progress: () => Effect.void }).pipe(Effect.match({
     onSuccess: (message): BeatAction => message.startsWith("merged ")
       ? { kind: "yolo-merged", task, pr }
       : { kind: "merge-refused", task, reason: message },
