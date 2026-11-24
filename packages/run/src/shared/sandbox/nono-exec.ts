@@ -4,6 +4,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { homedir } from "node:os"
 import { agentEnv, type AgentExec } from "./agent-exec"
 import { isStandinDir } from "./standin-dir"
+import { toolTimeCap } from "./tool-time-cap"
 import { NonoProviderError, prepareSandboxShims, resolveDeveloperDir, resolveHostBinary, resolvePiAgentDir, resolveRuntime } from "./host"
 import { buildHostGitEnv, checkProfile, refuseCredentialBearingCheckout, resolveRoots, sandboxEnv, sandboxRuntimes, standinDirsOf } from "./nono"
 import { defaultToolchainResolver, selectNonoProfile, type ModelCredential, type ToolchainResolver } from "./nono-profile"
@@ -43,12 +44,6 @@ export const checksCacheReads = (
   hostEnv: Readonly<Record<string, string | undefined>>
 ): ReadonlyArray<string> =>
   hostEnv.HOME === undefined || hostEnv.HOME === "" ? [] : [path.join(hostEnv.HOME, ".cache", "avi2dg-checks")]
-
-export const toolTimeCap = (fs: FileSystem.FileSystem, path: Path.Path, home: string) =>
-  fs.realPath(path.join(home, ".pi", "agent", "extensions", "tool-time-cap.ts")).pipe(
-    Effect.map((file): string | null => file),
-    Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null))
-  )
 
 const runtimeSearchPath = (searchPath: string): string =>
   searchPath.split(":").filter((entry) => !isStandinDir(entry)).join(":")

@@ -1,6 +1,7 @@
-import { Console, Effect, type FileSystem, type Path, type Scope } from "effect"
+import { Console, Effect, FileSystem, Path, type Scope } from "effect"
+import { homedir } from "node:os"
 import type { ChildProcessSpawner } from "effect/process"
-import { type AgentExec, hostExec, shellInAgent, streamShellInAgent } from "../../shared/sandbox/index"
+import { type AgentExec, hostExec, shellInAgent, streamShellInAgent, toolTimeCap } from "../../shared/sandbox/index"
 import { prepareCommandOf, readChecksCommands } from "./checks"
 import { commitsSince, headOf } from "../../shared/process/index"
 import { openNonoExec } from "../../shared/sandbox/index"
@@ -24,11 +25,26 @@ export const openAgentExec = (
   hostEnv: Readonly<Record<string, string | undefined>>
 ): Effect.Effect<AgentExec, OrcRunError, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path | Scope.Scope> =>
   plan.kind === "none"
-    ? Effect.succeed(hostExec(copyDir, hostEnv, {
-      GIT_CONFIG_GLOBAL: agentGitConfig(folders),
-      HEAVY_TESTS_CI_ONLY: "1",
-      ...(plan.own === null ? {} : { PI_CODING_AGENT_DIR: plan.own.piAgentDir, ...plan.own.env })
-    }))
+    ? Effect.gen(function*() {
+      const exec = hostExec(copyDir, hostEnv, {
+        GIT_CONFIG_GLOBAL: agentGitConfig(folders),
+        HEAVY_TESTS_CI_ONLY: "1",
+        ...(plan.own === null ? {} : { PI_CODING_AGENT_DIR: plan.own.piAgentDir, ...plan.own.env })
+      })
+      if (exec.env.PI_CODING_AGENT_DIR === undefined) {
+        return exec
+      }
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const home = hostEnv.HOME || homedir()
+      if (path.resolve(copyDir, exec.env.PI_CODING_AGENT_DIR) === path.join(home, ".pi", "agent")) {
+        return exec
+      }
+      const piExtension = yield* toolTimeCap(fs, path, home).pipe(
+        Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot resolve the Pi time cap: " + cause.message }))
+      )
+      return { ...exec, piExtension }
+    })
     : openNonoExec({
       worktree: copyDir,
       piSessionDir: folders.piSessionDir,
