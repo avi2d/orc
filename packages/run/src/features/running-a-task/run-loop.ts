@@ -8,6 +8,8 @@ import { idleSpan, type PiEnd } from "../../entities/agent/index"
 import { OrcRunError } from "../../shared/lib/index"
 import { askOnLoop, loopAnswerOf, loopContinuePrompt, loopGuidance, loopingNote, RunStopped } from "./loop-pause"
 import { askedNote, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, workerAnswersOf, workerContinuePrompt, workerGuidance } from "./worker-question"
+import { holdReleaseGuidance, holdReleaseWordsOf } from "../../entities/review-gate/index"
+import { freshFixOf, resumedFix } from "./fix-guidance"
 import { finishAfterChecks } from "./run-finish"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
@@ -130,18 +132,20 @@ const implementPrompt = (run: HistoryRun, plan: Pick<ResumePlan, "handover" | "i
   const loop = loopAnswerOf(plan.answers)
   const worker = workerAnswersOf(plan.answers)
   const sentBack = sentBackWordsOf(plan.answers)
+  const released = holdReleaseWordsOf(plan.answers)
+  const releaseSuffix = released.length === 0 ? "" : "\n" + holdReleaseGuidance(released)
   if (sentBack.length > 0 && plan.implementSessionFile !== null) {
-    return sentBackContinuePrompt(sentBack)
+    return sentBackContinuePrompt(sentBack) + releaseSuffix
   }
   if (loop?.kind === "continue" && plan.implementSessionFile !== null) {
-    return loopContinuePrompt(loop.words)
+    return loopContinuePrompt(loop.words) + releaseSuffix
   }
   if (worker.length > 0 && plan.implementSessionFile !== null) {
-    return workerContinuePrompt(worker)
+    return workerContinuePrompt(worker) + releaseSuffix
   }
   const taskFile = run.path.join(run.piSessionDir, "task.md")
   const base = plan.handover === null ? buildImplementPrompt(run.agent, taskFile) : handoverImplementPrompt(run.agent, taskFile, plan.handover)
-  const guidance = [...(sentBack.length === 0 ? [] : [sentBackGuidance(sentBack)]), ...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : [])]
+  const guidance = [...(sentBack.length === 0 ? [] : [sentBackGuidance(sentBack)]), ...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : []), ...(released.length === 0 ? [] : [holdReleaseGuidance(released)])]
   return [base, ...guidance].join("\n")
 }
 
@@ -196,14 +200,14 @@ const fixOnce = (
   runAgent: SandboxOps["runAgent"],
   evidenceFile: string,
   attempt: number,
-  resumed: { readonly session: string; readonly guidance: string | null } | null,
+  resumed: { readonly session: string | null; readonly guidance: string | null } | null,
   checkpoints: Pick<RunCheckpoints, "fixSession" | "questionAsked">,
   continuationWords: string | null = null
 ): Effect.Effect<{ readonly fix: RecordedFixAttempt; readonly commits: ReadonlyArray<OrcRunCommit>; readonly paused: string | null }, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const started = new Date().toISOString()
     const prompt = resumed !== null && continuationWords !== null
-      ? loopContinuePrompt(continuationWords)
+      ? loopContinuePrompt(continuationWords) + (resumed.guidance === null ? "" : "\n" + resumed.guidance)
       : buildFixPrompt(run.fixer, evidenceFile) + (resumed?.guidance == null ? "" : "\n" + resumed.guidance)
     const first: AgentRun = { agent: run.fixer, prompt, logFile: "fix-" + attempt.toString() + ".log", resumeSession: resumed?.session ?? null, onSession: (file) => checkpoints.fixSession(attempt, file) }
     const result = yield* runSettled(run, runAgent, first, { name: "fix", attempt }, checkpoints.questionAsked)
@@ -240,16 +244,6 @@ const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksC
   )
 
 type ImplementBase = Parameters<typeof finishAfterChecks>[1]
-
-const resumedFix = (plan: Pick<ResumePlan, "fixSessionFile" | "answers">): { readonly session: string; readonly guidance: string | null } | null => {
-  if (plan.fixSessionFile === null) {
-    return null
-  }
-  const loop = loopAnswerOf(plan.answers)
-  const worker = workerAnswersOf(plan.answers)
-  const guidance = [...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : [])]
-  return { session: plan.fixSessionFile, guidance: guidance.length === 0 ? null : guidance.join("\n") }
-}
 
 const retryParkedFix = (run: HistoryRun, ops: SandboxOps, base: ImplementBase, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, commits: Array<OrcRunCommit>, plan: ResumePlan, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport | null, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
@@ -319,7 +313,7 @@ const runChecksFixLoop = (
       }
       const attempt = fixes.length + 1
       yield* checkpoints.fixStart(attempt, new Date().toISOString())
-      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, attempt === 1 ? resumedFix(plan) : null, checkpoints)
+      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, (attempt === 1 ? resumedFix(plan) : null) ?? freshFixOf(plan), checkpoints)
       fixes.push(fixed.fix)
       yield* checkpoints.fixDone(fixed.fix)
       commits.push(...fixed.commits)

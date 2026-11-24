@@ -98,7 +98,7 @@ const endParked = (
       }
     })
     const open = Arr.appendAll(merged, live.filter((question) => !ending.questions.some((known) => known.id === question.id)))
-    const parked = yield* parkStartedTask(root, id, branch, open, yield* nowIso, run).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
+    const parked = yield* parkStartedTask(root, id, branch, open, yield* nowIso, run, ending.reason).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
     return parked === null
       ? Option.none()
       : Option.some({ kind: "parked", task: id, machine, branch, questions: open.map((question) => question.id), decider: [] } satisfies BeatAction)

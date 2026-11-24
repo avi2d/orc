@@ -22,3 +22,4 @@ export const sentBackGuidance = (words: ReadonlyArray<string>): string =>
 
 export const sentBackContinuePrompt = (words: ReadonlyArray<string>): string =>
   sentBackGuidance(words) + "\nThen end it the way the first prompt said."
+

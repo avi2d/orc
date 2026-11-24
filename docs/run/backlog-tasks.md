@@ -109,6 +109,8 @@ The date is a reminder, not an automatic release.
 Run `orc backlog answer <task-id> <words>` to release the hold.
 Orc records the answer and `answered_at`, and a later beat may start the task.
 The run receives the task body followed by hold reasons and answers in chronological order.
+A repeat hold release is the exception.
+It travels with the resume as guidance for the retried run instead of in the body.
 Orc refuses holds on taken, started, closed, or parked tasks, and answers when no question is open.
 Holding a held task again keeps its first reason.
 
