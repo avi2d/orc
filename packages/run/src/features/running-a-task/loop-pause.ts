@@ -39,8 +39,17 @@ export const loopAnswerOf = (answers: ReadonlyArray<QuestionAnswer>): LoopAnswer
 export const askOnLoop = (runDir: string, waitSeconds: number, end: Looping): Effect.Effect<LoopVerdict, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const text = loopQuestionText(end.label)
-    const waited = yield* waitForAnswers(runDir, waitSeconds, "the paused run")([{ id: loopQuestionId, description: text }])
-    return loopAnswerOf(waited.answers) ?? { kind: "unanswered", question: { id: loopQuestionId, text, asked: waited.asked ?? new Date().toISOString() } }
+    const waited = yield* waitForAnswers(runDir, waitSeconds, "the paused run")([{ id: loopQuestionId, description: text, owner: "user" }])
+    return loopAnswerOf(waited.answers) ?? {
+      kind: "unanswered",
+      question: {
+        id: loopQuestionId,
+        text,
+        owner: "user",
+        asked: waited.askedAt.find((entry) => entry.question === loopQuestionId)?.asked ?? waited.asked ?? new Date().toISOString(),
+        ...(waited.asked === null ? {} : { asking: waited.asked })
+      }
+    }
   })
 
 export const loopGuidance = (words: string): string =>
