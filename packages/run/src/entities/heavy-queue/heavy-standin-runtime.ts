@@ -11,6 +11,8 @@ export const helperCommand: ReadonlyArray<string> = [
   process.execPath, "--no-env-file", "--config=/dev/null", Bun.fileURLToPath(import.meta.resolve("./heavy-standin-main.ts"))
 ]
 
+export const standinHelper = { runtime: helperCommand[0] ?? "", folder: dirname(helperCommand.at(-1) ?? "") }
+
 export const waiterWord = "orc-heavy-wait"
 
 export interface StandinTiming {
@@ -180,9 +182,28 @@ const refuse = (message: string): StandinPlan => {
   return { kind: "exit", code: 127 }
 }
 
+const testsCiOnlyVariable = "HEAVY_TESTS_CI_ONLY"
+
+const testRefusal = (command: string): string =>
+  "orc heavy: " + command + " starts a test run, and with " + testsCiOnlyVariable + "=1 the repository tests run only in GitHub CI"
+
+const testsCiOnly = (): boolean => Bun.env[testsCiOnlyVariable] === "1"
+
+const refusedTest = (call: StandinCall, args: ReadonlyArray<string>): boolean => {
+  if (!testsCiOnly() || !isTestCall(call.tool, args)) {
+    return false
+  }
+  process.stderr.write(testRefusal([call.tool, ...args].join(" ")) + "\n")
+  return true
+}
+
+// The nono sandbox grants no pueue socket, so a queued call there could never start.
+const runsUnqueued = (call: StandinCall, args: ReadonlyArray<string>): boolean =>
+  testsCiOnly() || classifyHeavyCall(call.tool, call.commands, args) === "direct"
+
 export const planCall = (call: StandinCall, standin: string, args: ReadonlyArray<string>): StandinPlan => {
-  if (Bun.env.HEAVY_TESTS_CI_ONLY === "1" && isTestCall(call.tool, args)) {
-    return refuse("repository tests run in GitHub CI; local test runners are refused")
+  if (refusedTest(call, args)) {
+    return { kind: "exit", code: 1 }
   }
   const real = callerTool(call.tool, Bun.env.PATH ?? "", standin) || call.real || projectTool(call.tool, workingDirectory())
   if (real === "") {
@@ -191,7 +212,7 @@ export const planCall = (call: StandinCall, standin: string, args: ReadonlyArray
   if (!isExecutableFile(real) || sameFile(real, standin)) {
     return refuse("no " + call.tool + " at " + real)
   }
-  if (classifyHeavyCall(call.tool, call.commands, args) === "direct") {
+  if (runsUnqueued(call, args)) {
     return { kind: "run", real }
   }
   const bypass = Bun.env.HEAVY_QUEUE_BYPASS ?? ""

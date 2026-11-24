@@ -6,6 +6,7 @@ import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
 import { NonoProviderError } from "../../packages/run/src/shared/sandbox/host"
+import { standinHelper } from "../../packages/run/src/entities/heavy-queue/index"
 import { buildSandboxEnv } from "../../packages/run/src/shared/sandbox/nono"
 import { makeNonoFixtureDir, nonoFixtureRoot } from "../lib/nono-home"
 import { nonoOpenError } from "../lib/nono-shell"
@@ -74,7 +75,7 @@ const manifestOf = (profilePath: string, home: string) =>
 
 
 const createError = (worktree: string, piSessionDir: string, env: Record<string, string> = {}): Promise<unknown> =>
-  nonoOpenError({ worktree, piSessionDir, sessionsDir: piSessionDir, hostEnv: { ...Bun.env, HOME: fixtureHome, ...env }, env: {} })
+  nonoOpenError({ worktree, piSessionDir, sessionsDir: piSessionDir, standinHelper, hostEnv: { ...Bun.env, HOME: fixtureHome, ...env }, env: {} })
 
 const refusalOf = async (worktree: string, piSessionDir: string, env: Record<string, string> = {}): Promise<string> => {
   const error = await createError(worktree, piSessionDir, env)
