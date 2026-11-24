@@ -1,7 +1,7 @@
 import { type AsyncContext, type Context, type Element, View } from "gpui-kit"
 import { InputState, ScrollHandle, h_flex } from "gpui-base"
 import { layout, readTextFile, run, setShared, shared } from "herdr"
-import { type Card, type Filter, type RunAgent, buildCards, filterCards, goesOn, opensTurns, runAgent } from "../../src/agents"
+import { type Card, type Filter, type RunAgent, buildCards, filterCards, goesOn, openedFilter, opensTurns, runAgent } from "../../src/agents"
 import { type AgentsActions, type Chosen, type DetailShown, type Keyed, type Pane, approvalOf, askMerge, detailView, logLines, runsColumn, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
 import { type Merge, mergeCommand, mergedNote, runMerge, watchMerges } from "../../src/agents-merge"
 import { type RunChanges, changesKey } from "../../src/changes"
@@ -29,7 +29,7 @@ const readingOf = <A>(keyed: Keyed<A> | null, of: string | null): Reading<A> =>
 
 export default class OrcAgents extends View {
   cards: Reading<ReadonlyArray<Card>> = { kind: "reading" }
-  filter: Filter = { project: null, status: null }
+  filter: Filter = { project: null, status: null, allRuns: false }
   selectedKey: string | null = null
   chosen: Chosen | null = null
   pane: Pane = "turns"
@@ -340,9 +340,9 @@ export default class OrcAgents extends View {
 
   openAsked(cx: Context): void {
     const asked = openAsk(shared(agentsOpenKey))
-    if (asked === null || asked.at === this.opened) return
+    if (asked === null || asked.at === this.opened || this.cards.kind !== "ok") return
     this.opened = asked.at
-    this.filter = { project: null, status: null }
+    this.filter = openedFilter(this.cards.value, asked.run)
     this.select(cx, asked.run)
     setShared(agentsOpenKey, null)
   }

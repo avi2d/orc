@@ -6,6 +6,8 @@ import { backlogPaths, findTask, type BacklogError, type ParkedQuestion, type Ta
 import { readInstructions, readOrcRules } from "../../entities/orc-rules/index"
 import { answerTask } from "../../entities/parked-runs/index"
 import { askBackWords, neverDecidedReason } from "./decider-guard"
+import { quotedSource, type RuleSource, spaced, type Verdict } from "./quoted-source"
+import { answerOnRule, recommendedAnswer } from "./recommended"
 
 export class DeciderUnheard extends Data.TaggedError("DeciderUnheard")<{
   readonly reason: string
@@ -27,26 +29,16 @@ const Reply = Schema.Union([
   Schema.Struct({ decision: Schema.Literal("answer"), answer: Words, rule: Words, reason: Words }),
   Schema.Struct({ decision: Schema.Literal("ask-back"), question: Words }),
   Schema.Struct({ decision: Schema.Literal("duplicate"), of: Words }),
-  Schema.Struct({ decision: Schema.Literal("escalate"), reason: Words, recommendation: Schema.optionalKey(Schema.Unknown) })
+  Schema.Struct({ decision: Schema.Literal("escalate"), reason: Words, rule: Schema.optionalKey(Schema.Unknown), recommendation: Schema.optionalKey(Schema.Unknown) })
 ])
 
 type Reply = typeof Reply.Type
 
-interface RuleSource {
-  readonly source: string
-  readonly text: string
-}
+type EscalateReply = Extract<Reply, { readonly decision: "escalate" }>
 
 interface WrittenRules extends RuleSource {
   readonly heading: string
 }
-
-type Basis = { readonly kind: "rule"; readonly quote: string; readonly source: string; readonly reason: string } | { readonly kind: "duplicate"; readonly of: string }
-
-type Verdict =
-  | { readonly kind: "answered"; readonly words: string; readonly basis: Basis }
-  | { readonly kind: "asked-back"; readonly question: string }
-  | { readonly kind: "escalated"; readonly reason: string; readonly recommendation?: string }
 
 const decodeReply = Schema.decodeUnknownOption(Schema.fromJsonString(Reply))
 
@@ -54,101 +46,6 @@ const decodeReply = Schema.decodeUnknownOption(Schema.fromJsonString(Reply))
 const readReply = (text: string): Reply | string => {
   const json = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)
   return Option.getOrElse(decodeReply(json), () => "the decider's reply held no decision orc reads: " + text.trim().slice(0, 200))
-}
-
-const spaced = (text: string): string => text.replace(/\s+/g, " ").trim()
-
-const unquoted = (quote: string): string => spaced(quote).replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
-
-const stripMarker = (line: string): string => spaced(line).replace(/^(?:[-*+>]\s+|\d+[.)]\s+)/, "")
-
-const pushOnce = (out: Array<string>, value: string): void => {
-  if (value !== "" && !out.includes(value)) {
-    out.push(value)
-  }
-}
-
-const sentencesOf = (text: string): ReadonlyArray<string> =>
-  text.split(/(?<=[.!?])\s+/).map(unquoted).filter((sentence) => sentence !== "")
-
-const collectSentences = (out: Array<string>, text: string): void => {
-  for (const sentence of sentencesOf(text)) {
-    pushOnce(out, sentence)
-  }
-}
-
-const collectLine = (out: Array<string>, line: string): void => {
-  pushOnce(out, unquoted(line))
-  collectSentences(out, line)
-}
-
-const collectParagraph = (out: Array<string>, paragraph: string): void => {
-  const lines = paragraph.split("\n").map(stripMarker).filter((line) => line !== "")
-  for (const line of lines) {
-    collectLine(out, line)
-  }
-  if (lines.length === 0) {
-    return
-  }
-  const joined = spaced(lines.filter((line) => !/^#{1,6}\s/.test(line)).join(" "))
-  pushOnce(out, unquoted(joined))
-  collectSentences(out, joined)
-}
-
-const sentencesAndLinesOf = (text: string): ReadonlyArray<string> => {
-  const out: Array<string> = []
-  for (const paragraph of text.split(/\n\s*\n/)) {
-    collectParagraph(out, paragraph)
-  }
-  return out
-}
-
-const opensClause = (before: string): boolean => before === "" || /[.!?:;]["'”’)]*\s$/.test(before)
-
-const closesClause = (wanted: string, after: string): boolean =>
-  after === "" || (/[.!?:;]["'”’)]*$/.test(wanted) && /^\s/.test(after)) || /^["'”’)]*[.!?:;](?:["'”’)]*\s|["'”’)]*$)/.test(after)
-
-// A quote holding only a word or two of a sentence must not pass as a rule, so its ends have to sit on clause marks.
-const holdsClause = (segment: string, wanted: string): boolean => {
-  for (let at = segment.indexOf(wanted); at !== -1; at = segment.indexOf(wanted, at + 1)) {
-    if (opensClause(segment.slice(0, at)) && closesClause(wanted, segment.slice(at + wanted.length))) {
-      return true
-    }
-  }
-  return false
-}
-
-const normalizedQuote = (quote: string): string => unquoted(stripMarker(unquoted(quote)))
-
-const comparisonWords = (text: string): string =>
-  spaced(
-    text
-      .replace(/["'“”‘’`]/g, "")
-      .replace(/[.,;:?]+(?=\s|$)|\s[-–—]+(?=\s)/g, " ")
-  )
-
-interface Quoted {
-  readonly source: string
-  readonly quote: string
-}
-
-const quotedSource = (quote: string, sources: ReadonlyArray<RuleSource>): Quoted | undefined => {
-  const wanted = normalizedQuote(quote)
-  const words = comparisonWords(wanted)
-  if (words === "") {
-    return undefined
-  }
-  for (const source of sources) {
-    for (const segment of sentencesAndLinesOf(source.text)) {
-      if (holdsClause(segment, wanted)) {
-        return { source: source.source, quote: wanted }
-      }
-      if (comparisonWords(segment) === words) {
-        return { source: source.source, quote: segment }
-      }
-    }
-  }
-  return undefined
 }
 
 interface Earlier {
@@ -184,7 +81,7 @@ const optionTexts = (question: string): ReadonlyArray<string> =>
     return found === null ? [] : [found.at(1) ?? ""]
   })
 
-const escalation = (reply: Extract<Reply, { readonly decision: "escalate" }>, question: string): Verdict => {
+const escalation = (reply: EscalateReply, question: string): Verdict => {
   const recommended = typeof reply.recommendation === "string" ? reply.recommendation.trim() : undefined
   return recommended !== undefined && recommended !== "" && optionTexts(question).includes(recommended)
     ? { kind: "escalated", reason: reply.reason, recommendation: recommended }
@@ -194,13 +91,13 @@ const escalation = (reply: Extract<Reply, { readonly decision: "escalate" }>, qu
 const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlier: ReadonlyArray<Earlier>, kind: AttentionItem["kind"], question: string): Verdict => {
   switch (reply.decision) {
     case "escalate": {
-      return escalation(reply, question)
+      return recommendedAnswer(reply, sources, kind, question) ?? escalation(reply, question)
     }
     case "answer": {
       const found = quotedSource(reply.rule, sources)
       return found === undefined
         ? { kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on a rule in none of the rules it read word for word from a clause start to a clause end: " + JSON.stringify(reply.rule) }
-        : { kind: "answered", words: reply.answer.trim(), basis: { kind: "rule", quote: found.quote, source: found.source, reason: reply.reason } }
+        : answerOnRule(found, reply, kind, question)
     }
     case "duplicate": {
       const linked = earlier.find((entry) => entry.id === reply.of.trim())
