@@ -13,7 +13,7 @@ import { encodeUpdateJson, formatUpdate, runUpdate } from "./features/updating-o
 import { helpText, overview, usageErrorText } from "./app/help"
 import { runDispatch } from "./app/dispatch-cli"
 import { runQuotaCli } from "./app/quota-cli"
-import { decodeJson, pueue, PueueState, queuedTasks, RunnerError } from "./shared/process/index"
+import { decodeJson, pueue, PueueState, queuedTasks, RunnerError, selfCommand } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
 import { backlogPaths, backlogRoot as backlogRootOf, type ReportKind, runDirFor } from "./entities/backlog/index"
 import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listAllRuns, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
@@ -39,7 +39,7 @@ const dispatch = (args: Extract<OrcArgs, { readonly kind: "Dispatch" }>["args"])
     home: orcHomeDir(Bun.env.ORC_HOME),
     cwd: process.cwd(),
     env: Bun.env,
-    self: [process.execPath, Bun.main],
+    self: selfCommand(process.execPath, Bun.main),
     stdinIsTerminal: isatty(0),
     stdin: Effect.tryPromise({
       try: () => Bun.stdin.text(),
@@ -85,7 +85,7 @@ const scoreStep = (args: Extract<OrcArgs, { readonly kind: "ScoreStep" }>) =>
     yield* Console.log(`orc score recorded ${args.score} for ${args.step} in ${args.runId}`)
   })
 
-const chat = (sessionFile: string | null) => runChat(orcHomeDir(Bun.env.ORC_HOME), [process.execPath, Bun.main], sessionFile).pipe(
+const chat = (sessionFile: string | null) => runChat(orcHomeDir(Bun.env.ORC_HOME), selfCommand(process.execPath, Bun.main), sessionFile).pipe(
   Effect.provide(BunServices.layer),
   Effect.catchTag("ChatError", (error) => Console.error(error.message).pipe(Effect.andThen(Effect.fail("orc chat refused")))),
   Effect.flatMap((exitCode) => exitCode === 0 ? Effect.void : Effect.fail("pi exited " + String(exitCode)))
