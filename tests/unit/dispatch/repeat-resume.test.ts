@@ -267,6 +267,36 @@ describe("a resumed run that parks again", () => {
       expect(queued.answers).toEqual([{ question: "send-back", answer: "rename the flag" }])
     })
   })
+  test.each([false, true])("re-parking a sent-back run excludes old releases without blocking new guidance, with live asking %s", async (liveAsking) => {
+    await withResumed(async (root) => {
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }], "2026-10-27T10:35:00.000Z", "run-2", lint))
+      await run(answerTask(root, "orc-1", "fix the lint finding first", "2026-10-27T10:40:00.000Z"))
+      await run(claimTask(root, "orc-1"))
+      await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:45:00.000Z", log: root + "/logs/orc-1.log" } } }))
+      await run(closeStartedTask(root, "orc-1", "done", "", { pr: "https://github.com/acme/orc/pull/8", report: null }, "2026-10-27T11:00:00.000Z"))
+      await run(sendBackClosedTask(root, "orc-1", "rename the flag", "2026-10-27T12:00:00.000Z", { machine: "mac", run: "run-3" }))
+      await run(claimTask(root, "orc-1"))
+      await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T12:05:00.000Z", log: root + "/logs/orc-1.log" } } }))
+      const question = { id: "ask-1", text: "Rename its help too?", asked: "2026-10-27T12:10:00.000Z", blocks: true }
+      if (liveAsking) {
+        await run(askStartedTask(root, "orc-1", { asked: question.asked, questions: [question] }))
+      }
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", [question], "2026-10-27T12:15:00.000Z", "run-4", lint))
+      expect((await current(root)).parked?.questions.map((entry) => entry.id)).toEqual(["ask-1"])
+      await run(answerTask(root, "orc-1", "ask-1=Rename it", "2026-10-27T12:20:00.000Z"))
+      const file = join(root, "new", "orc-1.md")
+      const queued = () => run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: file, ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))
+      expect((await queued()).answers).toEqual([{ question: "ask-1", answer: "Rename it" }])
+      await run(claimTask(root, "orc-1"))
+      await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T12:25:00.000Z", log: root + "/logs/orc-1.log" } } }))
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", [question], "2026-10-27T12:30:00.000Z", "run-5", lint))
+      expect(await run(answerTask(root, "orc-1", "fix the renamed flag's check", "2026-10-27T12:35:00.000Z"))).toMatchObject({ kind: "hold" })
+      expect((await queued()).answers).toEqual([
+        { question: "ask-1", answer: "Rename it" },
+        { question: "hold-release", answer: "Current guidance: fix the renamed flag's check" }
+      ])
+    })
+  })
   test("a fixer that loops again after a release keeps the release instead of dropping it with the replaced loop question", async () => {
     await withResumed(async (root) => {
       await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }], "2026-10-27T10:35:00.000Z", "run-2", lint))

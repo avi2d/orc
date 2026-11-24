@@ -30,6 +30,7 @@ The origin records the machine and run id.
 `parked_at` records when the run parked.
 Each question keeps its id, text, blocking flag, and the time it was asked.
 It prints `parked <task-id> on <branch> for the captain's answer to <question-ids>`.
+When every question has an answer, it omits the `for …` suffix.
 A question the attention queue owns for the decider shows as `the decider's answer to <question-ids>` instead, after an `and` when you answer the others.
 Each later beat prints `waits <task-id>: parked on <branch> for the captain's answer to <question-ids>` and never starts it.
 That line names a question the attention queue owns for the decider the same way, as `the decider's answer to <question-ids>`, and so does the `wait` that `orc backlog --json` gives the task.
@@ -80,7 +81,7 @@ The first resume after a release gets a fresh budget of three fix attempts witho
 A release counts as new until a run parks after it, by the task's `parked_at`.
 A later resume of that task keeps its fixer and the fix attempts it used, so an answer to a question that fixer asked reaches it.
 Every resume carries each release as guidance, oldest first, with the latest marked current.
-A send-back starts a new park, so its resume drops the releases from earlier parks.
+A send-back records `parked_sent_back_at`, so every later resume excludes releases from before that time.
 Your words reach any implementer or fixer the resume starts, and any review fixes it requests.
 If checks pass and review approves without fixes, no worker reads the release.
 To [overturn a decider's answer](attention-queue.md#overturning-a-decider-answer) on that held task, use `orc backlog answer <task-id> <question-id>=<text>`.

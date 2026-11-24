@@ -100,8 +100,10 @@ const lastRunEndedAt = (decisions: ReadonlyArray<{ readonly at?: string | null |
     ...parked.questions.map((question) => timeOf(question.asked)),
     ...decisions.flatMap((decision) => decision.at === undefined || decision.at === null ? [] : [timeOf(decision.at)]))
 
-// A looping fixer replaces its question inside one park, so only the send-back marks where a park starts.
 const sentBackAt = (parked: Parked): number => {
+  if (parked.sentBackAt !== undefined) {
+    return timeOf(parked.sentBackAt)
+  }
   const sentBack = parked.questions.flatMap((question) => isSendBackQuestion(question.id) ? [timeOf(question.asked)] : [])
   return sentBack.length === 0 ? Number.NEGATIVE_INFINITY : Math.min(...sentBack)
 }

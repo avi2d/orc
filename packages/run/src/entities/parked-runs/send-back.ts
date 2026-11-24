@@ -43,7 +43,7 @@ export const sendBackClosedTask = (
       if (ran === null) {
         return yield* new BacklogError({ detail: id + " closed without a run, so it has no branch to send back" })
       }
-      const parked: Parked = { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at)], origin: ran.pr === null ? origin : { ...origin, pr: ran.pr }, at }
+      const parked: Parked = { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at)], origin: ran.pr === null ? origin : { ...origin, pr: ran.pr }, at, sentBackAt: at }
       const sent: TaskRecord = { ...record, parked, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(sent)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })

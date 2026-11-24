@@ -78,6 +78,7 @@ const ParkedOrigin = Schema.Struct({ machine: Schema.String.check(Schema.isNonEm
 export interface Parked {
   readonly origin?: typeof ParkedOrigin.Type
   readonly at?: string
+  readonly sentBackAt?: string
   readonly branch: string
   readonly questions: Arr.NonEmptyReadonlyArray<ParkedQuestion>
 }
@@ -178,6 +179,7 @@ const Frontmatter = Schema.Struct({
   parked_branch: Schema.optional(Schema.String),
   parked_origin: Schema.optional(ParkedOrigin),
   parked_at: Schema.optional(Schema.String),
+  parked_sent_back_at: Schema.optional(Schema.String),
   parked_questions: Schema.optional(Schema.Array(QuestionFront)),
   beat: Schema.optional(Schema.String),
   taken_for: Schema.optional(Schema.String),
@@ -250,7 +252,7 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
     return questions
   }
   return Arr.isReadonlyArrayNonEmpty(questions)
-    ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }), ...(front.parked_at === undefined ? {} : { at: front.parked_at }) }
+    ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }), ...(front.parked_at === undefined ? {} : { at: front.parked_at }), ...(front.parked_sent_back_at === undefined ? {} : { sentBackAt: front.parked_sent_back_at }) }
     : "a parked task names no question"
 }
 
