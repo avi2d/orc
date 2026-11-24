@@ -6,6 +6,7 @@ import { commitsSince, headOf } from "../../shared/process/index"
 import { openNonoExec } from "../../shared/sandbox/index"
 import type { ToolchainResolver } from "../../shared/sandbox/index"
 import { type AskSetup, failingFileName, runPi, type PiPacing } from "../../entities/agent/index"
+import { standinHelper } from "../../entities/heavy-queue/index"
 import type { RunFolders } from "./run-folders"
 import type { SandboxOps } from "./run-ops"
 import { OrcRunError } from "../../shared/lib/index"
@@ -35,6 +36,7 @@ export const openAgentExec = (
       modelCredential: plan.credential,
       hostEnv,
       toolchain,
+      standinHelper,
       env: {}
     }).pipe(Effect.mapError((cause) => new OrcRunError({ message: "orc: the sandbox failed to start: " + cause.message })))
 
