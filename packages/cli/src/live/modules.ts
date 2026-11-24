@@ -14,6 +14,7 @@ import {
   machineSchedulesLayer,
   noMistakesMachinesLayer,
   orcMachinesLayer,
+  orcQuotaSourceLayer,
   quotaFeedLayer,
   quotaSourceLayer,
   remoteTaskHistoryLayer,
@@ -44,6 +45,7 @@ const runnerSources = Layer.mergeAll(ciRunsLayer, machineSchedulesLayer(onMac ? 
 
 const commandSources = Layer.mergeAll(
   quotaSourceLayer,
+  orcQuotaSourceLayer,
   attentionSourceLayer,
   savedProfilesSourceLayer,
   hostSourcesLayer,

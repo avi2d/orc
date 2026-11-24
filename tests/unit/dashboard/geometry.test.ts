@@ -1,14 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { DateTime } from "effect";
 import { plain, quotaLines } from "@avi2dg/orc-quota";
-import { decodeQuota, decodeSavedProfiles, quotaBlocks, taskLevels } from "@avi2dg/orc-schema";
+import { taskLevels } from "@avi2dg/orc-schema";
 import { panelWidth, widthOf } from "@avi2dg/orc-ui";
 import { type BandedReadings, bandedReadings } from "../../lib/banded-fixture";
-import { dashboardNow } from "../../lib/dashboard-fixture";
+import { dashboardNow, quotaBlocksOf } from "../../lib/dashboard-fixture";
 import { fixture } from "../../lib/fixtures";
 import { cadencesOffTheRight, lonelyWords, pastTheRightEdge, type Screen, screenOf, sharedCells, textOverFrames } from "../../lib/geometry";
 import { bandedLines, type Step } from "../../lib/host-fixture";
-import { quotaAxiRead } from "../../lib/quota-read";
+import { orcQuotaText } from "../../lib/orc-quota";
 import { taskReadings } from "../../lib/task-levels-fixture";
 
 const widths = Array.from({ length: 161 }, (_, index) => 80 + index);
@@ -121,30 +120,14 @@ describe("each layout rule rejects the defect it names", () => {
   });
 });
 
-// The second profile carries the main profile's saved windows, so the panel draws the "7d fable" label the saved-profiles file holds.
-const savedFable = (fetchedAt: string, stale: boolean) => {
-  const quota = decodeQuota(fixture("quota-axi/full.json"));
-  const saved = decodeSavedProfiles(fixture("saved-profiles/status.json"));
-  if (quota.kind !== "ok" || saved.kind !== "ok") throw new Error("the fixtures do not decode");
-  const main = saved.value.profiles.find((profile) => profile.name === "main");
-  if (main === undefined) throw new Error("the saved profiles fixture has no main profile");
-  const fetched = DateTime.makeUnsafe(fetchedAt);
-  const profiles = saved.value.profiles.map((profile) => (profile.name === "second" ? { ...main, name: "second", active: false, stale, fetched_at: fetched } : profile));
-  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: dashboardNow }), { ...saved, value: { ...saved.value, profiles }, capturedAt: dashboardNow }, dashboardNow);
+const accountLabels = (columns: number): ReadonlyArray<string> => {
+  const blocks = quotaBlocksOf(fixture("quota-axi/full.json"), orcQuotaText("main-second"));
+  const rows = quotaLines(blocks, panelWidth(columns), true, dashboardNow).map(plain);
+  return ["● account main", "● account second"].map((header) => rows[rows.indexOf(header) + 1]?.split(/ (?=[━─╸┃])/u)[0]?.trimEnd() ?? "");
 };
 
-const savedLabels = (columns: number, fetchedAt: string, stale: boolean): ReadonlyArray<string> => {
-  const rows = quotaLines(savedFable(fetchedAt, stale), panelWidth(columns), true, dashboardNow).map(plain);
-  const second = rows.findIndex((row) => row.startsWith("● claude second"));
-  return rows.slice(second + 1, second + 3).map((row) => row.split(/ (?=[━─╸┃]| ?read )/u)[0]?.trimEnd() ?? "");
-};
-
-describe("the quota panel names a saved window in full when its label fits", () => {
-  test.each(widths)("a fresh saved window reads 7d fable, not 7d fab…, at %d columns", (columns) => {
-    expect(savedLabels(columns, "2026-10-13T20:17:16+00:00", false)).toEqual(["7d", "7d fable"]);
-  });
-
-  test.each(widths)("a stale saved window reads 7d fable, not 7d fab…, at %d columns", (columns) => {
-    expect(savedLabels(columns, "2026-10-13T10:07:23+00:00", true)).toEqual(["7d", "7d fable"]);
+describe("the quota panel names an orc quota account's row in full", () => {
+  test.each(widths)("each account row reads all models, not all mod…, at %d columns", (columns) => {
+    expect(accountLabels(columns)).toEqual(["all models", "all models"]);
   });
 });

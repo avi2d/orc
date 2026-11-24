@@ -3,6 +3,7 @@ import { DateTime } from "effect";
 import { capturedOf, captureRecords, decodeSavedProfiles, decodeQuota, quotaBlocks } from "@avi2dg/orc-schema";
 import { plain, quotaLines } from "@avi2dg/orc-quota";
 import { fixture } from "../../lib/fixtures";
+import { noOrcAccounts } from "../../lib/orc-quota";
 import { quotaAxiRead, recordedQuotaRead } from "../../lib/quota-read";
 
 const now = DateTime.makeUnsafe("2026-10-16T19:28:55.289Z");
@@ -11,7 +12,7 @@ const blocks = () => {
   const quota = decodeQuota(fixture("quota-axi/schema-6.json"));
   const savedProfiles = decodeSavedProfiles(fixture("saved-profiles/status.json"));
   if (quota.kind !== "ok" || savedProfiles.kind !== "ok") throw new Error("the fixtures do not decode");
-  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: now }), { ...savedProfiles, capturedAt: now }, now);
+  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: now }), { ...savedProfiles, capturedAt: now }, noOrcAccounts(now), now);
 };
 
 const styleOf = (text: string) =>
@@ -70,7 +71,7 @@ describe("the quota panel, with an account's statusline reading", () => {
   const captured = capturedOf([{ path: "/state/2026-10-16.jsonl", records }], { "claude-code": 0 }, "/home/tester/.claude/projects", [main, second]);
   const noProfiles = { kind: "ok", value: { schema: 2, active_profile: null, profiles: [] }, capturedAt: now } as const;
   const rows = quotaLines(
-    quotaBlocks(recordedQuotaRead(fixture("quota-axi/schema-6.json"), now, [], captured), noProfiles, now),
+    quotaBlocks(recordedQuotaRead(fixture("quota-axi/schema-6.json"), now, [], captured), noProfiles, noOrcAccounts(now), now),
     84,
     true,
     now,
@@ -115,7 +116,7 @@ describe("the quota panel, with an account's headless reading", () => {
   const captured = capturedOf([{ path: "/state/2026-10-16.jsonl", records }], { "claude-code": 0 }, "/home/tester/.claude/projects", [main, second]);
   const noProfiles = { kind: "ok", value: { schema: 2, active_profile: null, profiles: [] }, capturedAt: now } as const;
   const rows = quotaLines(
-    quotaBlocks(recordedQuotaRead(fixture("quota-axi/schema-6.json"), now, [], captured), noProfiles, now),
+    quotaBlocks(recordedQuotaRead(fixture("quota-axi/schema-6.json"), now, [], captured), noProfiles, noOrcAccounts(now), now),
     84,
     true,
     now,

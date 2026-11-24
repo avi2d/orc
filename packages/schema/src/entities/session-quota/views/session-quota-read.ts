@@ -6,6 +6,7 @@ import { SavedProfilesSource, savedProfilesSourceLayer, type SavedProfiles } fro
 import { HarnessProcessSource, HerdrSource, herdrSourceLayer, linuxHarnessProcessSourceLayer, macHarnessProcessSourceLayer } from "../sources/live-sessions";
 import { readBeside } from "../../../shared/config";
 import { type QuotaSource, quotaSourceLayer } from "../sources/quota";
+import type { OrcQuotaSource } from "../sources/orc-quota";
 import { type QuotaRead, readQuota } from "../sources/quota-read";
 import { SessionMachines, sessionMachinesLayer } from "./remote-sessions";
 import { type HarvestLogSource, harvestLogSourceLayer, SessionLogSource, sessionLogSourceLayer } from "../sources/session-logs";
@@ -13,6 +14,8 @@ import { type HarvestLogSource, harvestLogSourceLayer, SessionLogSource, session
 export type SessionSources = HerdrSource | HarnessProcessSource | SessionLogSource | SessionMachines;
 
 export type QuotaReadSources = QuotaSource | HarvestLogSource | SavedProfilesSource;
+
+export type QuotaPanelSources = QuotaReadSources | OrcQuotaSource;
 
 export type SessionQuotaSources = QuotaReadSources | SessionSources;
 

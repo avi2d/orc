@@ -9,6 +9,7 @@ import { printQuotaFrame } from "@avi2dg/orc-quota";
 import { harvestLogSourceLive } from "@avi2dg/orc-session-quota";
 import { fixture } from "../../lib/fixtures";
 import { escape, stripSgr } from "../../e2e/lib/print-color";
+import { recordedOrcQuotaLayer } from "../../lib/orc-quota";
 import { recordedSavedProfilesLayer } from "../../lib/saved-profiles";
 
 let home = "";
@@ -39,6 +40,7 @@ const printed = (color: boolean): Promise<string> =>
             ),
           ),
           harvestLogSourceLive.pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home })))),
+          recordedOrcQuotaLayer(),
           TestConsole.layer,
           TestClock.layer(),
         ),

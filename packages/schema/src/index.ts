@@ -20,6 +20,15 @@ export {
   decodeSavedProfiles,
 } from "./entities/session-quota";
 export {
+  decodeOrcQuota,
+  type OrcQuota,
+  type OrcQuotaAccount,
+  OrcQuotaSource,
+  orcQuotaSourceLayer,
+  type OrcQuotaUnreadCause,
+  orcQuotaUnreadCauses,
+} from "./entities/session-quota";
+export {
   decodeQuota,
   QuotaAvailability,
   type QuotaProvider,
@@ -136,7 +145,7 @@ export { type TaskHistoryMachine, RemoteTaskHistory, remoteTaskHistoryLayer } fr
 export { type TaskLiveMachine, RemoteTaskLive, remoteTaskLiveLayer } from "./entities/task-board";
 export { readBeside } from "./shared/config";
 
-export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./entities/session-quota";
+export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaPanelSources, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./entities/session-quota";
 export { sessionQuotaOf, type SessionQuotaSources, sessionQuotaSourcesLayer, type SessionSources, sessionSourcesLayer } from "./entities/session-quota";
 export { ComposedSessionQuotaReport } from "./entities/session-quota";
 export { composedSessionQuotaReport } from "./entities/session-quota";
@@ -270,5 +279,5 @@ export { type AttentionItem, type AttentionQueue, AttentionSource, attentionSour
 
 export { type NoMistakesMachine, NoMistakesMachines, noMistakesMachinesLayer, type OrcMachine, OrcMachines, orcMachinesLayer } from "./entities/task-pipeline";
 
-export { quotaBlocks, type QuotaBlock, type QuotaBlockBody, type SavedAge, type SavedWindow } from "./entities/session-quota";
+export { type AccountStanding, accountStandings, quotaBlocks, type QuotaBlock, type QuotaBlockBody, type SavedAge, type SavedWindow } from "./entities/session-quota";
 export * from "./features/panel-feeds";

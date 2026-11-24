@@ -10,6 +10,7 @@ import { harvestLogSourceLive } from "@avi2dg/orc-session-quota";
 import { fixture } from "../../lib/fixtures";
 import { claudeLogRelative, readBeforeHarvest, rolloutRelative } from "../../lib/harvest-fixture";
 import { quotaAxiJsonFor } from "../../lib/quota-read";
+import { recordedOrcQuotaLayer } from "../../lib/orc-quota";
 import { recordedSavedProfilesLayer } from "../../lib/saved-profiles";
 
 let home = "";
@@ -58,6 +59,7 @@ const printed = async (quotaJson: string, env: Readonly<Record<string, string>> 
             ),
           ),
           harvestLogSourceLive.pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ...env })))),
+          recordedOrcQuotaLayer(),
           TestConsole.layer,
           TestClock.layer(),
         ),

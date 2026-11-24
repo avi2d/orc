@@ -4,6 +4,7 @@ import { Effect, Fiber, Layer } from "effect";
 import { CommandRunner, HarvestLogSource, homeLogRoots, nothingCaptured, quotaSourceLayer } from "@avi2dg/orc-schema";
 import { livePanel } from "@avi2dg/orc-quota";
 import { fixture } from "../../lib/fixtures";
+import { recordedOrcQuotaLayer } from "../../lib/orc-quota";
 import { recordedSavedProfilesLayer } from "../../lib/saved-profiles";
 
 const noLogs = Layer.succeed(HarvestLogSource, { read: () => Effect.succeed({ home: "/home/tester", roots: homeLogRoots("/home/tester"), files: [], captured: nothingCaptured }) });
@@ -32,6 +33,7 @@ const recordedSources = Layer.merge(quotaSourceLayer, recordedSavedProfilesLayer
     }),
   ),
   Layer.merge(noLogs),
+  Layer.merge(recordedOrcQuotaLayer()),
 );
 
 const rowsOf = (frame: string) =>
