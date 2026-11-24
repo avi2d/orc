@@ -18,7 +18,6 @@ The entry gives the percent of room left, from 0 to 100, or the reason the accou
 Orc reads three shapes: its own `orc.quota.v1` document, the document `quota-axi --full --json --provider <id>` prints, and the `subquo.v1` snapshot `subquo read --json` prints.
 A command that is not installed, fails, runs past 15 seconds or prints anything else leaves the quota unread, and that beat starts nothing.
 
-A `subquo.v1` snapshot also names each account's vendor, such as `claude` or `codex`.
 To read quota from subquo, set the quota command to `["subquo", "read", "--json"]`.
 To go back, set the quota command back to the value it held before, the reader that prints an `orc.quota.v1` or quota-axi document.
 An account's room in a subquo snapshot is the smallest `percentLeft` among its windows with scope `all`.
@@ -36,6 +35,7 @@ An account an `orc.quota.v1` or quota-axi document does not name cannot run.
 The quota names a default provider, and an account may name its own, so one quota can hold Claude, OpenAI and OpenCode accounts.
 The beat compares every account in the quota, whatever its provider, and the run it starts takes the picked account's provider.
 Each provider is one `~/.orc/config.json` defines on each machine that runs tasks.
+An account's provider comes from its `provider` in `dispatch.json`, never from the vendor a `subquo.v1` snapshot names for it.
 
 The models in `~/.orc/config.json` serve the quota's provider.
 An account on another provider names its own implementer and fixer models from that provider, and the run it starts takes them.
