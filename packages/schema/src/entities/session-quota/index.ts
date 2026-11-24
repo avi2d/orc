@@ -94,10 +94,8 @@ export {
 export {
   type QuotaRead,
   logFreshMillis,
-  type SavedAge,
   staleSourceAgeSeconds,
   savedAgeSeconds,
-  staleSavedAgeSeconds,
   readQuota,
 } from "./sources/quota-read";
 export {
@@ -113,6 +111,15 @@ export {
   QuotaSource,
   quotaSourceLayer,
 } from "./sources/quota";
+export {
+  type OrcQuota,
+  type OrcQuotaAccount,
+  type OrcQuotaUnreadCause,
+  orcQuotaUnreadCauses,
+  decodeOrcQuota,
+  OrcQuotaSource,
+  orcQuotaSourceLayer,
+} from "./sources/orc-quota";
 export {
   type SavedProfiles,
   type SavedProfile,
@@ -143,7 +150,8 @@ export {
   type Estimate,
 } from "./views/estimate";
 export {
-  type SavedWindow,
+  type AccountStanding,
+  accountStandings,
   type QuotaBlockBody,
   type QuotaBlock,
   quotaBlocks,
@@ -165,6 +173,7 @@ export {
 export {
   type SessionSources,
   type QuotaReadSources,
+  type QuotaPanelSources,
   type SessionQuotaSources,
   type QuotaReadings,
   sessionSourcesLayer,

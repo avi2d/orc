@@ -9,7 +9,7 @@ import { printQuotaFrame } from "@avi2dg/orc-quota";
 import { harvestLogSourceLive } from "@avi2dg/orc-session-quota";
 import { fixture } from "../../lib/fixtures";
 import { escape, stripSgr } from "../../e2e/lib/print-color";
-import { recordedSavedProfilesLayer } from "../../lib/saved-profiles";
+import { recordedOrcQuotaLayer } from "../../lib/orc-quota";
 
 let home = "";
 
@@ -30,15 +30,15 @@ const printed = (color: boolean): Promise<string> =>
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
-          Layer.merge(quotaSourceLayer, recordedSavedProfilesLayer).pipe(
+          quotaSourceLayer.pipe(
             Layer.provide(
               Layer.succeed(CommandRunner, {
-                run: (command) =>
-                  Effect.succeed(command.argv[0] === "quota-axi" ? fixture("quota-axi/full.json") : fixture("saved-profiles/status.json")),
+                run: () => Effect.succeed(fixture("quota-axi/full.json")),
               }),
             ),
           ),
           harvestLogSourceLive.pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home })))),
+          recordedOrcQuotaLayer(),
           TestConsole.layer,
           TestClock.layer(),
         ),

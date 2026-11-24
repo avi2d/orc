@@ -1,6 +1,5 @@
 import { DateTime } from "effect";
 import {
-  decodeSavedProfiles,
   decodeComputeApps,
   decodeCpuUsage,
   decodeDf,
@@ -20,20 +19,17 @@ import {
 } from "@avi2dg/orc-schema";
 import { fixture } from "./fixtures";
 import { valueOf } from "./outcomes";
+import { orcQuotaReading, orcQuotaText } from "./orc-quota";
 import { quotaAxiRead } from "./quota-read";
 
 export const dashboardNow = DateTime.makeUnsafe("2026-10-13T20:18:16Z");
 
-export const quotaBlocksOf = (quotaText: string, profiles: (names: ReadonlyArray<string>) => ReadonlyArray<string> = (names) => names): ReadonlyArray<QuotaBlock> => {
+export const quotaBlocksOf = (quotaText: string, orcQuota: string = orcQuotaText("second-login-expired")): ReadonlyArray<QuotaBlock> => {
   const quota = decodeQuota(quotaText);
-  const savedProfiles = decodeSavedProfiles(fixture("saved-profiles/status.json"));
-  if (quota.kind !== "ok" || savedProfiles.kind !== "ok") throw new Error("the fixtures do not decode");
-  const second = savedProfiles.value.profiles.find((profile) => profile.name === "second");
-  if (second === undefined) throw new Error("the saved profiles fixture has no second profile");
-  const extra = profiles([]).map((name) => ({ ...second, name }));
+  if (quota.kind !== "ok") throw new Error("the fixtures do not decode");
   return quotaBlocks(
     quotaAxiRead({ ...quota, capturedAt: dashboardNow }),
-    { ...savedProfiles, value: { ...savedProfiles.value, profiles: [...savedProfiles.value.profiles, ...extra] }, capturedAt: dashboardNow },
+    orcQuotaReading(orcQuota, dashboardNow),
     dashboardNow,
   );
 };

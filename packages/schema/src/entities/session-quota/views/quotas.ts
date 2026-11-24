@@ -1,15 +1,14 @@
-import { DateTime } from "effect";
+import type { DateTime } from "effect";
 import { type Failed, failureOf, type Reading } from "../../../shared/lib";
-import type { SavedProfile, SavedProfiles } from "../sources/saved-profiles";
+import type { OrcQuota, OrcQuotaAccount, OrcQuotaUnreadCause } from "../sources/orc-quota";
 import type { QuotaAvailability, QuotaProvider, QuotaProviderId } from "../sources/quota";
-import { type AccountRead, type QuotaRead, type SavedAge, sourcedEntries } from "../sources/quota-read";
+import { type AccountRead, type QuotaRead, sourcedEntries } from "../sources/quota-read";
 import type { SourcedEntry, SourcedProvider, SourcedWindow } from "../sources/window-sources";
 
-export interface SavedWindow {
-  readonly label: string;
-  readonly percentLeft: number;
-  readonly resetsAt: DateTime.Utc | null;
-}
+export const accountStandings = ["next", "spare", "under-floor", "used-up"] as const;
+
+// next is the account orc quota picks for the coming run, and under-floor and used-up are ones it skips for too little room.
+export type AccountStanding = (typeof accountStandings)[number];
 
 export type QuotaBlockBody =
   | {
@@ -21,12 +20,14 @@ export type QuotaBlockBody =
       readonly exhaustion: ReadonlyArray<QuotaAvailability>;
     }
   | {
-      readonly kind: "saved";
-      readonly plan: string | null;
-      readonly stale: boolean;
-      readonly age: SavedAge;
-      readonly windows: ReadonlyArray<SavedWindow>;
+      readonly kind: "account";
+      readonly percentLeft: number;
+      readonly resetsAt: DateTime.Utc | null;
+      readonly standing: AccountStanding;
+      readonly floorPercent: number;
     }
+  | { readonly kind: "unusable"; readonly reason: string }
+  | { readonly kind: "accounts-unread"; readonly cause: OrcQuotaUnreadCause; readonly reason: string }
   | { readonly kind: "absent" }
   | { readonly kind: "unread" }
   | Failed;
@@ -56,33 +57,42 @@ const providerTitle = (provider: QuotaProviderId, activeClaude: string | null): 
 export const accountTitle = (entry: SourcedEntry, activeClaude: string | null): string =>
   `${providerTitle(entry.provider, activeClaude)}${accountSuffix(entry)}`;
 
-const savedAge = (fetchedAt: DateTime.Utc | null, now: DateTime.Utc): SavedAge =>
-  fetchedAt === null
-    ? { kind: "undated" }
-    : {
-        kind: "dated",
-        fetchedAt,
-        ageSeconds: Math.floor((DateTime.toEpochMillis(now) - DateTime.toEpochMillis(fetchedAt)) / 1000),
-      };
+// orc quota names no provider for an account, so every account block takes the Claude tint.
+const orcAccountProvider: QuotaProviderId = "claude";
 
-const savedBlock = (profile: SavedProfile, now: DateTime.Utc): QuotaBlock => ({
-  provider: "claude",
-  title: `claude ${profile.name}`,
-  body: {
-    kind: "saved",
-    plan: profile.tier,
-    stale: profile.stale,
-    age: savedAge(profile.fetched_at, now),
-    windows: profile.windows.map((window) => ({
-      label: window.label,
-      percentLeft: 100 - window.utilization_pct,
-      resetsAt: window.resets_at,
-    })),
-  },
+const orcAccountsTitle = "accounts";
+
+type ReadAccounts = Extract<OrcQuota, { readonly kind: "read" }>;
+
+const standingOf = (account: Extract<OrcQuotaAccount, { readonly kind: "usable" }>, reading: ReadAccounts): AccountStanding => {
+  if (reading.pick === account.account) return "next";
+  if (account.remainingPercent <= 0) return "used-up";
+  return account.remainingPercent >= reading.floorPercent ? "spare" : "under-floor";
+};
+
+const orcAccountBlock = (account: OrcQuotaAccount, reading: ReadAccounts): QuotaBlock => ({
+  provider: orcAccountProvider,
+  title: `account ${account.account}`,
+  body:
+    account.kind === "usable"
+      ? {
+          kind: "account",
+          percentLeft: account.remainingPercent,
+          resetsAt: account.resetsAt ?? null,
+          standing: standingOf(account, reading),
+          floorPercent: reading.floorPercent,
+        }
+      : { kind: "unusable", reason: account.reason },
 });
 
-const isOtherClaudeProfile = (status: SavedProfiles) => (profile: SavedProfile) =>
-  profile.harness === "claude" && profile.provider === "anthropic" && profile.name !== status.active_profile;
+const orcQuotaBlocks = (orcQuota: Reading<OrcQuota>): ReadonlyArray<QuotaBlock> => {
+  if (orcQuota.kind !== "ok") return [{ provider: orcAccountProvider, title: orcAccountsTitle, body: failureOf(orcQuota) }];
+  const reading = orcQuota.value;
+  if (reading.kind === "unread") {
+    return [{ provider: orcAccountProvider, title: orcAccountsTitle, body: { kind: "accounts-unread", cause: reading.cause, reason: reading.reason } }];
+  }
+  return reading.accounts.map((account) => orcAccountBlock(account, reading));
+};
 
 interface LiveContext {
   readonly entries: ReadonlyArray<SourcedEntry>;
@@ -106,21 +116,20 @@ const accountBlock = (account: AccountRead): QuotaBlock => ({
   body: account.read === undefined ? { kind: "unread" } : liveBody(account.read),
 });
 
-export const quotaBlocks = (read: QuotaRead, savedProfiles: Reading<SavedProfiles>, now: DateTime.Utc): ReadonlyArray<QuotaBlock> => {
-  const active = savedProfiles.kind === "ok" ? savedProfiles.value.active_profile : null;
-  const saved =
-    savedProfiles.kind === "ok"
-      ? savedProfiles.value.profiles.filter(isOtherClaudeProfile(savedProfiles.value)).map((profile) => savedBlock(profile, now))
-      : [{ provider: "claude" as const, title: "claude saved", body: failureOf(savedProfiles) }];
+export const quotaBlocks = (
+  read: QuotaRead,
+  orcQuota: Reading<OrcQuota>,
+  now: DateTime.Utc,
+): ReadonlyArray<QuotaBlock> => {
   const context: LiveContext = {
     entries: sourcedEntries(read, now),
     notSetUp: read.quotaAxi.kind === "ok" ? read.quotaAxi.value.notSetUp : [],
-    title: (entry) => accountTitle(entry, active),
+    title: (entry) => accountTitle(entry, null),
   };
   return [
-    ...liveBlocks("claude", providerTitle("claude", active), context),
+    ...liveBlocks("claude", "claude", context),
     ...read.accounts.map(accountBlock),
-    ...saved,
+    ...orcQuotaBlocks(orcQuota),
     ...liveBlocks("codex", "codex", context),
     ...liveBlocks("opencode-go", "opencode-go", context),
   ];

@@ -1,7 +1,7 @@
 import { Context, DateTime, Effect, Layer, Option } from "effect";
-import { SavedProfilesSource } from "../../entities/session-quota";
+import { OrcQuotaSource, SavedProfilesSource } from "../../entities/session-quota";
 import { readQuota } from "../../entities/session-quota";
-import { type QuotaReadings, type QuotaReadSources, sessionQuotaOf, type SessionSources } from "../../entities/session-quota";
+import { type QuotaPanelSources, type QuotaReadings, sessionQuotaOf, type SessionSources } from "../../entities/session-quota";
 import type { QueueReadings } from "../../entities/queues";
 import { type QuotaBlock, quotaBlocks } from "../../entities/session-quota";
 import type { SessionQuotaView } from "../../entities/session-quota";
@@ -57,12 +57,14 @@ export interface QueueShown {
 
 export class QueueFeed extends Context.Service<QueueFeed, { readonly read: Effect.Effect<QueueShown>; readonly refreshing: Effect.Effect<boolean> }>()("@avi2dg/orc-schema/QueueFeed") {}
 
-export const quotaFeedLayer: Layer.Layer<QuotaFeed, never, QuotaReadSources | SavedReadings> = Layer.effect(
+export const quotaFeedLayer: Layer.Layer<QuotaFeed, never, QuotaPanelSources | SavedReadings> = Layer.effect(
   QuotaFeed,
   Effect.gen(function* () {
     const savedProfiles = yield* SavedProfilesSource;
+    const orcQuotaSource = yield* OrcQuotaSource;
     const quota = yield* polled(readQuota, readsCadence);
     const login = yield* polled(savedProfiles.read, readsCadence);
+    const orcQuota = yield* polled(orcQuotaSource.read, readsCadence);
     const readings: Polled<QuotaReadings> = {
       latest: Effect.map(
         Effect.all({ quota: quota.latest, savedProfiles: login.latest }, { concurrency: "unbounded" }),
@@ -78,9 +80,15 @@ export const quotaFeedLayer: Layer.Layer<QuotaFeed, never, QuotaReadSources | Sa
     const standIn = yield* savedStandIn("quota", QuotaBlocksCodec);
     const blocks = Effect.gen(function* () {
       const now = yield* DateTime.now;
-      return yield* standIn(Option.map(yield* readings.latest, ({ value, at }) => ({ value: quotaBlocks(value.quota, value.savedProfiles, now), at })));
+      const latest = Option.all({ readings: yield* readings.latest, orcQuota: yield* orcQuota.latest });
+      return yield* standIn(
+        Option.map(latest, (answered) => ({
+          value: quotaBlocks(answered.readings.value.quota, answered.orcQuota.value, now),
+          at: Math.min(answered.readings.at, answered.orcQuota.at),
+        })),
+      );
     });
-    return { readings, blocks, refreshing: readings.refreshing };
+    return { readings, blocks, refreshing: refreshingOf([quota, login, orcQuota]) };
   }),
 );
 

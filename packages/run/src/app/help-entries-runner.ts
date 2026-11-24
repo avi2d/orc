@@ -116,7 +116,7 @@ export const heavyVerbHelp: Record<HeavyWord, HelpEntry> = {
   path: {
     usage: ["orc heavy path"],
     summary: "Create the heavy tool stand-ins and print their folder",
-    about: "Writes a stand-in for each heavy tool into ~/.orc/heavy/bin and prints that folder.",
+    about: "Writes a stand-in for each heavy tool into ~/.orc/heavy/bin and prints that folder. Also writes the agent wrappers into ~/.orc/heavy/agents that no-mistakes agent_path_override can point at.",
     options: [],
     examples: ["orc heavy path"]
   },

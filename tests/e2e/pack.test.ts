@@ -156,6 +156,7 @@ const expectedFiles = [
   "src/entities/events/pr-state.ts",
   "src/features/heavy-commands/heavy-cli.ts",
   "src/entities/heavy-queue/heavy-setup.ts",
+  "src/entities/heavy-queue/heavy-agent-wrapper.ts",
   "src/entities/heavy-queue/heavy-classify.ts",
   "src/entities/heavy-queue/heavy-process-tree.ts",
   "src/entities/heavy-queue/heavy-pueue-task.ts",

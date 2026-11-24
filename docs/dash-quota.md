@@ -27,19 +27,26 @@ See [Capture usage as it happens](session-quota/capture.md) for Claude statuslin
 
 To print one frame, run `orc-dash panel quota --print`.
 
-### Show saved profiles
+### Show the dispatch accounts
 
-The panel shows a block for each saved Claude profile other than the active one when `ORC_DASH_SAVED_PROFILES` names a shell command that prints them.
-With `ORC_DASH_SAVED_PROFILES` unset or blank, the panel runs nothing for them and shows no saved block.
+The panel runs `orc quota --json` and shows a block for each account the dispatch quota names, titled `account` and the account's name.
+It reads the same accounts, floor and pick the beat reads, as [Reading quota without running the beat](run/backlog-configuration.md#reading-quota-without-running-the-beat) describes.
+The account blocks sit after the Claude blocks and before Codex.
 
-The command prints one JSON object with `schema` 2, the `active_profile` name or `null`, and `profiles`.
-Each profile carries `name`, `active`, `provider`, `harness`, `tier` or `null`, `stale`, `fetched_at` or `null`, and `windows`.
-Each window carries `label`, `utilization_pct` and `resets_at` or `null`.
-Both panels title the Claude account with the active profile's name, such as `claude main` for a profile named `main`.
+An account the quota can read shows one `all models` row with its room left and the time to its reset.
+Its header names its standing:
 
-| Variable | What it sets |
+| Header | Meaning |
 | --- | --- |
-| `ORC_DASH_SAVED_PROFILES` | The shell command that prints the saved profiles |
+| `next run` | The beat picks this account for the next task |
+| `under the 20% floor` | The room is below the quota's `floorPercent`, here 20% |
+| none | The beat picks another account first |
+
+When no room is left, the account's row reads `used up`.
+An account the quota cannot use reads `unusable`, with the reason `orc quota` gives below the header.
+When `orc quota` reports the quota unread, one `accounts` block names the cause, such as `command not installed` or `an account is missing`, with the reason below it.
+When `orc` is not on `PATH` or `dispatch.json` is missing, the `accounts` block shows the error.
+In a short dashboard the account blocks fold first, into a `+2 more accounts` line.
 
 ### Show each Claude account
 

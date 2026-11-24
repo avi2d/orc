@@ -8,4 +8,4 @@ export type { CheckedModelWindow, HostTools, ToolchainResolver, ModelCredential,
 export { inheritedEnv } from "./nono"
 export { defaultSandbox, sandboxKinds } from "./sandbox-kind"
 export type { SandboxKind } from "./sandbox-kind"
-export { ciOnlyDirSuffix, heavyDirSuffix } from "./standin-dir"
+export { agentWrapperDirSuffix, ciOnlyDirSuffix, heavyDirSuffix } from "./standin-dir"

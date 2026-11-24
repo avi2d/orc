@@ -1,6 +1,6 @@
 import type { DateTime } from "effect";
-import { savedAgeSeconds, staleSavedAgeSeconds, staleSourceAgeSeconds, type AccountJoin, type QuotaAvailability, type QuotaWindow, type SourcedWindow } from "@avi2dg/orc-schema";
-import type { QuotaBlock, QuotaBlockBody, SavedAge, SavedWindow } from "@avi2dg/orc-schema";
+import { staleSourceAgeSeconds, type AccountJoin, type QuotaAvailability, type QuotaWindow, type SourcedWindow } from "@avi2dg/orc-schema";
+import type { QuotaBlock, QuotaBlockBody } from "@avi2dg/orc-schema";
 import {
   type Block,
   countdown,
@@ -23,6 +23,7 @@ import {
   truncate,
   widthOf,
 } from "@avi2dg/orc-ui";
+import { accountDetail, accountReasonLines, accountRowName } from "./accounts";
 import { noProviderLines } from "./sections";
 
 const minimumLabel = 8;
@@ -65,13 +66,19 @@ const liveVerdict = (window: SourcedWindow, exhaustion: ReadonlyArray<QuotaAvail
   return window.pace === undefined ? [] : paceWords[window.pace.status];
 };
 
-const ageWords = (age: SavedAge, now: DateTime.Utc): string => {
-  if (age.kind === "undated") return "read time unknown";
-  const ageSeconds = savedAgeSeconds(age.fetchedAt, now);
-  return ageSeconds > 0 ? `read ${countdown(ageSeconds)} ago` : "read just now";
-};
+type AccountBody = Extract<QuotaBlockBody, { readonly kind: "account" }>;
 
-const savedVerdict = (age: SavedAge, now: DateTime.Utc): Line => [span(ageWords(age, now), "muted")];
+const accountVerdict = (body: AccountBody): Line => (body.percentLeft <= 0 ? [span("used up", "error", { bold: true })] : []);
+
+const accountRow = (body: AccountBody, shape: RowShape, now: DateTime.Utc): Line =>
+  meteredRow(
+    accountRowName,
+    shape,
+    body.percentLeft,
+    quotaBar(body.percentLeft, undefined, shape.bar),
+    accountVerdict(body),
+    resetCell(shape, now, body.resetsAt),
+  );
 
 interface RowShape {
   readonly label: number;
@@ -179,24 +186,6 @@ const liveRow = (
   );
 };
 
-// The saved-profiles file names its windows, so a saved row keeps that name whole rather than quota-axi's seven-cell cut.
-const savedLabel = (window: SavedWindow): string => window.label.trim().toLowerCase();
-
-const savedRow = (window: SavedWindow, age: SavedAge, stale: boolean, shape: RowShape, now: DateTime.Utc): Line => {
-  const staleAge = staleSavedAgeSeconds(age, stale, now);
-  if (staleAge !== undefined) {
-    return staleCell(savedLabel(window), `read ${countdown(staleAge)} ago`, shape);
-  }
-  return meteredRow(
-    savedLabel(window),
-    shape,
-    window.percentLeft,
-    quotaBar(window.percentLeft, undefined, shape.bar),
-    savedVerdict(age, now),
-    resetCell(shape, now, window.resetsAt),
-  );
-};
-
 const stateNote = (state: Extract<QuotaBlockBody, { readonly kind: "live" }>["state"], width: number): Block => {
   if (state.status === "fresh") return [];
   const words = state.status.replaceAll("_", " ");
@@ -280,10 +269,11 @@ const bodyLines = (body: QuotaBlockBody, width: number, shape: RowShape, now: Da
           ? [[span("no windows reported", "muted")]]
           : body.windows.map((window) => liveRow(window, body, shape, now))),
       ];
-    case "saved":
-      return body.windows.length === 0
-        ? [[span("no saved windows", "muted")]]
-        : body.windows.map((window) => savedRow(window, body.age, body.stale, shape, now));
+    case "account":
+      return [accountRow(body, shape, now)];
+    case "unusable":
+    case "accounts-unread":
+      return accountReasonLines(body, width);
     case "absent":
       return [[span("✗ missing from quota-axi's report", "error")]];
     case "unread":
@@ -299,28 +289,31 @@ const verdictsOf = (body: QuotaBlockBody, now: DateTime.Utc): ReadonlyArray<Line
     return body.windows.flatMap((window) =>
       staleSourceAgeSeconds(window.source, now) === undefined ? [liveVerdict(window, body.exhaustion)] : [],
     );
-  if (body.kind === "saved")
-    return staleSavedAgeSeconds(body.age, body.stale, now) === undefined ? body.windows.map(() => savedVerdict(body.age, now)) : [];
+  if (body.kind === "account") return [accountVerdict(body)];
   return [];
 };
 
 const labelsOf = (body: QuotaBlockBody): ReadonlyArray<string> => {
   if (body.kind === "live") return body.windows.map(shortLabel);
-  if (body.kind === "saved") return body.windows.map(savedLabel);
+  if (body.kind === "account") return [accountRowName];
   return [];
 };
 
 const slug = (text: string) => text.toLowerCase().replaceAll(/[\s-]/g, "");
 
 const planOf = (block: QuotaBlock): string | undefined => {
-  const plan = block.body.kind === "live" || block.body.kind === "saved" ? block.body.plan : undefined;
-  return plan === undefined || plan === null || slug(plan) === slug(block.provider) ? undefined : plan.toLowerCase();
+  const plan = block.body.kind === "live" ? block.body.plan : undefined;
+  return plan === undefined || slug(plan) === slug(block.provider) ? undefined : plan.toLowerCase();
 };
 
-const header = (block: QuotaBlock, tint: QuotaTint): Line => {
+const headerDetail = (block: QuotaBlock): Line => {
   const plan = planOf(block);
-  return [span(`● ${block.title}`, tint, { bold: true }), ...(plan === undefined ? [] : [span(` · ${plan}`, "muted")])];
+  if (plan !== undefined) return [span(` · ${plan}`, "muted")];
+  const detail = accountDetail(block.body);
+  return detail === undefined ? [] : [span(` · ${detail.text}`, detail.tone)];
 };
+
+const header = (block: QuotaBlock, tint: QuotaTint): Line => [span(`● ${block.title}`, tint, { bold: true }), ...headerDetail(block)];
 
 const tintOf = (provider: QuotaBlock["provider"]): QuotaTint => {
   if (provider === "codex") return "codex";

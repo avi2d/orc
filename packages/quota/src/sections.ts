@@ -1,5 +1,5 @@
 import type { DateTime } from "effect";
-import { savedAgeSeconds, staleSavedAgeSeconds, staleSourceAgeSeconds, type QuotaAvailability, type QuotaBlock, type QuotaBlockBody, type SourcedWindow } from "@avi2dg/orc-schema";
+import { savedAgeSeconds, staleSourceAgeSeconds, type QuotaAvailability, type QuotaBlock, type QuotaBlockBody, type SourcedWindow } from "@avi2dg/orc-schema";
 import {
   type Block,
   countdown,
@@ -16,9 +16,9 @@ import {
   tintOfProvider,
   widthOf,
   quotaBar,
-  savedName,
   windowName,
 } from "@avi2dg/orc-ui";
+import { accountDetail, accountReasonLines, accountRowName, type DetailTone, hiddenLine, indent, splitShown } from "./accounts";
 
 type Outlook =
   | { readonly kind: "fine" }
@@ -28,6 +28,7 @@ type Outlook =
   | { readonly kind: "runs-out"; readonly seconds: number | undefined; readonly early: boolean };
 
 const fine: Outlook = { kind: "fine" };
+const usedUp: Outlook = { kind: "used-up" };
 
 // quota-axi projects a runway only from its own reading, so a window read from a harness log speaks only by its pace.
 const outlookOf = (window: SourcedWindow, exhaustion: ReadonlyArray<QuotaAvailability>, now: DateTime.Utc): Outlook => {
@@ -105,19 +106,17 @@ const liveRows = (body: Extract<QuotaBlockBody, { readonly kind: "live" }>, now:
 
 const rowsOf = (body: QuotaBlockBody, now: DateTime.Utc): ReadonlyArray<QuotaRow> => {
   if (body.kind === "live") return liveRows(body, now);
-  if (body.kind === "saved") {
-    const stale = staleSavedAgeSeconds(body.age, body.stale, now);
-    return body.windows.map((window) => {
-      const outlook: Outlook = stale === undefined ? (window.percentLeft <= 0 ? { kind: "used-up" } : fine) : { kind: "stale", ageSeconds: stale };
-      return {
-        name: savedName(window.label),
-        percentLeft: window.percentLeft,
+  if (body.kind === "account") {
+    return [
+      {
+        name: accountRowName,
+        percentLeft: body.percentLeft,
         timeRemainingPercent: undefined,
-        outlook,
-        resetSeconds: resetOf(outlook, secondsUntil(now, window.resetsAt)),
+        outlook: body.percentLeft <= 0 ? usedUp : fine,
+        resetSeconds: secondsUntil(now, body.resetsAt),
         reserve: undefined,
-      };
-    });
+      },
+    ];
   }
   return [];
 };
@@ -125,8 +124,8 @@ const rowsOf = (body: QuotaBlockBody, now: DateTime.Utc): ReadonlyArray<QuotaRow
 const flatName = (text: string): string => text.toLowerCase().replaceAll(/[\s-]/g, "");
 
 const planWords = (block: QuotaBlock): ReadonlyArray<string> => {
-  const plan = block.body.kind === "live" || block.body.kind === "saved" ? block.body.plan : undefined;
-  return plan === undefined || plan === null || flatName(plan) === flatName(block.provider) ? [] : [plan.toLowerCase()];
+  const plan = block.body.kind === "live" ? block.body.plan : undefined;
+  return plan === undefined || flatName(plan) === flatName(block.provider) ? [] : [plan.toLowerCase()];
 };
 
 const stateWords = {
@@ -146,13 +145,6 @@ const checkedAgo = (checkedAt: DateTime.Utc, now: DateTime.Utc): string => {
   return `checked ${ageSeconds > 0 ? countdown(ageSeconds) : "<1m"} ago`;
 };
 
-// Each stale row already shows the profile's age, so the header leaves it out.
-const checkedWords = (body: Extract<QuotaBlockBody, { readonly kind: "saved" }>, now: DateTime.Utc): ReadonlyArray<string> => {
-  if (body.age.kind === "undated") return ["not checked yet"];
-  if (body.windows.length > 0 && staleSavedAgeSeconds(body.age, body.stale, now) !== undefined) return [];
-  return [checkedAgo(body.age.fetchedAt, now)];
-};
-
 // quota-axi answers a refused check with its last reading marked stale, so that reading's age is all there is to say.
 const liveStateWords = (block: QuotaBlock, now: DateTime.Utc) =>
   block.body.kind === "live" &&
@@ -164,13 +156,11 @@ const liveStateWords = (block: QuotaBlock, now: DateTime.Utc) =>
       ? stateWords[block.body.state.status]
       : undefined;
 
-const indent = "  ";
-
 const headerLines = (block: QuotaBlock, width: number, now: DateTime.Utc): Block => {
   const state = liveStateWords(block, now);
-  const details: ReadonlyArray<{ readonly text: string; readonly tone: "muted" | "warning" | "error" }> = [
+  const details: ReadonlyArray<{ readonly text: string; readonly tone: DetailTone }> = [
+    ...[accountDetail(block.body)].filter((detail) => detail !== undefined),
     ...planWords(block).map((text) => ({ text, tone: "muted" as const })),
-    ...(block.body.kind === "saved" ? checkedWords(block.body, now).map((text) => ({ text, tone: "muted" as const })) : []),
     ...(state === undefined ? [] : [state]),
   ];
   return details.reduce<Block>(
@@ -185,8 +175,12 @@ const headerLines = (block: QuotaBlock, width: number, now: DateTime.Utc): Block
 
 const emptyBody = (body: QuotaBlockBody, width: number): Block => {
   switch (body.kind) {
+    case "account":
+      return [];
+    case "unusable":
+    case "accounts-unread":
+      return accountReasonLines(body, width);
     case "live":
-    case "saved":
       return body.windows.length === 0 ? [[span(`${indent}no limits reported`, "muted")]] : [];
     case "absent":
       return [[span(`${indent}no reading`, "muted")]];
@@ -310,7 +304,7 @@ const outlookWords = (outlook: Outlook): { readonly text: string; readonly tone:
 
 const compactHeader = (block: QuotaBlock, width: number, now: DateTime.Utc): Block => {
   const lines = headerLines(block, width, now);
-  const outlook = outlookWords(limitingOutlook(rowsOf(block.body, now)));
+  const outlook = block.body.kind === "account" ? undefined : outlookWords(limitingOutlook(rowsOf(block.body, now)));
   if (outlook === undefined) return lines;
   const last = lines.at(-1) ?? [];
   const joined: Line = [...last, span(` \u00b7 ${outlook.text}`, outlook.tone, outlook.bold === true ? { bold: true } : {})];
@@ -329,22 +323,12 @@ const reserveCell = (row: QuotaRow): Line => {
     : [span(padEnd(`${-points} over`, reserveWidth), "warning", { bold: true })];
 };
 
-const splitShown = (blocks: ReadonlyArray<QuotaBlock>, savedShown: number): { readonly hidden: ReadonlyArray<QuotaBlock>; readonly shown: ReadonlyArray<QuotaBlock> } => {
-  const hidden = blocks.filter((block) => block.body.kind === "saved").slice(savedShown);
-  return { hidden, shown: blocks.filter((block) => !hidden.includes(block)) };
-};
-
-const hiddenLine = (block: QuotaBlock, hidden: ReadonlyArray<QuotaBlock>): Block | undefined => {
-  if (block === hidden[0]) return [[span(`+${hidden.length} more claude profiles`, "muted")]];
-  return hidden.includes(block) ? [] : undefined;
-};
-
 // quota-axi drops every provider the user has not set up, so an empty report is a real reading, not a pending one.
 export const noProviderLines: Block = [[span("no provider is set up in quota-axi", "muted")]];
 
-export const reserveQuotaSection = (blocks: ReadonlyArray<QuotaBlock>, width: number, now: DateTime.Utc, savedShown: number): Block => {
+export const reserveQuotaSection = (blocks: ReadonlyArray<QuotaBlock>, width: number, now: DateTime.Utc, accountsShown: number): Block => {
   if (blocks.length === 0) return noProviderLines;
-  const { hidden, shown } = splitShown(blocks, savedShown);
+  const { hidden, shown } = splitShown(blocks, accountsShown);
   const rows = shown.flatMap((block) => rowsOf(block.body, now));
   const name = widest(rows.map((row) => widthOf(row.name)));
   const reset = widest(rows.map((row) => (row.resetSeconds === undefined ? 0 : widthOf(countdown(row.resetSeconds)))));
@@ -374,9 +358,9 @@ export const reserveQuotaSection = (blocks: ReadonlyArray<QuotaBlock>, width: nu
   ]);
 };
 
-export const quotaSection = (blocks: ReadonlyArray<QuotaBlock>, width: number, now: DateTime.Utc, savedShown: number): Block => {
+export const quotaSection = (blocks: ReadonlyArray<QuotaBlock>, width: number, now: DateTime.Utc, accountsShown: number): Block => {
   if (blocks.length === 0) return noProviderLines;
-  const { hidden, shown } = splitShown(blocks, savedShown);
+  const { hidden, shown } = splitShown(blocks, accountsShown);
   const shape = rowShape(
     shown.flatMap((block) => rowsOf(block.body, now)),
     width,

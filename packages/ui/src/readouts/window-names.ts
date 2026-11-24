@@ -24,7 +24,6 @@ const modelOf = (label: string): string =>
     .join(" ")
     .toLowerCase();
 
-// quota-axi and the saved profiles call one five-hour window session, rolling or 5h, so every window is named by its length.
 export const windowName = (
   window: Pick<QuotaWindow, "kind" | "label" | "id" | "windowSeconds">,
   cycleSeconds: number | undefined,
@@ -47,14 +46,4 @@ export const windowName = (
     case "unknown":
       return shortLabel(window);
   }
-};
-
-const savedLength = /^(\d+)\s*([hd])\b\s*(.*)$/i;
-
-export const savedName = (label: string): string => {
-  const match = savedLength.exec(label.trim());
-  if (match === null) return shortLabel({ label, id: label });
-  const seconds = Number(match[1]) * (match[2]?.toLowerCase() === "h" ? hourSeconds : daySeconds);
-  const model = modelOf(match[3]);
-  return model === "" ? lengthWords(seconds) : `${model} ${lengthWords(seconds)}`;
 };

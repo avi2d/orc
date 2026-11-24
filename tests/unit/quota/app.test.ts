@@ -4,7 +4,7 @@ import { Effect, Fiber, Layer } from "effect";
 import { CommandRunner, HarvestLogSource, homeLogRoots, nothingCaptured, quotaSourceLayer } from "@avi2dg/orc-schema";
 import { livePanel } from "@avi2dg/orc-quota";
 import { fixture } from "../../lib/fixtures";
-import { recordedSavedProfilesLayer } from "../../lib/saved-profiles";
+import { recordedOrcQuotaLayer } from "../../lib/orc-quota";
 
 const noLogs = Layer.succeed(HarvestLogSource, { read: () => Effect.succeed({ home: "/home/tester", roots: homeLogRoots("/home/tester"), files: [], captured: nothingCaptured }) });
 
@@ -24,14 +24,14 @@ const freshFixture = (relative: string): string => {
   return JSON.stringify(shift(JSON.parse(fixture(relative))));
 };
 
-const recordedSources = Layer.merge(quotaSourceLayer, recordedSavedProfilesLayer).pipe(
+const recordedSources = quotaSourceLayer.pipe(
   Layer.provide(
     Layer.succeed(CommandRunner, {
-      run: (command) =>
-        Effect.succeed(freshFixture(command.argv[0] === "quota-axi" ? "quota-axi/full.json" : "saved-profiles/status.json")),
+      run: () => Effect.succeed(freshFixture("quota-axi/full.json")),
     }),
   ),
   Layer.merge(noLogs),
+  Layer.merge(recordedOrcQuotaLayer()),
 );
 
 const rowsOf = (frame: string) =>
