@@ -10,7 +10,7 @@ const withTrial = async (use: (dir: string, run: (portBusy?: "0" | "1") => Retur
     const bin = join(dir, "bin")
     await mkdir(bin)
     await copyFile(source, join(dir, "try-bb.sh"))
-    for (const tool of ["id", "curl", "hdiutil", "ditto", "shasum", "jq", "lsof", "sqlite3", "orc", "screencapture", "pgrep"]) {
+    for (const tool of ["id", "curl", "hdiutil", "ditto", "shasum", "jq", "lsof", "sqlite3", "orc", "screencapture", "codesign", "defaults", "pgrep"]) {
       const body = tool === "id" ? "printf '\\n'" :
         tool === "lsof" ? 'printf "%s\\n" "$@" > "$HOME/ports"; exit "${TRIAL_PORT_BUSY:-0}"' :
         "exit 1"
@@ -37,17 +37,18 @@ const withTrial = async (use: (dir: string, run: (portBusy?: "0" | "1") => Retur
 }
 
 for (const kind of ["file", "symlink"] as const) {
-  test("bb trial refuses an existing preferences " + kind + " before setup", async () => {
+  test("bb trial goes on past an existing preferences " + kind + " instead of refusing, and leaves it as it was", async () => {
     await withTrial(async (dir, run) => {
       const prefs = join(dir, "Library/Preferences/dev.bb.desktop.plist")
       await mkdir(join(dir, "Library/Preferences"), { recursive: true })
       if (kind === "file") await writeFile(prefs, "personal preferences")
       else await symlink(join(dir, "missing-preferences"), prefs)
-      const result = run()
+      const result = run("1")
       expect(result.exitCode).toBe(1)
-      expect((result.stderr?.toString() ?? "")).toContain(prefs)
-      expect(await Bun.file(join(dir, "ports")).exists()).toBe(false)
+      expect((result.stderr?.toString() ?? "")).not.toContain(prefs)
+      expect(await Bun.file(join(dir, "ports")).exists()).toBe(true)
       if (kind === "file") expect(await readFile(prefs, "utf8")).toBe("personal preferences")
+      expect(await Bun.file(join(dir, ".scratch/proof/real-before")).exists()).toBe(true)
     })
   })
 }
