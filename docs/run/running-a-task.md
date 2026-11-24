@@ -70,6 +70,7 @@ Without it, the run sends Pi no project instructions.
 Run `orc runs` to list runs and `orc show <run-id>` to inspect the steps.
 See [Seeing runs](seeing-runs.md) for logs and JSON output.
 The run folder under `$ORC_HOME/runs/<run-id>` holds the task, agent log, session, evidence, and report.
+See [A run](../concepts/run.md) for which runs keep the Pi folder.
 When `ORC_HOME` is unset, the folder is under `~/.orc/runs`.
 At 300 turns or 5 compactions, an implementation session records a `long-session` warning and writes `handover.md` in the run folder.
 The handover names the commits made and why the run stopped, so a later run on the branch can continue from it.
