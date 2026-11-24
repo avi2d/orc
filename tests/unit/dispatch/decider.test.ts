@@ -9,6 +9,7 @@ import { attentionJson, attentionText } from "../../../packages/run/src/features
 import { claimDeciding, openItems, readAttention, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/features/decider/index"
+import { neverDecidedReason } from "../../../packages/run/src/features/decider/decider-guard"
 import { answerTask, askStartedTask, parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
@@ -372,6 +373,55 @@ describe("the decider", () => {
       }, [question])
     })
   }
+
+  test("code objects and record keys are not escalated as deleted work or credentials", () => {
+    const questions = [
+      "Should I remove the deprecated method?",
+      "Should I remove the unused dependency?",
+      "Should I drop the default value?",
+      "Should I remove the dead code?",
+      "Should I remove the console.log?",
+      "Should I remove the duplicate export?",
+      "Should I remove src/legacy?",
+      "Should I rm -rf dist before building?",
+      "Should the parser drop records with no id?",
+      "Should the loader drop rows with empty names?",
+      "Should the decoder discard data that fails the schema?",
+      "Should the summary drop commits from bots?",
+      "Should I remove logs from the test output?",
+      "Should the Map key be a string?",
+      "The Record key is path; ok?",
+      "Should the cache store the key with each entry?",
+      "Should both maps share the key?",
+      "Should the index store the project key on each run?",
+      "Should we expose the record key to the panel?",
+      "Should the lexer issue a token at end of input?",
+      "Should the parser store tokens in an array?"
+    ]
+    for (const question of questions) expect(neverDecidedReason(question)).toBeNull()
+  })
+
+  test("deleting listed work, handling secrets and choosing a site's look are not decided by the decider", () => {
+    const questions = [
+      "Should I delete the run for orc-12?",
+      "Should I delete the run so the slot frees?",
+      "Should I delete the run and its worktree?",
+      "Should I delete the branch orc/orc-12?",
+      "Should I delete orc-12?",
+      "Should I run git branch -D old?",
+      "Should I run git reset --hard?",
+      "Should I rotate the token?",
+      "Should I revoke the token?",
+      "Should I leak the key?",
+      "Should I regenerate the key?",
+      "Should I add the npm token to CI?",
+      "Should I store the GH_TOKEN in the repo?",
+      "Should I change the .env file?",
+      "Should the landing page look like the dark mock?",
+      "How should the header look at mobile widths?"
+    ]
+    for (const question of questions) expect(neverDecidedReason(question)).not.toBeNull()
+  })
 
   const guardedTopics = [
     { topic: "a site's look", text: "Which header look should the landing page get on its preview? Recommended: the dark one.", rejects: "a site's look" },
