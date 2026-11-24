@@ -38,6 +38,14 @@ const probeScript = (fakeBin: string): ReadonlyArray<string> => [
   "exit 1"
 ]
 
+const untilDaemonRuns = async (binary: string, cwd: string, env: Record<string, string>): Promise<void> => {
+  const deadline = Date.now() + 30_000
+  while (!/daemon running/.test(Bun.spawnSync([binary, "daemon", "status"], { cwd, env }).stdout.toString())) {
+    if (Date.now() > deadline) throw new Error("the no-mistakes daemon never reported running")
+    await Bun.sleep(100)
+  }
+}
+
 const driveReviewAgent = async (binary: string, wrapped: boolean): Promise<AgentProbe> => {
   const root = await realpath(await mkdtemp(join(tmpdir(), "orc-nm-agent-")))
   const fakeBin = join(root, "bin")
@@ -72,6 +80,7 @@ const driveReviewAgent = async (binary: string, wrapped: boolean): Promise<Agent
   git(repo, ["push", "-q", "origin", "main"], env)
   const daemon = Bun.spawn([binary, "daemon", "run", "--root", nmHome], { cwd: root, env, stdout: "ignore", stderr: "ignore" })
   try {
+    await untilDaemonRuns(binary, root, env)
     const init = Bun.spawnSync([binary, "init"], { cwd: repo, env })
     expect(init.exitCode, init.stderr.toString() + init.stdout.toString()).toBe(0)
     git(repo, ["checkout", "-q", "-b", "greeting"], env)
