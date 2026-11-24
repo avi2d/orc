@@ -286,7 +286,16 @@ describe("orc login", () => {
       const outside = (await filesUnder(fixture.dir)).filter((file) => !file.startsWith(opencode + "/"))
       expect(outside.length).toBeGreaterThan(0)
       for (const file of outside) {
-        expect({ file, holdsKey: (await readFile(file, "utf8")).includes(apiKey) }).toEqual({ file, holdsKey: false })
+        let content: string
+        try {
+          content = await readFile(file, "utf8")
+        } catch (error) {
+          if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
+            continue
+          }
+          throw error
+        }
+        expect({ file, holdsKey: content.includes(apiKey) }).toEqual({ file, holdsKey: false })
       }
     })
   }, 30_000)
