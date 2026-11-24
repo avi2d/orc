@@ -1,6 +1,7 @@
 import { Effect, FileSystem, Path, Result, Schema } from "effect"
 import { AbsolutePath, ConfigError, duplicateOf, readJsonFile, readJsonFileIfPresent } from "./json-file"
-import { ProviderId } from "./orc-config"
+import { ModelRef, ProviderId } from "./orc-config"
+import { providerOfModel } from "./model-route"
 import { type DeliveryMode, isDeliveryMode, unknownMode } from "./delivery"
 import { ownedBySweep } from "./machine-reach"
 
@@ -34,31 +35,42 @@ const checkedMachine = (machine: RawMachine): Machine | string => {
     : "the machine " + machine.name + " names a load limit, but its start does not run orc runner start, which the beat reads its load through"
 }
 
+const ownProvider = {
+  provider: Schema.optionalKey(ProviderId),
+  models: Schema.optionalKey(Schema.Struct({ implementer: ModelRef, fixer: ModelRef }))
+}
+
 const TokenFileAccount = Schema.Struct({
   name: Name,
+  ...ownProvider,
   kind: Schema.Literal("token-file"),
   tokenFile: AbsolutePath
 })
 const TokenCommandAccount = Schema.Struct({
   name: Name,
+  ...ownProvider,
   kind: Schema.Literal("token-command"),
   tokenCommand: Command
 })
 const ClaudeConfigAccount = Schema.Struct({
   name: Name,
+  ...ownProvider,
   kind: Schema.Literal("claude-config"),
   configDirs: Schema.Record(Name, AbsolutePath)
 })
 const NoneAccount = Schema.Struct({
   name: Name,
+  ...ownProvider,
   kind: Schema.Literal("none")
 })
 const LegacyTokenFileAccount = Schema.Struct({
   name: Name,
+  ...ownProvider,
   tokenFile: AbsolutePath
 })
 const LegacyTokenCommandAccount = Schema.Struct({
   name: Name,
+  ...ownProvider,
   tokenCommand: Command
 })
 
@@ -116,6 +128,8 @@ export type Project = Omit<RawProject, "mode" | "yolo" | "instructions" | "floor
   readonly instructions?: string
   readonly upstream?: ReadonlyArray<Contribution>
 }
+
+export const providerOf = (quota: { readonly provider: string }, account: { readonly provider?: string }): string => account.provider ?? quota.provider
 
 export const modeOf = (project: Project): DeliveryMode => project.mode ?? "no-mistakes"
 
@@ -224,13 +238,31 @@ const accountName = (entry: unknown): string | null =>
   typeof entry === "object" && entry !== null && "name" in entry && typeof entry.name === "string" && entry.name !== "" ? entry.name : null
 
 const accountDetail = (name: string | null, reason: string): string =>
-  (name === null ? "an account with no name" : "the account " + name) + " names a credential the beat cannot take: " + reason
+  (name === null ? "an account with no name" : "the account " + name) + " has an invalid configuration: " + reason
 
 const readAccount = (file: string, entry: unknown): Effect.Effect<Account, ConfigError> =>
   Schema.decodeUnknownEffect(AnyAccount)(entry, { onExcessProperty: "error" }).pipe(
     Effect.mapError((error) => new ConfigError({ file, detail: accountDetail(accountName(entry), error.message) })),
     Effect.map(tagAccount)
   )
+
+// A machine's config.json names one implementer and one fixer model, which serve the quota's provider only.
+const accountModelsProblem = (provider: string, accounts: ReadonlyArray<Account>): string | null => {
+  for (const account of accounts) {
+    const own = providerOf({ provider }, account)
+    if (account.models === undefined) {
+      if (own !== provider) {
+        return "the account " + account.name + " runs on the provider " + own + ", not the quota's provider " + provider + ", so name the implementer and fixer models from " + own + " in its models"
+      }
+      continue
+    }
+    const foreign = [account.models.implementer, account.models.fixer].find((model) => providerOfModel(model) !== own)
+    if (foreign !== undefined) {
+      return "the account " + account.name + " runs on the provider " + own + " and names the model " + foreign + ", which is not from " + own
+    }
+  }
+  return null
+}
 
 const claudeConfigProblem = (accounts: ReadonlyArray<Account>, machines: ReadonlyArray<Machine>): string | null => {
   for (const account of accounts) {
@@ -269,8 +301,8 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
           return yield* new ConfigError({ file, detail: "the account " + duplicate + " is named twice" })
         }
         const accounts = yield* Effect.forEach(config.quota.accounts, (entry) => readAccount(file, entry))
-        const claudeProblem = claudeConfigProblem(accounts, machines)
-        if (claudeProblem !== null) return yield* new ConfigError({ file, detail: claudeProblem })
+        const accountProblem = claudeConfigProblem(accounts, machines) ?? accountModelsProblem(config.quota.provider, accounts)
+        if (accountProblem !== null) return yield* new ConfigError({ file, detail: accountProblem })
         const single = accounts.find((entry) => entry.kind === "none")
         if (single !== undefined && accounts.length > 1) {
           return yield* new ConfigError({ file, detail: "the account " + single.name + " takes kind none and names no login, so the quota names no other account beside it" })
