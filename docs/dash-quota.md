@@ -40,9 +40,9 @@ Its header names its standing:
 | --- | --- |
 | `next run` | The beat picks this account for the next task |
 | `under the 20% floor` | The room is below the quota's `floorPercent`, here 20% |
-| `used up` | No room is left |
-| none | The account can run, and the beat picks another one first |
+| none | The beat picks another account first |
 
+When no room is left, the account's row reads `used up`.
 An account the quota cannot use reads `unusable`, with the reason `orc quota` gives below the header.
 When `orc quota` reports the quota unread, one `accounts` block names the cause, such as `command not installed` or `an account is missing`, with the reason below it.
 When `orc` is not on `PATH` or `dispatch.json` is missing, the `accounts` block shows the error.

@@ -328,7 +328,7 @@ const outlookWords = (outlook: Outlook): { readonly text: string; readonly tone:
 
 const compactHeader = (block: QuotaBlock, width: number, now: DateTime.Utc): Block => {
   const lines = headerLines(block, width, now);
-  const outlook = outlookWords(limitingOutlook(rowsOf(block.body, now)));
+  const outlook = block.body.kind === "account" ? undefined : outlookWords(limitingOutlook(rowsOf(block.body, now)));
   if (outlook === undefined) return lines;
   const last = lines.at(-1) ?? [];
   const joined: Line = [...last, span(` \u00b7 ${outlook.text}`, outlook.tone, outlook.bold === true ? { bold: true } : {})];

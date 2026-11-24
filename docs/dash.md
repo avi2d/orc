@@ -54,7 +54,7 @@ Each panel reads its settings from its key under `panels` in the [dashboard conf
 
 ## Panel guides
 
-<div id="run-the-quota-tool"><span id="show-the-dispatch-accounts"></span><span id="show-saved-profiles"></span><span id="show-each-claude-account"></span></div>
+<div id="run-the-quota-tool"><span id="show-saved-profiles"></span><span id="show-each-claude-account"></span></div>
 
 [Quota](dash-quota.md) shows account limits.
 It shows the [dispatch accounts](dash-quota.md#show-the-dispatch-accounts) from `orc quota --json`.
@@ -107,7 +107,10 @@ See [Develop orc-dash](dash-development.md) for checks and source paths.
 
 The quota tool could not start `quota-axi`.
 Install it and check that it runs on the panel machine's `PATH`.
-If the `accounts` block is unreachable, run `orc quota --json` and check its output.
+
+### The quota panel's accounts block shows an error
+
+Run `orc quota --json` and check its output.
 
 ### The other machine's resources panel says it is unreachable
 

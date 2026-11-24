@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { plain, quotaLines } from "@avi2dg/orc-quota";
+import { plain, quotaLines, reserveQuotaSection } from "@avi2dg/orc-quota";
 import { type Block, lineWidth } from "@avi2dg/orc-ui";
 import { quotaBlocksOf } from "../../lib/dashboard-fixture";
 import { fixture } from "../../lib/fixtures";
@@ -27,6 +27,16 @@ const accountRows = (block: Block): ReadonlyArray<string> => {
 
 const headers = (rows: ReadonlyArray<string>) => rows.filter((row) => row.startsWith("●"));
 
+for (const width of [84, 40]) {
+  test(`the reserve box at ${width} columns states exhaustion once per account, not in both header and row`, () => {
+    const rows = accountRows(reserveQuotaSection(blocksOf("second-used-up"), width, now, 3));
+    expect(headers(rows)).toEqual(["● account main · next run", "● account second", "● account third"]);
+    for (const account of ["second", "third"]) {
+      expect(reasonUnder(rows, `● account ${account}`).match(/used up/gu)).toHaveLength(1);
+    }
+  });
+}
+
 const reasonUnder = (rows: ReadonlyArray<string>, header: string): string =>
   rows
     .slice(rows.indexOf(header) + 1)
@@ -45,6 +55,16 @@ for (const [view, draw] of Object.entries(views)) {
 
       test("leaves a spare account's header bare, not marked next run", () => {
         expect(headers(accountRows(draw("second-spare", width)))).toEqual(["● account main · next run", "● account second"]);
+      });
+
+      test("states each nonpositive account's exhaustion once in its row, not again in its header", () => {
+        const block = draw("second-used-up", width);
+        const rows = accountRows(block);
+        expect(headers(rows)).toEqual(["● account main · next run", "● account second", "● account third"]);
+        for (const account of ["second", "third"]) {
+          expect(reasonUnder(rows, `● account ${account}`).match(/used up/gu)).toHaveLength(1);
+        }
+        expect(block.every((line) => lineWidth(line) <= width)).toBe(true);
       });
 
       test("names the 75% floor orc quota reports, not the default 20%", () => {

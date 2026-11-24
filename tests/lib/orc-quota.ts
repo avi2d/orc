@@ -10,6 +10,7 @@ export type OrcQuotaFixture =
   | "command-missing"
   | "second-unusable"
   | "second-spare"
+  | "second-used-up"
   | "second-login-expired";
 
 export const orcQuotaText = (name: OrcQuotaFixture): string => fixture(`orc-quota/${name}.json`);

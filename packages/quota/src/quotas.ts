@@ -76,7 +76,7 @@ const savedVerdict = (age: SavedAge, now: DateTime.Utc): Line => [span(ageWords(
 
 type AccountBody = Extract<QuotaBlockBody, { readonly kind: "account" }>;
 
-const accountVerdict = (body: AccountBody): Line => (body.percentLeft <= 0 ? runwayVerdict({ status: "exhausted_now" }) : []);
+const accountVerdict = (body: AccountBody): Line => (body.percentLeft <= 0 ? [span("used up", "error", { bold: true })] : []);
 
 const accountRow = (body: AccountBody, shape: RowShape, now: DateTime.Utc): Line =>
   meteredRow(

@@ -13,11 +13,10 @@ const standingWords = (standing: AccountStanding, floorPercent: number): Account
     case "next":
       return { text: "next run", tone: "success" };
     case "spare":
+    case "used-up":
       return undefined;
     case "under-floor":
       return { text: `under the ${percent(floorPercent)} floor`, tone: "warning" };
-    case "used-up":
-      return { text: "used up", tone: "error" };
   }
 };
 
