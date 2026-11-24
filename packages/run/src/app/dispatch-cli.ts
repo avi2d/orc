@@ -9,7 +9,7 @@ import { dropTask, edit, holdTask, prioritizeTask, priorityLine, dropChild, plan
 import { answerTask } from "../entities/parked-runs/index"
 import { type ConfigError, readFailure, type DispatchConfig, readDispatchConfig, readProjects } from "../shared/config/index"
 import { holdRun, sendBack, killHeld, queueFromText, renewTask, startTask, stopNow, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson, ensureAlertStream, liveAlertStream } from "../features/queueing-a-task/index"
-import { mergeTask } from "../features/merging-a-pr/index"
+import { mergeNow } from "./dispatch-merge"
 import { RunnerError, type Command } from "../shared/process/index"
 import { encodeToken, sessionToken } from "../entities/token/index"
 import { markEventPosted, mergedIds, unpostedEvents } from "../entities/events/index"
@@ -264,8 +264,7 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
       return prioritizeTask(backlogRoot(place), args.id, args.priority).pipe(Effect.map((outcome) => priorityLine(args.id, args.priority, outcome)))
     }
     case "MergeTask": {
-      return mergeTask(backlogRoot(place), args.id, args.basis, (words) =>
-        DateTime.now.pipe(Effect.flatMap((now) => sendBack(backlogRoot(place), place.home, { kind: "SendBack", id: args.id, words }, DateTime.formatIso(now)))))
+      return mergeNow(args, place.home)
     }
     case "ShowPlan": {
       return planText(backlogRoot(place), args.parent)

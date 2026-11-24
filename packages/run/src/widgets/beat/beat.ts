@@ -1,6 +1,6 @@
 import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
+import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
 import type { ConfigError } from "../../shared/config/index"
 import { type Account, type DispatchConfig, type Machine, type Project, providerOf, readDispatchConfig, readProjects } from "../../shared/config/index"
 import { type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
@@ -20,6 +20,7 @@ import { readPullRequest } from "../../entities/pull-request/index"
 import { prEvents, type ReadPullRequest } from "./task-events"
 import { roomWaits, writeBeatWaits } from "./beat-waits"
 import { mergedIds } from "../../entities/events/index"
+import { pollBaseCi, readBaseCi, type ReadBaseCi } from "../../features/merging-a-pr/index"
 import { type ReadUpstream, readUpstream, watchUpstream } from "./upstream"
 
 export type { BeatAction } from "../../entities/attention/index"
@@ -301,9 +302,10 @@ export interface BeatSources {
   readonly readPullRequest: ReadPullRequest
   readonly readUpstream: ReadUpstream
   readonly askDecider: AskDecider
+  readonly readBaseCi: ReadBaseCi
 }
 
-export const liveSources = (home: string): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream, askDecider: askDeciderWithPi(home) })
+export const liveSources = (home: string): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream, askDecider: askDeciderWithPi(home), readBaseCi })
 
 const decideAndRelay = (
   root: string,
@@ -372,7 +374,9 @@ export const runBeat = (
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task))
     yield* openRunDeaths(root, actions, at).pipe(Effect.andThen(writeBeatWaits(root, at, roomWaits(queued, actions, fresh.tasks, fresh.merged, deciderOwns))))
-    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at))
+    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at)).pipe(
+      Effect.tap(() => pollBaseCi(root, sources.readBaseCi, projects, latest.map(taskPr).filter((url) => url !== null), at))
+    )
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
         ...reported,
         ...stalls.flatMap(Option.toArray),

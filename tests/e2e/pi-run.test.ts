@@ -6,7 +6,6 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { hostExec } from "../../packages/run/src/shared/sandbox/agent-exec"
-import { ciOnlyTestsInstruction } from "../../packages/run/src/shared/lib/index"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
 import { askSetupFor, type PiRun, runPi } from "../../packages/run/src/entities/agent/index"
 
@@ -93,8 +92,16 @@ describe("runPi", () => {
         "ORC_COMPLETE",
         ""
       ].join("\n"))
-      expect(await readFile(join(fixture.dir, "stdin"), "utf8")).toBe(ciOnlyTestsInstruction + "\n\nDo the task.")
       expect((await readFile(join(fixture.dir, "argv"), "utf8")).split("\n")).toContain(fixture.sessionDir)
+    })
+  }, 20_000)
+
+  test("Pi's prompt forbids starting CI by hand when a pull request run exists and forbids waiting in a tool call", async () => {
+    await withFakePi(() => [emit(header)], async (fixture) => {
+      await run(fixture, { tickMillis: 50, idleMillis: 2_000 }, [])
+      expect(await readFile(join(fixture.dir, "stdin"), "utf8")).toBe(
+        "Leave repository tests to GitHub CI. Do not run them locally. You may run build, lint, or typecheck. If a pull request run exists, do not start or rerun CI by hand. Do not wait for CI in a tool call.\n\nDo the task."
+      )
     })
   }, 20_000)
 
