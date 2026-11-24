@@ -223,6 +223,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/heavy-queue/heavy.ts` | The heavy settings, the stand in folder and the default heavy tool list |
 | `packages/run/src/entities/heavy-queue/heavy-setup.ts` | The reading of the heavy settings and the writing of the stand in folder |
 | `packages/run/src/entities/heavy-queue/heavy-standin.ts` | The three line stand in launchers that start the helper for each heavy tool |
+| `packages/run/src/entities/heavy-queue/heavy-agent-wrapper.ts` | The agent wrappers that start a no-mistakes review or fix agent under `HEAVY_TESTS_CI_ONLY=1` and the stand in folders |
 | `packages/run/src/entities/heavy-queue/heavy-classify.ts` | The per tool decision of which calls queue and which targeted calls take priority |
 | `packages/run/src/entities/heavy-queue/heavy-standin-main.ts` | The helper a stand in launcher starts by the real bun path, and the waiter a queued pueue task starts |
 | `packages/run/src/entities/heavy-queue/heavy-standin-exec.ts` | The helper's run of a call: the classify probe, the real tool as a child, the through command and the queued call waiter |

@@ -70,7 +70,7 @@ const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, ne
     return ""
   })
 
-const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
+export const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 
 const launcher = (call: StandinCall): string => {
   const [bun = "", ...flags] = helperCommand
