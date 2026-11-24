@@ -5,7 +5,8 @@ kind: reference
 To land a closed task's PR, run `orc merge <task-id>`, or tell the chat to merge it.
 Orc squash-merges the PR only when it is open and every check is green.
 Otherwise it merges nothing and says why.
-When the branch is behind its base, orc updates it from the base, waits for the checks on the new head and merges once they are green.
+When the branch is behind its base and neither side changed a file the other did, orc merges it without updating and raises an alarm if CI fails on the squash commit.
+When they share a changed file, orc updates the branch from the base, waits for the checks on the new head and merges once they are green.
 When the update conflicts or a check on the new head turns red, orc merges nothing and sends the task back for a fix.
 
 The chat merges on your word.

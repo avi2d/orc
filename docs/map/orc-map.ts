@@ -269,7 +269,7 @@ export const parts: readonly MapPart[] = [
   { id: "merge-ask", inside: "merge", title: "Who asks", short: "You, the chat or the app", details: { points: ["you, with orc merge", "the chat, with its merge tool", "the app, with its Approve step"] } },
   { id: "merge-holds", inside: "merge", title: "Do all three hold?", short: "Named, open and green", details: { points: ["the task names a pull request", "it is open", "every check reported green"] } },
   { id: "merge-refused", inside: "merge", title: "Refused: nothing merges", short: "The refusal names every reason." },
-  { id: "merge-done", inside: "merge", title: "Squash merge", tone: "ok", short: "At the exact commit it checked", details: { text: "At the exact commit it checked, updating a branch behind its base first." } },
+  { id: "merge-done", inside: "merge", title: "Squash merge", tone: "ok", short: "At the exact commit it checked", details: { text: "At the exact commit it checked, after an update only when a branch behind its base shares a changed file." } },
   { id: "merge-word", inside: "merge", title: "Whose word merges", short: "Yours, never the decider's", details: { text: "Yours. The decider answers no question about merging." } }
 ]
 

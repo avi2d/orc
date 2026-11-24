@@ -19,7 +19,8 @@ Orc reads the pull request with `gh pr view` and merges nothing when any of thes
 - A check is red, a check has not reported, or no check has reported at all.
 
 Each refusal names every reason.
-When the branch is behind its base, orc updates it from the base and merges once the new checks are green.
+When the branch is behind its base and neither side changed a file the other did, orc merges without updating it and watches the base branch's CI afterwards.
+When they share a changed file, orc updates the branch from the base and merges once the new checks are green.
 Otherwise orc squash merges at the exact commit it checked, so a push that lands after the check merges nothing.
 
 ## Whose word merges
