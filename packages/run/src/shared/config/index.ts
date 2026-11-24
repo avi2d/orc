@@ -1,7 +1,7 @@
 export { ConfigError, AbsolutePath, readFailure, duplicateOf, readJsonFileIfPresent, writeWhole } from "./json-file"
 export { ModelRef, ProviderId, readOrcConfig } from "./orc-config"
 export type { LoginProvider, TokenFileProvider, PackageProvider, Provider, HeavyConfig, OrcConfig } from "./orc-config"
-export { modeOf, isYolo, contributionId, checkoutOn, readDispatchConfig, readProjects, readProjectInstructions } from "./dispatch-config"
+export { modeOf, isYolo, contributionId, checkoutOn, providerOf, readDispatchConfig, readProjects, readProjectInstructions } from "./dispatch-config"
 export type { Command, Machine, Account, DispatchConfig, Contribution, Project, ProjectInstructions } from "./dispatch-config"
 export { ownedBySweep, throughFor } from "./machine-reach"
 export { tokenFileVar, tokenFileApiKey, providerEnvOf, routeOfAgents, configuredModels, tokenFileSource, requireTokenFile } from "./model-route"

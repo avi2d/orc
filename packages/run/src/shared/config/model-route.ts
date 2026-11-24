@@ -8,13 +8,13 @@ export const tokenFileVar = "AGENT_TOKEN_FILE"
 // A literal key here would leave the token in the run's Pi folder.
 export const tokenFileApiKey = "!cat \"$" + tokenFileVar + "\""
 
-const providerOf = (model: string): string => {
+export const providerOfModel = (model: string): string => {
   const slash = model.indexOf("/")
   return slash === -1 ? model : model.slice(0, slash)
 }
 
 export const providerEnvOf = (config: OrcConfig, model: string): Record<string, string> => {
-  const provider = config.providers.find((candidate) => candidate.id === providerOf(model))
+  const provider = config.providers.find((candidate) => candidate.id === providerOfModel(model))
   return provider?.credential === "package" ? provider.env ?? {} : {}
 }
 
@@ -33,15 +33,15 @@ export const routeOfAgents = (
   models: { readonly agent: string; readonly fixer: string; readonly reviewer?: string | undefined },
   pinned: string | undefined
 ): Result.Result<Provider, string> => {
-  const agentProvider = config.providers.find((candidate) => candidate.id === providerOf(models.agent))
-  const fixerProvider = config.providers.find((candidate) => candidate.id === providerOf(models.fixer))
+  const agentProvider = config.providers.find((candidate) => candidate.id === providerOfModel(models.agent))
+  const fixerProvider = config.providers.find((candidate) => candidate.id === providerOfModel(models.fixer))
   if (agentProvider === undefined || fixerProvider === undefined) {
     return Result.fail("orc: " + config.file + " does not configure the provider for an agent model, so add it to the providers there")
   }
-  if (pinned !== undefined && providerOf(models.agent) !== pinned) {
+  if (pinned !== undefined && providerOfModel(models.agent) !== pinned) {
     return Result.fail("orc: --provider names " + pinned + ", and the implementer runs on model " + models.agent + ", so the run would hand its credential to another provider; name a model from " + pinned + " or drop the flag")
   }
-  if (providerOf(models.fixer) !== agentProvider.id) {
+  if (providerOfModel(models.fixer) !== agentProvider.id) {
     return Result.fail("orc: the implementer runs on " + models.agent + " and the fixer on " + models.fixer + ", and orc runs both agents of a run on one provider, so name models from one provider")
   }
   if (models.reviewer !== undefined && providerOf(models.reviewer) !== agentProvider.id) {
