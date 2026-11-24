@@ -85,6 +85,22 @@ A merged PR shows its run as Done, and a closed PR shows its run as Failed.
 
 [Develop the mods](herdr-app-development.md) covers the scratch App and screenshots.
 
+## Read a Checks step
+
+On the **Agents** tab, select a run and then select a **Checks** step.
+It opens in **Summary**, with one row per check showing its name, result, and time.
+Older logs that did not record times leave the time blank.
+
+Passed checks stay folded.
+A failed check opens below its row.
+Select the row to fold or reopen it.
+For a failed `bun test` check, **Summary** shows the failed test names, their errors, and the pass and fail counts.
+For other failed checks, it shows the last 20 lines before the exit.
+If the step ended before a check reported its result, the row says **Interrupted**.
+
+Select **Raw** in the step bar to see the full log.
+Select **Summary** to return to the results.
+
 ## Related topics
 
 - [The orc-dash dashboard](dash.md)

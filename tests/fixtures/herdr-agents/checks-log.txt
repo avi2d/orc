@@ -1,0 +1,56 @@
+check typecheck: bun run typecheck
+$ tsc --noEmit && effect-tsgo diagnostics --project tsconfig.json --format text --strict
+Checked 700 files out of 700 files.
+0 errors, 0 warnings and 0 messages.
+exit 0: passed in 21.4s
+
+check unit: bun test tests/unit
+bun test v1.4.3 (c6da4a4d3) 3x PARALLEL
+
+tests/unit/chat-tools.test.ts:
+(pass) the parked-question listing > a question asked again posts again instead of staying hidden as already shown [1.25ms]
+(pass) the parked-question listing > a failed read or a busy Pi lists the parked question on a later poll instead of counting it shown [70.96ms]
+
+tests/unit/dispatch/task-ids.test.ts:
+(pass) the task ids > a second project's first task is website-1 instead of continuing orc's numbers as orc-3 [32.84ms]
+
+ 3 pass
+ 0 fail
+ 9 expect() calls
+Ran 3 tests across 2 files. [412.00ms]
+exit 0: passed in 1.9s
+
+check e2e: bun test tests/e2e
+bun test v1.4.3 (c6da4a4d3) 3x PARALLEL
+
+tests/e2e/runs.test.ts:
+(pass) orc runs > a corrupt history file is reported on stderr with a non-zero exit [624.77ms]
+(pass) orc runs > runs --json on a fresh home prints an empty versioned document [355.88ms]
+
+tests/e2e/pack.test.ts:
+(pass) the trial pack > the tarball takes the scoped name instead of the taken orc name [10.25ms]
+208 | describe("the trial pack", () => {
+209 |   test("the scoped tarball keeps every file the orc tarball held instead of dropping the copied changelog", () => {
+210 |     expect([...packedTarball().files].sort()).toEqual([...expectedFiles].sort())
+                                                    ^
+error: expect(received).toEqual(expected)
+
+@@ -127,4 +127,5 @@
+    "src/features/running-a-task/run-loop.ts",
++   "src/features/running-a-task/run-machine.ts",
+    "src/features/running-a-task/run-ops.ts",
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/work/orc/tests/e2e/pack.test.ts:210:47)
+(fail) the trial pack > the scoped tarball keeps every file the orc tarball held instead of dropping the copied changelog [10.39ms]
+
+1 tests failed:
+(fail) the trial pack > the scoped tarball keeps every file the orc tarball held instead of dropping the copied changelog [10.39ms]
+
+ 3 pass
+ 1 fail
+ 11 expect() calls
+Ran 4 tests across 2 files. [3.10s]
+exit 1: failed in 4.2s
