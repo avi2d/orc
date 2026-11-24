@@ -6,7 +6,6 @@ import type { ConfigError } from "../../shared/config/index"
 import type { RunnerError } from "../../shared/process/index"
 import type { MergeBasis } from "../../entities/pull-request/index"
 import { checkRefusals, CommitSha, gh, greenChecks, prPattern, type PullRequestView, readPullRequest, redChecks } from "../../entities/pull-request/index"
-import { watchMainCi } from "./main-ci"
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
 
@@ -303,12 +302,6 @@ export const mergeTask = (
       return yield* landUpdated(landing, view)
     }
     return yield* mergeAt(landing, view).pipe(
-      Effect.flatMap((merged) => update === "disjoint"
-        ? watchMainCi(root, { task: id, url, branch: view.baseRefName, checkedHead: view.headRefOid }).pipe(
-          Effect.catchTag("BacklogError", (error) => refuse(merged + ", but Orc could not watch main CI: " + error.detail)),
-          Effect.as(merged)
-        )
-        : Effect.succeed(merged)),
       Effect.catchTag("MergeBehind", (error) => update === "disjoint" ? landUpdated(landing, view) : refuse(error.detail))
     )
   })

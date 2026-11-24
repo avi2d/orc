@@ -34,8 +34,6 @@ export interface Forge {
   readonly checks?: ReadonlyArray<Rollup>
   readonly behind?: number
   readonly baseFiles?: ReadonlyArray<ChangedFile>
-  readonly mainCi?: true
-  readonly mergedAt?: string
   readonly mergeRefusal?: string
   readonly update?: "updates" | "conflicts" | "head moved"
   readonly afterUpdate?: ReadonlyArray<HeadView>
@@ -64,18 +62,6 @@ const updateReply = (update: Forge["update"]): ReadonlyArray<string> => {
   }
 }
 
-export const writeMainRuns = (fixture: Fixture, runs: ReadonlyArray<{ readonly sha: string; readonly conclusion: "failure" | "success" | null }>): Promise<void> =>
-  writeFile(join(fixture.dir, "views", "main-runs.json"), JSON.stringify([{ workflow_runs: runs.map(({ sha, conclusion }) => ({
-    id: 91,
-    name: "ci",
-    head_sha: sha,
-    head_branch: "main",
-    event: "push",
-    status: conclusion === null ? "in_progress" : "completed",
-    conclusion,
-    html_url: ciRunUrl
-  })) }]))
-
 export const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
   const views = join(fixture.dir, "views")
   const state = forge.state ?? "OPEN"
@@ -91,12 +77,6 @@ export const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
     files: [{ filename: "shared.txt" }]
   }))
   await writeFile(join(views, "base-files.json"), JSON.stringify(forge.baseFiles ?? [{ filename: "shared.txt" }]))
-  if (forge.mainCi) {
-    await writeFile(join(views, "merged.json"), JSON.stringify({
-      state: "MERGED", mergeCommit: { oid: squashHead }, mergedAt: forge.mergedAt ?? new Date().toISOString(), headRefOid: head, baseRefName: "main", statusCheckRollup: []
-    }))
-    await writeMainRuns(fixture, [])
-  }
   await writeFile(ghCalls(fixture), "")
   await writeFile(join(fixture.dir, "bin", "gh"), [
     "#!/bin/sh",
@@ -106,7 +86,6 @@ export const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
     ...updateReply(forge.update),
     ";; esac",
     "if [ \"$1 $2\" = \"pr view\" ]; then",
-    "  if [ -f \"$VIEWS/merged\" ]; then cat \"$VIEWS/merged.json\"; exit 0; fi",
     "  if [ ! -f \"$VIEWS/updated\" ]; then cat \"$VIEWS/before.json\"; exit 0; fi",
     "  f=$(( $(cat \"$VIEWS/flaky\" 2>/dev/null || echo 0) + 1 )); echo $f > \"$VIEWS/flaky\"",
     "  if [ \"$f\" -le " + String(forge.flakyViews ?? 0) + " ]; then echo 'gh: Internal Server Error (HTTP 500)' >&2; exit 1; fi",
@@ -120,7 +99,6 @@ export const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
     "  c=$(( $(cat \"$VIEWS/parents-flaky\" 2>/dev/null || echo 0) + 1 )); echo $c > \"$VIEWS/parents-flaky\"",
     "  if [ \"$c\" -le " + String(forge.flakyParents ?? 0) + " ]; then echo 'gh: Not Found (HTTP 404)' >&2; exit 1; fi",
     "  echo " + (forge.parents ?? head) + "; exit 0;; esac",
-    "case \"$*\" in *actions/runs*branch=main*event=push*head_sha=" + squashHead + "*) cat \"$VIEWS/main-runs.json\"; exit $?;; esac",
     "case \"$*\" in *graphql*) cat \"$VIEWS/base-runs.json\"; if [ -f \"$VIEWS/base-fails\" ]; then exit 1; fi; exit 0;; esac",
     "if [ \"$1\" = api ]; then echo 0; exit 0; fi",
     "if [ \"$1 $2\" = \"pr merge\" ]; then",
@@ -129,7 +107,6 @@ export const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
       "    echo " + JSON.stringify(forge.mergeRefusal) + " >&2; exit 1",
       "  fi"
     ]),
-    "  if [ -f \"$VIEWS/merged.json\" ]; then touch \"$VIEWS/merged\"; fi",
     "  exit 0",
     "fi",
     "echo 'unexpected gh call' >&2",

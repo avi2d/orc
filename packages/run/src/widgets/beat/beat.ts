@@ -20,7 +20,7 @@ import { readPullRequest } from "../../entities/pull-request/index"
 import { prEvents, type ReadPullRequest } from "./task-events"
 import { roomWaits, writeBeatWaits } from "./beat-waits"
 import { mergedIds } from "../../entities/events/index"
-import { pollBaseCi, pollMainCi } from "../../features/merging-a-pr/index"
+import { pollBaseCi, readBaseCi, type ReadBaseCi } from "../../features/merging-a-pr/index"
 import { type ReadUpstream, readUpstream, watchUpstream } from "./upstream"
 
 export type { BeatAction } from "../../entities/attention/index"
@@ -302,9 +302,10 @@ export interface BeatSources {
   readonly readPullRequest: ReadPullRequest
   readonly readUpstream: ReadUpstream
   readonly askDecider: AskDecider
+  readonly readBaseCi: ReadBaseCi
 }
 
-export const liveSources = (home: string): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream, askDecider: askDeciderWithPi(home) })
+export const liveSources = (home: string): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream, askDecider: askDeciderWithPi(home), readBaseCi })
 
 const decideAndRelay = (
   root: string,
@@ -374,7 +375,7 @@ export const runBeat = (
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task))
     yield* openRunDeaths(root, actions, at).pipe(Effect.andThen(writeBeatWaits(root, at, roomWaits(queued, actions, fresh.tasks, fresh.merged, deciderOwns))))
     const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at)).pipe(
-      Effect.tap(() => pollMainCi(root, at).pipe(Effect.andThen(pollBaseCi(root, projects, latest.map(taskPr).filter((url) => url !== null), at))))
+      Effect.tap(() => pollBaseCi(root, sources.readBaseCi, projects, latest.map(taskPr).filter((url) => url !== null), at))
     )
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
         ...reported,

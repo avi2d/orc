@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, readFile, readdir, writeFile } from "node:fs/promises"
+import { chmod, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { closeTask, type Fixture, orchestratorConfig, ranClosing, runOrc, sessionFor, withFixture } from "./chat-helpers"
 import { closedWithPr, type Forge, ghCalls, head, newHead, passed, prUrl, type Rollup, stubGh, writeProject } from "./merge-helpers"
@@ -101,7 +101,6 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
         "view", "pr merge " + prUrl + " --squash --match-head-commit " + head,
         "update", "view", "pr merge " + prUrl + " --squash --match-head-commit " + newHead
       ])
-      expect(await readdir(join(fixture.home, "backlog", "main-ci")).catch(() => [])).toEqual([])
     })
   }, 60_000)
 

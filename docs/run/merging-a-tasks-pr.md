@@ -20,6 +20,7 @@ If GitHub refuses because the branch is not up to date, Orc updates the branch a
 Orc counts both paths of a renamed file.
 If GitHub returns its limit of 300 files on either side, Orc updates the branch because the lists may be incomplete.
 When the lists share a path, Orc updates the branch before merging.
+After either merge, a beat raises an alarm for a failed push run on the default branch, as [Main CI alarms](backlog-and-beat.md#main-ci-alarms) describes.
 
 To update the branch, Orc prints `Updating from main` and runs `gh api -X PUT repos/<owner>/<repo>/pulls/<n>/update-branch -f expected_head_sha=<sha>` with the head it checked.
 It then prints `Checks running` and reads the PR again with `gh pr view`, first after 1 second and then at doubling waits of at most 15 seconds.
@@ -28,15 +29,6 @@ A read that fails during the wait counts as no answer, and orc keeps waiting unt
 It stops waiting early once a check on the new head is red.
 It reads the new head's parents and treats a head that leaves out the checked head as changed after the approval.
 Once the new head is green and no longer behind, orc runs `gh pr merge <url> --squash --match-head-commit <new sha>`.
-
-## Main CI alarms after a merge without an update
-
-When Orc merges a behind PR without updating it, the next beats watch push workflow runs at the squash commit on that PR's base branch.
-A failed run raises a CI alarm in Orc chat with a link to the run and the PR link.
-The watch ends once every run has finished, or if no run exists 30 minutes after the PR merged.
-A running workflow keeps the watch open past that window.
-A failed or unreadable request does not count as an empty run list.
-Every beat also checks each repository's default branch, as [Main CI alarms](backlog-and-beat.md#main-ci-alarms) describes, and a run raises at most one alarm across both checks.
 
 ## When an update fails
 

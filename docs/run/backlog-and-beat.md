@@ -28,7 +28,6 @@ A failed run raises a CI alarm in Orc chat with a link to the run.
 A red run raises an alarm only at the current head of the default branch, or when it finished after Orc first saw the repository.
 The first beat that sees a repository records when it saw it and posts no alarm from this check.
 A later beat can still report a red run at the branch head.
-After [a merge without an update](merging-a-tasks-pr.md#main-ci-alarms-after-a-merge-without-an-update), Orc also watches that PR's squash commit.
 
 ## Reference
 

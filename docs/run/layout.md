@@ -118,7 +118,6 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/merging-a-pr/merge.ts` | The `orc merge` guard and squash-merge |
-| `packages/run/src/features/merging-a-pr/main-ci.ts` | The watch of a squash commit's push runs after a merge without an update, and the CI alarm it raises |
 | `packages/run/src/features/merging-a-pr/base-ci.ts` | The per-beat read of each repository's default branch for red push runs |
 
 ## features/queueing-a-task

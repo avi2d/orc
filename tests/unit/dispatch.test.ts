@@ -54,7 +54,7 @@ const pueueStub = (statusJson: string): Layer.Layer<ChildProcessSpawner.ChildPro
     )
   }))
 
-// Answers the quota command itself and reads the task file at the moment the beat asks for the start command, before any process runs. Every other command, such as the base-branch remote read, runs for real unrecorded.
+// Answers the quota command itself and reads the task file at the moment the beat asks for the start command, before any process runs.
 const recordingSpawner = (taskFile: string, seen: Array<string>): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner, never, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem> =>
   Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
     const real = yield* ChildProcessSpawner.ChildProcessSpawner
@@ -62,12 +62,10 @@ const recordingSpawner = (taskFile: string, seen: Array<string>): Layer.Layer<Ch
     return ChildProcessSpawner.make((command) =>
       ChildProcess.isStandardCommand(command) && command.command === "orc-quota"
         ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + quotaReply + "\nJ"]))
-        : ChildProcess.isStandardCommand(command) && command.args.includes("orc-start")
-          ? fs.readFileString(taskFile).pipe(
-            Effect.tap((text) => Effect.sync(() => seen.push(text))),
-            Effect.flatMap(() => real.spawn(command))
-          )
-          : real.spawn(command)
+        : fs.readFileString(taskFile).pipe(
+          Effect.tap((text) => Effect.sync(() => seen.push(text))),
+          Effect.flatMap(() => real.spawn(command))
+        )
     )
   }))
 

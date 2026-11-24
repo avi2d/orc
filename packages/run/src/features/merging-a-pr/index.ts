@@ -1,3 +1,3 @@
 export { mergeTask } from "./merge"
-export { pollMainCi } from "./main-ci"
-export { pollBaseCi } from "./base-ci"
+export { pollBaseCi, readBaseCi } from "./base-ci"
+export type { ReadBaseCi } from "./base-ci"
