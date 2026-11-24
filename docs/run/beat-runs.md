@@ -62,3 +62,6 @@ The beat leaves a stopped or failed task's PR open.
 The beat also leaves a PR open when you answered `hold` to its `pr-ready` item for the current head commit.
 A merge the beat attempts and `orc merge` refuses shows in `orc beat` as a line naming the task and the reason.
 Releases, deletions, workflow file changes, and secret changes wait for your merge word, as [Merging a task's PR](merging-a-tasks-pr.md) describes.
+
+Answer `hold` to a PR's `pr-ready` item to leave that head unmerged.
+The hold also covers Orc's pending branch update, but new work on the PR can lift it.

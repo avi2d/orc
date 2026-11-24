@@ -113,6 +113,9 @@ const lineageOf = (url: string, checked: string, sha: string): Effect.Effect<Lin
     Effect.catch((error) => Effect.succeed({ sha, kind: "unknown" as const, said: error.detail }))
   )
 
+export const isPendingUpdateHead = (url: string, pendingHead: string, head: string): Effect.Effect<boolean, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  head === pendingHead ? Effect.succeed(true) : lineageOf(url, pendingHead, head).pipe(Effect.map((lineage) => lineage.kind !== "foreign"))
+
 type Judgement =
   | PolledHead
   | { readonly kind: "waiting"; readonly lineage: Lineage | undefined }

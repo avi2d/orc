@@ -89,3 +89,6 @@ The beat merges a closed done ship task's PR on `yolo-green` by itself once its 
 A task that closed stopped or failed never auto-merges, even when its checks later turn green.
 A PR with a red check or a check that has not reported stays unmerged.
 A PR with a change that waits for your word stays unmerged, and its `pr-ready` item in `orc attention` names that change.
+
+Answer `hold` to a PR's `pr-ready` item to leave that head unmerged.
+The hold also covers Orc's pending branch update, but new work on the PR can lift it.

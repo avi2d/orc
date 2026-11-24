@@ -7,6 +7,7 @@ import { pullRequestHeld, routePullRequest } from "../../entities/attention/inde
 import { eventRecorded, readPrState, recordEvent, writePrState } from "../../entities/events/index"
 import { checkRefusals, greenChecks, type PullRequestView } from "../../entities/pull-request/index"
 import type { RunnerError } from "../../shared/process/index"
+import { isPendingUpdateHead, readPendingUpdate } from "../../features/merging-a-pr/index"
 import { ownerWaits, yoloMerge } from "./yolo-merge"
 
 export type ReadPullRequest = (url: string) => Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner>
@@ -83,6 +84,15 @@ const recordObservation = (
     yield* writePrState(root, task.spec.id, pr, prState)
   })
 
+const heldAcrossUpdate = (root: string, id: string, pr: string, head: string) =>
+  Effect.gen(function*() {
+    const pending = yield* readPendingUpdate(root, id).pipe(Effect.mapError((error) => new BacklogError({ detail: error.file + ": " + error.detail })))
+    if (pending === null || pending.url !== pr || !(yield* pullRequestHeld(root, id, pending.head))) {
+      return false
+    }
+    return yield* isPendingUpdateHead(pr, pending.head, head)
+  })
+
 export const prEvents = (
   root: string,
   task: TaskRecord,
@@ -121,7 +131,7 @@ export const prEvents = (
     if (waits.success === null || waits.success.length > 0) {
       return Option.none()
     }
-    if (ranClosing(task)?.outcome !== "done" || (yield* pullRequestHeld(root, id, view.success.headRefOid))) {
+    if (ranClosing(task)?.outcome !== "done" || (yield* pullRequestHeld(root, id, view.success.headRefOid)) || (yield* heldAcrossUpdate(root, id, pr, view.success.headRefOid))) {
       return Option.none()
     }
     return Option.some(yield* mergeTimed(root, id, pr, home))

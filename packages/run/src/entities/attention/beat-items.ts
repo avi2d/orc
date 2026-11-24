@@ -35,7 +35,7 @@ const openOrReopenPrItem = (root: string, id: string, asked: Asked): Effect.Effe
   })
 
 export const pullRequestHeld = (root: string, task: string, head: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
-  Effect.map(readItem(root, itemId(task, "pr-ready", head)), (item) => item?.state.kind === "closed" && item.state.answer.words === "hold")
+  Effect.map(readItem(root, itemId(task, "pr-ready", head)), (item) => item?.state.kind === "closed" && item.state.answer.words.trim().toLowerCase().startsWith("hold"))
 
 // Each head commit gets its own items, so a fix pushed after a red check opens anew.
 export const routePullRequest = (root: string, task: string, pr: string, view: PullRequestView, at: string, waits: ReadonlyArray<string> = []): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>

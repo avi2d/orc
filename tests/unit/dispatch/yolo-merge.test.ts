@@ -58,7 +58,7 @@ const taskOf = async (root: string) => {
   return task
 }
 
-const ghLayer = (current: PullRequestView, files: string | null, merges: Array<string>): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> =>
+const ghLayer = (current: PullRequestView, files: string | null, merges: Array<string>, parent = "0".repeat(40)): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> =>
   Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
     const real = yield* ChildProcessSpawner.ChildProcessSpawner
     const reply = (text: string) => real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + text + "\nJ"]))
@@ -75,6 +75,9 @@ const ghLayer = (current: PullRequestView, files: string | null, merges: Array<s
       if (text.includes("/pulls/") && text.includes("/files")) {
         return files === null ? refusal() : reply(files)
       }
+      if (text.includes("/commits/")) {
+        return reply(parent)
+      }
       if (text.includes("/compare/")) {
         return reply(JSON.stringify({ behind_by: 0, base_commit: { sha: "1".repeat(40) }, merge_base_commit: { sha: "1".repeat(40) }, files: [] }))
       }
@@ -86,18 +89,18 @@ const ghLayer = (current: PullRequestView, files: string | null, merges: Array<s
     })
   })).pipe(Layer.provide(BunServices.layer))
 
-const beatAction = async (root: string, current: PullRequestView, yolo: boolean, files: string | null, merges: Array<string>) => {
+const beatAction = async (root: string, current: PullRequestView, yolo: boolean, files: string | null, merges: Array<string>, parent = "0".repeat(40)) => {
   const task = await taskOf(root)
-  return Effect.runPromise(prEvents(root, task, () => Effect.succeed(current), "2026-11-18T11:10:00.000Z", yolo, dirname(root)).pipe(Effect.provide(Layer.merge(BunServices.layer, ghLayer(current, files, merges)))))
+  return Effect.runPromise(prEvents(root, task, () => Effect.succeed(current), "2026-11-18T11:10:00.000Z", yolo, dirname(root)).pipe(Effect.provide(Layer.merge(BunServices.layer, ghLayer(current, files, merges, parent)))))
 }
 
-const holdReady = async (root: string, current: PullRequestView): Promise<void> => {
+const holdReady = async (root: string, current: PullRequestView, words = "hold"): Promise<void> => {
   await run(routePullRequest(root, "task-1", pr, current, "2026-11-18T11:01:00.000Z"))
   const ready = (await run(taskItems(root, "task-1"))).find((entry) => entry.item.kind === "pr-ready" && entry.item.state.kind === "open")
   if (ready === undefined) {
     throw new Error("task-1 has no open pr-ready item")
   }
-  expect(await run(answerItem(root, ready.id, { words: "hold", at: "2026-11-18T11:02:00.000Z" }))).toBe("closed")
+  expect(await run(answerItem(root, ready.id, { words, at: "2026-11-18T11:02:00.000Z" }))).toBe("closed")
 }
 
 const filesOf = (rows: ReadonlyArray<Record<string, unknown>>): string => rows.map((row) => JSON.stringify(row)).join("\n")
@@ -176,6 +179,39 @@ describe("the beat merges a yolo project's green PR", () => {
 })
 
 describe("the beat gate around the merge", () => {
+  test('a yolo PR held with "Hold it for now" is not merged', async () => {
+    await withBacklog(true, async (root) => {
+      await closeWith(root, "done")
+      await holdReady(root, view(), " Hold it for now ")
+      const merges: Array<string> = []
+      expect(Option.isNone(await beatAction(root, view(), true, noFiles, merges))).toBe(true)
+      expect(merges).toEqual([])
+    })
+  })
+
+  test("a held PR is not merged after Orc's own branch update", async () => {
+    await withBacklog(true, async (root) => {
+      await closeWith(root, "done")
+      await holdReady(root, view())
+      await mkdir(join(root, "logs"), { recursive: true })
+      await writeFile(join(root, "logs", "task-1.merge"), JSON.stringify({ url: pr, head: view().headRefOid, green: ["ci/test"] }))
+      const merges: Array<string> = []
+      expect(Option.isNone(await beatAction(root, { ...view(), headRefOid: "1".repeat(40) }, true, noFiles, merges))).toBe(true)
+      expect(merges).toEqual([])
+    })
+  })
+
+  test("new work is not held by an unrelated pending update", async () => {
+    await withBacklog(true, async (root) => {
+      await closeWith(root, "done")
+      await holdReady(root, view())
+      await mkdir(join(root, "logs"), { recursive: true })
+      await writeFile(join(root, "logs", "task-1.merge"), JSON.stringify({ url: pr, head: view().headRefOid, green: ["ci/test"] }))
+      const merges: Array<string> = []
+      const current = { ...view(), headRefOid: "1".repeat(40) }
+      expect(Option.isSome(await beatAction(root, current, true, noFiles, merges, "2".repeat(40)))).toBe(true)
+    })
+  })
   test("a held green PR on a yolo project is not merged", async () => {
     await withBacklog(true, async (root) => {
       await closeWith(root, "done")
