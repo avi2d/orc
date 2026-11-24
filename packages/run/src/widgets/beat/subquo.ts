@@ -34,12 +34,7 @@ type SubquoAccount = SubquoSnapshot["accounts"][number]
 
 type SubquoRead =
   | { readonly kind: "ok"; readonly accounts: ReadonlyArray<AccountReading> }
-  | { readonly kind: "error"; readonly cause: "schema" | "account-missing" | "vendor-mixed"; readonly reason: string }
-
-export interface QuotaAccountRoute {
-  readonly name: string
-  readonly provider: string
-}
+  | { readonly kind: "error"; readonly cause: "schema" | "account-missing"; readonly reason: string }
 
 const everyModel = "all"
 
@@ -74,19 +69,7 @@ const figureOf = (entry: SubquoAccount, nowMillis: number): AccountReading => {
   return { account, kind: "usable", remainingPercent: limiting.percentLeft, resetsAt: limiting.resetsAt }
 }
 
-// Subquo's vendor names and orc's provider ids share no mapping, so the check is that one orc provider never holds accounts of two vendors.
-const mixedVendor = (entries: ReadonlyArray<SubquoAccount>, accounts: ReadonlyArray<QuotaAccountRoute>): string | null => {
-  const vendorOf = (name: string): string | undefined => entries.find((entry) => entry.id === name)?.provider
-  for (const account of accounts) {
-    const other = accounts.find((candidate) => candidate.provider === account.provider && vendorOf(candidate.name) !== vendorOf(account.name))
-    if (other !== undefined) {
-      return "the subquo snapshot reads the account " + account.name + " on " + vendorOf(account.name) + " and " + other.name + " on " + vendorOf(other.name) + ", and both run on the provider " + account.provider + ", so name each account's own provider in the quota"
-    }
-  }
-  return null
-}
-
-export const decodeSubquo = (document: unknown, accounts: ReadonlyArray<QuotaAccountRoute>, nowMillis: number): SubquoRead => {
+export const decodeSubquo = (document: unknown, names: ReadonlyArray<string>, nowMillis: number): SubquoRead => {
   const decoded = Schema.decodeUnknownResult(SubquoSnapshot)(document, { errors: "all" })
   if (Result.isFailure(decoded)) {
     return { kind: "error", cause: "schema", reason: "the quota command printed no " + SUBQUO_VERSION + " snapshot: " + decoded.failure.message }
@@ -96,14 +79,9 @@ export const decodeSubquo = (document: unknown, accounts: ReadonlyArray<QuotaAcc
   if (duplicate !== null) {
     return { kind: "error", cause: "schema", reason: "the subquo snapshot names the account " + duplicate + " twice" }
   }
-  const names = accounts.map((account) => account.name)
   const missing = names.filter((name) => !entries.some((entry) => entry.id === name))
   if (missing.length > 0) {
     return { kind: "error", cause: "account-missing", reason: "the subquo snapshot names no account " + missing.join(", ") + ", so its account list and the quota accounts differ" }
-  }
-  const mixed = mixedVendor(entries, accounts)
-  if (mixed !== null) {
-    return { kind: "error", cause: "vendor-mixed", reason: mixed }
   }
   return { kind: "ok", accounts: names.flatMap((name) => entries.filter((entry) => entry.id === name).map((entry) => figureOf(entry, nowMillis))) }
 }

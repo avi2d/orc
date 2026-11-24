@@ -165,13 +165,16 @@ describe("readDispatchConfig", () => {
   })
   test("refuses an account provider that is no provider id instead of handing it to the run", async () => {
     await withBacklog(async (root) => {
-      expect(await configProblem(root, { accounts: [{ name: "main", provider: "no such", tokenFile: "/a" }] })).toContain("the account main")
+      const problem = await configProblem(root, { accounts: [{ name: "main", provider: "no such", tokenFile: "/a" }] })
+      expect(problem).toContain("the account main")
+      expect(problem).toContain('["provider"]')
+      expect(problem).toContain("RegExp")
     })
   })
   test("refuses an account on another provider that names no models instead of running it on the quota provider's models", async () => {
     await withBacklog(async (root) => {
       expect(await configProblem(root, { accounts: [{ name: "main", tokenFile: "/a" }, { name: "openai", provider: "codex", tokenFile: "/b" }] }))
-        .toBe("the account openai runs on the provider codex, not the quota's provider keyed, so it names the implementer and fixer models from codex for its runs")
+        .toBe("the account openai runs on the provider codex, not the quota's provider keyed, so name the implementer and fixer models from codex in its models")
     })
   })
   test("refuses an account model from another provider instead of handing the run a model its credential cannot reach", async () => {

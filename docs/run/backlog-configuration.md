@@ -48,22 +48,6 @@ The start command must run `orc runner start`.
 On a machine whose start command runs `orc runner start`, the beat also pauses starts when its heavy queue has at least three calls.
 An unread heavy queue does not hold starts.
 
-An account may name its own `provider`, and the `models` its runs take from that provider:
-
-```json
-{
-  "name": "openai",
-  "provider": "codex",
-  "models": { "implementer": "codex/gpt-5.5", "fixer": "codex/gpt-5.5" },
-  "tokenFile": "/Users/me/.secrets/openai-token"
-}
-```
-
-The beat then picks the roomiest account across every provider.
-The run it starts takes that account's provider and models, through `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL`.
-An account without a `provider` takes the quota's `provider`, and without `models` the run takes the models of `config.json` or the agent files.
-An account whose provider differs from the quota's must name `models`, and each model must come from the account's provider.
-A model an agent file names still takes precedence, so the agent files of a project that runs on several providers name no model.
 Each provider must be defined in `config.json` on each machine that runs tasks.
 Token file paths in `dispatch.json` must exist on those machines.
 Token-command accounts store tokens in each machine's runner token folder instead.
@@ -82,6 +66,25 @@ Orc runs the quota command with no input and reads its standard output as this d
 Each entry gives remaining quota from 0 to 100, or why the account cannot run.
 An account missing from the document cannot run.
 
+### Accounts on other providers
+
+An account may name its own `provider`, and the `models` its runs take from that provider:
+
+```json
+{
+  "name": "openai",
+  "provider": "codex",
+  "models": { "implementer": "codex/gpt-5.5", "fixer": "codex/gpt-5.5" },
+  "tokenFile": "/Users/me/.secrets/openai-token"
+}
+```
+
+The beat then picks the roomiest account across every provider.
+The run it starts takes that account's provider and models, through `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL`.
+An account without a `provider` takes the quota's `provider`, and without `models` the run takes the models of `config.json` or the agent files.
+An account whose provider differs from the quota's must name `models`, and each model must come from the account's provider.
+A model an agent file names still takes precedence, so the agent files of a project that runs on several providers name no model.
+
 ### Quota from quota-axi
 
 The quota command may instead print the document of `quota-axi --full --json --provider <id>`, such as `["quota-axi", "--full", "--json", "--provider", "codex"]`.
@@ -97,7 +100,6 @@ Orc reads the account room as the smallest `percentLeft` among its windows with 
 The reset time is the `resetsAt` of the limiting window, the latest one when several tie.
 An account with a stale or unavailable reading, a fresh reading past its `validUntil`, or an unknown percent or reset cannot run.
 A snapshot that names no quota account, names one account twice, or breaks the `subquo.v1` shape leaves the whole quota unread.
-So does a snapshot in which two accounts on one provider read different vendors, such as `claude` and `codex`.
 
 A command that is not installed, exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
 

@@ -238,7 +238,7 @@ const accountName = (entry: unknown): string | null =>
   typeof entry === "object" && entry !== null && "name" in entry && typeof entry.name === "string" && entry.name !== "" ? entry.name : null
 
 const accountDetail = (name: string | null, reason: string): string =>
-  (name === null ? "an account with no name" : "the account " + name) + " names a credential the beat cannot take: " + reason
+  (name === null ? "an account with no name" : "the account " + name) + " has an invalid configuration: " + reason
 
 const readAccount = (file: string, entry: unknown): Effect.Effect<Account, ConfigError> =>
   Schema.decodeUnknownEffect(AnyAccount)(entry, { onExcessProperty: "error" }).pipe(
@@ -252,7 +252,7 @@ const accountModelsProblem = (provider: string, accounts: ReadonlyArray<Account>
     const own = providerOf({ provider }, account)
     if (account.models === undefined) {
       if (own !== provider) {
-        return "the account " + account.name + " runs on the provider " + own + ", not the quota's provider " + provider + ", so it names the implementer and fixer models from " + own + " for its runs"
+        return "the account " + account.name + " runs on the provider " + own + ", not the quota's provider " + provider + ", so name the implementer and fixer models from " + own + " in its models"
       }
       continue
     }

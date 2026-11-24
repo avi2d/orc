@@ -18,6 +18,7 @@ The entry gives the percent of room left, from 0 to 100, or the reason the accou
 Orc reads three shapes: its own `orc.quota.v1` document, the document `quota-axi --full --json --provider <id>` prints, and the `subquo.v1` snapshot `subquo read --json` prints.
 A command that is not installed, fails, runs past 15 seconds or prints anything else leaves the quota unread, and that beat starts nothing.
 
+A `subquo.v1` snapshot also names each account's vendor, such as `claude` or `codex`.
 To read quota from subquo, set the quota command to `["subquo", "read", "--json"]`.
 To go back, set the quota command back to the value it held before, the reader that prints an `orc.quota.v1` or quota-axi document.
 An account's room in a subquo snapshot is the smallest `percentLeft` among its windows with scope `all`.
@@ -39,9 +40,6 @@ Each provider is one `~/.orc/config.json` defines on each machine that runs task
 The models in `~/.orc/config.json` serve the quota's provider.
 An account on another provider names its own implementer and fixer models from that provider, and the run it starts takes them.
 Orc refuses a `dispatch.json` with an account on another provider that names no models, or a model from a provider other than the account's.
-
-A `subquo.v1` snapshot also names each account's vendor, such as `claude` or `codex`.
-When two accounts on one provider read different vendors, the beat leaves the quota unread and starts nothing, since one of them would hand its credential to the other vendor's route.
 
 ## How the credential reaches the run
 

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { assessQuota, describeQuota } from "../../../packages/run/src/widgets/beat/quota"
 
-const settings = (...names: ReadonlyArray<string>) => ({ command: ["quota-axi", "--full", "--json"] as const, provider: "anthropic", accounts: names.map((name) => ({ name })), floorPercent: 15 })
+const settings = (...names: ReadonlyArray<string>) => ({ command: ["quota-axi", "--full", "--json"] as const, accounts: names.map((name) => ({ name })), floorPercent: 15 })
 
 const codex = {
   generatedAt: "2026-11-15T15:58:15.631Z",
