@@ -97,7 +97,28 @@ Every other file call is refused, such as `bun run` on a bare path or `bun` on a
 - A `node` runner started from a Yarn 1 or Yarn Berry script, which puts a `node` wrapper first on the script's `PATH`, though no run has confirmed that route.
 - A runner started through a runtime's absolute path.
 - A runner the list does not name.
-- The [no-mistakes](https://github.com/kunchenguid/no-mistakes) review, which the shared daemon runs under its own `PATH`.
+- The [no-mistakes](https://github.com/kunchenguid/no-mistakes) review and fix agents, unless the no-mistakes config starts them through orc's agent wrapper, as the next section says.
+
+## The no-mistakes review and fix agents
+The no-mistakes daemon starts its review and fix agents with the daemon's own environment, never with the environment of the shell that runs `no-mistakes axi run`.
+So `HEAVY_TESTS_CI_ONLY=1` and the stand-in folders that `orc run` sets for its own steps never reach those agents.
+
+`orc heavy path`, `orc run` and `orc runner start` write an agent wrapper for `claude`, `codex`, `opencode` and `pi` into `~/.orc/heavy/agents`.
+A wrapper sets `HEAVY_TESTS_CI_ONLY=1`, puts `~/.orc/heavy/ci-only` and `~/.orc/heavy/bin` first on `PATH`, and starts the real agent.
+It starts the agent at the absolute path orc found when it wrote the wrapper, or else the first copy of the agent on the daemon's `PATH` that is not the wrapper.
+With neither, it exits 127 with a line naming the agent.
+
+To start the agents through the wrapper, point `agent_path_override` in `~/.no-mistakes/config.yaml` at it, here for a home folder of `/home/you`:
+
+```yaml
+agent: pi
+agent_path_override:
+  pi: /home/you/.orc/heavy/agents/pi
+```
+
+no-mistakes reads `agent_path_override` only from that global file, so it applies to every repository the daemon gates on the machine.
+Every review and fix agent it starts then refuses a test run as the list above says, and its builds, lints and typechecks queue through the stand-ins.
+Run `orc heavy path` once before the next no-mistakes run, so the wrapper exists.
 
 ## Sandboxed runs
 Under the default nono sandbox, orc puts `~/.orc/heavy/ci-only` and `~/.orc/heavy/bin` first on the agent's `PATH`, ahead of the runtime folders.

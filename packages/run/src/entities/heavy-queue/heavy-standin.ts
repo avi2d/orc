@@ -48,7 +48,7 @@ const isStandinFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<b
     )
   )
 
-const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, never, FileSystem.FileSystem> =>
+export const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     if (tool.includes("/") || tool === "" || tool === "." || tool === "..") {
       return ""
@@ -70,7 +70,7 @@ const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, ne
     return ""
   })
 
-const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
+export const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 
 const launcher = (call: StandinCall): string => {
   const [bun = "", ...flags] = helperCommand
