@@ -11,9 +11,10 @@ const answerGuidanceOf = (answers: Pick<ResumePlan, "answers">["answers"]): stri
   return guidance.length === 0 ? null : guidance.join("\n")
 }
 
+// A fresh fixer session never paused and never asked, so only the hold release is guidance it can act on.
 export const freshFixOf = (plan: Pick<ResumePlan, "answers">): { readonly session: null; readonly guidance: string } | null => {
-  const guidance = answerGuidanceOf(plan.answers)
-  return guidance === null ? null : { session: null, guidance }
+  const released = holdReleaseWordsOf(plan.answers)
+  return released.length === 0 ? null : { session: null, guidance: holdReleaseGuidance(released) }
 }
 
 export const resumedFix = (plan: Pick<ResumePlan, "fixSessionFile" | "answers">): { readonly session: string; readonly guidance: string | null } | null =>

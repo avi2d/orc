@@ -384,6 +384,37 @@ describe("a hold release reaches the resumed worker", () => {
     })
   })
 
+  test("a fresh fix attempt gets only the hold release, not loop or worker answers to a pause and a question it never had", async () => {
+    await withLoopRun(0, async (db, run) => {
+      await mkdir(run.piSessionDir, { recursive: true })
+      await writeFile(join(run.worktreeDir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
+      const prompts: Array<string> = []
+      const ops = fakeOps({
+        runAgent: async (agentRun) => {
+          prompts.push(agentRun.prompt)
+          return { commits: [] }
+        },
+        execCheck: async () => ({ stdout: "lint broken", stderr: "", exitCode: 1 })
+      }, run.hostSessionsDir)
+      const plan = {
+        ...freshPlan,
+        skipImplement: true,
+        implementSessionId: "aaa111",
+        implementSessionFile: "/sessions/first.jsonl",
+        answers: [
+          { question: "looping", answer: "continue with the new plan" },
+          { question: "ask-1", answer: "Use the cache" },
+          { question: holdReleaseId, answer: "Fix the lint failure first" }
+        ]
+      }
+      await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+      expect(prompts.length).toBeGreaterThan(1)
+      expect(prompts.every((prompt) => prompt.includes("Fix the lint failure first"))).toBe(true)
+      expect(prompts.some((prompt) => prompt.includes("orc paused you"))).toBe(false)
+      expect(prompts.some((prompt) => prompt.includes("The captain answered your question"))).toBe(false)
+    })
+  })
+
   test("a looping-continuation retry carries the hold release beside the loop guidance", async () => {
     await withLoopRun(0, async (db, run) => {
       await mkdir(run.piSessionDir, { recursive: true })
