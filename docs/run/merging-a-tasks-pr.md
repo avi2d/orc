@@ -20,7 +20,7 @@ If GitHub refuses because the branch is not up to date, Orc updates the branch a
 Orc counts both paths of a renamed file.
 If GitHub returns its limit of 300 files on either side, Orc updates the branch because the lists may be incomplete.
 When the lists share a path, Orc updates the branch before merging.
-After either merge, a beat raises an alarm for a failed push run on the default branch, as [Main CI alarms](backlog-and-beat.md#main-ci-alarms) describes.
+A beat raises an alarm for a failed push run on the default branch whichever way the PR merged, as [Main CI alarms](backlog-and-beat.md#main-ci-alarms) describes.
 
 To update the branch, Orc prints `Updating from main` and runs `gh api -X PUT repos/<owner>/<repo>/pulls/<n>/update-branch -f expected_head_sha=<sha>` with the head it checked.
 It then prints `Checks running` and reads the PR again with `gh pr view`, first after 1 second and then at doubling waits of at most 15 seconds.
