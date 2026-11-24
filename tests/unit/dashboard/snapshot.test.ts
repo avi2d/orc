@@ -79,7 +79,7 @@ const rendered = async (rows: Block, columns: number, height: number): Promise<s
 describe("the dashboard names every limit by its length", () => {
   test("in one set of words for every account", () => {
     const lines = printed(Number.POSITIVE_INFINITY, width, sessions(), twoAccounts());
-    expect(limitNames(lines, "claude main")).toEqual(["5 hours", "week", "fable week"]);
+    expect(limitNames(lines, "claude")).toEqual(["5 hours", "week", "fable week"]);
     expect(limitNames(lines, "account main")).toEqual(["all models"]);
     expect(limitNames(lines, "account second")).toEqual(["all models"]);
     expect(limitNames(lines, "codex")).toEqual(["5 hours", "week"]);
@@ -90,7 +90,7 @@ describe("the dashboard names every limit by its length", () => {
 describe("the dashboard names every limit by its length without its pace", () => {
   test("in the same words as with it", () => {
     const lines = printed(Number.POSITIVE_INFINITY, width, sessions(), twoAccounts(unpacedQuotaText()));
-    expect(limitNames(lines, "claude main")).toEqual(["5 hours", "week", "fable week"]);
+    expect(limitNames(lines, "claude")).toEqual(["5 hours", "week", "fable week"]);
     expect(limitNames(lines, "account main")).toEqual(["all models"]);
     expect(limitNames(lines, "codex")).toEqual(["5 hours", "week"]);
     expect(limitNames(lines, "opencode-go")).toEqual(["5 hours", "week", "month"]);
@@ -101,7 +101,7 @@ describe("the dashboard draws the pace marker on every paced limit", () => {
   test("at the window's time-remaining percent", () => {
     const lines = printed();
     for (const name of ["5 hours", "week", "fable week"]) {
-      expect(rowOf(lines, "claude main", name)).toContain("\u2503");
+      expect(rowOf(lines, "claude", name)).toContain("\u2503");
     }
     expect(rowOf(lines, "codex", "week")).toContain("\u2503");
     expect(rowOf(lines, "opencode-go", "month")).toContain("\u2503");
@@ -111,7 +111,7 @@ describe("the dashboard draws the pace marker on every paced limit", () => {
     expect(rowOf(printed(Number.POSITIVE_INFINITY, width, sessions(), twoAccounts()), "account main", "all models")).not.toContain("\u2503");
     const lines = printed(Number.POSITIVE_INFINITY, width, sessions(), blocksOf(unpacedQuotaText()));
     for (const name of ["5 hours", "week", "fable week"]) {
-      expect(rowOf(lines, "claude main", name)).not.toContain("\u2503");
+      expect(rowOf(lines, "claude", name)).not.toContain("\u2503");
     }
   });
 });
@@ -120,11 +120,11 @@ describe("the dashboard says how much is left, whether it lasts, and when it res
   const lines = printed();
 
   test("for a limit that lasts", () => {
-    expect(rowOf(lines, "claude main", "5 hours")).toMatch(/ 98% left +resets in 1h 11m$/u);
+    expect(rowOf(lines, "claude", "5 hours")).toMatch(/ 98% left +resets in 1h 11m$/u);
   });
 
   test("for a limit projected to run out before its reset", () => {
-    expect(rowOf(lines, "claude main", "week")).toMatch(/ 31% left {2}runs out in 1d 20h +resets in 2d 20h$/u);
+    expect(rowOf(lines, "claude", "week")).toMatch(/ 31% left {2}runs out in 1d 20h +resets in 2d 20h$/u);
     expect(rowOf(lines, "opencode-go", "month")).toMatch(/ 81% left {2}runs out in 22d +resets in 25d$/u);
   });
 
@@ -133,7 +133,7 @@ describe("the dashboard says how much is left, whether it lasts, and when it res
   });
 
   test("keeping the reset's words when the bar gives way at 60 columns", () => {
-    expect(rowOf(printed(Number.POSITIVE_INFINITY, 60), "claude main", "week")).toMatch(/ 31%.* {2}runs out in 1d 20h +resets in 2d 20h$/u);
+    expect(rowOf(printed(Number.POSITIVE_INFINITY, 60), "claude", "week")).toMatch(/ 31%.* {2}runs out in 1d 20h +resets in 2d 20h$/u);
   });
 
   test("keeping every run-out figure whole in a 30 column terminal", () => {
@@ -145,7 +145,7 @@ describe("the dashboard says how much is left, whether it lasts, and when it res
 
   test("for a limit with nothing left", () => {
     const spent = blocksOf(fixture("quota-axi/full.json").replace('"percentRemaining": 98', '"percentRemaining": 0'));
-    expect(rowOf(printed(Number.POSITIVE_INFINITY, width, sessions(), spent), "claude main", "5 hours")).toMatch(/ {3}0% left {2}used up +resets in 1h 11m$/u);
+    expect(rowOf(printed(Number.POSITIVE_INFINITY, width, sessions(), spent), "claude", "5 hours")).toMatch(/ {3}0% left {2}used up +resets in 1h 11m$/u);
   });
 });
 
@@ -233,7 +233,7 @@ describe("the dashboard fits the terminal it runs in", () => {
       expect(lines.length).toBeLessThanOrEqual(rows);
       for (const line of lines) expect(lineWidth(line)).toBeLessThanOrEqual(columns);
       const text = lines.map(plain).join("\n");
-      for (const header of ["● claude main", "● codex", "● opencode-go"]) expect(text).toContain(header);
+      for (const header of ["● claude", "● codex", "● opencode-go"]) expect(text).toContain(header);
       expect(text.includes("● account second") || text.includes("+1 more account")).toBe(true);
       expect((text.match(/⚑/gu)?.length ?? 0) + Number(/^\+(\d+) more flags?$/mu.exec(text)?.[1] ?? 0)).toBe(4);
       expect(text).toContain("queue    north · 2 running");
@@ -351,7 +351,7 @@ describe("the dashboard with nine orc quota accounts and sixteen gpus in a stand
   test("keeps every live account, four flags and the machine, and sums the gpus up on one line", () => {
     const shown = lines();
     expect(shown.length).toBeLessThanOrEqual(standardRows);
-    for (const header of ["● claude main", "● codex", "● opencode-go"]) expect(shown.some((line) => line.startsWith(header))).toBe(true);
+    for (const header of ["● claude", "● codex", "● opencode-go"]) expect(shown.some((line) => line.startsWith(header))).toBe(true);
     expect(shown.filter((line) => line.startsWith("⚑"))).toHaveLength(4);
     expect(shown).toContain("machine  cpu 11% · memory 5.5G of 31.3G");
     expect(shown).toContain("gpus     16 cards · busiest 9% · memory 29.2G of 256.0G");

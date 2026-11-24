@@ -127,10 +127,10 @@ describe("the live dashboard's saved readings", () => {
         );
         const size = { width: 240, height: 60 };
         await withLivePanel(size, dashboardSources({ env, saved, run: (command) => Effect.sync(() => recordedAnswer(command)) }), (setup) =>
-          frameWhere(setup, (frame) => frame.includes("harbor") && frame.includes("\u25cf claude main") && frame.includes("pueue") && !frame.includes("reading") && !frame.includes("checking")),
+          frameWhere(setup, (frame) => frame.includes("harbor") && frame.includes("\u25cf claude \u00b7 max") && frame.includes("pueue") && !frame.includes("reading") && !frame.includes("checking")),
         );
         const frame = await withLivePanel(size, dashboardSources({ env, saved, run: () => Effect.never }), (setup) =>
-          frameWhere(setup, (text) => text.includes("harbor") && text.includes("\u25cf claude main") && text.includes("pueue")),
+          frameWhere(setup, (text) => text.includes("harbor") && text.includes("\u25cf claude \u00b7 max") && text.includes("pueue")),
         );
         const titles = frame
           .split("\n")
@@ -147,7 +147,7 @@ describe("the live dashboard's saved readings", () => {
         }
         expect(titles.some((title) => title.includes("saved"))).toBe(false);
         expect(frame).not.toContain("pueue reading");
-        expect([frame.includes("harbor"), frame.includes("\u25cf claude main"), frame.includes("\u25b6 pueue unknown")]).toEqual([true, true, true]);
+        expect([frame.includes("harbor"), frame.includes("\u25cf claude \u00b7 max"), frame.includes("\u25b6 pueue unknown")]).toEqual([true, true, true]);
         expect([frame.includes("reading the machines"), frame.includes("reading the quota")]).toEqual([false, false]);
       }),
     30_000,

@@ -11,7 +11,7 @@ w  warning
 W  warning bold
 X  codex bold
 
-C CCCCCC CCCC m mmm     mmmmmm mmmmmmmmm mmmmmm mmmmmmmm mmmmm mmm m mmmmmm mmmmm mm
+C CCCCCC m mmm          mmmmmm mmmmmmmmm mmmmmm mmmmmmmm mmmmm mmm m mmmmmm mmmmm mm
   f fffff    sssssasssssssssssssss  sss ssss                        mmmmmm mm mm mmm
   ffff       wwwwwwwuuauuuuuuuuuuu  www wwww  WWWW WWW WW WW WWW    mmmmmm mm mm mmm
   fffff ffff sssssssssasssssssssss ssss ssss                        mmmmmm mm mm mmm

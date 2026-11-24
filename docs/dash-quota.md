@@ -48,21 +48,6 @@ When `orc quota` reports the quota unread, one `accounts` block names the cause,
 When `orc` is not on `PATH` or `dispatch.json` is missing, the `accounts` block shows the error.
 In a short dashboard the account blocks fold first, into a `+2 more accounts` line.
 
-### Show saved profiles
-
-The panel titles the Claude account with the active profile's name when `ORC_DASH_SAVED_PROFILES` names a shell command that prints the saved profiles.
-With `ORC_DASH_SAVED_PROFILES` unset or blank, the panel runs nothing for them and titles the Claude account `claude`.
-The panel shows no block for a saved profile, since the dispatch accounts take their place.
-
-The command prints one JSON object with `schema` 2, the `active_profile` name or `null`, and `profiles`.
-Each profile carries `name`, `active`, `provider`, `harness`, `tier` or `null`, `stale`, `fetched_at` or `null`, and `windows`.
-Each window carries `label`, `utilization_pct` and `resets_at` or `null`.
-Both panels take the title from the active profile's name, such as `claude main` for a profile named `main`.
-
-| Variable | What it sets |
-| --- | --- |
-| `ORC_DASH_SAVED_PROFILES` | The shell command that prints the saved profiles |
-
 ### Show each Claude account
 
 The panel shows a block for each Claude account named by the config file's `accounts` key, titled `claude` and the account's name.
