@@ -48,6 +48,14 @@ describe("classifyHeavyCall", () => {
     ["go build -o bin/app ./cmd/app", "prioritized"],
     ["go vet ./...", "queued"],
     ["cargo test", "queued"],
+    ["cargo t", "queued"],
+    ["node --test", "queued"],
+    ["python -m pytest", "queued"],
+    ["python3 -m pytest", "queued"],
+    ["uv run pytest", "queued"],
+    ["make test", "queued"],
+    ["make check", "queued"],
+    ["deno test", "queued"],
     ["xcodebuild -scheme App", "queued"],
     ["xcrun simctl boot uuid", "queued"]
   ] as const)("%s queues as %s instead of running directly", (call, expected) => {
@@ -76,6 +84,13 @@ describe("classifyHeavyCall", () => {
     "go version",
     "go",
     "cargo --version",
+    "node script.js",
+    "node script.js --test",
+    "python script.py",
+    "python3 -m http.server",
+    "uv run python",
+    "make build",
+    "deno run",
     "xcodebuild --help",
     "xcrun simctl list",
     "mytool foo"

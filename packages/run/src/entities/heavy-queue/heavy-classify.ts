@@ -147,6 +147,17 @@ const isTestCallInner = (tool: string, args: Args): boolean => {
         return execTest(rest)
       }
       return matchesAny(sub, testScripts) || isTestCallInner(packageName(sub), rest)
+    case "node":
+      return args[0] === "--test"
+    case "python":
+    case "python3":
+      return args[0] === "-m" && args[1] === "pytest"
+    case "uv":
+      return sub === "run" && rest[0] === "pytest"
+    case "make":
+      return hasAny(args, ["test", "check"])
+    case "deno":
+      return sub === "test"
     case "playwright":
     case "go":
     case "cargo":
@@ -257,6 +268,9 @@ const subcommandBody = (heavy: Args) => (args: Args): BodyResult => {
   return heavy.includes(sub) ? fellThrough(queueOn(targeted(rest)), rest) : fellThrough("direct", args)
 }
 
+const testRunnerBody = (tool: string) => (args: Args): BodyResult =>
+  isTestCall(tool, args) ? fellThrough(queueOn(targeted(args)), args) : fellThrough("direct", args)
+
 const xcodeBody = (args: Args): BodyResult => (hasAny(args, versionFlags) ? returned : fellThrough("queued", args))
 
 const xcrunBody = (args: Args): BodyResult =>
@@ -277,7 +291,13 @@ const builtinBodies: ReadonlyMap<string, (args: Args) => BodyResult> = new Map([
   ["eslint", queueAll(targeted)],
   ["playwright", playwrightBody],
   ["go", subcommandBody(["test", "build", "vet"])],
-  ["cargo", subcommandBody(["test", "build", "clippy"])],
+  ["cargo", subcommandBody(["test", "t", "build", "clippy"])],
+  ["node", testRunnerBody("node")],
+  ["python", testRunnerBody("python")],
+  ["python3", testRunnerBody("python3")],
+  ["uv", testRunnerBody("uv")],
+  ["make", testRunnerBody("make")],
+  ["deno", testRunnerBody("deno")],
   ["xcodebuild", xcodeBody],
   ["xcrun", xcrunBody]
 ])
