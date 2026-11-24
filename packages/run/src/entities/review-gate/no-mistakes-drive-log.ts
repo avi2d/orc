@@ -1,4 +1,5 @@
-import { missingReason, parseRun, type NoMistakesFinding, type OpenQuestion, type ParkedGate, type ParsedRun } from "./no-mistakes-gate"
+import { missingReason, parseRun, type NoMistakesFinding, type OpenQuestion, type ParkedGate, type ParsedRun, type PendingFinding } from "./no-mistakes-gate"
+import type { AskedAt } from "./answer-wait"
 import { scalar } from "../../shared/lib/index"
 
 type NoMistakesStatus = "passed" | "refused" | "failed"
@@ -33,7 +34,7 @@ export interface DriveLog {
   readonly gatesSinceCap: () => number
   readonly liftCap: () => void
   readonly refuse: (gate: ParkedGate | null, reason: string) => Ending
-  readonly awaitAnswers: (gate: ParkedGate, missing: ReadonlyArray<NoMistakesFinding>, asked: string | null) => Ending
+  readonly awaitAnswers: (gate: ParkedGate, missing: ReadonlyArray<PendingFinding>, asked: string | null, askedAt: ReadonlyArray<AskedAt>) => Ending
   readonly fail: (reason: string) => Ending
   readonly finish: (parsed: ParsedRun) => Ending
   readonly close: (ending: Ending) => NoMistakesRecord
@@ -97,10 +98,16 @@ export const openDriveLog = (started: string): DriveLog => {
       capLifted = gatesAnswered
     },
     refuse,
-    awaitAnswers: (gate, missing, asked) => ({
-      ...refuse(gate, missingReason(missing)),
-      openQuestions: missing.map((finding) => ({ id: finding.id, text: finding.description, ...(asked === null ? {} : { asked }) }))
-    }),
+    awaitAnswers: (gate, missing, asked, askedAt) => {
+      const at = (finding: NoMistakesFinding): string | null => askedAt.find((entry) => entry.question === finding.id)?.asked ?? asked
+      return {
+        ...refuse(gate, missingReason(missing)),
+        openQuestions: missing.map((finding) => {
+          const time = at(finding)
+          return { id: finding.id, text: finding.description, ...(time === null ? {} : { asked: time }), ...(asked === null ? {} : { asking: asked }), ...(finding.owner === undefined ? {} : { owner: finding.owner }) }
+        })
+      }
+    },
     fail,
     finish: (parsed) =>
       greenOutcomes.has(parsed.outcome) && prLink !== null
