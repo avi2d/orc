@@ -37,8 +37,14 @@ const filesHolding = async (dirs: ReadonlyArray<string>, needle: string): Promis
   const holding: Array<string> = []
   for (const dir of dirs) {
     for (const file of await filesUnder(dir)) {
-      if ((await readFile(file)).includes(needle)) {
-        holding.push(file)
+      try {
+        if ((await readFile(file)).includes(needle)) {
+          holding.push(file)
+        }
+      } catch (error) {
+        if (!(typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT")) {
+          throw error
+        }
       }
     }
   }

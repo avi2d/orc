@@ -143,6 +143,8 @@ export interface HostRuntime {
   readonly developerDir: string | null
   readonly toolchainFolders: ReadonlyArray<string>
   readonly runtimeDirs: ReadonlyArray<string>
+  readonly standinFolders?: ReadonlyArray<string>
+  readonly standinFiles?: ReadonlyArray<string>
 }
 
 export interface ModelCredential {
@@ -296,10 +298,10 @@ const profileWithFiles = (
   },
   filesystem: {
     allow: outermost([roots.worktree, roots.gitData, roots.piSessionDir, roots.sessions]),
-    read: [...systemReadPaths, ...host.toolchainFolders, ...host.runtimeDirs],
+    read: [...systemReadPaths, ...host.toolchainFolders, ...host.runtimeDirs, ...(host.standinFolders ?? [])],
     write: [],
     allow_file: [],
-    read_file: [...readFile],
+    read_file: [...readFile, ...(host.standinFiles ?? [])],
     write_file: ["/dev/null"],
     unix_socket: [],
     unix_socket_bind: [],

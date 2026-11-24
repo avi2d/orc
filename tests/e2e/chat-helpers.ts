@@ -1,7 +1,8 @@
 import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { chatSession } from "../../packages/run/src/features/chat/chat-tools"
+import { chatExtension, chatSession } from "../../packages/run/src/features/chat/chat-tools"
+import type { ChatTool } from "../../packages/run/src/features/chat/chat-run"
 
 export const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
 
@@ -102,4 +103,35 @@ export const closeTask = async (fixture: Fixture, id: string, fields: ReadonlyAr
   await mkdir(join(fixture.home, "backlog", "closed"), { recursive: true })
   await writeFile(from, text.replace("\n---\n", "\n" + fields.join("\n") + "\n---\n"))
   await rename(from, to)
+}
+
+type ChatHost = Parameters<ReturnType<typeof chatExtension>>[0]
+
+interface FakePi {
+  readonly add: (params: unknown) => ReturnType<ChatTool["execute"]> | undefined
+  readonly call: (name: string, params: unknown) => Promise<string> | undefined
+  readonly sent: Array<{ readonly message: unknown; readonly options: unknown }>
+  readonly fire: (event: string, ctx?: { isIdle: () => boolean }) => void
+}
+
+export const piFor = (fixture: Fixture, pollMillis: number): FakePi => {
+  const tools = new Map<string, ChatTool>()
+  const handlers = new Map<string, (event: string, ctx?: { isIdle: () => boolean }) => void>()
+  const sent: Array<{ readonly message: unknown; readonly options: unknown }> = []
+  const host: ChatHost = {
+    registerTool: (tool) => tools.set(tool.name, tool),
+    on: (event, handler) => handlers.set(event, handler),
+    sendMessage: (message, options) => sent.push({ message, options })
+  }
+  chatExtension(chatEnv(fixture), pollMillis)(host)
+  const add = (params: unknown) => tools.get("orc_backlog_add")?.execute("call-1", params)
+  const call = (name: string, params: unknown) => tools.get(name)?.execute("call-1", params).then((result) => result.content.map((block) => block.text).join(""))
+  return { add, call, sent, fire: (event: string, ctx?: { isIdle: () => boolean }) => handlers.get(event)?.(event, ctx) }
+}
+
+export const until = async (done: () => boolean, millis: number): Promise<void> => {
+  const end = Date.now() + millis
+  while (!done() && Date.now() < end) {
+    await Bun.sleep(20)
+  }
 }
