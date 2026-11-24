@@ -74,7 +74,7 @@ test("the Awaiting you lane count on the Board opens the Inbox as cmd-4 does ins
 })
 
 const card: Card = {
-  key: "orc-1", id: "orc-1", kind: "ship", delivery: null, title: "A task", project: "orc",
+  key: "orc-1", id: "orc-1", kind: "ship", delivery: null, title: "A task", project: "orc", known: true,
   standing: { status: "Awaiting you", waiting: { on: "answer" } }, where: "Question 1", runId: null, checkout: null, sendBack: null
 }
 
@@ -88,7 +88,7 @@ test("the Awaiting you count on the Agents tab opens the Inbox as cmd-4 does ins
   }
   ran.length = 0
   stopped.length = 0
-  const column: object = runsColumn(palette(), { cards: { kind: "ok", value: [card] }, filter: { project: null, status: null }, selectedKey: null, agents: new Map(), folded: false }, act)
+  const column: object = runsColumn(palette(), { cards: { kind: "ok", value: [card] }, filter: { project: null, status: null, allRuns: false }, selectedKey: null, agents: new Map(), folded: false }, act)
   const count = find(column, "inbox-count")
   expect(count?.kids).toEqual(["1"])
   click(count)

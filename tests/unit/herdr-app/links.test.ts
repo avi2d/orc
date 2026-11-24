@@ -47,7 +47,7 @@ test("gives text with no PR address no open action instead of linking it", () =>
 test("draws the Approve step's PR address with an open action instead of plain text", () => {
   const [card] = buildCards(
     { schema: "orc.runs.v1", runs: [{ id: "20261113-090000-aaaaaa", project: "/work/orc", branch: "orc/orc-219", status: "succeeded", prLink: address, title: "run", step: null, questions: 0, endReason: null, kind: null, delivery: null, worktree: null }] },
-    { schema: "orc.backlog.v1", tasks: [{ id: "orc-219", title: "t", project: "orc", kind: "ship", status: "closed", hold: null, parked: null, parkedOrigin: null, reason: null, prState: "open" }], merged: [], projects: null, projectCheckouts: [] }
+    { schema: "orc.backlog.v1", tasks: [{ id: "orc-219", title: "t", project: "orc", kind: "ship", status: "closed", hold: null, parked: null, parkedOrigin: null, reason: null, prState: "open" }], merged: [], projects: null }
   )
   const waiting = card.standing.status === "Awaiting you" ? card.standing.waiting : null
   expect(waiting?.on === "approval" ? textParts(waiting.link) : []).toEqual([{ text: address, opens: address }])

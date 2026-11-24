@@ -161,8 +161,8 @@ export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> =>
   const byBranch = new Map(backlog.tasks.flatMap((task) => taskBranches(task).map((branch) => [branch, task] as const)))
   const merged = new Set(backlog.merged)
   const approval = newestRun(runs)
-  const known = (project: string): boolean => backlog.projects === null || backlog.projects.includes(project)
-  const checkoutProject = new Map(backlog.projectCheckouts.flatMap((project) => project.paths.map((path) => [path, project.name] as const)))
+  const known = (project: string): boolean => backlog.projects === null || backlog.projects.some((configured) => configured.name === project)
+  const checkoutProject = new Map((backlog.projects ?? []).flatMap((project) => project.paths.map((path) => [path, project.name] as const)))
   const active = new Set<string>()
   const cards: Array<Card> = []
   for (const run of runs.runs) {
@@ -203,10 +203,13 @@ export const sendBackArgs = (card: Pick<Card, "sendBack">, words: string): Reado
 const sortCards = (cards: ReadonlyArray<Card>): ReadonlyArray<Card> =>
   cardStatuses.flatMap((status) => cards.filter((card) => card.standing.status === status))
 
-export const filterCards = (cards: ReadonlyArray<Card>, filter: Filter, keepKey: string | null = null): ReadonlyArray<Card> =>
+export const filterCards = (cards: ReadonlyArray<Card>, filter: Filter): ReadonlyArray<Card> =>
   cards.filter((card) =>
-    (filter.project === null ? filter.allRuns || card.known || card.key === keepKey : card.project === filter.project) &&
+    (filter.project === null ? filter.allRuns || card.known : card.project === filter.project) &&
     (filter.status === null || card.standing.status === filter.status))
+
+export const openedFilter = (cards: ReadonlyArray<Card>, key: string): Filter =>
+  ({ project: null, status: null, allRuns: cards.some((card) => card.key === key && !card.known) })
 
 export const projectsOf = (cards: ReadonlyArray<Card>): ReadonlyArray<string> =>
   [...new Set(cards.flatMap((card) => card.known ? [card.project] : []))].sort((a, b) => a.localeCompare(b))

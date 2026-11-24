@@ -90,8 +90,8 @@ const chip = (t: Palette, id: string, label: string, on: boolean, pick: (cx: Con
     .on_click((_event, cx) => pick(cx))
     .child(label)
 
-const filters = (t: Palette, all: ReadonlyArray<Card>, filter: Filter, keepKey: string | null, act: AgentsActions): Element => {
-  const byProject = filterCards(all, { ...filter, status: null }, keepKey)
+const filters = (t: Palette, all: ReadonlyArray<Card>, filter: Filter, act: AgentsActions): Element => {
+  const byProject = filterCards(all, { ...filter, status: null })
   return v_flex().gap(6).px(12).pb(8).border_b(1).border_color(t.border)
     .child(h_flex().gap(4).flex_wrap().items_center()
       .child(div().w(52).text_color(t.dim).child("Project"))
@@ -161,7 +161,7 @@ const rail = (t: Palette, shown: RunsShown, visible: ReadonlyArray<Card>, act: A
 
 export const runsColumn = (t: Palette, shown: RunsShown, act: AgentsActions): Element => {
   const all = shown.cards.kind === "ok" ? shown.cards.value : []
-  const visible = filterCards(all, shown.filter, shown.selectedKey)
+  const visible = filterCards(all, shown.filter)
   if (shown.folded) {
     return rail(t, shown, visible, act)
   }
@@ -169,7 +169,7 @@ export const runsColumn = (t: Palette, shown: RunsShown, act: AgentsActions): El
     .child(h_flex().px(12).h(44).items_center().justify_between()
       .child(div().text_size(15).font_semibold().child("Runs"))
       .child(foldButton(t, "fold", "«", act)))
-    .child(filters(t, all, shown.filter, shown.selectedKey, act))
+    .child(filters(t, all, shown.filter, act))
     .child(listBody(t, shown, visible, act))
 }
 

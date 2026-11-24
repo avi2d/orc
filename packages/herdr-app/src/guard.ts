@@ -179,8 +179,7 @@ export interface Backlog {
   readonly schema: "orc.backlog.v1"
   readonly tasks: ReadonlyArray<Task>
   readonly merged: ReadonlyArray<string>
-  readonly projects: ReadonlyArray<string> | null
-  readonly projectCheckouts: ReadonlyArray<ProjectCheckouts>
+  readonly projects: ReadonlyArray<ProjectCheckouts> | null
 }
 
 export const projectName: Guard<string> = (value, at) => {
@@ -210,12 +209,8 @@ const projectCheckouts: Guard<ProjectCheckouts> = (value, at) => {
   return ok({ name: named.value.name, paths })
 }
 
-const readProjects = (record: Fields, at: string): Guarded<{ readonly names: ReadonlyArray<string> | null; readonly checkouts: ReadonlyArray<ProjectCheckouts> }> => {
-  if (record["projects"] === null || record["projects"] === undefined) return ok({ names: null, checkouts: [] })
-  const parsed = arrayOf(record, "projects", at, projectCheckouts)
-  if (parsed.kind === "refused") return parsed
-  return ok({ names: parsed.value.map((project) => project.name), checkouts: parsed.value })
-}
+const readProjects = (record: Fields, at: string): Guarded<ReadonlyArray<ProjectCheckouts> | null> =>
+  record["projects"] === null || record["projects"] === undefined ? ok(null) : arrayOf(record, "projects", at, projectCheckouts)
 
 export const backlog: Guard<Backlog> = (value, at) => {
   const record = fields(value, at)
@@ -225,14 +220,14 @@ export const backlog: Guard<Backlog> = (value, at) => {
   const projects = readProjects(record.value, at)
   if (projects.kind === "refused") return projects
   const mergedRaw = record.value["merged"]
-  if (mergedRaw === undefined) return ok({ schema: head.value.schema, tasks: head.value.tasks, merged: [], projects: projects.value.names, projectCheckouts: projects.value.checkouts })
+  if (mergedRaw === undefined) return ok({ schema: head.value.schema, tasks: head.value.tasks, merged: [], projects: projects.value })
   if (!Array.isArray(mergedRaw)) return refused(child(at, "merged"), "an array", mergedRaw)
   const merged: Array<string> = []
   for (const [index, entry] of mergedRaw.entries()) {
     if (typeof entry !== "string") return refused(child(at, "merged") + "[" + index.toString() + "]", "a string", entry)
     merged.push(entry)
   }
-  return ok({ schema: head.value.schema, tasks: head.value.tasks, merged, projects: projects.value.names, projectCheckouts: projects.value.checkouts })
+  return ok({ schema: head.value.schema, tasks: head.value.tasks, merged, projects: projects.value })
 }
 
 export const boardKinds = ["ship", "scout", "task", "decision", "parent"] as const
