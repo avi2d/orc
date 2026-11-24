@@ -24,6 +24,9 @@ When they share a changed file, orc updates the branch from the base and merges 
 Orc updates it the same way when GitHub refuses the branch as out of date.
 Each beat raises an alarm when a push run on the default branch fails.
 Otherwise orc squash merges at the exact commit it checked, so a push that lands after the check merges nothing.
+The chat requests a branch update without waiting for CI, so a behind PR needs another merge call once the new checks are green.
+That call checks the new head against the checks that were green before the update.
+A plain `orc merge` drops those saved checks and waits for the new head's own checks instead.
 
 ## Whose word merges
 

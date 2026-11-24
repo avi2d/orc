@@ -47,6 +47,16 @@ Commands that do not go through a stand-in are not blocked.
 In the default `nono` sandbox and in no-mistakes review, Orc relies on instructions instead of blocking test commands.
 Orc starts no-mistakes without its local Test step.
 
+## Base updates and CI waits
+
+Orc starts no-mistakes without its preflight Rebase step.
+An existing task branch keeps its base during the run instead of rebasing just because the base moved.
+The no-mistakes CI monitor can still repair a merge conflict.
+By default, the monitor leaves clean behind branches alone.
+Setting `ci.rebase_behind: true` in `.no-mistakes.yaml` opts into updating them.
+When a pull request run exists, Orc tells workers not to start or rerun CI by hand.
+Orc manages the wait for CI instead of asking workers to wait in a tool call.
+
 ## Choose the run
 
 A ship run uses no-mistakes delivery by default.

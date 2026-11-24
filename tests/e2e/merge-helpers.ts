@@ -35,7 +35,7 @@ export interface Forge {
   readonly behind?: number
   readonly baseFiles?: ReadonlyArray<ChangedFile>
   readonly mergeRefusal?: string
-  readonly update?: "updates" | "conflicts" | "head moved"
+  readonly update?: "updates" | "conflicts" | "head moved" | "reject duplicate"
   readonly afterUpdate?: ReadonlyArray<HeadView>
   readonly parents?: string
   readonly flakyViews?: number
@@ -44,7 +44,7 @@ export interface Forge {
 
 export const ghCalls = (fixture: Fixture): string => join(fixture.dir, "gh-calls")
 
-const viewJson = (state: string, view: HeadView): string =>
+export const viewJson = (state: string, view: HeadView): string =>
   JSON.stringify({ state, headRefOid: view.head, baseRefName: "main", statusCheckRollup: view.checks })
 
 const updateReply = (update: Forge["update"]): ReadonlyArray<string> => {
@@ -54,6 +54,12 @@ const updateReply = (update: Forge["update"]): ReadonlyArray<string> => {
     }
     case "head moved": {
       return ["echo '{\"message\":\"expected head sha did not match current head ref.\"}'", "echo 'gh: expected head sha did not match current head ref. (HTTP 422)' >&2", "exit 1"]
+    }
+    case "reject duplicate": {
+      return [
+        "if [ -f \"$VIEWS/updated\" ]; then echo 'gh: duplicate update request (HTTP 422)' >&2; exit 1; fi",
+        ...updateReply("updates")
+      ]
     }
     case "updates":
     case undefined: {
@@ -93,6 +99,9 @@ export const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
     "  if [ -f \"$VIEWS/after-$n.json\" ]; then cat \"$VIEWS/after-$n.json\"; else cat \"$VIEWS/after-last.json\"; fi",
     "  exit 0",
     "fi",
+    "case \"$*\" in *compare/main..." + newHead + "*)",
+    "  case \"$*\" in *.behind_by) echo 0;; *) echo '{\"behind_by\":0,\"base_commit\":{\"sha\":\"" + baseHead + "\"},\"merge_base_commit\":{\"sha\":\"" + baseHead + "\"},\"files\":[]}';; esac",
+    "  exit 0;; esac",
     "case \"$*\" in *compare/main..." + head + "*) cat \"$VIEWS/pr-comparison.json\"; exit 0;; esac",
     "case \"$*\" in *compare/" + mergeBase + "..." + baseHead + "*) cat \"$VIEWS/base-files.json\"; exit 0;; esac",
     "case \"$*\" in *commits/*)",
