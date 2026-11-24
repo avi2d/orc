@@ -5,6 +5,8 @@ commands:
   typecheck: bun run typecheck
 test:
   ci_only: true
+ci:
+  rebase_behind: false
 review:
   path_instructions:
     - path: "docs/**"

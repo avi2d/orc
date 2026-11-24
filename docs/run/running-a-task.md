@@ -45,7 +45,12 @@ Keep test runners out of those commands and `prepare`.
 With `--sandbox none`, the heavy-queue stand-ins refuse recognized test runners and test scripts in Pi sessions, `prepare`, and local checks.
 Commands that do not go through a stand-in are not blocked.
 In the default `nono` sandbox and in no-mistakes review, Orc relies on instructions instead of blocking test commands.
-Orc starts no-mistakes without its local Test step.
+Orc starts no-mistakes without its local Test or preflight Rebase step.
+An existing task branch keeps its base during the run instead of rebasing just because the base moved.
+The no-mistakes CI monitor can still repair a merge conflict.
+If you want the monitor to leave clean behind branches alone, keep `ci.rebase_behind` off in `.no-mistakes.yaml`.
+When a pull request run exists, Orc tells workers not to start or rerun CI by hand.
+Orc manages the wait for CI instead of asking workers to wait in a tool call.
 
 ## Choose the run
 
