@@ -50,17 +50,19 @@ const liveBody = (entry: SourcedProvider): QuotaBlockBody => ({
 
 const namedKey = (key: string | undefined): string | undefined => key === "default" ? undefined : key;
 
-const dispatchAccountName = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>): string | undefined => {
+const dispatchAccountName = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>, entries: ReadonlyArray<SourcedEntry>): string | undefined => {
   if (entry.provider !== "claude" || orcQuota.kind !== "ok" || orcQuota.value.kind !== "read") return undefined;
   const { accounts } = orcQuota.value;
-  if (accounts.length === 1) return accounts[0]?.account;
   const keys = keysOf(entry);
   const matches = accounts.filter(({ account }) => keys.includes(account));
-  return matches.length === 1 ? matches[0]?.account : undefined;
+  if (matches.length === 1) return matches[0]?.account;
+  return accounts.length === 1 && entries.filter((candidate) => candidate.provider === "claude").length === 1
+    ? accounts[0]?.account
+    : undefined;
 };
 
-export const accountTitle = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>): string => {
-  const name = dispatchAccountName(entry, orcQuota) ?? namedKey(entry.accountKey);
+export const accountTitle = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>, entries: ReadonlyArray<SourcedEntry>): string => {
+  const name = dispatchAccountName(entry, orcQuota, entries) ?? namedKey(entry.accountKey);
   return name === undefined ? entry.provider : `${entry.provider} ${name}`;
 };
 
@@ -128,10 +130,11 @@ export const quotaBlocks = (
   orcQuota: Reading<OrcQuota>,
   now: DateTime.Utc,
 ): ReadonlyArray<QuotaBlock> => {
+  const entries = sourcedEntries(read, now);
   const context: LiveContext = {
-    entries: sourcedEntries(read, now),
+    entries,
     notSetUp: read.quotaAxi.kind === "ok" ? read.quotaAxi.value.notSetUp : [],
-    title: (entry) => accountTitle(entry, orcQuota),
+    title: (entry) => accountTitle(entry, orcQuota, entries),
   };
   return [
     ...liveBlocks("claude", "claude", context),

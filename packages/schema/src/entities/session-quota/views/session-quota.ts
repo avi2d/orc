@@ -278,6 +278,7 @@ const windowView = (
 };
 
 interface AccountContext {
+  readonly entries: ReadonlyArray<SourcedEntry>;
   readonly inputs: SessionQuotaInputs;
   readonly sessionsById: ReadonlyMap<string, Session>;
 }
@@ -285,7 +286,7 @@ interface AccountContext {
 const accountView = (
   entry: SourcedEntry,
   joined: ReadonlyArray<{ readonly call: CountedCall; readonly join: AccountJoin }>,
-  { inputs, sessionsById }: AccountContext,
+  { entries, inputs, sessionsById }: AccountContext,
 ): AccountView => {
   const joins = joined.reduce<ReadonlyArray<AccountJoin>>(
     (seen, { join }) => (seen.some((known) => sameJoin(known, join)) ? seen : [...seen, join]),
@@ -296,7 +297,7 @@ const accountView = (
     accountKey: entry.accountKey,
     credentialKey: credentialKeyOf(entry),
     accountKeys: keysOf(entry),
-    title: accountTitle(entry, inputs.orcQuota),
+    title: accountTitle(entry, inputs.orcQuota, entries),
     joins,
   };
   if ("kind" in entry) return { ...head, body: failureOf(entry) };
@@ -320,6 +321,7 @@ export const sessionQuotaView = (inputs: SessionQuotaInputs): SessionQuotaView =
   const { calls, ...counts } = inputs.ledger;
   const entries = sourcedEntries(inputs.quota, inputs.now);
   const context: AccountContext = {
+    entries,
     inputs,
     sessionsById: new Map(inputs.sessions.map((session) => [session.id, session])),
   };

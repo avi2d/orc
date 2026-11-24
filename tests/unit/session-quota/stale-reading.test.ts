@@ -10,32 +10,32 @@ const readThirteenHoursAgo = weekAtZero.replace('"refreshedAt": "2026-10-13T20:1
 
 const panel = (quotaJson: string): ReadonlyArray<string> => sessionLines(sessionViewOfQuota(quotaJson, recordedNow), 84).map(plain);
 
-const claudeSecond = (rows: ReadonlyArray<string>): ReadonlyArray<string> =>
+const claudeMain = (rows: ReadonlyArray<string>): ReadonlyArray<string> =>
   rows.slice(rows.indexOf("● claude main · assumed the only login"), rows.indexOf("● codex · joined by credential key"));
 
 describe("a session quota window read thirteen hours ago at 0 percent", () => {
   test("shows its age instead of 100 points used, the fair rate or the pace", () => {
-    const rows = claudeSecond(panel(readThirteenHoursAgo));
+    const rows = claudeMain(panel(readThirteenHoursAgo));
     expect(rows).toContain("7d window read 13h 0m ago");
     expect(rows).toContain("5h window read 13h 0m ago");
     expect(rows.join("\n")).not.toMatch(/pp used|fair|pace/u);
   });
 
   test("keeps each session's logged shares and drops the points scaled from the reading", () => {
-    const rows = claudeSecond(panel(readThirteenHoursAgo));
+    const rows = claudeMain(panel(readThirteenHoursAgo));
     expect(rows).toContainEqual(expect.stringMatching(/^● shop-a1b2c3\/1 w1A:p2 +51% {2}50%$/u));
     expect(rows.join("\n")).not.toContain("≤");
   });
 
   test("flags none of its sessions", () => {
     const rows = panel(readThirteenHoursAgo);
-    expect(claudeSecond(rows).join("\n")).not.toContain("⚑");
+    expect(claudeMain(rows).join("\n")).not.toContain("⚑");
     const summary = flagLines(sessionViewOfQuota(readThirteenHoursAgo, recordedNow), 84, 40).map(plain);
     expect(summary.filter((row) => row.startsWith("⚑ "))).toEqual([expect.stringContaining("opencode-go 31d window")]);
   });
 
   test("keeps the points used and the flags when read seconds ago instead of reading every window as stale", () => {
-    const rows = claudeSecond(panel(weekAtZero));
+    const rows = claudeMain(panel(weekAtZero));
     expect(rows).toContainEqual(expect.stringMatching(/^7d window 100pp used · /u));
     expect(rows.join("\n")).toContain("⚑");
   });

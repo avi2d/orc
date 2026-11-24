@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { decodeOrcQuota, decodeQuota, type OrcQuota, type QuotaBlock, quotaBlocks, type Reading } from "@avi2dg/orc-schema";
+import { decodeOrcQuota, decodeQuota, type OrcQuota, type QuotaBlock, quotaBlocks, type Reading, sessionQuotaView } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { type OrcQuotaFixture, orcQuotaOf, orcQuotaReading } from "../../lib/orc-quota";
 import { quotaAxiRead } from "../../lib/quota-read";
+import { ledgerOf } from "../../lib/quota-view-fixture";
 
 const now = DateTime.makeUnsafe("2026-11-24T18:46:36Z");
 
@@ -19,6 +20,39 @@ const accountBlocks = (name: OrcQuotaFixture): ReadonlyArray<QuotaBlock> =>
 describe("quotaBlocks over the accounts orc quota --json prints", () => {
   test("does not show bare claude when Subquo names only main and quota-axi keys it default", () => {
     expect(blocksWith(orcQuotaOf("main", now))[0]?.title).toBe("claude main");
+  });
+
+  test.each(["main", "second-login-expired"] as const)("does not give two Claude rows the sole Orc account's name with %s", (name) => {
+    const quota = decodeQuota(JSON.stringify({
+      schemaVersion: 5,
+      generatedAt: DateTime.formatIso(now),
+      providers: ["default", "second"].map((accountKey) => ({
+        provider: "claude",
+        accountKey,
+        accountKeys: [accountKey],
+        windows: [],
+        state: { status: "fresh", stale: false },
+      })),
+    }));
+    if (quota.kind !== "ok") throw new Error("the two-account report does not decode");
+    const read = quotaAxiRead({ ...quota, capturedAt: now });
+    const orcQuota = orcQuotaOf(name, now);
+    expect(quotaBlocks(read, orcQuota, now)
+      .filter((block) => block.provider === "claude" && block.body.kind === "live")
+      .map((block) => block.title)).toEqual(["claude", "claude second"]);
+    const session = sessionQuotaView({
+      quota: read,
+      orcQuota,
+      panes: undefined,
+      processes: undefined,
+      ledger: ledgerOf([]),
+      sessions: [],
+      sessionOfFile: new Map(),
+      unmatched: [],
+      now,
+      timeZone: DateTime.zoneMakeNamedUnsafe("UTC"),
+    });
+    expect(session.accounts.map((account) => account.title)).toEqual(["claude", "claude second"]);
   });
 
   test("puts one account block per account between live claude and codex without guessing the login", () => {
