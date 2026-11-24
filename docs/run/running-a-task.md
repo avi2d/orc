@@ -42,10 +42,11 @@ Without local checks, orc records the round as `skipped`.
 Orc then hands off to no-mistakes or opens the direct PR.
 GitHub CI runs repository tests and decides completion.
 Keep test runners out of those commands and `prepare`.
-With `--sandbox none`, the heavy-queue stand-ins refuse recognized test runners and test scripts in Pi sessions, `prepare`, and local checks.
-Commands that do not go through a stand-in are not blocked.
-In the default `nono` sandbox and in no-mistakes review, Orc relies on instructions instead of blocking test commands.
+In Pi sessions, `prepare`, and local checks, under either sandbox, stand-ins first on `PATH` refuse a test run when it starts, as [Test runs in agent sessions](heavy-queue.md#test-runs-in-agent-sessions) lists.
+A package script, a shell wrapper or a workspace-selected script that reaches a test runner fails the same way.
+A runner started through a runtime's absolute path, and a runner the list does not name, is not blocked.
 Orc starts no-mistakes without its local Test step.
+The no-mistakes review runs its steps in the shared no-mistakes daemon, under the daemon's own `PATH`, so no stand-in refuses a test run there.
 
 ## Choose the run
 

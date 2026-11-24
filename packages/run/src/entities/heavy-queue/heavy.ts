@@ -1,11 +1,15 @@
 import type { HeavyConfig } from "../../shared/config/index"
-import { standinDirSuffix } from "../../shared/sandbox/index"
+import { ciOnlyDirSuffix, heavyDirSuffix } from "../../shared/sandbox/index"
 
 export const heavyGroup = "heavy"
 
-export const heavyBinDir = (home: string): string => home + standinDirSuffix
+export const heavyBinDir = (home: string): string => home + heavyDirSuffix
+
+export const ciOnlyBinDir = (home: string): string => home + ciOnlyDirSuffix
 
 export const withHeavyPath = (home: string, path: string): string => heavyBinDir(home) + ":" + path
+
+export const runStepPath = (home: string, path: string): string => ciOnlyBinDir(home) + ":" + withHeavyPath(home, path)
 
 export const defaultHeavyTools: ReadonlyArray<string> = [
   "bun",

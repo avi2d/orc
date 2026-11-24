@@ -165,6 +165,11 @@ describe("buildSandboxEnv", () => {
     expect(env["HEAVY_QUEUE_UNREACHABLE"]).toBe("1")
   })
 
+  test("keeps the ci-only stand-in folder ahead of the runtimes instead of letting a runtime's node shadow it", () => {
+    const env = buildSandboxEnv({ ...hostEnv, PATH: "/o/heavy/ci-only:/o/heavy/bin:/usr/bin:/bin" }, "/tmp/orc-test/session", ["/r/node/bin"])
+    expect(env.PATH).toBe("/o/heavy/ci-only:/o/heavy/bin:/r/node/bin:/usr/bin:/bin")
+  })
+
   test("host git reads no global or system config and no credential from the env", () => {
     const env = buildHostGitEnv(hostEnv)
     expect(env).toEqual({

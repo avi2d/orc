@@ -1,6 +1,6 @@
 import { constants } from "node:os"
 import { classifyHeavyCall, decisionWords } from "./heavy-classify"
-import { parseStandinCall, planCall, queueCall, type StandinCall } from "./heavy-standin-runtime"
+import { ciOnlyPlan, parseStandinCall, planCall, queueCall, type StandinCall } from "./heavy-standin-runtime"
 
 const exitCodeOf = (code: number | null, signal: NodeJS.Signals | number | null): number =>
   code ?? 128 + (signal === null ? 0 : typeof signal === "number" ? signal : constants.signals[signal])
@@ -110,6 +110,17 @@ const runCall = async (call: StandinCall, standin: string, args: ReadonlyArray<s
     case "queue":
       return queueCall(call, plan.real, args)
   }
+}
+
+// The launcher execs the path this prints, so a passed call keeps the stand-in's process and no helper stays between it and the caller.
+export const resolveCiOnly = (words: ReadonlyArray<string>): number => {
+  const [tool = "", standin = "", ...args] = words
+  const plan = ciOnlyPlan(tool, standin, args)
+  if (plan.kind === "exit") {
+    return plan.code
+  }
+  process.stdout.write(plan.real)
+  return 0
 }
 
 export const runStandin = async (settings: string, rest: ReadonlyArray<string>): Promise<number> => {

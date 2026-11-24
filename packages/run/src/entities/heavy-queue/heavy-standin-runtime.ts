@@ -1,6 +1,7 @@
 import { accessSync, appendFileSync, closeSync, constants, mkdirSync, openSync, readSync, statSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { classifyHeavyCall, isTestCall } from "./heavy-classify"
+import { interpretedRunner } from "./heavy-runner-entry"
 import { ancestry, insideSlot, insideThrough, parseProcessTable } from "./heavy-process-tree"
 import { exitCodeOf, queuedAhead, slotTasks, taskState, type TaskState } from "./heavy-pueue-task"
 
@@ -14,6 +15,8 @@ export const helperCommand: ReadonlyArray<string> = [
 export const standinHelper = { runtime: helperCommand[0] ?? "", folder: dirname(helperCommand.at(-1) ?? "") }
 
 export const waiterWord = "orc-heavy-wait"
+
+export const ciOnlyWord = "orc-ci-only"
 
 export interface StandinTiming {
   readonly budgetMinutes: number | null
@@ -184,16 +187,26 @@ const refuse = (message: string): StandinPlan => {
 
 const testsCiOnlyVariable = "HEAVY_TESTS_CI_ONLY"
 
-const testRefusal = (command: string): string =>
-  "orc heavy: " + command + " starts a test run, and with " + testsCiOnlyVariable + "=1 the repository tests run only in GitHub CI"
+const testRefusal = (command: string, runner: string | null): string =>
+  "orc heavy: " + command + " starts a test run" + (runner === null ? "" : " through " + runner) + ", and with " + testsCiOnlyVariable +
+  "=1 the repository tests run only in GitHub CI"
 
 const testsCiOnly = (): boolean => Bun.env[testsCiOnlyVariable] === "1"
 
-const refusedTest = (call: StandinCall, args: ReadonlyArray<string>): boolean => {
-  if (!testsCiOnly() || !isTestCall(call.tool, args)) {
+const refusedTest = (tool: string, args: ReadonlyArray<string>): boolean => {
+  if (!testsCiOnly()) {
     return false
   }
-  process.stderr.write(testRefusal([call.tool, ...args].join(" ")) + "\n")
+  const command = [tool, ...args].join(" ")
+  if (isTestCall(tool, args)) {
+    process.stderr.write(testRefusal(command, null) + "\n")
+    return true
+  }
+  const runner = interpretedRunner(tool, args, workingDirectory())
+  if (runner === null) {
+    return false
+  }
+  process.stderr.write(testRefusal(command, runner) + "\n")
   return true
 }
 
@@ -202,8 +215,24 @@ const queueUnreachable = (): boolean => Bun.env.HEAVY_QUEUE_UNREACHABLE === "1"
 const runsUnqueued = (call: StandinCall, args: ReadonlyArray<string>): boolean =>
   queueUnreachable() || classifyHeavyCall(call.tool, call.commands, args) === "direct"
 
+export const ciOnlyPlan = (
+  tool: string,
+  standin: string,
+  args: ReadonlyArray<string>
+): { readonly kind: "run"; readonly real: string } | { readonly kind: "exit"; readonly code: number } => {
+  if (refusedTest(tool, args)) {
+    return { kind: "exit", code: 1 }
+  }
+  const real = callerTool(tool, Bun.env.PATH ?? "", standin)
+  if (real === "") {
+    process.stderr.write("orc heavy: no " + tool + " on PATH after the stand-in at " + standin + "\n")
+    return { kind: "exit", code: 127 }
+  }
+  return { kind: "run", real }
+}
+
 export const planCall = (call: StandinCall, standin: string, args: ReadonlyArray<string>): StandinPlan => {
-  if (refusedTest(call, args)) {
+  if (refusedTest(call.tool, args)) {
     return { kind: "exit", code: 1 }
   }
   const real = callerTool(call.tool, Bun.env.PATH ?? "", standin) || call.real || projectTool(call.tool, workingDirectory())
