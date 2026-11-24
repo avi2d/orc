@@ -18,7 +18,7 @@ export class StepOutput {
   private shownLines = 0
   private turnsText: string | null = null
 
-  read(of: string, runId: string, step: ShownStep, pane: Pane, taskFile: string | null): Promise<void> {
+  read(of: string, runId: string, step: ShownStep, pane: Pane, taskFile: string): Promise<void> {
     if (pane === "parsed") {
       if (step.name === "checks") return this.readSummary(of, runId, step, taskFile)
       if (opensTurns(step)) return this.readTurns(of, step.piSessionFile)
@@ -26,9 +26,9 @@ export class StepOutput {
     return this.readLog(of, runId, step.id).then(() => undefined)
   }
 
-  private readSummary(of: string, runId: string, step: ShownStep, taskFile: string | null): Promise<void> {
+  private readSummary(of: string, runId: string, step: ShownStep, taskFile: string): Promise<void> {
     const file = checkIndexFile(taskFile, step)
-    const index = file === null ? Promise.resolve(null) : readTextFile(file).then(
+    const index = readTextFile(file).then(
       (text) => text === null ? null : parseCheckIndex(text),
       () => ({ kind: "refused", reason: `Cannot read ${file}` }) as const
     )

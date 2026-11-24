@@ -1,7 +1,7 @@
 import { type AsyncContext, type Context, type Element, View } from "gpui-kit"
 import { InputState, h_flex } from "gpui-base"
 import { layout, run, setShared, shared } from "herdr"
-import { type Card, type Filter, type RunAgent, cardAnswers, filterCards, goesOn, openedFilter, runAgent } from "../../src/agents"
+import { type Card, type Filter, type RunAgent, cardAnswers, filterCards, goesOn, openedFilter, recordedStatus, runAgent } from "../../src/agents"
 import { readAgents } from "../../src/agents-read"
 import { type AgentsActions, type Chosen, type DetailShown, type Keyed, approvalOf, askMerge, detailView, runsColumn, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
 import { type Merge, mergeCommand, mergedNote, runMerge, watchMerges } from "../../src/agents-merge"
@@ -34,7 +34,7 @@ export default class OrcAgents extends View {
   filter: Filter = { project: null, status: null, allRuns: false }
   selectedKey: string | null = null
   chosen: Chosen | null = null
-  rawFor: string | null = null
+  pane: Pane = "parsed"
   opened = 0
   folded = false
   steps: Keyed<Show> | null = null
@@ -113,12 +113,14 @@ export default class OrcAgents extends View {
     }
     return readJson("orc", ["show", runId, "--json"], show).then((showReading) => {
       this.steps = { of: runId, reading: showReading }
-      if (showReading.kind !== "ok" || this.selectedCard()?.runId !== runId) return
+      const card = this.selectedCard()
+      if (showReading.kind !== "ok" || card?.runId !== runId) return
       this.agents.set(runId, runAgent(showReading.value.steps))
       const step = this.stepShown()
       if (step === null) return
       const of = `${runId}/${step.id}`
-      return this.output.read(of, runId, step, this.paneFor(of), showReading.value.taskFile)
+      const status = recordedStatus(step.status, card.standing.status)
+      return this.output.read(of, runId, { ...step, status }, this.pane, showReading.value.taskFile)
     })
   }
 
@@ -240,14 +242,9 @@ export default class OrcAgents extends View {
     return this.recordedSteps(card).find((step) => step.id === target.id) ?? null
   }
 
-  paneFor(stepKey: string | null): Pane {
-    return stepKey !== null && this.rawFor === stepKey ? "raw" : "parsed"
-  }
-
   moveSelection(cx: Context, change: () => void): void {
     const before = this.selectedCard()?.key ?? null
     this.chosen = null
-    this.rawFor = null
     change()
     if ((this.selectedCard()?.key ?? null) !== before) {
       this.changesProblem = null
@@ -267,9 +264,7 @@ export default class OrcAgents extends View {
   }
 
   setPane(cx: Context, pane: Pane): void {
-    const runId = this.selectedCard()?.runId ?? null
-    const step = this.stepShown()
-    this.rawFor = pane === "raw" && runId !== null && step !== null ? `${runId}/${step.id}` : null
+    this.pane = pane
     this.refresh(cx)
     cx.notify()
   }
@@ -343,7 +338,7 @@ export default class OrcAgents extends View {
       step,
       steps: card === null ? [] : this.recordedSteps(card),
       back: card === null ? [] : sendBackBar(t, card, this.review, this.sent?.of === card.key ? this.sent.reading : null, (cx) => this.sendBack(cx)),
-      pane: this.paneFor(of),
+      pane: this.pane,
       turns: readingOf(this.output.turns, of),
       log: readingOf(this.output.log, of),
       summary: readingOf(this.output.summary, of),

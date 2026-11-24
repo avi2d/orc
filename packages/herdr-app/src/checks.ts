@@ -119,8 +119,7 @@ export const parseCheckIndex = (text: string): Guarded<ReadonlyArray<CheckBounda
     return index.kind === "ok" ? arrayOf(index.value, "checks", at, checkBoundary) : index
   })
 
-export const checkIndexFile = (taskFile: string | null, step: Pick<ShownStep, "attempt" | "from">): string | null => {
-  if (taskFile === null) return null
+export const checkIndexFile = (taskFile: string, step: Pick<ShownStep, "attempt" | "from">): string => {
   const runDir = taskFile.slice(0, taskFile.lastIndexOf("/"))
   const dir = step.from === null ? runDir : runDir.slice(0, runDir.lastIndexOf("/")) + "/" + step.from
   return `${dir}/session/checks-${step.attempt.toString()}.txt.index.json`
