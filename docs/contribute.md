@@ -37,6 +37,18 @@ Generated references and decision records keep the structure their content needs
 The link check fails a page that names a tool from `scripts/outside-tools.json` and never links that tool's URL.
 Link the tool at its first mention, and add a new outside tool to that file with its home page.
 
+## Time the start of orc
+
+To time how fast orc starts:
+
+1. Run `bun run bench:start` to time `orc --help` and one heavy stand-in classification call from source.
+1. Read the median and p90 of each call, printed after the Bun version and the machine.
+
+The script runs each call once to warm up and then 20 times.
+`--runs N` sets the number of timed runs.
+`--orc FILE` and `--standin FILE` time a built file in place of the source entry.
+A file ending in `.ts` or `.js` runs under Bun, and any other file runs as an executable.
+
 ## Preview the docs site
 
 To preview the docs site:
