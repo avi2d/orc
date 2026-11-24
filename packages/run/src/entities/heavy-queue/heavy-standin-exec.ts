@@ -113,8 +113,8 @@ const runCall = async (call: StandinCall, standin: string, args: ReadonlyArray<s
 }
 
 // The launcher execs the path this prints, so a passed call keeps the stand-in's process and no helper stays between it and the caller.
-export const resolveCiOnly = (words: ReadonlyArray<string>): number => {
-  const [tool = "", standin = "", ...args] = words
+export const resolveCiOnly = (call: ReadonlyArray<string>): number => {
+  const [tool = "", standin = "", ...args] = call
   const plan = ciOnlyPlan(tool, standin, args)
   if (plan.kind === "exit") {
     return plan.code

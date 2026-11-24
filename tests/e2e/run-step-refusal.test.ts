@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { mkdir, readFile, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
-import { git, prUrl, runOrc, withNoSandboxFixture, writeScript } from "./no-sandbox-fixture"
+import { git, prUrl, runOrc, withNoSandboxFixture } from "./no-sandbox-fixture"
 
 const refusedForms: ReadonlyArray<string> = [
   "bun test",

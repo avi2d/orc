@@ -1,7 +1,7 @@
 import { accessSync, appendFileSync, closeSync, constants, mkdirSync, openSync, readSync, statSync } from "node:fs"
 import { dirname, join } from "node:path"
-import { classifyHeavyCall, isTestCall } from "./heavy-classify"
-import { bunRuntimeOverride, interpretedRunner } from "./heavy-runner-entry"
+import { classifyHeavyCall } from "./heavy-classify"
+import { refusedTest } from "./heavy-standin-refusal"
 import { ancestry, insideSlot, insideThrough, parseProcessTable } from "./heavy-process-tree"
 import { exitCodeOf, queuedAhead, slotTasks, taskState, type TaskState } from "./heavy-pueue-task"
 
@@ -187,38 +187,6 @@ const refuse = (message: string): StandinPlan => {
   return { kind: "exit", code: 127 }
 }
 
-const testsCiOnlyVariable = "HEAVY_TESTS_CI_ONLY"
-
-const testRefusal = (command: string, runner: string | null): string =>
-  "orc heavy: " + command + " starts a test run" + (runner === null ? "" : " through " + runner) + ", and with " + testsCiOnlyVariable +
-  "=1 the repository tests run only in GitHub CI"
-
-const testsCiOnly = (): boolean => Bun.env[testsCiOnlyVariable] === "1"
-
-const refusedTest = (tool: string, args: ReadonlyArray<string>): boolean => {
-  if (!testsCiOnly()) {
-    return false
-  }
-  const command = [tool, ...args].join(" ")
-  const override = bunRuntimeOverride(tool, args, workingDirectory())
-  if (override !== null) {
-    process.stderr.write(
-      "orc heavy: refusing " + command + " because " + override + " can bypass CI-only runtime stand-ins; repository tests run only in GitHub CI\n"
-    )
-    return true
-  }
-  if (isTestCall(tool, args)) {
-    process.stderr.write(testRefusal(command, null) + "\n")
-    return true
-  }
-  const runner = interpretedRunner(tool, args, workingDirectory())
-  if (runner === null) {
-    return false
-  }
-  process.stderr.write(testRefusal(command, runner) + "\n")
-  return true
-}
-
 const queueUnreachable = (): boolean => Bun.env.HEAVY_QUEUE_UNREACHABLE === "1"
 
 const runsUnqueued = (call: StandinCall, args: ReadonlyArray<string>): boolean =>
@@ -229,7 +197,7 @@ export const ciOnlyPlan = (
   standin: string,
   args: ReadonlyArray<string>
 ): { readonly kind: "run"; readonly real: string } | { readonly kind: "exit"; readonly code: number } => {
-  if (refusedTest(tool, args)) {
+  if (refusedTest(tool, args, workingDirectory())) {
     return { kind: "exit", code: 1 }
   }
   const real = callerTool(tool, Bun.env.PATH ?? "", standin, ciOnlyMarker)
@@ -241,7 +209,7 @@ export const ciOnlyPlan = (
 }
 
 export const planCall = (call: StandinCall, standin: string, args: ReadonlyArray<string>): StandinPlan => {
-  if (refusedTest(call.tool, args)) {
+  if (refusedTest(call.tool, args, workingDirectory())) {
     return { kind: "exit", code: 1 }
   }
   const real = callerTool(call.tool, Bun.env.PATH ?? "", standin) || call.real || projectTool(call.tool, workingDirectory())

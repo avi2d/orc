@@ -59,6 +59,59 @@ const bunBuiltins: Args = [
   "patch", "pm", "info", "why", "build", "init", "create", "c", "upgrade", "repl", "check", "test", "help", "completions"
 ]
 
+interface BunOptions {
+  readonly directory: string
+  readonly config: string
+  readonly bunFlag: string | null
+}
+
+const flagValue = (word: string, next: string | undefined): readonly [string, string | undefined] => {
+  const equals = word.indexOf("=")
+  return equals === -1 ? [word, next] : [word.slice(0, equals), word.slice(equals + 1)]
+}
+
+const bunOptionsOf = (options: Args, cwd: string): BunOptions => {
+  let directory = cwd
+  let config = "bunfig.toml"
+  for (let at = 0; at < options.length; at += 1) {
+    const word = options[at] ?? ""
+    if (word === "--bun" || word === "-b") {
+      return { directory, config, bunFlag: word }
+    }
+    const [flag, value] = flagValue(word, options.at(at + 1))
+    if (flag === "--cwd" && value !== undefined) {
+      directory = resolve(cwd, value)
+    } else if ((flag === "--config" || flag === "-c") && value !== undefined) {
+      config = value
+    }
+    if (bunValueOptions.includes(word)) {
+      at += 1
+    }
+  }
+  return { directory, config, bunFlag: null }
+}
+
+const setsRunBun = (parsed: unknown): boolean => {
+  if (typeof parsed !== "object" || parsed === null || !("run" in parsed)) {
+    return false
+  }
+  const run = parsed.run
+  return typeof run === "object" && run !== null && "bun" in run && run.bun === true
+}
+
+const parseToml = (text: string): unknown => {
+  try {
+    return Bun.TOML.parse(text)
+  } catch {
+    return undefined
+  }
+}
+
+const bunfigRunBun = (file: string): boolean => {
+  const text = readText(file)
+  return text !== null && setsRunBun(parseToml(text))
+}
+
 export const bunRuntimeOverride = (tool: string, args: Args, cwd: string): string | null => {
   if (tool !== "bun" && tool !== "bunx") {
     return null
@@ -66,41 +119,31 @@ export const bunRuntimeOverride = (tool: string, args: Args, cwd: string): strin
   const first = launchOf(args, bunValueOptions)
   const nested = tool === "bun" && first.kind === "script" && ["run", "x", "exec"].includes(first.file)
   const options = nested ? [...first.options, ...launchOf(first.args, bunValueOptions).options] : first.options
-  let directory = cwd
-  let config = "bunfig.toml"
-  for (let at = 0; at < options.length; at += 1) {
-    const word = options[at] ?? ""
-    if (word === "--bun" || word === "-b") {
-      return word
-    }
-    const equals = word.indexOf("=")
-    const flag = equals === -1 ? word : word.slice(0, equals)
-    const value = equals === -1 ? options[at + 1] : word.slice(equals + 1)
-    if (value !== undefined) {
-      if (flag === "--cwd") {
-        directory = resolve(cwd, value)
-      } else if (flag === "--config" || flag === "-c") {
-        config = value
-      }
-    }
-    if (bunValueOptions.includes(word)) {
-      at += 1
-    }
+  const { directory, config, bunFlag } = bunOptionsOf(options, cwd)
+  if (bunFlag !== null) {
+    return bunFlag
   }
   if (first.kind === "none" || (tool === "bun" && bunBuiltins.includes(first.file))) {
     return null
   }
+  const file = resolve(directory, config)
+  return bunfigRunBun(file) ? file + " sets run.bun = true" : null
+}
+
+const readText = (file: string): string | null => {
   try {
-    const file = resolve(directory, config)
-    const parsed: unknown = Bun.TOML.parse(readFileSync(file, "utf8"))
-    if (typeof parsed === "object" && parsed !== null && "run" in parsed) {
-      const run = parsed.run
-      if (typeof run === "object" && run !== null && "bun" in run && run.bun === true) {
-        return file + " sets run.bun = true"
-      }
-    }
-  } catch {}
-  return null
+    return readFileSync(file, "utf8")
+  } catch {
+    return null
+  }
+}
+
+const parseJson = (text: string): unknown => {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return undefined
+  }
 }
 
 const realFile = (file: string): string | null => {
@@ -127,11 +170,8 @@ const binsOf = (manifest: unknown): ReadonlyArray<readonly [string, string]> => 
 }
 
 const readManifest = (file: string): unknown => {
-  try {
-    return JSON.parse(readFileSync(file, "utf8"))
-  } catch {
-    return undefined
-  }
+  const text = readText(file)
+  return text === null ? undefined : parseJson(text)
 }
 
 const owningPackage = (file: string): { readonly folder: string; readonly manifest: unknown } | null => {
