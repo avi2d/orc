@@ -307,6 +307,9 @@ const actionLine = (action: BeatAction): string => {
     case "yolo-merged": {
       return "merged " + action.task + " " + action.pr + " on yolo-green"
     }
+    case "yolo-updating": {
+      return "updating " + action.task + " " + action.pr + " on yolo-green: requested the branch update, and a later beat merges it once the new head's checks are green"
+    }
     case "merge-refused": {
       return "did not merge " + action.task + " on yolo-green: " + action.reason
     }

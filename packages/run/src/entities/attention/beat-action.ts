@@ -42,6 +42,7 @@ export type BeatAction =
   | StalledAction
   | { readonly kind: "pr-unread"; readonly task: string; readonly reason: string }
   | { readonly kind: "yolo-merged"; readonly task: string; readonly pr: string }
+  | { readonly kind: "yolo-updating"; readonly task: string; readonly pr: string }
   | { readonly kind: "merge-refused"; readonly task: string; readonly reason: string }
   | { readonly kind: "attention"; readonly item: string; readonly task: string; readonly owner: "decider" | "user"; readonly overdue: boolean; readonly text: string }
   | { readonly kind: "upstream-seen"; readonly project: string; readonly url: string; readonly state: string }

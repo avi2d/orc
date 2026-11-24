@@ -544,7 +544,7 @@ describe("beat merge output", () => {
       expect(document).toMatchObject({
         schema: "orc.beat.v1",
         actions: expect.arrayContaining([
-          expect.objectContaining({ kind: "merge-refused", task: "orc-1", reason: expect.stringContaining("requested branch update") })
+          expect.objectContaining({ kind: "yolo-updating", task: "orc-1", pr: prUrl })
         ])
       })
       expect(await forgeSteps(fixture)).toEqual(["view", "view", "update"])

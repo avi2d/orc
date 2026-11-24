@@ -79,16 +79,10 @@ Either basis meets every refusal above.
 
 `yolo-green` also reads the PR's changed files from the GitHub pull request files API and refuses a change that waits for your merge word:
 
-- A release, which changes `CHANGELOG.md` or the `version` of a `package.json`.
+- A release, which changes `CHANGELOG.md`, or changes a `version` line in a `package.json`, `Cargo.toml`, `pyproject.toml`, `setup.cfg` or `*.gemspec`.
 - A deletion, which removes a file.
 - A workflow file change under `.github/workflows/`.
-- A secret change, to a file named `.env`, `.env.<name>`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, or a name with `secret` in it.
+- A secret change, to a file named `.env`, `.env.<name>`, `*.env`, `.envrc`, `id_rsa`, `id_ed25519`, `.npmrc`, `.netrc`, `credentials.json`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, or a name with `secret` in it.
 
 Each such refusal ends `which waits for the captain's merge word`.
-The beat merges a closed done ship task's PR on `yolo-green` by itself once its project has `yolo` true and every check is green.
-A task that closed stopped or failed never auto-merges, even when its checks later turn green.
-A PR with a red check or a check that has not reported stays unmerged.
-A PR with a change that waits for your word stays unmerged, and its `pr-ready` item in `orc attention` names that change.
-
-Answer `hold` to a PR's `pr-ready` item to leave that head unmerged.
-The hold also covers Orc's pending branch update, but new work on the PR can lift it.
+The beat also merges a yolo project's green PR by itself, as [Merging a task's PR](beat-runs.md#merging-a-tasks-pr) in the beat reference describes.

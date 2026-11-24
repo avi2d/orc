@@ -171,6 +171,35 @@ describe("the beat merges a yolo project's green PR", () => {
     })
   }
 
+  for (const { path, patch } of [
+    { path: "Cargo.toml", patch: '-version = "0.1.0"\n+version = "0.2.0"' },
+    { path: "pyproject.toml", patch: '-version = "1.0.0"\n+version = "1.1.0"' },
+    { path: "setup.cfg", patch: "-version = 1.0.0\n+version = 1.1.0" },
+    { path: "orc.gemspec", patch: '-  spec.version = "1.0.0"\n+  spec.version = "1.1.0"' }
+  ]) {
+    test("a " + path + " version bump waits for the captain instead of merging without the owner's word", async () => {
+      const layer = ghLayer(view(), filesOf([{ status: "modified", path, previous: null, patch }]), [])
+      const files = await Effect.runPromise(readChangedFiles(pr).pipe(Effect.provide(Layer.merge(BunServices.layer, layer))))
+      expect(ownerWordChanges(files)).toEqual([
+        "is a release, as it changes " + path + ", which waits for the captain's merge word"
+      ])
+    })
+  }
+
+  test("a Cargo.toml dependency patch is not refused as a release", async () => {
+    const layer = ghLayer(view(), filesOf([{ status: "modified", path: "Cargo.toml", previous: null, patch: '-serde = { version = "1.0.199" }\n+serde = { version = "1.0.200" }' }]), [])
+    const files = await Effect.runPromise(readChangedFiles(pr).pipe(Effect.provide(Layer.merge(BunServices.layer, layer))))
+    expect(ownerWordChanges(files)).toEqual([])
+  })
+
+  for (const path of [".envrc", "deploy/prod.env", "id_rsa", ".ssh/id_ed25519", ".npmrc", ".netrc", "config/credentials.json", "android/release.jks", "app.keystore"]) {
+    test("a change to " + path + " waits for the captain instead of merging without the owner's word", () => {
+      expect(ownerWordChanges([changed(path)])).toEqual([
+        "changes the secret file " + path + ", which waits for the captain's merge word"
+      ])
+    })
+  }
+
   test("a readable package.json dependency patch is not refused as a release", async () => {
     const layer = ghLayer(view(), filesOf([{ status: "modified", path: "package.json", patch: '-  "effect": "4.0.0"\n+  "effect": "4.0.1"' }]), [])
     const files = await Effect.runPromise(readChangedFiles(pr).pipe(Effect.provide(Layer.merge(BunServices.layer, layer))))

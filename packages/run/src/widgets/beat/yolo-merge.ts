@@ -24,8 +24,8 @@ export const yoloMerge = (
   home: string
 ): Effect.Effect<BeatAction, never, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   mergeTask(root, task, "yolo-green", (words) => DateTime.now.pipe(Effect.flatMap((now) => sendBack(root, home, { kind: "SendBack", id: task, words }, DateTime.formatIso(now)))), { noWait: true, progress: () => Effect.void }).pipe(Effect.match({
-    onSuccess: (message): BeatAction => message.startsWith("merged ")
+    onSuccess: (outcome): BeatAction => outcome.kind === "merged"
       ? { kind: "yolo-merged", task, pr }
-      : { kind: "merge-refused", task, reason: message },
+      : { kind: "yolo-updating", task, pr },
     onFailure: (error): BeatAction => ({ kind: "merge-refused", task, reason: error.detail })
   }))

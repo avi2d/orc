@@ -25,6 +25,8 @@ const behindBy = (id: string, url: string, view: PullRequestView) =>
 type MergeRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 type MergeError = BacklogError | ConfigError | TaskFileError | RunnerError
 
+export type MergeOutcome = { readonly kind: "merged" | "updating"; readonly message: string }
+
 export type SendBackForFix = (words: string) => Effect.Effect<string, BacklogError | ConfigError | TaskFileError, MergeRequirements>
 
 interface Landing {
@@ -199,7 +201,7 @@ const mergeAt = (landing: Landing, view: PullRequestView) =>
         : refuse(detail)
     }
     yield* clearPendingUpdate(landing.root, landing.id)
-    return "merged " + landing.id + " " + landing.url
+    return { kind: "merged", message: "merged " + landing.id + " " + landing.url } satisfies MergeOutcome
   })
 
 type Unsettled = Exclude<PolledHead, { readonly kind: "ready" }>
@@ -261,7 +263,7 @@ const landUpdated = (landing: Landing, checked: PullRequestView, approved: Appro
     }
     yield* updateBranch(landing, checked)
     if (noWait) {
-      return "requested branch update for " + landing.id + " " + landing.url + "; not merged. Run " + retryCommand(landing) + " again once the new head checks are green."
+      return { kind: "updating", message: "requested branch update for " + landing.id + " " + landing.url + "; not merged. Run " + retryCommand(landing) + " again once the new head checks are green." } satisfies MergeOutcome
     }
     return yield* awaitUpdatedAndMerge(landing, checked, approved)
   })
@@ -353,7 +355,7 @@ export const mergeTask = (
   basis: MergeBasis,
   sendBack: SendBackForFix,
   options: { readonly noWait: boolean; readonly progress?: (message: string) => Effect.Effect<void> } = { noWait: false }
-): Effect.Effect<string, MergeError, MergeRequirements> =>
+): Effect.Effect<MergeOutcome, MergeError, MergeRequirements> =>
   Effect.gen(function*() {
     const { url, view } = yield* openPullRequest(root, id, basis)
     const landing: Landing = { root, id, url, basis, sendBack, progress: options.progress ?? Console.log }
