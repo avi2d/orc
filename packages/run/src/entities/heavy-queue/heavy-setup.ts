@@ -1,8 +1,8 @@
 import { Effect, FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { readOrcConfig } from "../../shared/config/index"
-import { heavyBinDir, resolveHeavy, type HeavySettings } from "./heavy"
-import { detectWrap, standinScripts, type HeavyPlatform, type StandinSettings } from "./heavy-standin"
+import { ciOnlyBinDir, heavyBinDir, resolveHeavy, type HeavySettings } from "./heavy"
+import { ciOnlyScript, ciOnlyTools, detectWrap, standinScripts, type HeavyPlatform, type StandinSettings } from "./heavy-standin"
 import { RunnerError } from "../../shared/process/index"
 import { ensureGroup } from "../../shared/process/index"
 
@@ -20,17 +20,9 @@ export const readHeavySettings = (home: string): Effect.Effect<HeavySettings, Ru
 const ensureHeavyGroup = (settings: HeavySettings): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   ensureGroup(settings.group, ["--parallel", "1"])
 
-export const writeHeavyBin = (
-  home: string,
-  settings: HeavySettings,
-  platform: HeavyPlatform
-): Effect.Effect<ReadonlyArray<string>, RunnerError, FileSystem.FileSystem> =>
+const writeStandinDir = (bin: string, scripts: Readonly<Record<string, string>>): Effect.Effect<ReadonlyArray<string>, RunnerError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    const bin = heavyBinDir(home)
-    const wrap = detectWrap(platform, settings.limit)
-    const standins: StandinSettings = { home, group: settings.group, wrap, through: settings.through }
-    const scripts = yield* standinScripts(standins, settings.commands)
     yield* fs.makeDirectory(bin, { recursive: true }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "cannot write " + bin + ": " + error.message }))
     )
@@ -57,6 +49,18 @@ export const writeHeavyBin = (
       )
     }
     return tools
+  })
+
+export const writeHeavyBin = (
+  home: string,
+  settings: HeavySettings,
+  platform: HeavyPlatform
+): Effect.Effect<ReadonlyArray<string>, RunnerError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const wrap = detectWrap(platform, settings.limit)
+    const standins: StandinSettings = { home, group: settings.group, wrap, through: settings.through }
+    yield* writeStandinDir(ciOnlyBinDir(home), Object.fromEntries(ciOnlyTools.map((tool) => [tool, ciOnlyScript(tool)])))
+    return yield* writeStandinDir(heavyBinDir(home), yield* standinScripts(standins, settings.commands))
   })
 
 export const ensureHeavyQueue = (home: string, settings: HeavySettings): Effect.Effect<ReadonlyArray<string>, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>

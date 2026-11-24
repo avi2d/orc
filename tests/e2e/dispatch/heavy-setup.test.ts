@@ -215,6 +215,10 @@ describe("the heavy queue setup", () => {
         const check = Bun.spawnSync(["sh", "-n", join(home, "heavy", "bin", tool)])
         expect(check.exitCode).toBe(0)
       }
+      for (const tool of ["node", "checks-test"]) {
+        const check = Bun.spawnSync(["sh", "-n", join(home, "heavy", "ci-only", tool)])
+        expect({ tool, exitCode: check.exitCode }).toEqual({ tool, exitCode: 0 })
+      }
     } finally {
       await rm(home, { recursive: true, force: true })
     }
