@@ -11,6 +11,7 @@ export interface AgentRun {
   readonly prompt: string
   readonly logFile: string
   readonly resumeSession: string | null
+  readonly withoutAsks?: true | undefined
   readonly onSession: (file: string) => Effect.Effect<void, OrcRunError>
 }
 

@@ -11,13 +11,11 @@ here=$(cd "$(dirname "$0")" && pwd)
 plugin=$here/plugin
 real_home=$(eval echo "~$(id -un)")
 prefs=$real_home/Library/Preferences/dev.bb.desktop.plist
-if [ -e "$prefs" ] || [ -L "$prefs" ]; then
-  echo "refusing to run while $prefs exists" >&2
-  exit 1
-fi
+trial_id=dev.bb.desktop.orc-trial
+trial_prefs=$real_home/Library/Preferences/$trial_id.plist
 real_data=("$real_home/.bb" "$real_home/Library/Application Support/bb" "$prefs")
 scratch=$here/.scratch
-for tool in curl hdiutil ditto shasum jq lsof sqlite3 orc screencapture; do
+for tool in curl hdiutil ditto shasum jq lsof sqlite3 orc screencapture codesign defaults; do
   if ! command -v "$tool" >/dev/null; then
     echo "missing tool: $tool" >&2
     exit 1
@@ -35,11 +33,11 @@ app=$scratch/bb.app
 data=$scratch/data
 user_data=$scratch/user-data
 proof=$scratch/proof
-mkdir -p "$data" "$user_data" "$proof" "$scratch/home"
+mkdir -p "$data" "$user_data" "$proof"
 snapshot() {
   for path in "${real_data[@]}"; do
     if [ -e "$path" ]; then
-      find "$path" -type f -print0 | sort -z | xargs -0 shasum -a 256
+      find -H "$path" -type f -print0 | sort -z | xargs -0 shasum -a 256
     else
       echo "missing $path"
     fi
@@ -61,13 +59,16 @@ if [ "$installed" != "$version" ]; then
   echo "scratch bb.app is $installed, not $version; remove $app and run again" >&2
   exit 1
 fi
+# Electron writes its launch defaults through NSUserDefaults to the login home's Preferences under the bundle identifier, whatever HOME says.
+# A scratch identifier keeps them out of the real bb's preferences, and the edited bundle needs a fresh ad-hoc signature to launch.
+if [ "$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$app/Contents/Info.plist")" != "$trial_id" ]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $trial_id" "$app/Contents/Info.plist"
+fi
+if ! codesign --verify --deep "$app" 2>/dev/null; then
+  codesign --force --deep --sign - "$app"
+fi
 export ORC_HOME=${ORC_HOME:-$real_home/.orc}
-# The orc launcher can find its runtime through HOME, which the scratch home below does not hold.
-mkdir -p "$scratch/bin"
-printf '#!/bin/bash\nHOME=%q exec %q "$@"\n' "$real_home" "$(command -v orc)" > "$scratch/bin/orc"
-chmod +x "$scratch/bin/orc"
-export PATH=$scratch/bin:$PATH
-export HOME=$scratch/home
+# HOME stays the login home: a process given another HOME finds no login keychain, and macOS then offers to reset it.
 export BB_DATA_DIR=$data
 export BB_SERVER_PORT=$port
 export BB_HOST_DAEMON_PORT=$((port + 1))
@@ -91,12 +92,11 @@ cleanup() {
   trap - EXIT
   set +e
   stop_bb
-  # Electron sets its launch defaults through NSUserDefaults, which writes under the login home whatever HOME says.
-  if [ -e "$prefs" ]; then
-    defaults delete dev.bb.desktop >/dev/null 2>&1
-    rm -f "$prefs"
-    echo "removed $prefs, which Electron wrote at launch and the trial found missing"
+  if defaults delete "$trial_id" >/dev/null 2>&1; then
+    echo "removed launch defaults for $trial_id"
   fi
+  # cfprefsd empties the domain but leaves its plist file behind.
+  rm -f "$trial_prefs"
   snapshot > "$proof/real-after"
   if cmp -s "$proof/real-before" "$proof/real-after"; then
     echo "real bb data untouched: ${real_data[*]}"
@@ -108,7 +108,7 @@ cleanup() {
 }
 trap cleanup EXIT
 # Electron keeps its own state, the Connect credential cache among it, in the userData folder, which BB_DATA_DIR does not move.
-# Chromium otherwise stores its cookie key in the login keychain, which no scratch HOME reaches.
+# The mock keychain keeps Chromium's cookie key out of the login keychain.
 "$app/Contents/MacOS/bb" --user-data-dir="$user_data" --use-mock-keychain > "$proof/bb.log" 2>&1 &
 pid=$!
 cli=$data/bin/bb
@@ -122,6 +122,11 @@ if [ ! -x "$cli" ] || [ "$status" = "000" ]; then
   echo "timed out waiting 60 seconds for the bb server at $BB_SERVER_URL" >&2
   exit 1
 fi
+if ! defaults read "$trial_id" >/dev/null 2>&1; then
+  echo "the scratch bb wrote no launch defaults for $trial_id" >&2
+  exit 1
+fi
+echo "the scratch bb keeps its launch defaults under $trial_id"
 "$cli" settings general telemetryEnabled false >/dev/null
 "$cli" settings show --json > "$proof/settings.json"
 jq -e '.generalSettings.telemetryEnabled == false' "$proof/settings.json" >/dev/null
@@ -151,7 +156,7 @@ else
   echo "screenshot saved to $proof/board.png"
 fi
 stop_bb
-find "$scratch/home" "$data" "$user_data" \( -name connect-credential.bin -o -name env.json \) -print > "$proof/account-files"
+find "$data" "$user_data" \( -name connect-credential.bin -o -name env.json \) -print > "$proof/account-files"
 find "$user_data" -type f -name Cookies -print0 | while IFS= read -r -d '' cookies; do
   sqlite3 -readonly "$cookies" "select host_key from cookies where host_key like '%getbb.app'" | sed "s|^|$cookies: |"
 done >> "$proof/account-files"
