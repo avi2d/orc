@@ -163,6 +163,15 @@ describe("a worker question with a Recommended: line", () => {
     })
   })
 
+  test("answered by the decider on the policy's definition of a Recommended: line stays with the owner, instead of closing on the worker's own preference", async () => {
+    const flag = { id: "ask-1", text: "Name the flag --retries or --attempts?\nRecommended: --retries" }
+    const definition = 'A line of a review question that starts with "Recommended:" names its recommended option, and the words after it are that option.'
+    await withAskingTask([flag], async (root) => {
+      await decide(root, replying(JSON.stringify({ decision: "answer", answer: "--retries", rule: definition, reason: "the question names its recommended option" })))
+      expect(await itemFile(root, itemOf(flag))).toMatchObject({ kind: "worker-question", owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+    })
+  })
+
   test("escalated by the decider on an open product choice stays with the owner, instead of orc answering with the worker's own preference", async () => {
     const flag = { id: "ask-1", text: "Name the flag --retries or --attempts?\nRecommended: --retries" }
     await withAskingTask([flag], async (root) => {
