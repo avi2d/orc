@@ -16,6 +16,7 @@ const AskingQuestion = Schema.Struct({
   text: Schema.String,
   options: Schema.optional(Schema.Array(AskOption)),
   recommendation: Schema.optional(Schema.String),
+  asks: Schema.optional(Schema.String),
   blocks: Schema.optional(Schema.Boolean),
   asked: Schema.optional(Schema.String),
   owner: Schema.optional(Schema.Literal("user"))
@@ -87,7 +88,7 @@ const readRelayed = (file: string, asked: string): Effect.Effect<ReadonlyArray<Q
   )
 
 export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: string) =>
-  (missing: ReadonlyArray<Pick<NoMistakesFinding, "id" | "description"> & Pick<OpenQuestion, "owner">>): Effect.Effect<WaitResult, never, FileSystem.FileSystem> =>
+  (missing: ReadonlyArray<Pick<NoMistakesFinding, "id" | "description" | "asks"> & Pick<OpenQuestion, "owner">>): Effect.Effect<WaitResult, never, FileSystem.FileSystem> =>
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
       const asking = runDir + "/" + askingFileName
@@ -101,7 +102,7 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
       const asked = previous?.asked ?? now
       const deadline = Date.now() + waitSeconds * 1000
       const until = new Date(deadline).toISOString()
-      const fresh: ReadonlyArray<AskingQuestion> = missing.map((finding) => ({ id: finding.id, text: finding.description, blocks: true, asked: now, ...(finding.owner === undefined ? {} : { owner: finding.owner }) }))
+      const fresh: ReadonlyArray<AskingQuestion> = missing.map((finding) => ({ id: finding.id, text: finding.description, ...(finding.asks === undefined ? {} : { asks: finding.asks }), blocks: true, asked: now, ...(finding.owner === undefined ? {} : { owner: finding.owner }) }))
       const kept = (previous?.questions ?? []).filter((question) => !missing.some((finding) => finding.id === question.id))
       const merged = [...kept, ...fresh]
       if (!(yield* writeWhole(asking, JSON.stringify({ asked, until, questions: merged })))) {

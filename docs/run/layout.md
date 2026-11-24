@@ -87,7 +87,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/decider/decider.ts` | The decider: one call per open question it owns with the rules it reads, its reply checked as an answer on a quoted rule, an ask back, a duplicate link or an escalation, and that decision recorded on the item |
-| `packages/run/src/features/decider/decider-guard.ts` | The fixed list of topics orc never hands the decider, and the words an ask back hands the worker |
+| `packages/run/src/features/decider/decider-guard.ts` | The asked actions and the fixed list of topics orc never hands the decider, and the words an ask back hands the worker |
 | `packages/run/src/features/decider/decider-ask.ts` | The decider's call, Pi on `models.decider` with the policy as its system prompt and no tools |
 | `packages/run/src/features/decider/recommended.ts` | The recommended-option override for review questions with a `Recommended:` line |
 | `packages/run/src/features/decider/quoted-source.ts` | The check that a quoted rule is a whole clause of a rule the decider read |
