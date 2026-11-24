@@ -1,7 +1,8 @@
 import { Effect, FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { readOrcConfig } from "../../shared/config/index"
-import { ciOnlyBinDir, heavyBinDir, resolveHeavy, type HeavySettings } from "./heavy"
+import { agentWrapperDir, ciOnlyBinDir, heavyBinDir, resolveHeavy, type HeavySettings } from "./heavy"
+import { agentWrapperScripts } from "./heavy-agent-wrapper"
 import { ciOnlyScript, ciOnlyTools, detectWrap, standinScripts, type HeavyPlatform, type StandinSettings } from "./heavy-standin"
 import { RunnerError } from "../../shared/process/index"
 import { ensureGroup } from "../../shared/process/index"
@@ -61,6 +62,7 @@ export const writeHeavyBin = (
     const standins: StandinSettings = { home, group: settings.group, wrap, through: settings.through }
     const ciOnly = Object.fromEntries(ciOnlyTools.map((tool) => [tool, ciOnlyScript(tool)]))
     yield* writeStandinDir(ciOnlyBinDir(home), ciOnly)
+    yield* writeStandinDir(agentWrapperDir(home), agentWrapperScripts(home))
     return yield* writeStandinDir(heavyBinDir(home), yield* standinScripts(standins, settings.commands))
   })
 

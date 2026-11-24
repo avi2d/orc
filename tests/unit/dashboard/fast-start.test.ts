@@ -153,7 +153,7 @@ describe("the live dashboard's panes while their first read is in flight", () =>
 
   test("say they are reading the agents in the gluttons box and in its badge under the alerts tab, never that nothing is flagged", () =>
     withLivePanel({ width: 240, height: 60 }, hangingAgentsSources, async (setup) => {
-      const gluttons = await frameWhere(setup, (text) => text.includes("\u25cf claude main"));
+      const gluttons = await frameWhere(setup, (text) => text.includes("\u25cf claude"));
       expect(gluttons).toContain("reading the agents\u2026");
       setup.mockInput.pressKey("a");
       const alerts = await frameWhere(setup, (text) => text.includes("alert    quota-pace"));

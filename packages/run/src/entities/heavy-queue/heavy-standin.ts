@@ -72,7 +72,7 @@ const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, ne
     return ""
   })
 
-const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
+export const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 
 const launcher = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, real: string, timing?: StandinTiming): string => {
   const call = { tool, ...settings, commands, real, timing: timing ?? null } satisfies StandinCall

@@ -24,12 +24,12 @@ describe("agentCommand", () => {
   test("a nono exec runs the argv under nono with the profile instead of on the host", () => {
     const argv = ["pi", "-p", "a b"] as const
     expect(nonoRunArgs("/p.json", argv)).toEqual(["run", "--silent", "--profile", "/p.json", "--", "pi", "-p", "a b"])
-    const command = agentCommand({ kind: "nono", cwd: "/w", env: {}, nonoBinary: "/bin/nono", profilePath: "/p.json" }, argv)
+    const command = agentCommand({ kind: "nono", cwd: "/w", env: {}, nonoBinary: "/bin/nono", profilePath: "/p.json", piExtension: null }, argv)
     expect(ChildProcess.isStandardCommand(command) ? [command.command, ...command.args] : []).toEqual(["/bin/nono", "run", "--silent", "--profile", "/p.json", "--", "pi", "-p", "a b"])
   })
 
   test("a host exec runs the argv itself with only the env it names", () => {
-    const command = agentCommand({ kind: "none", cwd: "/w", env: { PATH: "/bin" } }, ["sh", "-c", "true"])
+    const command = agentCommand({ kind: "none", cwd: "/w", env: { PATH: "/bin" }, piExtension: null }, ["sh", "-c", "true"])
     expect(ChildProcess.isStandardCommand(command) ? { argv: [command.command, ...command.args], cwd: command.options.cwd, env: command.options.env, extendEnv: command.options.extendEnv } : null)
       .toEqual({ argv: ["sh", "-c", "true"], cwd: "/w", env: { PATH: "/bin", HEAVY_TESTS_CI_ONLY: "1" }, extendEnv: false })
   })

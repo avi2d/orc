@@ -9,7 +9,7 @@ w  warning
 W  warning bold
 X  codex bold
 
-C CCCCCC CCCC m mmm
+C CCCCCC m mmm
 fffffff sssssssssassssssssssssssssssssssssssssu  sss  mmmmmm mmmm             mm mmm
 ffff    wwwwwwwwwwwwuuuuauuuuuuuuuuuuuuuuuuuuuu  www  WWWWW WW WW WWW         mm mmm
 fffff   ssssssssssssssssassssssssssssssssssssss ssss  mmmmmm mmmm             mm mmm
