@@ -178,7 +178,8 @@ const QuestionFront = Schema.Struct({
   used: Schema.optional(Schema.Boolean),
   answered_by: Schema.optional(Schema.Literals(deciderAnswerKinds)),
   overturned: Schema.optional(OverturnedFront),
-  correction_queued: Schema.optional(Schema.Boolean)
+  correction_queued: Schema.optional(Schema.Boolean),
+  owner: Schema.optional(Schema.Literal("user"))
 })
 
 const Frontmatter = Schema.Struct({
@@ -256,7 +257,8 @@ const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: str
     asked: question.asked_at ?? "",
     blocks: question.blocks ?? true,
     ...choicesOf(question),
-    answer: answer === null ? null : parkedAnswerOf(question, answer)
+    answer: answer === null ? null : parkedAnswerOf(question, answer),
+    ...(question.owner === undefined ? {} : { owner: question.owner })
   }))
 
 const holdQuestionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<HoldQuestion> | string =>

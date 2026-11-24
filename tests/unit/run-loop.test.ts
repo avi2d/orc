@@ -250,7 +250,7 @@ describe("a run Pi loops in", () => {
       expect(report.implementPassed).toBe(false)
       expect(report.checksRounds).toBeNull()
       const asked = await Effect.runPromise(openQuestionsForRun(db, run.runId))
-      expect(asked).toMatchObject([{ id: "looping", text: expect.stringContaining("Pi failed bun run test 6 times in a row") }])
+      expect(asked).toMatchObject([{ id: "looping", text: expect.stringContaining("Pi failed bun run test 6 times in a row"), owner: "user" }])
     })
   })
 

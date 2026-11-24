@@ -17,7 +17,7 @@ A token account also supplies `--token-file`.
 
 `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` select the run's models.
 A model in an agent file takes precedence.
-Without the variables, the run uses its config or agent files.
+When the variables are empty, the run uses its config or agent files.
 
 `ORC_TASK_IMPLEMENTER_THINKING` and `ORC_TASK_FIXER_THINKING` select the run's thinking levels.
 The runner passes them to `orc run` as `--implementer-thinking` and `--fixer-thinking`.
@@ -27,8 +27,8 @@ The runner refuses any other level before it queues the run.
 The run history records the handed level on the step row.
 Without the variables, the run uses the agent file's `thinking` line.
 
-The beat sets none of these four variables yet.
-They stay unset until the routes task lands.
+The beat sets the two model variables from the picked account's `models` in `dispatch.json`, and leaves them empty for an account that names none.
+It sets neither thinking variable yet.
 
 ### Queue limits and files
 

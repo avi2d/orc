@@ -49,6 +49,17 @@ describe("assessSubquo on a snapshot built from subquo's published subquo.v1 sch
     const reading = assessSubquo(schemaBuiltSnapshot(), settings("main"), now)
     expect(reading.kind === "read" ? reading.pick : null).toBe("main")
   })
+  test("the pick is the roomiest account across Claude, OpenAI and OpenCode instead of within one vendor", () => {
+    const snapshot = withAccount("codex-home", {
+      status: "fresh",
+      observedAt: "2026-11-22T20:00:10.000Z",
+      source: "provider",
+      validUntil: "2026-11-22T20:02:10.000Z",
+      windows: [{ id: "weekly", scope: "all", percentLeft: 90, resetsAt: "2026-11-29T08:00:00.000Z" }]
+    })
+    const reading = assessSubquo(snapshot, settings("main", "second", "codex-home", "go"), now)
+    expect(reading.kind === "read" ? [reading.pick, reading.accounts.map((entry) => entry.kind)] : reading.reason).toEqual(["codex-home", ["usable", "usable", "usable", "unusable"]])
+  })
   test("a missing account is a parse error instead of an unusable account", () => {
     expect(decodeSubquo(schemaBuiltSnapshot(), ["main", "third"], now)).toEqual({
       kind: "error",

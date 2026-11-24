@@ -5,13 +5,18 @@ kind: reference
 A run that [no-mistakes](https://github.com/kunchenguid/no-mistakes) stops on review questions waits at that gate first, as [Running a task](running-a-task.md) shows.
 It waits 30 minutes, or the `ORC_ANSWER_WAIT_SECONDS` its machine sets.
 A finding marked `ask-user`, or with any action other than `auto-fix` and `no-op`, is one of those questions, with the finding's id and text.
+A finding whose action is not `auto-fix`, `no-op`, or `ask-user` waits for you, so the decider never answers it.
 The question `gate-cap` is another, asked once orc has answered 20 gates in the run without an outcome.
+The decider owns `gate-cap`.
+
+## A waiting run
+
 The next beat writes the questions into the started task's `parked_questions`.
 It prints `asking <task-id> on <machine>: the run waits until <time> for the captain's answer to <question-ids>` only for the questions the attention queue owns for you.
 `orc backlog` shows that task as `started asking (<question-ids>)`.
 The chat posts only the questions the attention queue owns for you, as it does a parked task's.
 Each question also waits in `orc attention` until an answer or a withdraw takes it out, as [The attention queue](attention-queue.md) shows.
-The beat first gives each question to the decider, which answers a routine one in that beat or escalates it to you, as [The decider](attention-queue.md#the-decider) shows.
+The beat first gives each question the attention queue owns for the decider to the decider, which answers a routine one in that beat or escalates it to you, as [The decider](attention-queue.md#the-decider) shows.
 Answer one with `orc backlog answer <task-id> <question-id>=<text>`, and the next beat hands every answer the run waits on to it through `orc runner answer` on its machine.
 It prints `handed <question-ids> to the run of <task-id> on <machine>`, and the run carries on at the same gate with no new dispatch.
 A wait on several questions gets every answer given so far each time the beat hands one more.
@@ -53,6 +58,10 @@ If the latest resumable run has changed or disappeared, Orc refuses the resume i
 The resumed attempt keeps the earlier completed steps and hands your answers to no-mistakes.
 If the resumed run stops on new questions, the task parks again with those beside the questions it kept, and it keeps the answers it already has.
 An answer given after the beat last read the waiting run is kept too.
+The resumed run records only the earlier questions that no `--answer` settled.
+An unchanged gate keeps its attention item, so you read the question once while the task waits.
+Your answer to a finding goes into the fix as instructions.
+The response declines every finding it does not fix.
 A task whose every blocking question has an answer can resume when its original machine and run are available.
 A [resume that parks again](#a-resume-that-parks-again) stays held instead until you release it.
 `orc backlog` shows a parked task as `parked (<question-ids>)`.

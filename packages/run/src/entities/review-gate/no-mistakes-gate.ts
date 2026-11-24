@@ -23,9 +23,11 @@ export interface OpenQuestion {
   readonly id: string
   readonly text: string
   readonly asked?: string | undefined
+  readonly asking?: string | undefined
   readonly blocks?: boolean | undefined
   readonly options?: ReadonlyArray<{ readonly text: string; readonly outcome?: string | undefined; readonly picture?: string | undefined }> | undefined
   readonly recommendation?: string | undefined
+  readonly owner?: "user" | undefined
 }
 
 export interface NoMistakesFinding {
@@ -36,6 +38,8 @@ export interface NoMistakesFinding {
   readonly action: string
   readonly description: string
 }
+
+export type PendingFinding = NoMistakesFinding & Pick<OpenQuestion, "owner">
 
 export interface ParkedGate {
   readonly step: string
@@ -128,13 +132,15 @@ export const parseRun = (output: string): ParsedRun => {
   }
 }
 
-const isQuestion = (finding: NoMistakesFinding): boolean => finding.id.startsWith("question-")
+type Classified = Pick<NoMistakesFinding, "id" | "action">
+
+const isQuestion = (finding: Classified): boolean => finding.id.startsWith("question-")
 
 const orcActions = new Set(["auto-fix", "no-op"])
 
-const isAskUser = (finding: NoMistakesFinding): boolean => !orcActions.has(finding.action) && !isQuestion(finding)
+const isAskUser = (finding: Classified): boolean => !orcActions.has(finding.action) && !isQuestion(finding)
 
-const isUnknownAction = (finding: NoMistakesFinding): boolean => isAskUser(finding) && finding.action !== "ask-user"
+export const isUnknownAction = (finding: Classified): boolean => isAskUser(finding) && finding.action !== "ask-user"
 
 export const askUserFindings = (findings: ReadonlyArray<NoMistakesFinding>, allow: ReadonlyArray<AllowWord>): ReadonlyArray<NoMistakesFinding> =>
   allow.includes(askUserWord) ? findings.filter(isUnknownAction) : findings.filter(isAskUser)
