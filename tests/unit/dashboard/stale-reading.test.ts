@@ -138,8 +138,8 @@ const agentsGlance = (): ReadonlyArray<string> => glanceLines({ blocks: [], sess
 describe("the agents column over a session quota week read thirteen hours ago", () => {
   test("shows the reading's age instead of the stale week's pace flags", () => {
     const rows = agentsGlance();
-    expect(rows.join("\n")).not.toContain("claude second's week");
-    expect(rows).toContain("! claude second's 5 hours and week read 13h 0m ago, too old to flag its agents");
+    expect(rows.join("\n")).not.toContain("claude main's week");
+    expect(rows).toContain("! claude main's 5 hours and week read 13h 0m ago, too old to flag its agents");
   });
 
   test("keeps the flags of a limit read seconds ago", () => {
@@ -148,7 +148,7 @@ describe("the agents column over a session quota week read thirteen hours ago", 
 
   test("shows the reading's age instead of the stale week's pace flags in the compact box", () => {
     const frame = boxLines({ sessions: Option.some(staleWeekSessions()) }).join("\n");
-    expect(frame).not.toContain("claude second's week");
-    expect(frame).toContain("! claude second's 5 hours and week read 13h 0m ago, too");
+    expect(frame).not.toContain("claude main's week");
+    expect(frame).toContain("! claude main's 5 hours and week read 13h 0m ago, too");
   });
 });

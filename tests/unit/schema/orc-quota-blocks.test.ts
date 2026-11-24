@@ -17,9 +17,13 @@ const accountBlocks = (name: OrcQuotaFixture): ReadonlyArray<QuotaBlock> =>
   blocksWith(orcQuotaOf(name, now)).filter((block) => block.title.startsWith("account"));
 
 describe("quotaBlocks over the accounts orc quota --json prints", () => {
-  test("puts one account block per account between live claude and codex", () => {
+  test("does not show bare claude when Subquo names only main and quota-axi keys it default", () => {
+    expect(blocksWith(orcQuotaOf("main", now))[0]?.title).toBe("claude main");
+  });
+
+  test("puts one account block per account between live claude and codex without guessing the login", () => {
     expect(blocksWith(orcQuotaOf("main-second", now)).map((block) => block.title)).toEqual([
-      "claude second",
+      "claude",
       "account main",
       "account second",
       "codex",

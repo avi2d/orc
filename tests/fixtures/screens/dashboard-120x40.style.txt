@@ -19,12 +19,12 @@ W  warning bold
 X  codex bold
 
 mm fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmmm Gfffff f fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mm
-m C CCCCCC CCCCCC m mmm W WWWW WWW WW WW WWW               mm w ffff fff ffffff fffff ffffff f ff                      m
+m C CCCCCC CCCC m mmm W WWWW WWW WW WW WWW                 mm w ffff fff ffffff fffff ffffff f ff                      m
 m   f fffff    ssssassssssssssss  sss  sss sssss    mm mmm mm f fff fffffff fff fffff fff ffff fff ffffffff f ff       m
 m   ffff       wwwwwwuauuuuuuuuu  www  WW WWWW      mm mmm mm w ffff f ffff fff ffff fffffff f ff                      m
 m   fffff ffff sssssssasssssssss ssss  sss sssss    mm mmm mm f ffff f fffff fff ffff fffffff fff fff ffffff fff f fff m
-m C CCCCCCC CCCCCC w wwwwwwww                              mm                                                          m
-m   mmm mmmmm mmmmmmm                                      mm                                                          m
+m C CCCCCCC CCCC s ssss sss                                mm                                                          m
+m   fff ffffff sssssssssssssuuuu  sss  mm mmmm      mmm mm mm                                                          m
 m X XXXXX m mmmm m mmm mmm mmm mm mm mm                    mm                                                          m
 m   f fffff    ssssssssssssssssa ssss  mm mmmm      mm mmm mm                                                          m
 m   ffff       ssssssssssssssuua  sss  WW WWWW      mm mmm mm                                                          m
@@ -34,10 +34,10 @@ m   ffff       sssssssssssssassu  sss  sss sssss     mm mm mm                   
 m   fffff      ssssssssssssssauu  sss  W WWWW          mmm mm                                                          m
 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm                                                          m
 mm GOOOOOOO m Gmmmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mm mmm                                                          m
-m E FFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF              mm                                                          m
-m   FFFFFFFF FFFF                                          mm                                                          m
+m E FFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF  mm                                                          m
+m E FFFFFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF           mm                                                          m
+m   FFFFFF FFFF                                            mm                                                          m
 m ww wwww wwwww                                            mm                                                          m
-m                                                          mm                                                          m
 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 mm ffffffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmoo GOOOOOOO O OOOOO ooooooooooooooooooooooooooooooo m mmm oo
 m FFFFF  mmm sss  mmm ssssssssss  mmm ss  mmmm sss         mo   uuuuuuu                 uuuu uuuu uuuu uuuuu uuuu uuuu o

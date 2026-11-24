@@ -107,7 +107,7 @@ describe("the banded dashboard", () => {
 
   test("draws each quota row with a pace bar and a reserve column under its header's run-out figure", () => {
     const text = texts(120, 40).join("\n");
-    expect(text).toContain("● claude second · max · runs out in 1d 20h");
+    expect(text).toContain("● claude main · max · runs out in 1d 20h");
     expect(text).toContain("● opencode-go · runs out in 22d");
     expect(text).toContain("98%");
     expect(text).toContain("┃");

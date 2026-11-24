@@ -13,7 +13,7 @@ export type OrcQuotaFixture =
   | "second-used-up"
   | "second-login-expired";
 
-export const recordedOrcQuota: OrcQuotaFixture = "second-login-expired";
+export const recordedOrcQuota: OrcQuotaFixture = "main";
 
 export const orcQuotaText = (name: OrcQuotaFixture): string => fixture(`orc-quota/${name}.json`);
 

@@ -1,4 +1,4 @@
-● claude second · max   quota, gluttons, queue, machines every 10s · alerts every 2s
+● claude main · max     quota, gluttons, queue, machines every 10s · alerts every 2s
   5 hours    ━━━━━┃━━━━━━━━━━━━━━╸  98% left                        resets in 1h 11m
   week       ━━━━━━╸──┃───────────  31% left  runs out in 1d 20h    resets in 2d 20h
   fable week ━━━━━━━━━┃━━━━━━━━━━━ 100% left                        resets in 2d 20h

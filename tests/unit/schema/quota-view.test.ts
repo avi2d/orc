@@ -91,7 +91,7 @@ describe("quotaBlocks, against the recorded quota-axi and orc quota reports", ()
     if (decoded.kind !== "ok") throw new Error("expected ok, got " + JSON.stringify(decoded));
     const blocks = quotaBlocks(quotaAxiRead({ ...decoded, capturedAt: now }), accounts(), now);
     expect(blocks.map((block) => block.title)).toEqual([
-      "claude",
+      "claude second",
       "account second",
       "codex codex-home",
       "codex openai-codex",

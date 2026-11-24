@@ -52,9 +52,10 @@ const namedKey = (key: string | undefined): string | undefined => key === "defau
 
 const dispatchAccountName = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>): string | undefined => {
   if (entry.provider !== "claude" || orcQuota.kind !== "ok" || orcQuota.value.kind !== "read") return undefined;
+  const { accounts } = orcQuota.value;
+  if (accounts.length === 1) return accounts[0]?.account;
   const keys = keysOf(entry);
-  // The default key does not identify a login across commands.
-  const matches = orcQuota.value.accounts.filter(({ account }) => account !== "default" && keys.includes(account));
+  const matches = accounts.filter(({ account }) => keys.includes(account));
   return matches.length === 1 ? matches[0]?.account : undefined;
 };
 

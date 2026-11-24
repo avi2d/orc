@@ -152,10 +152,10 @@ describe("the dashboard says how much is left, whether it lasts, and when it res
 describe("the dashboard names each agent spending over its share of a running-ahead limit", () => {
   test("by its project, beside the account and the limit", () => {
     expect(printed().filter((line) => line.startsWith("⚑")).toSorted()).toEqual([
-      "⚑ a no-mistakes run is spending over its share of claude second's week",
-      "⚑ my-home is spending over its share of claude second's week",
+      "⚑ a no-mistakes run is spending over its share of claude main's week",
+      "⚑ my-home is spending over its share of claude main's week",
       "⚑ my-home is spending over its share of opencode-go's month",
-      "⚑ shop is spending over its share of claude second's week",
+      "⚑ shop is spending over its share of claude main's week",
     ]);
   });
 
@@ -234,7 +234,7 @@ describe("the dashboard fits the terminal it runs in", () => {
       for (const line of lines) expect(lineWidth(line)).toBeLessThanOrEqual(columns);
       const text = lines.map(plain).join("\n");
       for (const header of ["● claude", "● codex", "● opencode-go"]) expect(text).toContain(header);
-      expect(text.includes("● account second") || text.includes("+1 more account")).toBe(true);
+      expect(text.includes("● account main") || text.includes("+1 more account")).toBe(true);
       expect((text.match(/⚑/gu)?.length ?? 0) + Number(/^\+(\d+) more flags?$/mu.exec(text)?.[1] ?? 0)).toBe(4);
       expect(text).toContain("queue    north · 2 running");
       expect(text).toContain("actions  toolshed · 2 running");

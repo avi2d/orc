@@ -12,7 +12,7 @@ X  codex bold
 mmmmmmmmm mmmm mmmmm mmmmm mmmmm mmmmmm
 mmmmm mmmmm
   mmmmmmm           mmmmm  mmm  mmm mmmm
-C CCCCCC CCCCCC m mmmmmmm mmm mmmm mmmmm
+C CCCCCC CCCC m mmmmmmm mmm mmmm mmmmm
 uu uuuuuu uuu uuuu u uuuu uuuuuuuu uuuu
 mmmmmm mmmm
 s fffffffffff ffffff  fff  mmm mmmm mmmm

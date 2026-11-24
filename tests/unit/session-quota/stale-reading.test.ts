@@ -11,7 +11,7 @@ const readThirteenHoursAgo = weekAtZero.replace('"refreshedAt": "2026-10-13T20:1
 const panel = (quotaJson: string): ReadonlyArray<string> => sessionLines(sessionViewOfQuota(quotaJson, recordedNow), 84).map(plain);
 
 const claudeSecond = (rows: ReadonlyArray<string>): ReadonlyArray<string> =>
-  rows.slice(rows.indexOf("● claude second · assumed the only login"), rows.indexOf("● codex · joined by credential key"));
+  rows.slice(rows.indexOf("● claude main · assumed the only login"), rows.indexOf("● codex · joined by credential key"));
 
 describe("a session quota window read thirteen hours ago at 0 percent", () => {
   test("shows its age instead of 100 points used, the fair rate or the pace", () => {

@@ -54,11 +54,11 @@ describe("the session pipeline over the recorded fixture home", () => {
 
   // The fair share is the 31 points the week has left over its hours to reset, split among the three live burners.
   test("flags every live session over its fair share of the Claude week, which is ahead and past its first tenth", () => {
-    const week = windowOf(view(), "claude second", "seven_day");
+    const week = windowOf(view(), "claude main", "seven_day");
     const hoursLeft = (Date.parse("2026-10-16T17:00:00.123738Z") - DateTime.toEpochMillis(recordedNow)) / 3_600_000;
     expect(week.fairPointsPerHour).toBeCloseTo(31 / hoursLeft / 3, 9);
     expect(flaggedIn(week)).toEqual(["pane:w1A:p2", "pane:w2B:p2", "pid:4242"]);
-    expect(flaggedIn(windowOf(view(), "claude second", "five_hour"))).toEqual([]);
+    expect(flaggedIn(windowOf(view(), "claude main", "five_hour"))).toEqual([]);
   });
 
   test("flags nothing on the Codex week, which is ahead but inside its first tenth", () => {
@@ -87,7 +87,7 @@ describe("the session pipeline over the recorded fixture home", () => {
 
   test("names the model of every session's calls in each window", () => {
     const modelsIn = (window: WindowView) => window.sessions.map((row) => [row.session.id, row.models.map((model) => model.model)]);
-    expect(modelsIn(windowOf(view(), "claude second", "seven_day"))).toEqual([
+    expect(modelsIn(windowOf(view(), "claude main", "seven_day"))).toEqual([
       ["pane:w1A:p2", ["claude-opus-5-5"]],
       ["pane:w2B:p2", ["claude-opus-5-5"]],
       [endedNotes, ["claude-opus-5-5"]],
