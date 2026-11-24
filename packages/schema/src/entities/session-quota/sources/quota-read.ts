@@ -47,10 +47,6 @@ const accountWindows = {
 // quota-axi reuses a reading only while it is younger than its --max-age, at most an hour, so a log reading that old asks quota-axi again.
 export const logFreshMillis = 3_600_000;
 
-export type SavedAge =
-  | { readonly kind: "dated"; readonly fetchedAt: DateTime.Utc; readonly ageSeconds: number }
-  | { readonly kind: "undated" };
-
 export const staleSourceAgeSeconds = (source: WindowSource, now: DateTime.Utc): number | undefined => {
   const readAt = source.kind === "quota-axi" ? source.readAt : source.observedAt;
   const ageMillis = DateTime.toEpochMillis(now) - DateTime.toEpochMillis(readAt);
@@ -59,14 +55,6 @@ export const staleSourceAgeSeconds = (source: WindowSource, now: DateTime.Utc): 
 
 export const savedAgeSeconds = (fetchedAt: DateTime.Utc, now: DateTime.Utc): number =>
   Math.max(0, Math.floor((DateTime.toEpochMillis(now) - DateTime.toEpochMillis(fetchedAt)) / 1000));
-
-// Saved profiles reuse quota-axi's bound on reuse: a profile read more than an hour ago reads stale.
-export const staleSavedAgeSeconds = (age: SavedAge, stale: boolean, now: DateTime.Utc): number | undefined => {
-  if (age.kind !== "dated") return undefined;
-  return stale || DateTime.toEpochMillis(now) - DateTime.toEpochMillis(age.fetchedAt) >= logFreshMillis
-    ? savedAgeSeconds(age.fetchedAt, now)
-    : undefined;
-};
 
 interface Covered {
   readonly shape: WindowShape;

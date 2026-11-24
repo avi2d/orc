@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { TextRenderable } from "@opentui/core";
 import { createTestRenderer } from "@opentui/core/testing";
 import { DateTime, Effect } from "effect";
-import { decodeSavedProfiles, decodeQuota, quotaBlocks } from "@avi2dg/orc-schema";
+import { decodeQuota, quotaBlocks } from "@avi2dg/orc-schema";
 import { blockDocument, type Block, frameText, quotaLines } from "@avi2dg/orc-quota";
 import { fixture } from "../../lib/fixtures";
 import { orcQuotaOf } from "../../lib/orc-quota";
@@ -23,9 +23,8 @@ const brandColours = [
 
 const blocks = () => {
   const quota = decodeQuota(fixture("quota-axi/full.json"));
-  const savedProfiles = decodeSavedProfiles(fixture("saved-profiles/status.json"));
-  if (quota.kind !== "ok" || savedProfiles.kind !== "ok") throw new Error("the fixtures do not decode");
-  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: now }), { ...savedProfiles, capturedAt: now }, orcQuotaOf("second-login-expired", now), now);
+  if (quota.kind !== "ok") throw new Error("the fixtures do not decode");
+  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: now }), orcQuotaOf("second-login-expired", now), now);
 };
 
 const normalize = (frame: string): string =>

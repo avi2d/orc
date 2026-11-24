@@ -1,6 +1,6 @@
 import { type Context, type Element, div } from "gpui-kit"
 import { type ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { settings } from "herdr"
+import { monospace } from "./fonts"
 import type { Reading } from "./orc-read"
 import type { palette } from "./palette"
 import { type Turn, type TurnCall, callMark, outputSize, outputStart, turnHeader } from "./turns"
@@ -23,11 +23,6 @@ export interface TurnsWords {
 }
 
 const outputLines = 20
-
-const monospace = (): string => {
-  const family = settings()["font_family"]
-  return typeof family === "string" ? family : "Menlo"
-}
 
 const clock = (at: number): string => {
   const time = new Date(at)

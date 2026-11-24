@@ -2,6 +2,7 @@ export { textInput, agentCommand, hostExec, shellInAgent, streamShellInAgent } f
 export type { CommandResult, Argv, AgentExec } from "./agent-exec"
 export { hostGitSafetyEnv, hostGitRefusalExit, hostGitShim } from "./host"
 export { openNonoExec } from "./nono-exec"
+export { toolTimeCap } from "./tool-time-cap"
 export { defaultToolchainResolver, withInstallFolders, within, loginCheckCommand, modelCredentialFor, piAgentModels, providerKeyOf } from "./nono-profile"
 export type { CheckedModelWindow, HostTools, ToolchainResolver, ModelCredential, ProviderKey } from "./nono-profile"
 export { inheritedEnv } from "./nono"

@@ -1,7 +1,10 @@
 import { type Color, type Context, type Element, div } from "gpui-kit"
 import { Input, type InputState, type ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { openOverlay, settings } from "herdr"
-import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, agentLabel, approveRow, cardAnswers, cardPlace, cardStatuses, filterCards, namedModels, opensTurns, prNumber, projectsOf, railLabel, sendBackArgs, stepRows } from "./agents"
+import { openOverlay } from "herdr"
+import { monospace } from "./fonts"
+import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, approveRow, cardAnswers, cardPlace, cardStatuses, filterCards, namedModels, opensTurns, prNumber, projectsOf, railLabel, sendBackArgs, stepRows } from "./agents"
+import { type ChecksSummary, logLines } from "./checks"
+import { checksView } from "./checks-view"
 import type { Show, ShownStep } from "./guard"
 import { optionView } from "./ask-view"
 import type { InboxAnswer, InboxApproval } from "./inbox"
@@ -9,6 +12,7 @@ import { inboxItemView } from "./inbox-view"
 import { linkedText } from "./links-view"
 import { type Reading, readText } from "./orc-read"
 import type { palette } from "./palette"
+import { type Pane, stepBar } from "./step-bar"
 import { type Turn } from "./turns"
 import { turnsView } from "./turns-view"
 import { openInbox } from "./views"
@@ -16,8 +20,6 @@ import { openInbox } from "./views"
 type Palette = ReturnType<typeof palette>
 
 export type Chosen = { readonly kind: "step"; readonly id: number } | { readonly kind: "approve" }
-
-export type Pane = "turns" | "raw"
 
 export type MergeOutcome = { readonly kind: "merging" } | { readonly kind: "failed"; readonly reason: string }
 
@@ -69,16 +71,6 @@ const markColor = (t: Palette, mark: Mark): Color => {
     case "○":
       return t.dim
   }
-}
-
-const escapeSequence = new RegExp(String.fromCharCode(27) + "\\[[0-9;?]*[A-Za-z]", "g")
-
-export const logLines = (text: string): ReadonlyArray<string> =>
-  text.replace(escapeSequence, "").replace(/\n$/, "").split("\n")
-
-const monospace = (): string => {
-  const family = settings()["font_family"]
-  return typeof family === "string" ? family : "Menlo"
 }
 
 const chip = (t: Palette, id: string, label: string, on: boolean, pick: (cx: Context) => void): Element =>
@@ -232,24 +224,6 @@ export const stepsColumn = (t: Palette, card: Card | null, shown: StepsShown, ac
     .children(changesProblem === null ? [] : [div().px(12).py(8).border_t(1).border_color(t.border).text_size(12).text_color(t.blocked).child(`No Changes column: ${changesProblem}`)])
 }
 
-const paneChoice = (t: Palette, pane: Pane, label: string, on: boolean, act: AgentsActions): Element =>
-  div().id(`pane-${pane}`).px(10).py(2).rounded(4).cursor_pointer()
-    .bg(on ? t.selected : t.background).text_color(on ? t.foreground : t.muted)
-    .hover((style) => style.bg(t.hover))
-    .on_click((_event, cx) => act.setPane(cx, pane))
-    .child(label)
-
-const stepBar = (t: Palette, step: ShownStep, title: string, source: string, pane: Pane, act: AgentsActions): Element => {
-  const agent = agentLabel({ model: step.model, effort: step.thinking })
-  return h_flex().px(16).h(40).gap(12).flex_shrink_0().items_center().border_b(1).border_color(t.border)
-    .child(div().flex_shrink_0().font_semibold().child(title))
-    .children(agent === null ? [] : [div().flex_shrink_0().text_size(12).text_color(t.muted).child(agent)])
-    .children(opensTurns(step)
-      ? [h_flex().gap(2).flex_shrink_0().child(paneChoice(t, "turns", "Turns", pane === "turns", act)).child(paneChoice(t, "raw", "Raw", pane === "raw", act))]
-      : [])
-    .child(div().flex_1().min_w_0().truncate().text_right().text_size(12).text_color(t.dim).child(source))
-}
-
 const detailPane = (t: Palette, parts: ReadonlyArray<Element>): Element =>
   v_flex().flex_1().min_w_0().h_full().bg(t.background).children(parts)
 
@@ -362,12 +336,16 @@ export interface DetailShown {
   readonly pane: Pane
   readonly turns: Reading<ReadonlyArray<Turn>>
   readonly log: Reading<string>
+  readonly summary: Reading<ChecksSummary>
   readonly thinking: ReadonlySet<string>
   readonly calls: ReadonlySet<string>
+  readonly checks: ReadonlySet<string>
   readonly turnsScroll: ScrollHandle
   readonly logScroll: ScrollHandle
+  readonly checksScroll: ScrollHandle
   readonly flipThinking: (turn: string, cx: Context) => void
   readonly flipCall: (call: string, cx: Context) => void
+  readonly flipCheck: (check: string, cx: Context) => void
 }
 
 export const detailView = (t: Palette, card: Card | null, act: AgentsActions, shown: DetailShown): Element => {
@@ -387,13 +365,22 @@ export const detailView = (t: Palette, card: Card | null, act: AgentsActions, sh
     const settled = card.standing.status === "Failed" || card.standing.status === "Done"
     return detailNote(t, settled ? "This run ended before it recorded a step" : "No step has started yet")
   }
+  return detailStep(t, card, card.runId, step, shown, act)
+}
+
+const detailStep = (t: Palette, card: Card, runId: string, step: ShownStep, shown: DetailShown, act: AgentsActions): Element => {
   const title = stepTitle(card, shown.steps, step.id)
-  if (opensTurns(step) && shown.pane === "turns") {
-    return detailPane(t, [...shown.back, stepBar(t, step, title, "Pi session", shown.pane, act),
+  const log = `orc log ${runId} ${step.id}`
+  if (step.name === "checks" && shown.pane === "parsed") {
+    return detailPane(t, [...shown.back, stepBar(t, step, title, log, shown.pane, act.setPane),
+      div().flex_1().min_h_0().child(checksView(t, shown.summary, { of: `${runId}/${step.id.toString()}`, flipped: shown.checks, flip: shown.flipCheck }, shown.checksScroll))])
+  }
+  if (opensTurns(step) && shown.pane === "parsed") {
+    return detailPane(t, [...shown.back, stepBar(t, step, title, "Pi session", shown.pane, act.setPane),
       div().flex_1().min_h_0().child(turnsView(t, shown.turns, { thinking: shown.thinking, calls: shown.calls }, {
         toggleThinking: (turn, cx) => shown.flipThinking(turn, cx),
         toggleCall: (call, cx) => shown.flipCall(call, cx)
       }, shown.turnsScroll, { reading: "Reading the step's Pi session", empty: "No turn yet. Pi writes its session after its first reply." }))])
   }
-  return detailPane(t, [...shown.back, stepBar(t, step, title, `orc log ${card.runId} ${step.id}`, shown.pane, act), logBody(t, shown.log, shown.logScroll)])
+  return detailPane(t, [...shown.back, stepBar(t, step, title, log, shown.pane, act.setPane), logBody(t, shown.log, shown.logScroll)])
 }
