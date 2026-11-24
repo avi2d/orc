@@ -24,7 +24,7 @@ interface Forge {
   readonly state?: "OPEN" | "CLOSED" | "MERGED"
   readonly checks?: ReadonlyArray<Rollup>
   readonly behind?: number
-  readonly update?: "updates" | "conflicts" | "head moved"
+  readonly update?: "updates" | "conflicts" | "head moved" | "reject duplicate"
   readonly afterUpdate?: ReadonlyArray<HeadView>
   readonly parents?: string
   readonly flakyViews?: number
@@ -43,6 +43,12 @@ const updateReply = (update: Forge["update"]): ReadonlyArray<string> => {
     }
     case "head moved": {
       return ["echo '{\"message\":\"expected head sha did not match current head ref.\"}'", "echo 'gh: expected head sha did not match current head ref. (HTTP 422)' >&2", "exit 1"]
+    }
+    case "reject duplicate": {
+      return [
+        "if [ -f \"$VIEWS/updated\" ]; then echo 'gh: duplicate update request (HTTP 422)' >&2; exit 1; fi",
+        ...updateReply("updates")
+      ]
     }
     case "updates":
     case undefined: {
@@ -230,6 +236,28 @@ describe("chat merge returns without waiting for CI", () => {
 
       await writeFile(join(fixture.dir, "views", "after-last.json"), viewJson("OPEN", { head: newHead, checks: [passed("lint"), status("ci/deploy")] }))
       expect(await session.call("merge_task", { id: "orc-1", basis: "captain-word" })).toBe("merged orc-1 " + prUrl)
+      expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+    })
+  }, 60_000)
+
+  test("a rejected duplicate update does not let the new head merge without a check that passed before the first request", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, {
+        behind: 1,
+        update: "reject duplicate",
+        checks: [passed("lint"), status("ci/deploy")],
+        afterUpdate: [{ head, checks: [passed("lint")] }, { head: newHead, checks: [passed("lint")] }]
+      })
+      const session = sessionFor(fixture)
+      const merge = () => session.call("merge_task", { id: "orc-1", basis: "captain-word" })
+      expect(await merge()).toContain("requested branch update for orc-1")
+      expect(await merge().then(String, refusalOf)).toContain("duplicate update request")
+      expect(await merge().then(String, refusalOf)).toContain("the check ci/deploy was green before the update and has not reported green")
+      expect(await mergeCalls(fixture)).toEqual([])
+
+      await writeFile(join(fixture.dir, "views", "after-last.json"), viewJson("OPEN", { head: newHead, checks: [passed("lint"), status("ci/deploy")] }))
+      expect(await merge()).toBe("merged orc-1 " + prUrl)
       expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
     })
   }, 60_000)

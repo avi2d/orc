@@ -211,13 +211,12 @@ const refuseUnsettled = (landing: Landing, approved: Approved, settled: Unsettle
 
 const retryCommand = (landing: Landing): string => "orc merge " + landing.id + " --basis " + landing.basis + " --no-wait"
 
-const landUpdated = (landing: Landing, checked: PullRequestView, noWait: boolean) =>
+const landUpdated = (landing: Landing, checked: PullRequestView, approved: Approved, noWait: boolean) =>
   Effect.gen(function*() {
-    const approved = approvedAt(checked)
     if (noWait) {
       yield* savePendingUpdate(landing.root, landing.id, { url: landing.url, ...approved })
     }
-    yield* updateBranch(landing, checked).pipe(Effect.onError(() => clearPendingUpdate(landing.root, landing.id)))
+    yield* updateBranch(landing, checked)
     if (noWait) {
       return "requested branch update for " + landing.id + " " + landing.url + "; not merged. Run " + retryCommand(landing) + " again once the new head checks are green."
     }
@@ -309,8 +308,9 @@ export const mergeTask = (
       return yield* refuse(refusal(id, url, ["is " + view.state.toLowerCase() + ", not open"]))
     }
     const landing: Landing = { root, id, url, basis, sendBack }
-    const pending = yield* readPendingUpdate(root, id)
-    if (pending !== null && pending.url === url && pending.head !== view.headRefOid) {
+    const saved = yield* readPendingUpdate(root, id)
+    const pending = saved?.url === url ? saved : null
+    if (pending !== null && pending.head !== view.headRefOid) {
       yield* checkUpdatedHead(landing, pending, view)
     }
     const reasons = checkRefusals(view)
@@ -318,5 +318,14 @@ export const mergeTask = (
       return yield* refuse(refusal(id, url, reasons))
     }
     const behind = yield* behindBy(id, url, view)
-    return yield* behind > 0 ? landUpdated(landing, view, options.noWait) : mergeAt(landing, view)
+    const checked = approvedAt(view)
+    const sameHead = pending?.head === checked.head ? pending : null
+    if (behind > 0) {
+      const approved = sameHead === null ? checked : { ...checked, green: [...new Set([...sameHead.green, ...checked.green])] }
+      return yield* landUpdated(landing, view, approved, options.noWait)
+    }
+    if (sameHead !== null) {
+      return yield* refuse(refusal(id, url, ["its branch update has not produced a new head, so run " + retryCommand(landing) + " again once the new head's checks have reported"]))
+    }
+    return yield* mergeAt(landing, view)
   })
