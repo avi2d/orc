@@ -1,6 +1,7 @@
 import { type AsyncContext, type Context, type Element, View, div } from "gpui-kit"
 import { Scrollbar, h_flex, v_flex, v_virtual_list } from "gpui-base"
-import { settings, shared } from "herdr"
+import { shared } from "herdr"
+import { monospace } from "../../src/fonts"
 import { type ChangedFile, type DiffRow, type RunChanges, changeTotals, changesKey, diffRows, runChanges } from "../../src/changes"
 import { readDiff } from "../../src/changes-read"
 import type { Reading } from "../../src/orc-read"
@@ -18,11 +19,6 @@ const everyMs = 1000
 const rowHeight = 20
 const fileHeight = 28
 const glyphWidth = 7
-
-const monospace = (): string => {
-  const family = settings()["font_family"]
-  return typeof family === "string" ? family : "Menlo"
-}
 
 const heldChanges = (): Reading<RunChanges | null> => {
   const value = shared(changesKey)
