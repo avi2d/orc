@@ -373,9 +373,9 @@ export const runBeat = (
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task))
     yield* openRunDeaths(root, actions, at).pipe(Effect.andThen(writeBeatWaits(root, at, roomWaits(queued, actions, fresh.tasks, fresh.merged, deciderOwns))))
-    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at))
-    yield* pollMainCi(root, at)
-    yield* pollBaseCi(root, projects, latest.map(taskPr).filter((url) => url !== null), at)
+    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at)).pipe(
+      Effect.tap(() => pollMainCi(root, at).pipe(Effect.andThen(pollBaseCi(root, projects, latest.map(taskPr).filter((url) => url !== null), at))))
+    )
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
         ...reported,
         ...stalls.flatMap(Option.toArray),

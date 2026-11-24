@@ -54,7 +54,7 @@ const readJson = <S extends Schema.Top & { readonly DecodingServices: never }>(a
     Effect.catchTag("RunnerError", () => Effect.succeed(Option.none()))
   )
 
-export const recordMainCiAlarm = (root: string, run: Pick<typeof WorkflowRun.Type, "status" | "conclusion" | "html_url" | "name" | "head_branch" | "head_sha">, at: string, context = "") =>
+export const recordMainCiAlarm = (root: string, run: Pick<typeof WorkflowRun.Type, "status" | "conclusion" | "html_url" | "name" | "head_branch" | "head_sha">, at: string, context = ""): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   run.status === "completed" && run.conclusion !== null && redConclusions.has(run.conclusion)
     ? recordEvent(root, {
       key: "main-ci." + new Bun.CryptoHasher("sha256").update(run.html_url).digest("hex"),
