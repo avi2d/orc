@@ -73,7 +73,7 @@ describe("orc run --sandbox none", () => {
 
   test("with a prepare command that fails is refused before Pi runs instead of starting Pi without its install", async () => {
     await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
-      await writeFile(join(repo, ".no-mistakes.yaml"), "commands:\n  prepare: exit 3\n  greeting: test -f greeting.txt\n")
+      await writeFile(join(repo, ".no-mistakes.yaml"), "commands:\n  prepare: exit 3\n  lint: test -f greeting.txt\n")
       git(repo, ["add", ".no-mistakes.yaml"], env)
       git(repo, ["commit", "-qm", "prepare that fails"], env)
       const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], repo, env)
@@ -86,7 +86,7 @@ describe("orc run --sandbox none", () => {
 
   test("runs the prepare command in the copy before Pi starts instead of starting Pi without its install", async () => {
     await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
-      await writeFile(join(repo, ".no-mistakes.yaml"), "commands:\n  prepare: touch prepared\n  greeting: test -f greeting.txt\n")
+      await writeFile(join(repo, ".no-mistakes.yaml"), "commands:\n  prepare: touch prepared\n  lint: test -f greeting.txt\n")
       git(repo, ["add", ".no-mistakes.yaml"], env)
       git(repo, ["commit", "-qm", "prepare that touches"], env)
       const piPath = join(fakeBin, "pi")
