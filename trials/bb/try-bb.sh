@@ -62,6 +62,11 @@ if [ "$installed" != "$version" ]; then
   exit 1
 fi
 export ORC_HOME=${ORC_HOME:-$real_home/.orc}
+# The orc launcher can find its runtime through HOME, which the scratch home below does not hold.
+mkdir -p "$scratch/bin"
+printf '#!/bin/bash\nHOME=%q exec %q "$@"\n' "$real_home" "$(command -v orc)" > "$scratch/bin/orc"
+chmod +x "$scratch/bin/orc"
+export PATH=$scratch/bin:$PATH
 export HOME=$scratch/home
 export BB_DATA_DIR=$data
 export BB_SERVER_PORT=$port

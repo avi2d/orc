@@ -19,9 +19,13 @@ const parkedQuestions = (
     (known.answer === null || answersAsking(known.answer, asking))
   const kept = prior.filter((known) => known.answer !== null && answersAsking(known.answer, asking) && !open.some((question) => question.id === known.id))
   return Arr.appendAll(
-    Arr.map(open, (question): ParkedQuestion =>
-      prior.find((known) => stillAsked(known, question)) ??
-      { id: question.id, text: question.text, asked: askedOf(question), blocks: question.blocks ?? true, ...choicesOf(question), answer: null }),
+    Arr.map(open, (question): ParkedQuestion => {
+      const known = prior.find((candidate) => stillAsked(candidate, question))
+      if (known === undefined) {
+        return { id: question.id, text: question.text, asked: askedOf(question), blocks: question.blocks ?? true, ...choicesOf(question), answer: null, ...(question.owner === undefined ? {} : { owner: question.owner }) }
+      }
+      return known
+    }),
     kept
   )
 }
@@ -118,7 +122,7 @@ export const parkStartedTask = (
       if (record.state.kind !== "started") {
         return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task parks" })
       }
-      const lastAsking = asked.find((question) => question.asked !== undefined)?.asked ?? null
+      const lastAsking = asked.find((question) => question.asking !== undefined)?.asking ?? asked.find((question) => question.asked !== undefined)?.asked ?? null
       const questions = parkedQuestions(open, record.parked?.questions ?? [], lastAsking, (question) => question.asked ?? at)
       yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null))
       const sentPr = record.parked?.origin?.pr
