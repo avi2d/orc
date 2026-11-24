@@ -1,6 +1,7 @@
 export {
   parseAgentFile,
-  bundledAgentsDir,
+  bundledAgentFiles,
+  bundledDeciderPolicyFile,
   agentFileCandidates,
   resolveAgentFile,
   piThinkingLevels,

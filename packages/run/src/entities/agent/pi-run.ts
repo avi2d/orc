@@ -5,8 +5,7 @@ import type { AgentFile } from "./agents"
 import { OrcRunError, workerCiInstructions } from "../../shared/lib/index"
 import { writeWhole } from "../../shared/config/index"
 import { askAfterFailures, type FailingMark, type FailureStreak, nextStreak, pauseAfterFailures } from "./failure-streak"
-import { askDirFlag, askToolName } from "./orc-ask-extension"
-import { askExtensionSource, type AskedQuestion, type AskSetup, type WorkerAsks, openWorkerAsks } from "./worker-ask"
+import { askDirFlag, askExtensionSource, askToolName, type AskedQuestion, type AskSetup, type WorkerAsks, openWorkerAsks } from "./worker-ask"
 
 export interface PiRequest {
   readonly agent: AgentFile
@@ -180,7 +179,8 @@ const countFailure = (watch: FailureWatch, sink: FailureSink, tool: { readonly l
 
 const placeAskExtension = (fs: FileSystem.FileSystem, request: PiRequest): Effect.Effect<void, OrcRunError> =>
   fs.makeDirectory(request.asks.askDir, { recursive: true }).pipe(
-    Effect.andThen(fs.readFileString(askExtensionSource)),
+    Effect.andThen(askExtensionSource),
+    Effect.flatMap((file) => fs.readFileString(file)),
     Effect.flatMap((source) => fs.writeFileString(request.asks.extensionFile, source)),
     Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot place the orc_ask extension at " + request.asks.extensionFile + ": " + String(cause) }))
   )

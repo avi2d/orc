@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
+import { chmod, exists, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -92,7 +92,7 @@ const seedRun = async (home: string): Promise<void> => {
 }
 
 describe("compiled orc", () => {
-  test("bun run compile builds one bytecode file that answers help, beat, score, show and chat's self command", async () => {
+  test("bun run compile builds one bytecode file that answers help, beat, score, show, chat's self command and reads its embedded agent file", async () => {
     const compiled = await run([process.execPath, "run", "compile"], {}, repoRoot)
     if (compiled.exitCode !== 0) {
       throw new Error("bun run compile exited " + compiled.exitCode + ": " + compiled.stderr)
@@ -123,6 +123,17 @@ describe("compiled orc", () => {
       expect(chat.exitCode).toBe(0)
       expect(chat.stdout).toContain("ORC_CHAT_ORC=" + JSON.stringify([await realpath(compiledOrc)]))
       expect(chat.stdout).toContain("orc " + packageJson.version)
+      expect(await exists(join(env.ORC_HOME, "chat-tools.js"))).toBe(true)
+
+      const repo = join(dir, "repo")
+      await mkdir(repo)
+      await writeFile(join(repo, "task.md"), "Do nothing.\n")
+      for (const args of [["init", "-q"], ["add", "task.md"], ["-c", "user.name=orc", "-c", "user.email=orc@example.com", "commit", "-qm", "task"]]) {
+        expect((await run(["git", ...args], {}, repo)).exitCode).toBe(0)
+      }
+      const agent = await run([compiledOrc, "run", "task.md"], env, repo)
+      expect(agent.exitCode).not.toBe(0)
+      expect(agent.stdout + agent.stderr).toMatch(/the agent file \/\$bunfs\/root\/implementer-\w+\.md names no model/)
     })
   }, compileTimeout)
 })
