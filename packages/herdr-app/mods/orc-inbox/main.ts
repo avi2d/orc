@@ -2,7 +2,7 @@ import { type AsyncContext, type Context, type Element, View, div } from "gpui-k
 import { Input, InputState, h_flex, v_flex } from "gpui-base"
 import { openOverlay } from "herdr"
 import { type Sent, actionButton, failureLine, listenFor, optionView, section, sendOrc } from "../../src/ask-view"
-import { askingRuns, attention } from "../../src/guard"
+import { askingRuns, attention } from "../../src/guard-attention"
 import { type InboxItem, inboxItems, inboxTasks } from "../../src/inbox"
 import { linkedText } from "../../src/links-view"
 import { type Reading, readJson } from "../../src/orc-read"

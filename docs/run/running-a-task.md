@@ -70,6 +70,7 @@ Without it, the run sends Pi no project instructions.
 Run `orc runs` to list runs and `orc show <run-id>` to inspect the steps.
 See [Seeing runs](seeing-runs.md) for logs and JSON output.
 The run folder under `$ORC_HOME/runs/<run-id>` holds the task, agent log, session, evidence, and report.
+See [A run](../concepts/run.md) for which runs keep the Pi folder.
 When `ORC_HOME` is unset, the folder is under `~/.orc/runs`.
 At 300 turns or 5 compactions, an implementation session records a `long-session` warning and writes `handover.md` in the run folder.
 The handover names the commits made and why the run stopped, so a later run on the branch can continue from it.
@@ -79,6 +80,8 @@ Set `ORC_IDLE_TIMEOUT_SECONDS` to a positive whole number to change that limit.
 A running tool is not interrupted by the idle limit.
 
 ## Answer a review question
+
+To ask each review question for a recommended option, add the `review.path_instructions` entry in [Installing no-mistakes](installing-no-mistakes.md#ask-each-review-question-for-a-recommended-option).
 
 A no-mistakes run waits 30 minutes for an unanswered review question.
 Set `ORC_ANSWER_WAIT_SECONDS` to change the wait, or set it to `0` to refuse the gate immediately.
