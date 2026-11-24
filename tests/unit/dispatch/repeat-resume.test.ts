@@ -216,6 +216,24 @@ describe("a resumed run that parks again", () => {
       ])
     })
   })
+  test("a correction after the release still hands the release as new instead of carried with the spent fix budget", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-repeat-"))
+    try {
+      const added = await run(addTask(root, spec))
+      const deciderAnswered = { ...r2, asked, blocks: true, answer: { words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: null, by: "decider" as const } }
+      await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", origin: { machine: "mac", run: "run-1" }, questions: [deciderAnswered] } }))
+      await run(claimTask(root, "orc-1"))
+      await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:10:00.000Z", log: root + "/logs/orc-1.log" } } }))
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }], "2026-10-27T10:35:00.000Z", "run-2", lint))
+      expect(await run(answerTask(root, "orc-1", "fix the lint finding first", "2026-10-27T10:40:00.000Z"))).toMatchObject({ kind: "hold" })
+      expect(await run(answerTask(root, "orc-1", "r2=Drop it", "2026-10-27T10:45:00.000Z", { kind: "parked" }))).toMatchObject({ kind: "question", question: "r2" })
+      const file = join(root, "new", "orc-1.md")
+      const queued = await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: file, ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))
+      expect(queued.answers).toEqual([{ question: "r2", answer: "Drop it" }, { question: "hold-release", answer: "Current guidance: fix the lint finding first" }])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
   test("a send-back hands its resume only the review instead of an old release as current guidance", async () => {
     await withResumed(async (root) => {
       await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }], "2026-10-27T10:35:00.000Z", "run-2", lint))

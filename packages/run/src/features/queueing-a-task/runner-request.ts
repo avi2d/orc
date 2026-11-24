@@ -94,9 +94,11 @@ const timeOf = (at: string): number => {
   return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time
 }
 
-const parkedSince = (parked: Parked): number =>
-  Math.max(Number.NEGATIVE_INFINITY, ...parked.questions.flatMap((question) =>
-    [timeOf(question.asked), ...(question.answer === null ? [] : [timeOf(question.answer.at)])]))
+// An answer given while the task sits parked is no run, so only an ask or a hold placement marks a run that ended.
+const lastRunEndedAt = (decisions: ReadonlyArray<{ readonly at?: string | null }>, parked: Parked): number =>
+  Math.max(Number.NEGATIVE_INFINITY,
+    ...parked.questions.map((question) => timeOf(question.asked)),
+    ...decisions.flatMap((decision) => decision.at === undefined || decision.at === null ? [] : [timeOf(decision.at)]))
 
 // A looping fixer replaces its question inside one park, so only the send-back marks where a park starts.
 const sentBackAt = (parked: Parked): number => {
@@ -105,7 +107,6 @@ const sentBackAt = (parked: Parked): number => {
 }
 
 // A send-back opens a new park, so a release older than it answered a failure the merged work already resolved.
-// A run that parks after a release asks or is answered after it, so a release later than all of the park is one no resume has seen.
 const releaseAnswerOf = (hold: TaskRecord["hold"], parked: Parked): ReadonlyArray<typeof AnswerArg.Type> => {
   const decisions = hold === null ? [] : [...hold.history ?? [], hold]
   const opened = sentBackAt(parked)
@@ -113,7 +114,7 @@ const releaseAnswerOf = (hold: TaskRecord["hold"], parked: Parked): ReadonlyArra
     decision.repeat === true && decision.answer !== null && decision.answer.words.trim() !== "" && timeOf(decision.answer.at) > opened ? [decision.answer] : [])
   const latest = releases.at(-1)
   return latest === undefined ? [] : [{
-    question: timeOf(latest.at) > parkedSince(parked) ? holdReleaseId : carriedHoldReleaseId,
+    question: timeOf(latest.at) > lastRunEndedAt(decisions, parked) ? holdReleaseId : carriedHoldReleaseId,
     answer: releases.map((release, index) => (index === releases.length - 1 ? "Current guidance: " : "Earlier repeat hold release: ") + release.words).join("\n")
   }]
 }
