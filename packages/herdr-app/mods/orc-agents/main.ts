@@ -10,7 +10,7 @@ import { type RunChanges, changesKey } from "../../src/changes"
 import { readChanges } from "../../src/changes-read"
 import { show, type Show, type ShownStep } from "../../src/guard"
 import { InboxAnswers } from "../../src/inbox-view"
-import { type Reading, inBatches, readJson, readText } from "../../src/orc-read"
+import { type Reading, readJson, readText } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { type Turn, sessionTurns } from "../../src/turns"
 import { activeChild, agentsOpenKey, openAsk, viewsStack } from "../../src/views"
@@ -208,7 +208,14 @@ export default class OrcAgents extends View {
           this.agents.set(runId, runAgent(reading.value.steps))
         }
       })
-    cx.spawn((task) => inBatches(wanted, showsAtOnce, label, () => task.notify()).then(() => {
+    const from = (start: number, task: AsyncContext): Promise<void> =>
+      start >= wanted.length
+        ? Promise.resolve()
+        : Promise.all(wanted.slice(start, start + showsAtOnce).map(label)).then(() => {
+          task.notify()
+          return from(start + showsAtOnce, task)
+        })
+    cx.spawn((task) => from(0, task).then(() => {
       this.labelling = false
     }))
   }
