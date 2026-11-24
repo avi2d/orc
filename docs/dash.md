@@ -58,7 +58,7 @@ Each panel reads its settings from its key under `panels` in the [dashboard conf
 
 [Quota](dash-quota.md) shows account limits.
 It shows the [dispatch accounts](dash-quota.md#show-the-dispatch-accounts) from `orc quota --json`.
-Configure [saved profiles](dash-quota.md#show-saved-profiles) or [Claude accounts](dash-quota.md#show-each-claude-account).
+Configure [Claude accounts](dash-quota.md#show-each-claude-account).
 
 <div id="run-the-session-quota-tool"></div>
 

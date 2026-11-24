@@ -54,16 +54,6 @@ export const QuotaBlocksCodec: Schema.Codec<ReadonlyArray<QuotaBlock>, unknown> 
         exhaustion: Schema.Array(QuotaAvailability),
       }),
       Schema.Struct({
-        kind: Schema.Literal("saved"),
-        plan: Schema.NullOr(Schema.String),
-        stale: Schema.Boolean,
-        age: Schema.Union([
-          Schema.Struct({ kind: Schema.Literal("dated"), fetchedAt: Instant, ageSeconds: Schema.Finite }),
-          Schema.Struct({ kind: Schema.Literal("undated") }),
-        ]),
-        windows: Schema.Array(Schema.Struct({ label: Schema.String, percentLeft: Schema.Finite, resetsAt: Schema.NullOr(Instant) })),
-      }),
-      Schema.Struct({
         kind: Schema.Literal("account"),
         percentLeft: Schema.Finite,
         resetsAt: Schema.NullOr(Instant),

@@ -1,6 +1,6 @@
 import type { CliRenderer } from "@opentui/core";
 import { DateTime, Effect } from "effect";
-import { OrcQuotaSource, type QuotaBlock, type QuotaPanelSources, quotaBlocks, readQuotas } from "@avi2dg/orc-schema";
+import { type HarvestLogSource, OrcQuotaSource, type QuotaBlock, type QuotaSource, quotaBlocks, readQuota } from "@avi2dg/orc-schema";
 import {
   type Block,
   livePanel as liveUiPanel,
@@ -12,6 +12,8 @@ import {
 } from "@avi2dg/orc-ui";
 import { quotaLines } from "./quotas";
 
+type QuotaPanelSources = QuotaSource | HarvestLogSource | OrcQuotaSource;
+
 interface Readings {
   readonly blocks: ReadonlyArray<QuotaBlock>;
   readonly now: DateTime.Utc;
@@ -19,9 +21,9 @@ interface Readings {
 
 const readBlocks: Effect.Effect<Readings, never, QuotaPanelSources> = Effect.gen(function* () {
   const orcQuotaSource = yield* OrcQuotaSource;
-  const [{ quota, savedProfiles }, orcQuota] = yield* Effect.all([readQuotas, orcQuotaSource.read], { concurrency: "unbounded" });
+  const [quota, orcQuota] = yield* Effect.all([readQuota, orcQuotaSource.read], { concurrency: "unbounded" });
   const now = yield* DateTime.now;
-  return { blocks: quotaBlocks(quota, savedProfiles, orcQuota, now), now };
+  return { blocks: quotaBlocks(quota, orcQuota, now), now };
 });
 
 const panelLines = (readings: Readings, columns: number, rows: number): Block =>
