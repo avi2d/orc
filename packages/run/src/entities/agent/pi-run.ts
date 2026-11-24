@@ -17,6 +17,7 @@ export interface PiRequest {
   readonly logFile: string
   readonly failingFile: string
   readonly asks: AskSetup
+  readonly withoutAsks?: true | undefined
   readonly onSession: (file: string) => Effect.Effect<void, OrcRunError>
 }
 
@@ -60,15 +61,14 @@ const askPollMillis = 1000
 export const idleSpan = (seconds: number): string =>
   seconds < 120 ? seconds.toString() + (seconds === 1 ? " second" : " seconds") : Math.floor(seconds / 60).toString() + " min"
 
-export const piArgv = (request: Pick<PiRequest, "agent" | "instructions" | "sessionDir" | "resumeSession" | "asks">): Argv => [
+export const piArgv = (request: Pick<PiRequest, "agent" | "instructions" | "sessionDir" | "resumeSession" | "asks" | "withoutAsks">): Argv => [
   "pi", "-p", "--mode", "json",
   "--model", request.agent.model,
   "--thinking", request.agent.thinking,
   "--session-dir", request.sessionDir,
   ...(request.resumeSession === null ? [] : ["--session", request.resumeSession]),
-  "--extension", request.asks.extensionFile,
-  "--" + askDirFlag, request.asks.askDir,
-  "--tools", [...request.agent.tools, askToolName].join(","),
+  ...(request.withoutAsks === true ? [] : ["--extension", request.asks.extensionFile, "--" + askDirFlag, request.asks.askDir]),
+  "--tools", (request.withoutAsks === true ? request.agent.tools : [...request.agent.tools, askToolName]).join(","),
   ...(request.instructions === null ? [] : ["--append-system-prompt", request.instructions])
 ]
 
@@ -281,7 +281,9 @@ export const runPi = (
     yield* fs.writeFileString(request.logFile, "", { flag: "a" }).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + request.logFile + ": " + String(cause) }))
     )
-    yield* placeAskExtension(fs, request)
+    if (request.withoutAsks !== true) {
+      yield* placeAskExtension(fs, request)
+    }
     const asks = openWorkerAsks(fs, request.asks)
     const prompt = ciOnlyTestsInstruction + "\n\n" + request.prompt
     const handle = yield* spawner.spawn(agentCommand(exec, piArgv(request), textInput(prompt))).pipe(

@@ -84,7 +84,7 @@ export const runReviewTurn = (
     let resumeSession: string | null = null
     let problem = ""
     for (let answer = 1; answer <= maxReviewAnswers; answer += 1) {
-      const result: Result.Result<AgentRunResult, OrcRunError> = yield* runAgent({ agent: { ...reviewer, tools: readOnlyTools }, prompt, logFile: "review-" + answer.toString() + ".log", resumeSession, onSession: () => Effect.void }).pipe(Effect.result)
+      const result: Result.Result<AgentRunResult, OrcRunError> = yield* runAgent({ agent: { ...reviewer, tools: readOnlyTools }, prompt, logFile: "review-" + answer.toString() + ".log", resumeSession, withoutAsks: true, onSession: () => Effect.void }).pipe(Effect.result)
       if (Result.isFailure(result)) {
         return { status: "failed", reason: result.failure.message }
       }

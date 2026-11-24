@@ -90,6 +90,7 @@ export const agentOps = (
         logFile: run.path.join(folders.runDir, agentRun.logFile),
         failingFile: run.path.join(folders.runDir, failingFileName),
         asks,
+        withoutAsks: agentRun.withoutAsks,
         onSession: agentRun.onSession
       }, pacing)
       const commits = yield* commitsSince(run.spawner, run.git, exec.cwd, base)
