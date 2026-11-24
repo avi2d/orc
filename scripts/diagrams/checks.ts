@@ -25,7 +25,7 @@ const deliver: Part = { title: "no-mistakes delivers", text: "It pushes the bran
 
 const modes: readonly Part[] = [
   { title: "`no-mistakes`", text: "The default. Checks, then the review, then a pull request with green CI." },
-  { title: "`direct-PR`", text: "Checks, then orc pushes the branch and opens the pull request itself." },
+  { title: "`direct-PR`", text: "Checks, then a review turn that only records findings, then orc opens the pull request." },
   { title: "`no-mistakes-prod-only`", text: "`direct-PR` for a task marked internal, `no-mistakes` for the rest." }
 ]
 const pullRequest: Part = { title: "A pull request", text: "A code change, checked before it reaches you. Delivery may include review.", cls: "card-ok", href: "merge" }
@@ -55,7 +55,7 @@ const wide = (): Drawing => {
     arrow([[430, 266], [430, 290]], "ask"),
     arrow([[503, 420], [503, 444]], "work"),
     arrow([[678, 196], [692, 196], [692, 468], [680, 468]], "work"),
-    ...modes.map((mode, index) => card(738, 42 + index * 104, 204, 96, mode)),
+    ...modes.map((mode, index) => card(738, 42 + index * 120, 204, 112, mode)),
     card(738, 432, 204, 96, pullRequest),
     arrow([[678, 504], [736, 504]], "work")
   ]

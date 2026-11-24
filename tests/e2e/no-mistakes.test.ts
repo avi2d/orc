@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { access, readFile, realpath, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { isRecord } from "./runner-helpers"
-import { checksPassedWhileMonitoring, git, passedWithPr, readyToCheck, recordedNothing, runStep, sandboxResult, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
+import { checksPassedWhileMonitoring, git, passedWithPr, readyToCheck, recordedNothing, recordingKinds, runStep, sandboxResult, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
 
 const fixableGate: NoMistakesReply = {
   stdout: [
@@ -64,6 +64,38 @@ const waitExpired: NoMistakesReply = {
   exitCode: 1
 }
 
+const questionGate: NoMistakesReply = {
+  stdout: [
+    "run:",
+    "  id: \"01STUB\"",
+    "  branch: orc/test",
+    "  status: awaiting_approval",
+    "  awaiting_agent: parked 2m10s",
+    "  head: abc1234",
+    "  pr: \"\"",
+    "  findings[1]{id,severity,file,line,action,description}:",
+    "    question-3,info,,,ask-user,Which scope should the report cover?",
+    "gate: review"
+  ].join("\n") + "\n"
+}
+
+const omittedQuestionsGate: NoMistakesReply = {
+  stdout: [
+    "run:",
+    "  id: \"01STUB\"",
+    "  branch: orc/test",
+    "  status: awaiting_approval",
+    "  awaiting_agent: parked 2m10s",
+    "  head: abc1234",
+    "  pr: \"\"",
+    "  findings[2]{id,severity,file,line,action,description}:",
+    "    question-3,info,,,ask-user,Which scope should the report cover?",
+    "    question-4,info,,,ask-user,Which retries are allowed?",
+    "review-questions-omitted: 1 further review question(s) are open and have no row of their own. This gate releases only once EVERY open question is answered, so answer these by id as well, with: no-mistakes axi answer --question <id> --answer \"<your answer>\". Omitted question ids: question-5",
+    "gate: review"
+  ].join("\n") + "\n"
+}
+
 describe("runWithHistory hands the branch to no-mistakes", () => {
   test("a clean run records the PR link, the finding count and the final result", async () => {
     await withRepo(async (dir) => {
@@ -71,8 +103,11 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         const sha = await readyToCheck(dir, home)
         const taskPath = join(home, "runs", "step-run-1", "task.md")
         const workdir = await realpath(dir)
-        const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [passedWithPr, recordedNothing])
+        const kinds: Array<string> = []
+        const outcome = await runStep(dir, home, recordingKinds(sandboxResult(sha), kinds), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [passedWithPr, recordedNothing])
         expect(outcome.report.completed).toBe(true)
+        expect(kinds).toEqual(["implementer"])
+        expect(await Bun.file(join(home, "runs", "step-run-1", "review.json")).exists()).toBe(false)
         expect(outcome.report.prLink).toBe("https://github.com/o/r/pull/7")
         expect(outcome.run?.prLink).toBe("https://github.com/o/r/pull/7")
         expect(outcome.run?.status).toBe("succeeded")
@@ -156,20 +191,6 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const questionGate: NoMistakesReply = {
-          stdout: [
-            "run:",
-            "  id: \"01STUB\"",
-            "  branch: orc/test",
-            "  status: awaiting_approval",
-            "  awaiting_agent: parked 2m10s",
-            "  head: abc1234",
-            "  pr: \"\"",
-            "  findings[1]{id,severity,file,line,action,description}:",
-            "    question-3,info,,,ask-user,Which scope should the report cover?",
-            "gate: review"
-          ].join("\n") + "\n"
-        }
         const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [questionGate, fixableGate, passedWithPr, recordedNothing], [{ question: "question-3", answer: "Use the wide scope" }])
         const calls = axiCalls(outcome.nmCalls)
         expect(calls).toContain("axi answer --question question-3 --answer Use the wide scope")
@@ -185,20 +206,6 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const questionGate: NoMistakesReply = {
-          stdout: [
-            "run:",
-            "  id: \"01STUB\"",
-            "  branch: orc/test",
-            "  status: awaiting_approval",
-            "  awaiting_agent: parked 2m10s",
-            "  head: abc1234",
-            "  pr: \"\"",
-            "  findings[1]{id,severity,file,line,action,description}:",
-            "    question-3,info,,,ask-user,Which scope should the report cover?",
-            "gate: review"
-          ].join("\n") + "\n"
-        }
         const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [questionGate, recordedNothing])
         expect(axiCalls(outcome.nmCalls)).toEqual(["axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"), statusLookup])
         expect(outcome.report.completed).toBe(false)
@@ -214,23 +221,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const questionGate: NoMistakesReply = {
-          stdout: [
-            "run:",
-            "  id: \"01STUB\"",
-            "  branch: orc/test",
-            "  status: awaiting_approval",
-            "  awaiting_agent: parked 2m10s",
-            "  head: abc1234",
-            "  pr: \"\"",
-            "  findings[2]{id,severity,file,line,action,description}:",
-            "    question-3,info,,,ask-user,Which scope should the report cover?",
-            "    question-4,info,,,ask-user,Which retries are allowed?",
-            "review-questions-omitted: 1 further review question(s) are open and have no row of their own. This gate releases only once EVERY open question is answered, so answer these by id as well, with: no-mistakes axi answer --question <id> --answer \"<your answer>\". Omitted question ids: question-5",
-            "gate: review"
-          ].join("\n") + "\n"
-        }
-        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [questionGate, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [omittedQuestionsGate, recordedNothing])
         expect(axiCalls(outcome.nmCalls)).toEqual(["axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"), statusLookup])
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.noMistakes?.status).toBe("refused")
@@ -249,23 +240,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const questionGate: NoMistakesReply = {
-          stdout: [
-            "run:",
-            "  id: \"01STUB\"",
-            "  branch: orc/test",
-            "  status: awaiting_approval",
-            "  awaiting_agent: parked 2m10s",
-            "  head: abc1234",
-            "  pr: \"\"",
-            "  findings[2]{id,severity,file,line,action,description}:",
-            "    question-3,info,,,ask-user,Which scope should the report cover?",
-            "    question-4,info,,,ask-user,Which retries are allowed?",
-            "review-questions-omitted: 1 further review question(s) are open and have no row of their own. This gate releases only once EVERY open question is answered, so answer these by id as well, with: no-mistakes axi answer --question <id> --answer \"<your answer>\". Omitted question ids: question-5",
-            "gate: review"
-          ].join("\n") + "\n"
-        }
-        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [questionGate, recordedNothing], [{ question: "question-3", answer: "Use the wide scope" }])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [omittedQuestionsGate, recordedNothing], [{ question: "question-3", answer: "Use the wide scope" }])
         expect(outcome.report.noMistakes?.status).toBe("refused")
         const signals: ReadonlyArray<unknown> = Array.isArray(outcome.signals) ? outcome.signals : []
         const open = signals.flatMap((signal) => isRecord(signal) && signal.name === "open-question" ? [String(signal.value)] : [])
@@ -280,24 +255,8 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const questionGate: NoMistakesReply = {
-          stdout: [
-            "run:",
-            "  id: \"01STUB\"",
-            "  branch: orc/test",
-            "  status: awaiting_approval",
-            "  awaiting_agent: parked 2m10s",
-            "  head: abc1234",
-            "  pr: \"\"",
-            "  findings[2]{id,severity,file,line,action,description}:",
-            "    question-3,info,,,ask-user,Which scope should the report cover?",
-            "    question-4,info,,,ask-user,Which retries are allowed?",
-            "review-questions-omitted: 1 further review question(s) are open and have no row of their own. This gate releases only once EVERY open question is answered, so answer these by id as well, with: no-mistakes axi answer --question <id> --answer \"<your answer>\". Omitted question ids: question-5",
-            "gate: review"
-          ].join("\n") + "\n"
-        }
         const answered: NoMistakesReply = { stdout: "answered\n" }
-        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [questionGate, answered, answered, fixableGate, passedWithPr, recordedNothing], [
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [omittedQuestionsGate, answered, answered, fixableGate, passedWithPr, recordedNothing], [
           { question: "question-3", answer: "Use the wide scope" },
           { question: "question-4", answer: "Allow both retries" },
           { question: "question-5", answer: "Focus on the report" }

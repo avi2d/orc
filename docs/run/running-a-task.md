@@ -106,6 +106,8 @@ The reviewer agent file is `$ORC_HOME/agents/reviewer.md`, then the project's `.
 The bundled reviewer prints its findings as a JSON array with `id`, `file`, `line`, `severity`, `action` and `description` for each finding.
 An implementer or fixer model comes from its file, its role's model flag, or `config.json`, in that order.
 The implementer and the fixer must use a configured provider, and both must use the same provider.
+The reviewer runs only in direct-PR delivery, on the fixer model unless its file names a model, and it must use the same provider.
+Orc runs the reviewer with read, grep, find and ls whatever tools its file names.
 Orc refuses models absent from Pi or with a context window of 150,000 tokens or less.
 Pi compacts context at 150,000 tokens in the default sandbox.
 For `--sandbox none` with a Pi login provider, Pi uses your own compaction settings.

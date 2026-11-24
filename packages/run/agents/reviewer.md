@@ -1,10 +1,10 @@
 ---
 thinking: high
-tools: read, bash
+tools: read, grep, find, ls
 ---
 You review one change on the current branch of this repository.
 Read the task file that orc names at the end of this prompt.
-Compare the branch with its base and read every changed file in full.
+Read the branch diff orc names at the end of this prompt and read every changed file in full.
 Change no file, make no commit and run no command that writes anything.
 Report each problem the change brings in as one finding.
 Skip a problem the change did not bring in.

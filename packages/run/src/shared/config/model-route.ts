@@ -30,7 +30,7 @@ export const configuredModels = (config: OrcConfig, handed: HandedModels): Hande
 
 export const routeOfAgents = (
   config: OrcConfig,
-  models: { readonly agent: string; readonly fixer: string },
+  models: { readonly agent: string; readonly fixer: string; readonly reviewer?: string | undefined },
   pinned: string | undefined
 ): Result.Result<Provider, string> => {
   const agentProvider = config.providers.find((candidate) => candidate.id === providerOf(models.agent))
@@ -43,6 +43,9 @@ export const routeOfAgents = (
   }
   if (providerOf(models.fixer) !== agentProvider.id) {
     return Result.fail("orc: the implementer runs on " + models.agent + " and the fixer on " + models.fixer + ", and orc runs both agents of a run on one provider, so name models from one provider")
+  }
+  if (models.reviewer !== undefined && providerOf(models.reviewer) !== agentProvider.id) {
+    return Result.fail("orc: the implementer runs on " + models.agent + " and the reviewer on " + models.reviewer + ", and orc runs all agents of a run on one provider, so name models from one provider")
   }
   return Result.succeed(agentProvider)
 }

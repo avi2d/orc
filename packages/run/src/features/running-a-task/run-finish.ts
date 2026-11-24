@@ -5,23 +5,26 @@ import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
 import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
-import { ciWaitingQuestionId, type RunCheckpoints } from "./run-ops"
+import { ciWaitingQuestionId, type RunCheckpoints, type SandboxOps } from "./run-ops"
 import { recordOpenAsks } from "./history-write"
+import { reviewSentence, runReviewTurn } from "./review-turn"
 
-export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
+export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + ", and the checks passed. "
     const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
     if (run.delivery.kind === "direct-PR") {
+      const review = yield* runReviewTurn(run, runAgent, run.delivery.reviewer)
       const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
+      const reviewed = checked + reviewSentence(review)
       if (pr.status !== "opened") {
-        return { ...settled, completed: false, waitingOnCi: false, prLink: pr.prLink, endReason: checked + pr.result }
+        return { ...settled, completed: false, waitingOnCi: false, prLink: pr.prLink, endReason: reviewed + pr.result }
       }
       const ci = yield* ciVerdictOfHead(run, run.delivery.opener, pr.prLink)
       if (ci.kind === "pending") {
         yield* recordOpenAsks(checkpoints.questionAsked, run.asks, { name: "pr", attempt: 1 }, [ciWaitingQuestion(ci, pr.prLink)])
       }
-      return { ...settled, completed: ci.kind === "passed", waitingOnCi: ci.kind === "pending", prLink: pr.prLink, endReason: checked + pr.result + " " + ciVerdictLine(ci) }
+      return { ...settled, completed: ci.kind === "passed", waitingOnCi: ci.kind === "pending", prLink: pr.prLink, endReason: reviewed + pr.result + " " + ciVerdictLine(ci) }
     }
     yield* checkpoints.noMistakesStart(new Date().toISOString())
     const waitSeconds = run.answerWaitSeconds ?? 0

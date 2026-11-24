@@ -27,7 +27,7 @@ import { runDirFor, type ReportKind } from "../../entities/backlog/index"
 import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "../../entities/review-gate/index"
 import { isRunId, newRunId } from "../../shared/lib/index"
 import { prepareRunFolders, type RunFolders, runInstructions } from "./run-folders"
-import { subprocessDeliverer } from "./run-deliverer"
+import { subprocessDeliverer, type PreparedReviewer } from "./run-deliverer"
 import type { RunDelivery } from "../../shared/config/index"
 import { closeTaskCopy, openTaskCopy, writeAgentGitConfig } from "../../entities/task-copy/index"
 import { ensureHeavyQueue, readHeavySettings } from "../../entities/heavy-queue/index"
@@ -104,6 +104,7 @@ interface PreparedAgents {
   readonly folders: RunFolders
   readonly agent: AgentFile
   readonly fixer: AgentFile
+  readonly reviewer: PreparedReviewer
   readonly plan: SandboxPlan
 }
 
@@ -118,6 +119,7 @@ const prepareAgents = (
   instructionsFile: string | null,
   agentsDir: string | undefined,
   sandboxKind: SandboxKind,
+  delivery: RunDelivery | undefined,
   pins: { readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly implementerModel: string | undefined; readonly fixerModel: string | undefined; readonly implementerThinking: PiThinkingLevel | undefined; readonly fixerThinking: PiThinkingLevel | undefined }
 ): Effect.Effect<PreparedAgents, OrcRunError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
@@ -131,9 +133,12 @@ const prepareAgents = (
         .pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
     const agent: AgentFile = yield* resolveRole("implementer", configured.implementer, pins.implementerThinking)
     const fixer: AgentFile = yield* resolveRole("fixer", configured.fixer, pins.fixerThinking)
+    const reviewer: PreparedReviewer = delivery === "direct-PR"
+      ? { kind: "direct-PR", reviewer: yield* resolveRole("reviewer", fixer.model, undefined) }
+      : { kind: "no-mistakes" }
     const piBinary = Bun.which("pi")
     const nodeBinary = Bun.which("node")
-    const models = { agent: agent.model, fixer: fixer.model }
+    const models = reviewer.kind === "direct-PR" ? { agent: agent.model, fixer: fixer.model, reviewer: reviewer.reviewer.model } : { agent: agent.model, fixer: fixer.model }
     const provider = yield* Effect.fromResult(routeOfAgents(config, models, pins.provider)).pipe(Effect.mapError((message) => new OrcRunError({ message })))
     if (piBinary === null) {
       return yield* refuse("orc: pi is not on the host PATH")
@@ -143,7 +148,7 @@ const prepareAgents = (
     }
     const host: HostTools = { piBinary, nodeBinary, homeDir: homedir() }
     const plan = yield* planSandbox(fs, path, spawner, host, { projectDir: checkout.projectDir, runDir: folders.runDir, piAgentDir: folders.piAgentDir }, models, { config, provider, tokenFileFlag: pins.tokenFile }, sandboxKind)
-    return { folders, agent, fixer, plan }
+    return { folders, agent, fixer, reviewer, plan }
   })
 
 const requireNoMistakes = (options: NoMistakesHost, cwd: string): Effect.Effect<void, OrcRunError> =>
@@ -209,7 +214,7 @@ const openRun = (
 
 const prepareRunAgents = (opened: OpenedRun, request: OrcRunRequest) =>
   prepareAgents(
-    opened.fs, opened.path, opened.spawner, opened.checkout, opened.home, opened.runDir, opened.effectiveTaskFile, opened.instructionsFile, request.agentsDir, opened.sandboxKind,
+    opened.fs, opened.path, opened.spawner, opened.checkout, opened.home, opened.runDir, opened.effectiveTaskFile, opened.instructionsFile, request.agentsDir, opened.sandboxKind, request.delivery,
     { tokenFile: request.tokenFile, provider: request.provider, implementerModel: request.implementerModel, fixerModel: request.fixerModel, implementerThinking: request.implementerThinking, fixerThinking: request.fixerThinking }
   )
 
@@ -255,7 +260,7 @@ export const runAgentStep = (
     const opened = yield* openRun(request)
     const { fs, path, spawner, home, runId, git, checkout, sandboxKind } = opened
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: withHeavyPath(home, hostPath ?? ""), git: checkout.git }
-    const { folders, agent, fixer, plan } = yield* prepareRunAgents(opened, request).pipe(
+    const { folders, agent, fixer, reviewer, plan } = yield* prepareRunAgents(opened, request).pipe(
       Effect.tap(() => request.delivery === "direct-PR" ? Effect.void : requireNoMistakes(noMistakes, checkout.projectDir)),
       Effect.onError(() => removeRunDir(opened))
     )
@@ -278,7 +283,7 @@ export const runAgentStep = (
       taskPath: folders.taskPath, instructions: folders.instructionsPath, agent, fixer, branch: checkout.branch, sandbox: sandboxKind, started,
       worktreeDir: copy.dir,
       machine: opened.machine,
-      delivery: subprocessDeliverer(request.delivery ?? "no-mistakes", { ...noMistakes, worktreeDir: copy.dir, branch: checkout.branch }),
+      delivery: subprocessDeliverer({ ...noMistakes, worktreeDir: copy.dir, branch: checkout.branch }, reviewer),
       allow: request.allow ?? [],
       answers: request.answers ?? [],
       resumeRun: request.resumeRun,

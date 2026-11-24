@@ -138,13 +138,14 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/running-a-task/run-exec.ts` | The sandbox a run opens, the install that prepares the copy and the steps that run in it |
 | `packages/run/src/features/running-a-task/run-loop.ts` | The implement, check and fix steps of one run |
 | `packages/run/src/features/running-a-task/run-finish.ts` | The finish of a run after its checks pass: the direct PR or the [no-mistakes](https://github.com/kunchenguid/no-mistakes) gate |
+| `packages/run/src/features/running-a-task/review-turn.ts` | The direct-PR review turn: the branch diff, the reviewer run and the findings it records |
 | `packages/run/src/features/running-a-task/run-resume.ts` | The prior run's session and passed steps a resume starts from |
 | `packages/run/src/features/running-a-task/checks.ts` | The check commands `.no-mistakes.yaml` names and their run in the copy |
 | `packages/run/src/features/running-a-task/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
 | `packages/run/src/features/running-a-task/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `packages/run/src/features/running-a-task/context-mark.ts` | The 150 thousand token compaction mark orc writes into the run’s Pi folder |
 | `packages/run/src/features/running-a-task/report-run.ts` | The report run: the Pi run that writes a report file instead of opening a PR |
-| `packages/run/src/features/running-a-task/run-deliverer.ts` | The deliverer a run takes: the direct PR opener or the no-mistakes runner |
+| `packages/run/src/features/running-a-task/run-deliverer.ts` | The deliverer a run takes: the direct PR opener and reviewer or the no-mistakes runner |
 | `packages/run/src/features/running-a-task/run-place.ts` | The machine name a run records, read from `ORC_RUN_MACHINE` |
 | `packages/run/src/features/running-a-task/worker-question.ts` | The end reason of a run stopped on an unanswered `orc_ask` and the prompt that resumes it with the answers |
 

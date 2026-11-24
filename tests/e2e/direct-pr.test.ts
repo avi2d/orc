@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runStatus } from "../../packages/run/src/entities/run-history/index"
-import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, runDirectPrResume, runDirectPrStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, recordingKinds, runDirectPrResume, runDirectPrStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const isNamedSignal = (value: unknown): value is { readonly name: string } =>
   typeof value === "object" && value !== null && "name" in value && typeof value.name === "string"
@@ -34,8 +34,11 @@ describe("a direct-PR run opens its own PR after the checks", () => {
       await withHome(async (home) => {
         await withOrigin(dir, async (origin) => {
           const sha = await readyToCheck(dir, home)
-          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha), lintPasses)
+          const kinds: Array<string> = []
+          const outcome = await runDirectPrStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses)
           const bodyFile = join(home, "runs", "step-run-1", "pr-body.md")
+          expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
+          expect(outcome.report.endReason).toContain("The review turn failed, so the review did not pass")
           expect(outcome.nmCalls).toBe("")
           expect(branchOn(origin)).toBe(sha)
           expect(callLines(outcome.ghCalls)).toEqual([
