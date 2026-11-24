@@ -235,7 +235,7 @@ const runLogAt = (home: string, runId: string): Effect.Effect<string | null, nev
     const names = yield* fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
     let latest: string | null = null
     for (const name of names) {
-      if (name !== "agent.log" && name !== gateLogFileName && !/^fix-.*\.log$/.test(name) && !/^checks-.*\.txt$/.test(name)) {
+      if (name !== "agent.log" && name !== gateLogFileName && !/^fix-.*\.log$/.test(name) && !/^review-\d+\.log$/.test(name) && !/^checks-.*\.txt$/.test(name)) {
         continue
       }
       const info = yield* fs.stat(dir + "/" + name).pipe(Effect.orElseSucceed(() => null))

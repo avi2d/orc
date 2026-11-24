@@ -60,7 +60,8 @@ export const writeHeavyBin = (
   Effect.gen(function*() {
     const wrap = detectWrap(platform, settings.limit)
     const standins: StandinSettings = { home, group: settings.group, wrap, through: settings.through }
-    yield* writeStandinDir(ciOnlyBinDir(home), Object.fromEntries(ciOnlyTools.map((tool) => [tool, ciOnlyScript(tool)])))
+    const ciOnly = Object.fromEntries(ciOnlyTools.map((tool) => [tool, ciOnlyScript(tool)]))
+    yield* writeStandinDir(ciOnlyBinDir(home), ciOnly)
     const fs = yield* FileSystem.FileSystem
     const bashFile = ciOnlyBashFile(home)
     const staging = bashFile + ".pending-" + process.pid
