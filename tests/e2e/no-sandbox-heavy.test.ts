@@ -5,12 +5,19 @@ import { runOrc, withNoSandboxFixture, writeScript } from "./no-sandbox-fixture"
 
 const refused: ReadonlyArray<string> = [
   "bun test", "bun run test", "bunx vitest", "npm test", "npx jest", "node --test", "python -m pytest",
-  "python3 -m pytest", "uv run pytest", "make test", "make check", "deno test", "cargo t"
+  "python3 -m pytest", "uv run pytest", "make test", "make check", "deno test", "cargo t",
+  "node --import tsx --test", "node --experimental-strip-types --test test/", "python -B -m pytest",
+  "python3 -I -m pytest", "uv run --frozen pytest", "uv run --locked pytest", "uv run --no-sync pytest",
+  "uv run python -m pytest", "uv run python3 -B -m pytest", "node --test --watch", "deno test --watch"
 ]
 
 const queued: ReadonlyArray<string> = ["bun run build", "tsc", "eslint", "cargo build"]
 
-const direct: ReadonlyArray<string> = ["make build", "node script.js"]
+const direct: ReadonlyArray<string> = [
+  "make build", "make -C test build", "make -f check build", "make -o test build", "make --directory test build",
+  "node script.js", "node script.js --test", "node --import tsx script.js --test",
+  "python -B script.py", "python3 -m http.server", "uv run --frozen python script.py"
+]
 
 const refusal = (call: string): string =>
   "orc heavy: " + call + " starts a test run, and with HEAVY_TESTS_CI_ONLY=1 the repository tests run only in GitHub CI\n"

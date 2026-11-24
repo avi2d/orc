@@ -44,6 +44,12 @@ const launchOf = (args: Args, valued: Args): Launch => {
   let at = 0
   while (at < args.length) {
     const word = args[at] ?? ""
+    if (word === "--") {
+      const file = args[at + 1]
+      return file === undefined
+        ? { kind: "none", options: args.slice(0, at) }
+        : { kind: "script", options: args.slice(0, at), file, args: args.slice(at + 2) }
+    }
     if (evalOptions.includes(word)) {
       return { kind: "none", options: args.slice(0, at) }
     }
@@ -67,6 +73,8 @@ const scriptOf = (tool: string, args: Args): Launch => {
       return { kind: "none", options: [] }
   }
 }
+
+export const nodeTestCall = (args: Args): boolean => launchOf(args, nodeValueOptions).options.includes("--test")
 
 const bunBuiltins: Args = [
   "add", "a", "install", "i", "remove", "rm", "update", "audit", "dedupe", "prune", "outdated", "link", "unlink", "publish",
@@ -253,7 +261,7 @@ const runnerOfFile = (real: string, args: Args): string | null => {
 // A package manager puts node_modules/.bin ahead of every stand-in, so a runner bin is only seen when its shebang starts bun or node.
 export const interpretedRunner = (tool: string, args: Args, cwd: string): string | null => {
   const launch = scriptOf(tool, args)
-  if (tool === "node" && launch.options.includes("--test")) {
+  if (tool === "node" && nodeTestCall(args)) {
     return "node --test"
   }
   const real = launch.kind === "script" ? realFile(resolve(cwd, launch.file)) : null

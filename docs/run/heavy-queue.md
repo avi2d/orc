@@ -3,11 +3,13 @@ kind: reference
 ---
 # The heavy queue
 Without `through` set, each machine queues its heavy shell calls through one pueue group named `heavy` with one slot.
-Heavy calls are test runs, builds and browser runs through tools like `bun`, `bunx`, `npm`, `npx`, `pnpm`, `yarn`, `vitest`, `playwright`, `jest`, `go`, `cargo`, `pytest`, `tsc`, `oxlint`, `eslint`, `xcodebuild` and `xcrun`.
+Heavy calls are test runs, builds and browser runs through tools like `bun`, `bunx`, `npm`, `npx`, `pnpm`, `yarn`, `vitest`, `playwright`, `jest`, `go`, `cargo`, `node`, `python`, `python3`, `uv`, `make`, `deno`, `pytest`, `tsc`, `oxlint`, `eslint`, `xcodebuild` and `xcrun`.
 The queue keeps two such calls from overloading the machine at the same time.
 
 ## How calls reach the queue
-`orc run` and `orc runner start` write a stand in for each heavy tool into `~/.orc/heavy/bin`.
+`orc run` and `orc runner start` write a stand in into `~/.orc/heavy/bin` for each heavy tool found on `PATH`.
+Tools absent from `PATH` get no stand in, so shell probes still find them absent.
+Each write removes stand ins for tools no longer found on `PATH`.
 A stand in is a launcher of three shell lines that starts orc's TypeScript helper through the absolute path of its bun.
 `orc run` puts that folder on `PATH` for the agent it starts, after only `~/.orc/heavy/ci-only`.
 A stand in queues the call with `pueue add` into the `heavy` group, or hands it to the `through` command when one is set, and waits for its turn, then prints the call output and exits with its exit code.
@@ -66,11 +68,15 @@ With `through` set, `orc heavy check` and `orc heavy watch-once` fail with a lin
 
 ## Test runs in agent sessions
 `orc run` sets `HEAVY_TESTS_CI_ONLY=1` for the steps it starts: `prepare`, the local checks and the Pi agent, under the [nono](https://nono.sh) sandbox and under `--sandbox none`.
-For those steps it also writes stand ins for `node` and `checks-test` into `~/.orc/heavy/ci-only` and puts that folder first on `PATH`, ahead of `~/.orc/heavy/bin`.
+For those steps it also writes stand ins for `node` and `checks-test`, when found on `PATH`, into `~/.orc/heavy/ci-only`.
+It puts that folder first on `PATH`, ahead of `~/.orc/heavy/bin`.
 A `ci-only` stand in never queues: it refuses a test run, or runs the next `node` or `checks-test` on `PATH`.
 Under that variable a stand in refuses a test run with exit 1 and a line naming the command, and leaves the tests to GitHub CI.
 A test run is one of these calls, watch and UI runs included:
-- `bun test`, `npm t`, `node --test`, `go test`, `cargo test` and `cargo t`.
+- `bun test`, `npm t`, `node --test`, `go test`, `cargo test`, and `cargo t`.
+- `python -m pytest`, `python3 -m pytest`, `uv run pytest`, and `uv run python -m pytest`, including flags before the runner.
+- `make` with a `test` or `check` target, and `deno test`.
+  A `make` option value named `test` or `check` is not a test target.
 - A `test`, `tests`, `test:*`, `e2e` or `e2e:*` script, or a script named `vitest`, `jest` or `pytest`, through `bun`, `npm`, `pnpm` or `yarn`.
 - `checks-test`, `vitest`, `jest`, `pytest` or `playwright test`, directly or through `bunx`, `npx`, `bun x`, or a manager's `exec` or `dlx`.
 - `bun` or `node` starting the bin file of `checks-test`, `checks-flake`, `checks-mutation`, `stryker`, `vitest`, `jest` or `playwright test`.

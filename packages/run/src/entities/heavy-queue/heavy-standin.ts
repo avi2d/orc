@@ -48,7 +48,7 @@ const isStandinFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<b
     )
   )
 
-const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, never, FileSystem.FileSystem> =>
+export const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     if (tool.includes("/") || tool === "" || tool === "." || tool === "..") {
       return ""
@@ -72,7 +72,8 @@ const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, ne
 
 const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 
-const launcher = (call: StandinCall): string => {
+const launcher = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, real: string, timing?: StandinTiming): string => {
+  const call = { tool, ...settings, commands, real, timing: timing ?? null } satisfies StandinCall
   const [bun = "", ...flags] = helperCommand
   const main = flags.at(-1) ?? ""
   const fallback = call.real === "" ? "running the nearest node_modules/.bin/" + call.tool + " unqueued" : "running " + call.real + " unqueued"
@@ -108,7 +109,7 @@ exec "$real" "$@"
 export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming): Effect.Effect<string, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const real = yield* findRealTool(tool, Bun.env.PATH ?? "")
-    return launcher({ tool, commands, home: settings.home, group: settings.group, wrap: settings.wrap, real, through: settings.through, timing: timing ?? null })
+    return launcher(tool, settings, commands, real, timing)
   })
 
 export const standinScripts = (
@@ -120,7 +121,10 @@ export const standinScripts = (
   Effect.gen(function*() {
     const entries: Array<[string, string]> = []
     for (const tool of tools) {
-      entries.push([tool, yield* standinScript(tool, settings, commands, timing)])
+      const real = yield* findRealTool(tool, Bun.env.PATH ?? "")
+      if (real !== "") {
+        entries.push([tool, launcher(tool, settings, commands, real, timing)])
+      }
     }
     return Object.fromEntries(entries)
   })
