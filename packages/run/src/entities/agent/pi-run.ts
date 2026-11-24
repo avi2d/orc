@@ -61,11 +61,12 @@ const askPollMillis = 1000
 export const idleSpan = (seconds: number): string =>
   seconds < 120 ? seconds.toString() + (seconds === 1 ? " second" : " seconds") : Math.floor(seconds / 60).toString() + " min"
 
-export const piArgv = (request: Pick<PiRequest, "agent" | "instructions" | "sessionDir" | "resumeSession" | "asks" | "withoutAsks">): Argv => [
+export const piArgv = (request: Pick<PiRequest, "agent" | "instructions" | "sessionDir" | "resumeSession" | "asks" | "withoutAsks">, extension?: string | null): Argv => [
   "pi", "-p", "--mode", "json",
   "--model", request.agent.model,
   "--thinking", request.agent.thinking,
   "--session-dir", request.sessionDir,
+  ...(extension == null ? [] : ["-e", extension]),
   ...(request.resumeSession === null ? [] : ["--session", request.resumeSession]),
   ...(request.withoutAsks === true ? [] : ["--extension", request.asks.extensionFile, "--" + askDirFlag, request.asks.askDir]),
   "--tools", (request.withoutAsks === true ? request.agent.tools : [...request.agent.tools, askToolName]).join(","),
@@ -286,7 +287,7 @@ export const runPi = (
     }
     const asks = openWorkerAsks(fs, request.asks)
     const prompt = workerCiInstructions + "\n\n" + request.prompt
-    const handle = yield* spawner.spawn(agentCommand(exec, piArgv(request), textInput(prompt))).pipe(
+    const handle = yield* spawner.spawn(agentCommand(exec, piArgv(request, exec.kind === "nono" ? exec.piExtension : undefined), textInput(prompt))).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: pi did not start: " + String(cause) }))
     )
     const running = new Map<string, RunningTool>()

@@ -44,6 +44,12 @@ export const checksCacheReads = (
 ): ReadonlyArray<string> =>
   hostEnv.HOME === undefined || hostEnv.HOME === "" ? [] : [path.join(hostEnv.HOME, ".cache", "avi2dg-checks")]
 
+export const toolTimeCap = (fs: FileSystem.FileSystem, path: Path.Path, home: string) =>
+  fs.realPath(path.join(home, ".pi", "agent", "extensions", "tool-time-cap.ts")).pipe(
+    Effect.map((file): string | null => file),
+    Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null))
+  )
+
 const runtimeSearchPath = (searchPath: string): string =>
   searchPath.split(":").filter((entry) => !entry.endsWith(standinDirSuffix)).join(":")
 
@@ -74,9 +80,11 @@ export const openNonoExec = (
     const profileDir = yield* fs.makeTempDirectoryScoped({ prefix: "orc-nono-" })
     const profilePath = path.join(profileDir, "profile.json")
     const standins = yield* standinReads(fs, hostEnv.PATH, options.standinHelper)
-    const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: [...toolchain.folders, ...checksCacheReads(path, hostEnv)], runtimeDirs, ...standins }, options.modelCredential)
+    const piExtension = yield* toolTimeCap(fs, path, hostEnv.HOME || homedir())
+    const readFiles = [...standins.standinFiles, ...(piExtension === null ? [] : [piExtension])]
+    const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: [...toolchain.folders, ...checksCacheReads(path, hostEnv)], runtimeDirs, ...standins, standinFiles: readFiles }, options.modelCredential)
     yield* fs.writeFileString(profilePath, `${JSON.stringify(profile, null, 2)}\n`)
-    yield* checkProfile(spawner, nono, profilePath, [profileDir, nonoBinary, path.dirname(nonoBinary), ...standins.standinFolders, ...standins.standinFiles])
+    yield* checkProfile(spawner, nono, profilePath, [profileDir, nonoBinary, path.dirname(nonoBinary), ...standins.standinFolders, ...readFiles])
     yield* fs.makeDirectory(sandboxed.TMPDIR, { recursive: true })
-    return { kind: "nono", cwd: roots.worktree, env, nonoBinary, profilePath } as const
+    return { kind: "nono", cwd: roots.worktree, env, nonoBinary, profilePath, piExtension } as const
   })

@@ -1,4 +1,10 @@
 import { describe, expect, test } from "bun:test"
+import { BunServices } from "@effect/platform-bun"
+import { Effect, FileSystem, Path } from "effect"
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { toolTimeCap } from "../../packages/run/src/shared/sandbox/nono-exec"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
 import { askSetupFor, piArgv, readPiLine, sessionFileName, stillRunningLines, toolLabel } from "../../packages/run/src/entities/agent/index"
 
@@ -7,6 +13,24 @@ const agent: AgentFile = { kind: "implementer", model: "acme/coder", thinking: "
 const asks = askSetupFor("/r", "/r/sessions/host", 60, [])
 
 describe("piArgv", () => {
+  test("passes the existing home cap as a separate extension argument and omits a missing cap", async () => {
+    const home = await realpath(await mkdtemp(join(tmpdir(), "orc-pi-cap-")))
+    const file = join(home, ".pi", "agent", "extensions", "tool-time-cap.ts")
+    const request = { agent, instructions: null, sessionDir: "/s", resumeSession: null, asks }
+    const resolve = () => Effect.runPromise(Effect.gen(function*() {
+      return yield* toolTimeCap(yield* FileSystem.FileSystem, yield* Path.Path, home)
+    }).pipe(Effect.provide(BunServices.layer)))
+    try {
+      expect(piArgv(request, await resolve())).not.toContain("-e")
+      await mkdir(join(home, ".pi", "agent", "extensions"), { recursive: true })
+      await writeFile(file, "export default () => {}")
+      const argv = piArgv(request, await resolve())
+      expect(argv.slice(argv.indexOf("-e"), argv.indexOf("-e") + 2)).toEqual(["-e", file])
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   test("passes the session folder and the resumed id as separate arguments, never through a shell", () => {
     expect(piArgv({ agent, instructions: "/r/instructions.md", sessionDir: "/r/sessions/host", resumeSession: "id; rm -rf ~", asks })).toEqual([
       "pi", "-p", "--mode", "json", "--model", "acme/coder", "--thinking", "high",
