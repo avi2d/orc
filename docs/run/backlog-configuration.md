@@ -103,6 +103,18 @@ A snapshot that names no quota account, names one account twice, or breaks the `
 
 A command that is not installed, exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
 
+### Reading quota without running the beat
+
+Run `orc quota` on the machine that runs the beat to see its quota line without starting tasks.
+For example, set `quota.command` to `["subquo", "read", "--json"]` and run `orc quota --json` to read your configured accounts.
+
+A JSON reading with `kind: "read"` gives `floorPercent`, `accounts` in configuration order, and `pick`, which is the chosen account name or `null`.
+Each usable account gives `remainingPercent` and, if the source supplies it, `resetsAt`.
+Each unusable account gives its `reason`.
+A reading with `kind: "unread"` gives `reason` and a machine-readable `cause`: `command-missing`, `exit`, `timeout`, `no-json`, `spawn`, `schema`, or `account-missing`.
+Both kinds of reading exit successfully.
+If Orc cannot read `dispatch.json`, the command reports the configuration error on standard error and exits non-zero.
+
 ### Token command accounts
 
 A quota with a token command account then looks like this:

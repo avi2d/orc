@@ -29,6 +29,7 @@ The backlog and the beat:
   backlog    See the backlog, and add, hold, answer or close its tasks
   attention  See everything that waits on you or the decider
   beat       Start what can start and close what finished
+  quota      Show the quota and account pick the beat reads
   merge      Merge a closed task's PR once its checks are green
 
 The runner:
@@ -507,6 +508,23 @@ Options:
 
 Examples:
   orc beat
+```
+
+### orc quota
+
+```text
+Usage: orc quota [--json]
+
+Runs the quota command from dispatch.json and shows its reading without starting
+tasks. Run it on the machine that runs the beat.
+
+Options:
+  --json  Print the reading as JSON, with the floor, accounts and pick, or the
+          cause and reason the quota is unread.
+
+Examples:
+  orc quota
+  orc quota --json
 ```
 
 ### orc merge
