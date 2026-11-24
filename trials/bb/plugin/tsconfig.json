@@ -10,5 +10,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["app.tsx", "server.ts"]
+  "include": ["app.tsx", "server.ts", "board-next.ts"]
 }

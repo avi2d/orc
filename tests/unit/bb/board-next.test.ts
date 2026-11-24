@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test"
+import { Effect } from "effect"
 import type { TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 import type { PrState } from "../../../packages/run/src/entities/events/index"
 import { ciWaitingQuestionId } from "../../../packages/run/src/features/running-a-task/run-ops"
 import { backlogJson, type BacklogView } from "../../../packages/run/src/widgets/beat/board"
 import type { TaskWait } from "../../../packages/run/src/widgets/beat/beat-place"
-import { type Actor, boardNext, type TaskNext } from "../../../trials/bb/board-next"
+import { type Actor, boardNext, type TaskNext } from "../../../trials/bb/plugin/board-next"
 
 const orcActors = {
   "no-priority": "owner",
@@ -48,11 +49,10 @@ const boardOf = (tasks: ReadonlyArray<TaskRecord>, prStates: ReadonlyMap<string,
 
 const parsed = (board: unknown): unknown => JSON.parse(JSON.stringify(board))
 
-const nextOf = (tasks: ReadonlyArray<TaskRecord>, prStates?: ReadonlyMap<string, PrState | null>, deciderOwns?: BacklogView["deciderOwns"]): ReadonlyArray<TaskNext> => {
-  const read = boardNext(parsed(boardOf(tasks, prStates, deciderOwns)), "")
-  if (read.kind === "refused") throw new Error(read.reason)
-  return read.value
-}
+const nextOf = (tasks: ReadonlyArray<TaskRecord>, prStates?: ReadonlyMap<string, PrState | null>, deciderOwns?: BacklogView["deciderOwns"]): ReadonlyArray<TaskNext> =>
+  Effect.runSync(boardNext(parsed(boardOf(tasks, prStates, deciderOwns))))
+
+const refusal = (board: unknown): string => Effect.runSync(Effect.flip(boardNext(board))).message
 
 describe("what a new task waits for", () => {
   test("a task with no priority is not left to orc, since orc never starts it until the owner gives one", () => {
@@ -133,7 +133,7 @@ describe("what a new task waits for", () => {
   })
   test("a ready task waiting for a free slot is not attributed to the owner", () => {
     const [next] = nextOf([asNew("orc-1")])
-    expect(next).toEqual({ task: "orc-1", next: { waits: "room", actor: orcActors.room }, pr: null })
+    expect(next).toEqual({ id: "orc-1", title: "Fix the thing", next: { waits: "room", actor: orcActors.room }, pr: null })
   })
   test("a sent-back task whose answer is in keeps the PR it was sent back on rather than showing none", () => {
     const [next] = nextOf([asNew("orc-1", parkedOn([question("send-back", "rename the flag", true)], { machine: "mac", run: "run-1", pr }))])
@@ -197,7 +197,7 @@ describe("what a taken or closed task waits for", () => {
 
 describe("reading the Board JSON", () => {
   test("a document that is not orc.backlog.v1 is refused rather than read as an empty board", () => {
-    expect(boardNext({ schema: "orc.runs.v1", tasks: [] }, "")).toMatchObject({ kind: "refused" })
+    expect(refusal({ schema: "orc.runs.v1", tasks: [] })).toContain(`["schema"]`)
   })
   test.each(["blocks", "deciderOwns"] as const)("invalid %s question metadata is refused rather than guessing its actor", (field) => {
     const board = boardOf([asNew("orc-1", parkedOn([question("q1", "Which table?")]))])
@@ -208,11 +208,11 @@ describe("reading the Board JSON", () => {
         parked: { ...task.parked, questions: task.parked?.questions.map((asked) => ({ ...asked, [field]: "true" })) }
       }))
     }
-    expect(boardNext(parsed(invalid), "")).toMatchObject({ kind: "refused", reason: expect.stringContaining("tasks[0].parked.questions[0]." + field) })
+    expect(refusal(parsed(invalid))).toContain(`["tasks"][0]["parked"]["questions"][0]["${field}"]`)
   })
   test("a waiting kind orc does not define is refused rather than guessed", () => {
     const board = boardOf([asNew("orc-1")])
     const unknownWait = { ...board, tasks: board.tasks.map((task) => ({ ...task, waiting: { kind: "later", detail: null } })) }
-    expect(boardNext(parsed(unknownWait), "")).toMatchObject({ kind: "refused", reason: expect.stringContaining("tasks[0].waiting.kind") })
+    expect(refusal(parsed(unknownWait))).toContain(`["tasks"][0]["waiting"]["kind"]`)
   })
 })
