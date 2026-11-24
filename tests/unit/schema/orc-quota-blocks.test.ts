@@ -19,7 +19,7 @@ const accountBlocks = (name: OrcQuotaFixture): ReadonlyArray<QuotaBlock> =>
 describe("quotaBlocks over the accounts orc quota --json prints", () => {
   test("puts one account block per account between live claude and codex", () => {
     expect(blocksWith(orcQuotaOf("main-second", now)).map((block) => block.title)).toEqual([
-      "claude",
+      "claude second",
       "account main",
       "account second",
       "codex",
