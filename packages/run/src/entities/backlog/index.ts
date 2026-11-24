@@ -77,10 +77,6 @@ export {
   fullPrUrl,
   ranClosing,
   decisionAnswer,
-  decisionWait,
-  answersAwaited,
-  answerWait,
-  missingOriginWait,
   isCalendarDate,
   taskPriorities,
   isTaskPriority,
@@ -100,8 +96,8 @@ export type {
   Parked,
   TaskRecord,
   TaskPriority,
-  DeciderOwns,
 } from "./task-record"
+export { answersAwaited, answerWait, decisionWait, missingOriginWait, type DeciderOwns } from "./task-wait"
 export {
   answerDecision,
   decisionRefusal,
