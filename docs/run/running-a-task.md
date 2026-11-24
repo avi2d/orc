@@ -41,7 +41,8 @@ The `prepare` command runs before Pi starts and is not skipped.
 Without local checks, orc skips that round and continues to CI.
 GitHub CI runs repository tests and decides completion.
 Keep test runners out of those commands and `prepare`.
-The heavy-queue stand-ins refuse test runners and test scripts in worker sessions.
+Only in `--sandbox none` Pi sessions do the heavy-queue stand-ins refuse recognized test runners and test scripts resolved through them.
+Under the default `nono` sandbox and for the no-mistakes review agent, the no-local-tests policy is instructions only.
 Orc starts no-mistakes without its local Test step.
 
 ## Choose the run

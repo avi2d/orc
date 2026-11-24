@@ -16,7 +16,7 @@ const tools = ["bun", "bunx", "npm", "npx", "pnpm", "yarn", "vitest", "jest", "p
 
 const quote = (word: string): string => "'" + word.replaceAll("'", "'\\''") + "'"
 
-export const exerciseCiOnlyWorkers = async (): Promise<void> => {
+export const exerciseCiOnlyHostPi = async (): Promise<void> => {
   await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
     const starts = join(fakeBin, "process-starts")
     const attempts = join(fakeBin, "attempts")
@@ -55,7 +55,6 @@ export const exerciseCiOnlyWorkers = async (): Promise<void> => {
     await writeFile(piFile, pi.replace("echo hello > greeting.txt", probe + "\necho hello >> greeting.txt"))
     await writeScript(join(fakeBin, "no-mistakes"), [
       'if [ "$1" = --version ]; then echo "no-mistakes version 1.111.0"; exit; fi',
-      probe,
       'case "$2" in',
       'run) printf "%s\\n" "gate: review" "findings[1]{id,severity,file,line,action,description}:" "  R1,warning,greeting.txt,1,auto-fix,revise greeting" ;;',
       'respond) printf "%s\\n" "pr: ' + prUrl + '" "outcome: checks-passed" ;;',
@@ -66,11 +65,11 @@ export const exerciseCiOnlyWorkers = async (): Promise<void> => {
     assert.equal(result.exitCode, 0, result.stdout + result.stderr)
     assert.equal(result.stdout.includes(prUrl), true)
     const statuses = (await readFile(attempts, "utf8")).trim().split("\n")
-    assert.deepEqual(statuses, Array.from({ length: 5 }, () => forbidden.map((command) => "127 " + command)).flat())
+    assert.deepEqual(statuses, Array.from({ length: 3 }, () => forbidden.map((command) => "127 " + command)).flat())
     const refusals = (await readFile(errors, "utf8")).trim().split("\n")
     assert.equal(refusals.length, statuses.length)
     assert.equal(refusals.every((line) => line.includes("tests run in GitHub CI")), true)
-    assert.deepEqual((await readFile(starts, "utf8")).trim().split("\n"), Array.from({ length: 5 }, () => permitted).flat())
+    assert.deepEqual((await readFile(starts, "utf8")).trim().split("\n"), Array.from({ length: 3 }, () => permitted).flat())
     assert.equal((result.stderr.match(/skipped local commands:/g) ?? []).length, 1)
     const outside = Bun.spawn([join(env["ORC_HOME"] ?? "", "heavy", "bin", "bun"), "test"], {
       cwd: repo, env, stdout: "pipe", stderr: "pipe"
@@ -82,6 +81,6 @@ export const exerciseCiOnlyWorkers = async (): Promise<void> => {
 }
 
 if (import.meta.main) {
-  await exerciseCiOnlyWorkers()
-  console.log("Worker probes passed: implementer, two fixers, review, review fix; permitted checks and non-worker tests preserved")
+  await exerciseCiOnlyHostPi()
+  console.log("Pi probes passed (--sandbox none): implementer, two fixers; permitted checks and non-worker tests preserved")
 }
