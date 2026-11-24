@@ -104,7 +104,7 @@ export const openDriveLog = (started: string): DriveLog => {
         ...refuse(gate, missingReason(missing)),
         openQuestions: missing.map((finding) => {
           const time = at(finding)
-          return { id: finding.id, text: finding.description, ...(time === null ? {} : { asked: time }), ...(asked === null ? {} : { asking: asked }), ...(finding.owner === undefined ? {} : { owner: finding.owner }) }
+          return { id: finding.id, text: finding.description, ...(finding.asks === undefined ? {} : { asks: finding.asks }), ...(time === null ? {} : { asked: time }), ...(asked === null ? {} : { asking: asked }), ...(finding.owner === undefined ? {} : { owner: finding.owner }) }
         })
       }
     },
