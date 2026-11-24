@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { type DispatchConfig, readDispatchConfig } from "../../packages/run/src/shared/config/dispatch-config"
+import { type DispatchConfig, providerOf, readDispatchConfig } from "../../packages/run/src/shared/config/dispatch-config"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -152,6 +152,19 @@ describe("readDispatchConfig", () => {
       const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
       await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts: [{ name: "main", tokenFile: "/a" }, { name: "alt", tokenCommand: ["my-token-command", "alt"] }] } }))
       expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", kind: "token-file", tokenFile: "/a" }, { name: "alt", kind: "token-command", tokenCommand: ["my-token-command", "alt"] }])
+    })
+  })
+  test("keeps an account's own provider and falls back to the quota provider instead of one provider for every account", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      await writeFile(file, JSON.stringify({ machines: config.machines, quota: { ...config.quota, accounts: [{ name: "main", tokenFile: "/a" }, { name: "openai", provider: "codex", tokenFile: "/b" }] } }))
+      const quota = (await run(readDispatchConfig(file))).quota
+      expect(quota.accounts.map((account) => providerOf(quota, account))).toEqual(["keyed", "codex"])
+    })
+  })
+  test("refuses an account provider that is no provider id instead of handing it to the run", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", provider: "no such", tokenFile: "/a" }] })).toContain("the account main")
     })
   })
 })

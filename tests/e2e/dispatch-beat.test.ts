@@ -183,6 +183,24 @@ describe("orc beat", () => {
     })
   }, beatTimeout)
 
+  test("subquo's roomiest account starts the run with that account's own provider instead of the quota provider", async () => {
+    await withFixture({ mac: 1, linux: 0, floorPercent: 15 }, async (fixture) => {
+      const observedAt = new Date().toISOString()
+      const validUntil = new Date(Date.parse(observedAt) + 600_000).toISOString()
+      const fresh = (percentLeft: number) => ({ status: "fresh", observedAt, source: "provider", validUntil, windows: [{ id: "weekly", scope: "all", percentLeft, resetsAt: validUntil }] })
+      const snapshot = { version: "subquo.v1", writtenAt: observedAt, accounts: [{ id: "main", provider: "claude", observation: fresh(40) }, { id: "openai", provider: "codex", observation: fresh(90) }] }
+      await writeFile(join(fixture.dir, "bin", "subquo"), "#!/bin/sh\ncat <<'J'\n" + JSON.stringify(snapshot) + "\nJ\n")
+      await chmod(join(fixture.dir, "bin", "subquo"), 0o755)
+      const seen = join(fixture.dir, "credential")
+      const machines = [{ name: "mac", slots: 1, start: ["sh", "-c", "echo \"$ORC_TASK_PROVIDER $ORC_TASK_ACCOUNT\" > '" + seen + "'"] }, { name: "linux", slots: 0, start: ["true"] }]
+      const accounts = [{ name: "main", tokenFile: "/secrets/main-token" }, { name: "openai", provider: "codex", tokenFile: "/secrets/openai-token" }]
+      await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({ machines, quota: { ...quotaConfig(15), command: ["subquo", "read", "--json"], accounts } }))
+      await addTasks(fixture, 1)
+      expect(await orcOk(fixture, ["beat"])).toContain("runs use openai")
+      expect(await eventually(() => readFile(seen, "utf8").catch(() => ""), (text) => text !== "")).toBe("codex openai\n")
+    })
+  }, beatTimeout)
+
   test("a quota command that fails starts nothing instead of running on an unread account", async () => {
     await withFixture({ mac: 4, linux: 4, floorPercent: 15 }, async (fixture) => {
       await writeFile(join(fixture.dir, "bin", "orc-quota"), "#!/bin/sh\nexit 4\n")
@@ -197,7 +215,7 @@ describe("orc beat", () => {
   test("a beat with no account above the floor starts nothing", async () => {
     await withFixture({ mac: 4, linux: 4, floorPercent: 90 }, async (fixture) => {
       await addTasks(fixture, 1)
-      expect(await orcOk(fixture, ["beat"])).toContain("waits orc-1: no acme account has room")
+      expect(await orcOk(fixture, ["beat"])).toContain("waits orc-1: no account has room")
       expect(await startedLines(fixture)).toEqual([])
     })
   }, beatTimeout)

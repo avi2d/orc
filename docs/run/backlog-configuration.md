@@ -48,7 +48,10 @@ The start command must run `orc runner start`.
 On a machine whose start command runs `orc runner start`, the beat also pauses starts when its heavy queue has at least three calls.
 An unread heavy queue does not hold starts.
 
-The provider must be defined in `config.json` on each machine that runs tasks.
+An account may name its own `provider`, such as `{ "name": "openai", "provider": "codex", "tokenFile": "/Users/me/.secrets/openai-token" }`.
+The beat then picks the roomiest account across every provider, and the run it starts takes that account's provider.
+An account without a `provider` takes the quota's `provider`.
+Each provider must be defined in `config.json` on each machine that runs tasks.
 Token file paths in `dispatch.json` must exist on those machines.
 Token-command accounts store tokens in each machine's runner token folder instead.
 Orc runs the quota command with no input and reads its standard output as this document:

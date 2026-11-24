@@ -2,7 +2,7 @@ import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } fro
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
 import type { ConfigError } from "../../shared/config/index"
-import { type Account, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "../../shared/config/index"
+import { type Account, type DispatchConfig, type Machine, type Project, providerOf, readDispatchConfig, readProjects } from "../../shared/config/index"
 import { type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
@@ -155,7 +155,7 @@ const credentialFor = (
   account: Account
 ): Effect.Effect<Credential | { readonly kind: "waits"; readonly reason: string }, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    const provider = context.config.quota.provider
+    const provider = providerOf(context.config.quota, account)
     switch (account.kind) {
       case "token-file": {
         return { kind: "file", provider, tokenFile: account.tokenFile }
@@ -189,7 +189,7 @@ const considerTask = (
       return waits(placement.reason)
     }
     if (context.account === null) {
-      return waits("no " + context.config.quota.provider + " account has room")
+      return waits("no account has room")
     }
     const credential = yield* credentialFor(context, context.account)
     if (credential.kind === "waits") {

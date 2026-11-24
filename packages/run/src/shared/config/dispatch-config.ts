@@ -34,31 +34,39 @@ const checkedMachine = (machine: RawMachine): Machine | string => {
     : "the machine " + machine.name + " names a load limit, but its start does not run orc runner start, which the beat reads its load through"
 }
 
+const ownProvider = { provider: Schema.optionalKey(ProviderId) }
+
 const TokenFileAccount = Schema.Struct({
   name: Name,
+  ...ownProvider,
   kind: Schema.Literal("token-file"),
   tokenFile: AbsolutePath
 })
 const TokenCommandAccount = Schema.Struct({
   name: Name,
+  ...ownProvider,
   kind: Schema.Literal("token-command"),
   tokenCommand: Command
 })
 const ClaudeConfigAccount = Schema.Struct({
   name: Name,
+  ...ownProvider,
   kind: Schema.Literal("claude-config"),
   configDirs: Schema.Record(Name, AbsolutePath)
 })
 const NoneAccount = Schema.Struct({
   name: Name,
+  ...ownProvider,
   kind: Schema.Literal("none")
 })
 const LegacyTokenFileAccount = Schema.Struct({
   name: Name,
+  ...ownProvider,
   tokenFile: AbsolutePath
 })
 const LegacyTokenCommandAccount = Schema.Struct({
   name: Name,
+  ...ownProvider,
   tokenCommand: Command
 })
 
@@ -116,6 +124,8 @@ export type Project = Omit<RawProject, "mode" | "yolo" | "instructions" | "floor
   readonly instructions?: string
   readonly upstream?: ReadonlyArray<Contribution>
 }
+
+export const providerOf = (quota: DispatchConfig["quota"], account: Account): string => account.provider ?? quota.provider
 
 export const modeOf = (project: Project): DeliveryMode => project.mode ?? "no-mistakes"
 
