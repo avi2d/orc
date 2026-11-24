@@ -235,7 +235,7 @@ const failingReads = (started: ReadonlyArray<TaskRecord>, progress: ReadonlyArra
     if (entry.kind === "running") {
       return [{ task: task.spec.id, failing: entry.failing }]
     }
-    if (entry.kind === "ended" && (entry.action.kind === "closed" || entry.action.kind === "parked" || entry.action.kind === "split")) {
+    if (entry.kind === "ended" && (entry.action.kind === "closed" || entry.action.kind === "parked" || entry.action.kind === "held" || entry.action.kind === "split")) {
       return [{ task: task.spec.id, failing: null }]
     }
     return []
@@ -246,7 +246,7 @@ const routeRunItems = (root: string, started: ReadonlyArray<TaskRecord>, progres
 
 const releaseClosedSlots = (live: BeatContext["live"], closed: ReadonlyArray<BeatAction>): void => {
   for (const action of closed) {
-    if (action.kind === "closed" || action.kind === "parked" || action.kind === "split") {
+    if (action.kind === "closed" || action.kind === "parked" || action.kind === "held" || action.kind === "split") {
       const slot = live.find((entry) => entry.machine === action.machine)
       if (slot !== undefined) {
         slot.busy -= 1

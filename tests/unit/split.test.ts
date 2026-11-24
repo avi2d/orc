@@ -56,3 +56,32 @@ describe("a split sibling wait", () => {
     expect(taskWait(scout, [...tasks, scout], new Set(), () => false)).toBeNull()
   })
 })
+
+describe("a wait on a task that closed undone", () => {
+  const failedClosing = { outcome: "failed" as const, started: { at: "2026-10-27T10:02:00.000Z", log: "/logs/orc-2.log" }, reason: "no-mistakes stopped at the test gate", pr: null, report: null }
+  const parent: TaskRecord = {
+    spec: { ...spec, id: "orc-1", kind: "parent", parent: null, dependsOn: [], split: { by: "intake", reason: "two slices" } },
+    hold: null,
+    parked: null,
+    state: { kind: "new" }
+  }
+  const failed: TaskRecord = {
+    spec: { ...spec, id: "orc-2", title: "Record the split", parent: "orc-1", dependsOn: [] },
+    hold: null,
+    parked: null,
+    state: { kind: "closed", claim, closing: failedClosing, closedAt: "2026-10-27T11:00:00.000Z", postedAt: null }
+  }
+  const sibling: TaskRecord = {
+    spec: { ...spec, id: "orc-3", title: "Plan at intake", parent: "orc-1", dependsOn: ["orc-2"] },
+    hold: null,
+    parked: null,
+    state: { kind: "new" }
+  }
+  const tasks = [parent, failed, sibling]
+  test("a task waiting on a failed task names the failure instead of reading like a wait that ends", () => {
+    expect(taskWait(sibling, tasks, new Set(), () => false)).toBe("waits on orc-2, and orc-2 closed failed, which no beat reopens")
+  })
+  test("a parent with a failed child names that child instead of only counting it as not done", () => {
+    expect(taskWait(parent, tasks, new Set(), () => false)).toBe("waits on its children, 0 of 2 done, and orc-2 closed failed, which no beat reopens")
+  })
+})
