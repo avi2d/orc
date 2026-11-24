@@ -234,6 +234,7 @@ const expectedFiles = [
   "src/features/running-a-task/run-loop.ts",
   "src/features/running-a-task/run-ops.ts",
   "src/features/running-a-task/run-place.ts",
+  "src/features/running-a-task/run-prepare.ts",
   "src/features/running-a-task/run-record.ts",
   "src/features/running-a-task/run-resume.ts",
   "src/features/seeing-runs/run-scores.ts",
