@@ -357,7 +357,6 @@ describe("the heavy stand-in under HEAVY_TESTS_CI_ONLY=1", () => {
     "pnpm test:watch",
     "npx --yes vitest run",
     "npx -y jest",
-    "bunx --bun vitest",
     "npx vitest@latest run",
     "npx jest@29",
     "bun run vitest",

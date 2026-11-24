@@ -1,6 +1,6 @@
 import type { CliRenderer } from "@opentui/core";
 import { DateTime, Effect } from "effect";
-import { type QuotaBlock, type QuotaReadSources, quotaBlocks, readQuotas } from "@avi2dg/orc-schema";
+import { OrcQuotaSource, type QuotaBlock, type QuotaPanelSources, quotaBlocks, readQuotas } from "@avi2dg/orc-schema";
 import {
   type Block,
   livePanel as liveUiPanel,
@@ -17,21 +17,22 @@ interface Readings {
   readonly now: DateTime.Utc;
 }
 
-const readBlocks: Effect.Effect<Readings, never, QuotaReadSources> = Effect.gen(function* () {
-  const { quota, savedProfiles } = yield* readQuotas;
+const readBlocks: Effect.Effect<Readings, never, QuotaPanelSources> = Effect.gen(function* () {
+  const orcQuotaSource = yield* OrcQuotaSource;
+  const [{ quota, savedProfiles }, orcQuota] = yield* Effect.all([readQuotas, orcQuotaSource.read], { concurrency: "unbounded" });
   const now = yield* DateTime.now;
-  return { blocks: quotaBlocks(quota, savedProfiles, now), now };
+  return { blocks: quotaBlocks(quota, savedProfiles, orcQuota, now), now };
 });
 
 const panelLines = (readings: Readings, columns: number, rows: number): Block =>
   withinRows(quotaLines(readings.blocks, panelWidth(columns), true, readings.now), rows);
 
-const quotaPanel: Panel<Readings, QuotaReadSources> = { read: readBlocks, lines: panelLines };
+const quotaPanel: Panel<Readings, QuotaPanelSources> = { read: readBlocks, lines: panelLines };
 
-export const livePanel = (renderer: CliRenderer): Effect.Effect<void, never, QuotaReadSources> =>
+export const livePanel = (renderer: CliRenderer): Effect.Effect<void, never, QuotaPanelSources> =>
   liveUiPanel(renderer, quotaPanel, "30 seconds");
 
-export const runQuotaPanel: Effect.Effect<void, never, QuotaReadSources> = runPanel(quotaPanel, "30 seconds");
+export const runQuotaPanel: Effect.Effect<void, never, QuotaPanelSources> = runPanel(quotaPanel, "30 seconds");
 
-export const printQuotaFrame = (width: number, height: number = Number.POSITIVE_INFINITY, color = false): Effect.Effect<void, never, QuotaReadSources> =>
+export const printQuotaFrame = (width: number, height: number = Number.POSITIVE_INFINITY, color = false): Effect.Effect<void, never, QuotaPanelSources> =>
   printFrame(quotaPanel, width, height, color);

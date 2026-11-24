@@ -9,7 +9,7 @@ The queue keeps two such calls from overloading the machine at the same time.
 ## How calls reach the queue
 `orc run` and `orc runner start` write a stand in for each heavy tool into `~/.orc/heavy/bin`.
 A stand in is a launcher of three shell lines that starts orc's TypeScript helper through the absolute path of its bun.
-`orc run` puts that folder first on `PATH` for the agent it starts.
+`orc run` puts that folder on `PATH` for the agent it starts, after only `~/.orc/heavy/ci-only`.
 A stand in queues the call with `pueue add` into the `heavy` group, or hands it to the `through` command when one is set, and waits for its turn, then prints the call output and exits with its exit code.
 Without `through` set, the wait message names how many queued calls stand ahead, counting higher priority calls and earlier calls at the same priority.
 Without `through` set, a finished call leaves the queue after the stand in reads its exit code.
@@ -65,20 +65,43 @@ With `through` set, `orc heavy watch` prints a line naming the through command a
 With `through` set, `orc heavy check` and `orc heavy watch-once` fail with a line naming the through command.
 
 ## Test runs in agent sessions
-`orc run` sets `HEAVY_TESTS_CI_ONLY=1` for the Pi agent it starts, under the [nono](https://nono.sh) sandbox and under `--sandbox none`.
+`orc run` sets `HEAVY_TESTS_CI_ONLY=1` for the steps it starts: `prepare`, the local checks and the Pi agent, under the [nono](https://nono.sh) sandbox and under `--sandbox none`.
+For those steps it also writes stand ins for `node` and `checks-test` into `~/.orc/heavy/ci-only` and puts that folder first on `PATH`, ahead of `~/.orc/heavy/bin`.
+A `ci-only` stand in never queues: it refuses a test run, or runs the next `node` or `checks-test` on `PATH`.
 Under that variable a stand in refuses a test run with exit 1 and a line naming the command, and leaves the tests to GitHub CI.
 A test run is one of these calls, watch and UI runs included:
-- `bun test`, `npm t`, `go test`, `cargo test` and `cargo t`.
+- `bun test`, `npm t`, `node --test`, `go test`, `cargo test` and `cargo t`.
 - A `test`, `tests`, `test:*`, `e2e` or `e2e:*` script, or a script named `vitest`, `jest` or `pytest`, through `bun`, `npm`, `pnpm` or `yarn`.
-- `vitest`, `jest`, `pytest` or `playwright test`, directly or through `bunx`, `npx`, `bun x`, or a manager's `exec` or `dlx`.
+- `checks-test`, `vitest`, `jest`, `pytest` or `playwright test`, directly or through `bunx`, `npx`, `bun x`, or a manager's `exec` or `dlx`.
+- `bun` or `node` starting the bin file of `checks-test`, `checks-flake`, `checks-mutation`, `stryker`, `vitest`, `jest` or `playwright test`.
 
 Under `--sandbox none` every other call, such as a build, a lint or a typecheck, queues as it does without the variable.
 Under the nono sandbox it runs at once, as the next section says.
 The checks of a run go through the same stand ins, so a check command that starts a test run fails.
 
+### Runners behind a package manager
+A package manager puts `node_modules/.bin` ahead of every stand in, so a script body that names a runner skips the runner's own stand in.
+That runner's bin file starts `bun` or `node` through its first line, and the stand in for that runtime reads the file it starts.
+So a package script, a shell wrapper or a workspace-selected script that reaches a runner is refused too.
+
+### Bun runtime overrides
+`--bun`, its `-b` alias and `[run] bun = true` in `bunfig.toml` make Bun put its own `node` and `bun` links ahead of the stand-ins on `PATH`.
+Under `HEAVY_TESTS_CI_ONLY=1`, the Bun stand-in refuses `--bun` and `-b` in `bun`, `bun run`, `bun x` and `bunx`.
+It also refuses package script and bin-name calls when the effective `bunfig.toml` sets `[run] bun = true`, `bun check` included, because a package script named `check` runs in place of Bun's built-in.
+The stand-in finds that file from the call's working directory, `--cwd` and `--config`.
+A file call runs when its path starts with `/`, `./` or `../`, in both `bun <file>` and `bun run <file>`.
+A `bun <file>` call on a bare path that ends in `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts` or `.cts` runs too.
+Every other file call is refused, such as `bun run` on a bare path or `bun` on a `.sh` file, because Bun gives it the same `node` link.
+
+### What is not blocked
+- A `node` runner started from a Yarn 1 or Yarn Berry script, which puts a `node` wrapper first on the script's `PATH`, though no run has confirmed that route.
+- A runner started through a runtime's absolute path.
+- A runner the list does not name.
+- The [no-mistakes](https://github.com/kunchenguid/no-mistakes) review, which the shared daemon runs under its own `PATH`.
+
 ## Sandboxed runs
-Under the default nono sandbox, orc puts `~/.orc/heavy/bin` first on the agent's `PATH`, ahead of the runtime folders.
-The nono profile grants read and no write of `~/.orc/heavy/bin`, the helper's folder and the bun file that starts the helper.
+Under the default nono sandbox, orc puts `~/.orc/heavy/ci-only` and `~/.orc/heavy/bin` first on the agent's `PATH`, ahead of the runtime folders.
+The nono profile grants read and no write of both folders, the helper's folder and the bun file that starts the helper.
 The sandbox grants no pueue socket, so it also sets `HEAVY_QUEUE_UNREACHABLE=1`, and under that variable a call that is not refused runs at once.
 
 ## Watch the queue

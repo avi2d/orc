@@ -1,10 +1,13 @@
 import { accessSync, appendFileSync, closeSync, constants, mkdirSync, openSync, readSync, statSync } from "node:fs"
 import { dirname, join } from "node:path"
-import { classifyHeavyCall, isTestCall } from "./heavy-classify"
+import { classifyHeavyCall } from "./heavy-classify"
+import { refusedTest } from "./heavy-standin-refusal"
 import { ancestry, insideSlot, insideThrough, parseProcessTable } from "./heavy-process-tree"
 import { exitCodeOf, queuedAhead, slotTasks, taskState, type TaskState } from "./heavy-pueue-task"
 
 export const standinMarker = "Written by orc heavy path"
+
+export const ciOnlyMarker = standinMarker + " CI-only"
 
 // Bun would otherwise load the caller's .env and bunfig.toml preloads into the stand-in.
 export const helperCommand: ReadonlyArray<string> = [
@@ -14,6 +17,8 @@ export const helperCommand: ReadonlyArray<string> = [
 export const standinHelper = { runtime: helperCommand[0] ?? "", folder: dirname(helperCommand.at(-1) ?? "") }
 
 export const waiterWord = "orc-heavy-wait"
+
+export const ciOnlyWord = "orc-ci-only"
 
 export interface StandinTiming {
   readonly budgetMinutes: number | null
@@ -81,27 +86,27 @@ const isExecutableFile = (path: string): boolean => {
   }
 }
 
-const isStandin = (path: string): boolean => {
+const isStandin = (path: string, marker = standinMarker): boolean => {
   try {
     const handle = openSync(path, "r")
     const head = Buffer.alloc(4096)
     const read = readSync(handle, head, 0, head.length, 0)
     closeSync(handle)
-    return head.subarray(0, read).toString("utf8").split("\n").slice(0, 2).join(" ").includes(standinMarker)
+    return head.subarray(0, read).toString("utf8").split("\n").slice(0, 2).join(" ").includes(marker)
   } catch {
     return false
   }
 }
 
 // The shell's field split on ":" keeps empty inner fields as "." and drops a trailing empty field.
-export const callerTool = (tool: string, pathValue: string, standin: string): string => {
+export const callerTool = (tool: string, pathValue: string, standin: string, marker = standinMarker): string => {
   const entries = pathValue.split(":")
   if (entries.at(-1) === "") {
     entries.pop()
   }
   for (const entry of entries) {
     const candidate = (entry === "" ? "." : entry) + "/" + tool
-    if (!sameFile(candidate, standin) && isExecutableFile(candidate) && !isStandin(candidate)) {
+    if (!sameFile(candidate, standin) && isExecutableFile(candidate) && !isStandin(candidate, marker)) {
       return candidate
     }
   }
@@ -182,28 +187,29 @@ const refuse = (message: string): StandinPlan => {
   return { kind: "exit", code: 127 }
 }
 
-const testsCiOnlyVariable = "HEAVY_TESTS_CI_ONLY"
-
-const testRefusal = (command: string): string =>
-  "orc heavy: " + command + " starts a test run, and with " + testsCiOnlyVariable + "=1 the repository tests run only in GitHub CI"
-
-const testsCiOnly = (): boolean => Bun.env[testsCiOnlyVariable] === "1"
-
-const refusedTest = (call: StandinCall, args: ReadonlyArray<string>): boolean => {
-  if (!testsCiOnly() || !isTestCall(call.tool, args)) {
-    return false
-  }
-  process.stderr.write(testRefusal([call.tool, ...args].join(" ")) + "\n")
-  return true
-}
-
 const queueUnreachable = (): boolean => Bun.env.HEAVY_QUEUE_UNREACHABLE === "1"
 
 const runsUnqueued = (call: StandinCall, args: ReadonlyArray<string>): boolean =>
   queueUnreachable() || classifyHeavyCall(call.tool, call.commands, args) === "direct"
 
+export const ciOnlyPlan = (
+  tool: string,
+  standin: string,
+  args: ReadonlyArray<string>
+): { readonly kind: "run"; readonly real: string } | { readonly kind: "exit"; readonly code: number } => {
+  if (refusedTest(tool, args, workingDirectory())) {
+    return { kind: "exit", code: 1 }
+  }
+  const real = callerTool(tool, Bun.env.PATH ?? "", standin, ciOnlyMarker)
+  if (real === "") {
+    process.stderr.write("orc heavy: no " + tool + " on PATH after the stand-in at " + standin + "\n")
+    return { kind: "exit", code: 127 }
+  }
+  return { kind: "run", real }
+}
+
 export const planCall = (call: StandinCall, standin: string, args: ReadonlyArray<string>): StandinPlan => {
-  if (refusedTest(call, args)) {
+  if (refusedTest(call.tool, args, workingDirectory())) {
     return { kind: "exit", code: 1 }
   }
   const real = callerTool(call.tool, Bun.env.PATH ?? "", standin) || call.real || projectTool(call.tool, workingDirectory())

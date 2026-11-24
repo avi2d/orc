@@ -227,6 +227,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/heavy-queue/heavy-standin-main.ts` | The helper a stand in launcher starts by the real bun path, and the waiter a queued pueue task starts |
 | `packages/run/src/entities/heavy-queue/heavy-standin-exec.ts` | The helper's run of a call: the classify probe, the real tool as a child, the through command and the queued call waiter |
 | `packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts` | The stand in runtime: the helper command, the real tool lookup, the bypass event, the plan of a call and the queue wait |
+| `packages/run/src/entities/heavy-queue/heavy-standin-refusal.ts` | The refusal of a test run, or of a Bun runtime override, under `HEAVY_TESTS_CI_ONLY=1` |
+| `packages/run/src/entities/heavy-queue/heavy-runner-entry.ts` | The reading of the script file a `bun` or `node` call starts, to find a test runner bin, and the check for Bun runtime overrides |
 | `packages/run/src/entities/heavy-queue/heavy-process-tree.ts` | The process tree walk that finds a call inside a held slot or under the through command |
 | `packages/run/src/entities/heavy-queue/heavy-pueue-task.ts` | The reading of pueue status and log JSON for the queue wait and the exit code |
 

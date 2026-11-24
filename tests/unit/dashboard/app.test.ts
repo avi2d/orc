@@ -86,7 +86,7 @@ describe("the live dashboard", () => {
       for (const header of ["\u25cf claude main", "\u25cf codex", "\u25cf opencode-go"]) {
         expect(standard.some((row) => row.startsWith(header))).toBe(true);
       }
-      expect(standard.some((row) => row.startsWith("\u25cf claude second")) || standard.includes("+1 more claude profiles")).toBe(true);
+      expect(standard.some((row) => row.startsWith("\u25cf account second")) || standard.includes("+1 more account")).toBe(true);
       expect(standard).toContain("queue    local \u00b7 2 running \u00b7 2 queued \u00b7 1 paused \u00b7 gpu group paused");
       expect(standard).toContain("actions  toolshed \u00b7 2 running \u00b7 1 waiting");
       expect(standard).toContain("+3 more rows");

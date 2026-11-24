@@ -4,7 +4,7 @@ import type { Reading } from "../../shared/lib";
 import { ActionRun } from "../../entities/queues";
 import type { CiReport } from "../../entities/queues";
 import { PueueStatus } from "../../entities/queues";
-import { QuotaAvailability, QuotaProviderState, QuotaWindow, shownQuotaProviders } from "../../entities/session-quota";
+import { accountStandings, orcQuotaUnreadCauses, QuotaAvailability, QuotaProviderState, QuotaWindow, shownQuotaProviders } from "../../entities/session-quota";
 
 import type { QuotaBlock } from "../../entities/session-quota";
 import type { MachinesView } from "../../entities/resources";
@@ -63,6 +63,15 @@ export const QuotaBlocksCodec: Schema.Codec<ReadonlyArray<QuotaBlock>, unknown> 
         ]),
         windows: Schema.Array(Schema.Struct({ label: Schema.String, percentLeft: Schema.Finite, resetsAt: Schema.NullOr(Instant) })),
       }),
+      Schema.Struct({
+        kind: Schema.Literal("account"),
+        percentLeft: Schema.Finite,
+        resetsAt: Schema.NullOr(Instant),
+        standing: Schema.Literals(accountStandings),
+        floorPercent: Schema.Finite,
+      }),
+      Schema.Struct({ kind: Schema.Literal("unusable"), reason: Schema.String }),
+      Schema.Struct({ kind: Schema.Literal("accounts-unread"), cause: Schema.Literals(orcQuotaUnreadCauses), reason: Schema.String }),
       Schema.Struct({ kind: Schema.Literal("absent") }),
       Schema.Struct({ kind: Schema.Literal("unread") }),
       ...Failed.members,
