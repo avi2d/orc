@@ -8,6 +8,7 @@ import { Effect } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { shellInAgent } from "../../packages/run/src/shared/sandbox/agent-exec"
 import { openNonoExec } from "../../packages/run/src/shared/sandbox/nono-exec"
+import { standinHelper } from "../../packages/run/src/entities/heavy-queue/index"
 import { makeNonoFixtureDir } from "../lib/nono-home"
 
 const git = (cwd: string, args: ReadonlyArray<string>): void => {
@@ -33,6 +34,7 @@ const runInNono = (dir: string, home: string, command: string) =>
       worktree: join(dir, "copy"),
       piSessionDir: join(dir, "run", "session"),
       sessionsDir: join(dir, "run", "sessions"),
+      standinHelper,
       hostEnv: { PATH: Bun.env.PATH, HOME: home },
       env: { ORC_HOME: join(dir, "orc-home"), AGENT_TOKEN_FILE: "/k" }
     })

@@ -243,6 +243,7 @@ export const classifyHeavyCall = (tool: string, commands: Args, args: Args): Hea
 
 const testScripts: Args = ["test", "tests", "test:*", "e2e", "e2e:*"]
 const testRunners: Args = ["vitest", "jest", "pytest"]
+const testDirectoryFlags: Args = ["--cwd", "-C", "--dir", "--prefix"]
 
 const packageName = (word: string): string => {
   const at = word.indexOf("@", 1)
@@ -250,21 +251,21 @@ const packageName = (word: string): string => {
 }
 
 const execsTests = (args: Args): boolean => {
-  const [tool = "", ...rest] = args.filter((word) => !word.startsWith("-"))
+  const [tool = "", ...rest] = skipLeading(args, testDirectoryFlags, (word) => word.startsWith("-"))
   const name = packageName(tool)
   return testRunners.includes(name) || (name === "playwright" && rest[0] === "test")
 }
 
 const runsTestScript = (args: Args): boolean => {
-  const [script = ""] = skipLeading(args, ["--filter", "--cwd", "-w", "--workspace", "--prefix"], (word) => word.startsWith("-"))
+  const [script = ""] = skipLeading(args, [...testDirectoryFlags, "--filter", "-w", "--workspace"], (word) => word.startsWith("-"))
   return matchesAny(script, testScripts)
 }
 
 const managerTests = (aliases: Args) => (all: Args): boolean => {
   const args = skipLeading(
     all,
-    ["--filter", "-F", "--workspace", "-w", "--prefix", "workspace"],
-    (word) => matchesAny(word, ["--filter=*", "--workspace=*", "--prefix=*", "-r", "--recursive"])
+    [...testDirectoryFlags, "--filter", "-F", "--workspace", "-w", "workspace"],
+    (word) => matchesAny(word, ["--filter=*", "--workspace=*", ...testDirectoryFlags.map((flag) => flag + "=*"), "-r", "--recursive"])
   )
   const [sub = "", ...rest] = args
   if (sub === "run" || sub === "run-script") {
@@ -277,7 +278,7 @@ const managerTests = (aliases: Args) => (all: Args): boolean => {
 }
 
 const bunTests = (all: Args): boolean => {
-  const args = skipLeading(all, ["--filter"], (word) => word.startsWith("--filter="))
+  const args = skipLeading(all, [...testDirectoryFlags, "--filter"], (word) => matchesAny(word, ["--filter=*", ...testDirectoryFlags.map((flag) => flag + "=*")]))
   const [sub = "", ...rest] = args
   if (sub === "run") {
     return runsTestScript(rest)
@@ -300,8 +301,13 @@ const testBodies: ReadonlyMap<string, (args: Args) => boolean> = new Map([
   ["cargo", (args) => args[0] === "test" || args[0] === "t"]
 ])
 
-export const isTestCall = (tool: string, args: Args): boolean =>
-  !hasAny(args, versionFlags) && (testBodies.get(tool)?.(args) ?? false)
+export const isTestCall = (tool: string, args: Args): boolean => {
+  const queryFlags = tool === "pytest" ? ["--version", "--help", "-h"] : versionFlags
+  if (args.length === 1 && queryFlags.includes(args[0] ?? "")) {
+    return false
+  }
+  return testBodies.get(tool)?.(args) ?? false
+}
 
 export const decisionWords = (decision: HeavyDecision): string => {
   switch (decision) {

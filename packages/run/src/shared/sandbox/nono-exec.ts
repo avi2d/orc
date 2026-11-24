@@ -16,7 +16,7 @@ export interface NonoExecOptions {
   readonly modelCredential?: ModelCredential | undefined
   readonly hostEnv: Readonly<Record<string, string | undefined>>
   readonly toolchain?: ToolchainResolver | undefined
-  readonly standinHelper?: StandinHelper | undefined
+  readonly standinHelper: StandinHelper
   readonly env: Readonly<Record<string, string>>
 }
 
@@ -31,10 +31,10 @@ const existingRealPaths = (fs: FileSystem.FileSystem, paths: ReadonlyArray<strin
   )
 
 // A stand-in the sandbox cannot read or a helper it cannot start falls back to the real tool, so the test refusal would not apply.
-const standinReads = (fs: FileSystem.FileSystem, searchPath: string | undefined, helper: StandinHelper | undefined) =>
+const standinReads = (fs: FileSystem.FileSystem, searchPath: string | undefined, helper: StandinHelper) =>
   Effect.gen(function*() {
-    const standinFolders = yield* existingRealPaths(fs, [...standinDirsOf(searchPath), ...(helper === undefined ? [] : [helper.folder])])
-    const standinFiles = yield* existingRealPaths(fs, helper === undefined ? [] : [helper.runtime])
+    const standinFolders = yield* existingRealPaths(fs, [...standinDirsOf(searchPath), helper.folder])
+    const standinFiles = yield* existingRealPaths(fs, [helper.runtime])
     return { standinFolders, standinFiles }
   })
 

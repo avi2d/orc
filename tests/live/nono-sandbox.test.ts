@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { NonoProviderError } from "../../packages/run/src/shared/sandbox/host"
 import type { NonoExecOptions } from "../../packages/run/src/shared/sandbox/nono-exec"
+import { standinHelper } from "../../packages/run/src/entities/heavy-queue/index"
 import { makeNonoFixtureDir } from "../lib/nono-home"
 import { nonoOpenError, type NonoShellRun, runNonoShell, withNonoShell } from "../lib/nono-shell"
 
@@ -92,6 +93,7 @@ describe("the nono exec", () => {
     worktree: copy,
     piSessionDir,
     sessionsDir: piSessionDir,
+    standinHelper,
     hostEnv: { ...Bun.env, ...hostEnv },
     env: {}
   })
