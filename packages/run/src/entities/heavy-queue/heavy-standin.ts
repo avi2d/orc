@@ -28,6 +28,8 @@ export const standinTools = (commands: ReadonlyArray<string>): ReadonlyArray<str
   return [...new Set([...defaultHeavyTools, ...extra])]
 }
 
+const toolsRequiringPathAtWrite = new Set(["python", "python3", "uv", "deno", "go", "cargo", "make"])
+
 const isExecutableFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<boolean> =>
   fs.stat(file).pipe(
     Effect.map((info) => info.type === "File" && (info.mode & 0o111) !== 0),
@@ -122,7 +124,7 @@ export const standinScripts = (
     const entries: Array<[string, string]> = []
     for (const tool of tools) {
       const real = yield* findRealTool(tool, Bun.env.PATH ?? "")
-      if (real !== "") {
+      if (real !== "" || !toolsRequiringPathAtWrite.has(tool)) {
         entries.push([tool, launcher(tool, settings, commands, real, timing)])
       }
     }

@@ -2,7 +2,7 @@ import { Effect, FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { readOrcConfig } from "../../shared/config/index"
 import { ciOnlyBinDir, heavyBinDir, resolveHeavy, type HeavySettings } from "./heavy"
-import { ciOnlyScript, ciOnlyTools, detectWrap, findRealTool, standinScripts, type HeavyPlatform, type StandinSettings } from "./heavy-standin"
+import { ciOnlyScript, ciOnlyTools, detectWrap, standinScripts, type HeavyPlatform, type StandinSettings } from "./heavy-standin"
 import { RunnerError } from "../../shared/process/index"
 import { ensureGroup } from "../../shared/process/index"
 
@@ -59,12 +59,7 @@ export const writeHeavyBin = (
   Effect.gen(function*() {
     const wrap = detectWrap(platform, settings.limit)
     const standins: StandinSettings = { home, group: settings.group, wrap, through: settings.through }
-    const ciOnly: Record<string, string> = {}
-    for (const tool of ciOnlyTools) {
-      if ((yield* findRealTool(tool, Bun.env.PATH ?? "")) !== "") {
-        ciOnly[tool] = ciOnlyScript(tool)
-      }
-    }
+    const ciOnly = Object.fromEntries(ciOnlyTools.map((tool) => [tool, ciOnlyScript(tool)]))
     yield* writeStandinDir(ciOnlyBinDir(home), ciOnly)
     return yield* writeStandinDir(heavyBinDir(home), yield* standinScripts(standins, settings.commands))
   })

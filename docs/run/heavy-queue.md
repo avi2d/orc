@@ -7,9 +7,11 @@ Heavy calls are test runs, builds and browser runs through tools like `bun`, `bu
 The queue keeps two such calls from overloading the machine at the same time.
 
 ## How calls reach the queue
-`orc run` and `orc runner start` write a stand in into `~/.orc/heavy/bin` for each heavy tool found on `PATH`.
-Tools absent from `PATH` get no stand in, so shell probes still find them absent.
-Each write removes stand ins for tools no longer found on `PATH`.
+`orc run` and `orc runner start` write a stand in into `~/.orc/heavy/bin` for each heavy tool and configured command.
+For `python`, `python3`, `uv`, `deno`, `go`, `cargo`, and `make`, orc writes a stand in only when the tool exists on `PATH`.
+Shell probes still find those tools absent when they are missing.
+Other tools get stand ins even without a `PATH` binary, so the helper can run the nearest `node_modules/.bin` copy.
+Each write removes stand ins for commands no longer configured and for those seven tools when they disappear from `PATH`.
 A stand in is a launcher of three shell lines that starts orc's TypeScript helper through the absolute path of its bun.
 `orc run` puts that folder on `PATH` for the agent it starts, after only `~/.orc/heavy/ci-only`.
 A stand in queues the call with `pueue add` into the `heavy` group, or hands it to the `through` command when one is set, and waits for its turn, then prints the call output and exits with its exit code.
@@ -68,7 +70,7 @@ With `through` set, `orc heavy check` and `orc heavy watch-once` fail with a lin
 
 ## Test runs in agent sessions
 `orc run` sets `HEAVY_TESTS_CI_ONLY=1` for the steps it starts: `prepare`, the local checks and the Pi agent, under the [nono](https://nono.sh) sandbox and under `--sandbox none`.
-For those steps it also writes stand ins for `node` and `checks-test`, when found on `PATH`, into `~/.orc/heavy/ci-only`.
+For those steps it also writes stand ins for `node` and `checks-test` into `~/.orc/heavy/ci-only`, even without a `PATH` binary.
 It puts that folder first on `PATH`, ahead of `~/.orc/heavy/bin`.
 A `ci-only` stand in never queues: it refuses a test run, or runs the next `node` or `checks-test` on `PATH`.
 Under that variable a stand in refuses a test run with exit 1 and a line naming the command, and leaves the tests to GitHub CI.
