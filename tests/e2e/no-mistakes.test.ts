@@ -70,14 +70,14 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const intentPath = join(home, "runs", "step-run-1", "review-intent.md")
+        const taskPath = join(home, "runs", "step-run-1", "task.md")
         const workdir = await realpath(dir)
         const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [passedWithPr, recordedNothing])
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.prLink).toBe("https://github.com/o/r/pull/7")
         expect(outcome.run?.prLink).toBe("https://github.com/o/r/pull/7")
         expect(outcome.run?.status).toBe("succeeded")
-        expect(outcome.nmCalls.split("\n").filter((line) => line !== "")).toEqual([startCall(intentPath), workdir, statusLookup, workdir])
+        expect(outcome.nmCalls.split("\n").filter((line) => line !== "")).toEqual([startCall(taskPath), workdir, statusLookup, workdir])
         const text = await readFile(join(home, "runs", "step-run-1", "no-mistakes.txt"), "utf8")
         expect(text).toContain("no-mistakes result: passed")
         expect(text).toContain("PR: https://github.com/o/r/pull/7")
@@ -95,11 +95,11 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const intentPath = join(home, "runs", "step-run-1", "review-intent.md")
+        const taskPath = join(home, "runs", "step-run-1", "task.md")
         const workdir = await realpath(dir)
         const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [fixableGate, passedWithPr, recordedNothing])
         expect(outcome.nmCalls.split("\n").filter((line) => line !== "")).toEqual([
-          startCall(intentPath),
+          startCall(taskPath),
           workdir,
           fixCall(),
           workdir,
@@ -136,7 +136,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
           ].join("\n") + "\n"
         }
         const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [askUserGate, recordedNothing])
-        expect(axiCalls(outcome.nmCalls)).toEqual([startCall(join(home, "runs", "step-run-1", "review-intent.md")), statusLookup])
+        expect(axiCalls(outcome.nmCalls)).toEqual([startCall(join(home, "runs", "step-run-1", "task.md")), statusLookup])
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.prLink).toBeNull()
         expect(outcome.report.noMistakes?.status).toBe("refused")
@@ -201,7 +201,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
           ].join("\n") + "\n"
         }
         const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [questionGate, recordedNothing])
-        expect(axiCalls(outcome.nmCalls)).toEqual([startCall(join(home, "runs", "step-run-1", "review-intent.md")), statusLookup])
+        expect(axiCalls(outcome.nmCalls)).toEqual([startCall(join(home, "runs", "step-run-1", "task.md")), statusLookup])
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.noMistakes?.status).toBe("refused")
         const reason = outcome.run?.endReason ?? ""
@@ -232,7 +232,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
           ].join("\n") + "\n"
         }
         const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [questionGate, recordedNothing])
-        expect(axiCalls(outcome.nmCalls)).toEqual([startCall(join(home, "runs", "step-run-1", "review-intent.md")), statusLookup])
+        expect(axiCalls(outcome.nmCalls)).toEqual([startCall(join(home, "runs", "step-run-1", "task.md")), statusLookup])
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.noMistakes?.status).toBe("refused")
         const reason = outcome.run?.endReason ?? ""
@@ -321,11 +321,11 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const intentPath = join(home, "runs", "step-run-1", "review-intent.md")
+        const taskPath = join(home, "runs", "step-run-1", "task.md")
         const workdir = await realpath(dir)
         const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [{ stdout: "still working\n" }, passedWithPr, recordedNothing])
         expect(outcome.nmCalls.split("\n").filter((line) => line !== "")).toEqual([
-          startCall(intentPath),
+          startCall(taskPath),
           workdir,
           "axi run",
           workdir,
@@ -347,7 +347,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
           { stdout: "", stderr: "refused: protected path docs/launch.md needs your word", exitCode: 1 },
           recordedNothing
         ])
-        expect(axiCalls(outcome.nmCalls)).toEqual([startCall(join(home, "runs", "step-run-1", "review-intent.md")), fixCall(), statusLookup])
+        expect(axiCalls(outcome.nmCalls)).toEqual([startCall(join(home, "runs", "step-run-1", "task.md")), fixCall(), statusLookup])
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.prLink).toBeNull()
         expect(outcome.report.noMistakes?.status).toBe("refused")
@@ -364,7 +364,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
         const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [checksPassedWhileMonitoring, recordedNothing])
-        expect(axiCalls(outcome.nmCalls)).toEqual([startCall(join(home, "runs", "step-run-1", "review-intent.md")), statusLookup])
+        expect(axiCalls(outcome.nmCalls)).toEqual([startCall(join(home, "runs", "step-run-1", "task.md")), statusLookup])
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.noMistakes?.status).toBe("passed")
         expect(outcome.run?.prLink).toBe("https://github.com/o/r/pull/7")
@@ -453,7 +453,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         const sha = await readyToCheck(dir, home)
         const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [fixableGate, fixReviewGate, checksPassedWhileMonitoring, recordedNothing])
         expect(axiCalls(outcome.nmCalls)).toEqual([
-          startCall(join(home, "runs", "step-run-1", "review-intent.md")),
+          startCall(join(home, "runs", "step-run-1", "task.md")),
           fixCall(),
           "axi respond --action approve",
           statusLookup
@@ -507,7 +507,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         }
         const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [withFixes, status, lintLog])
         expect(axiCalls(outcome.nmCalls)).toEqual([
-          startCall(join(home, "runs", "step-run-1", "review-intent.md")),
+          startCall(join(home, "runs", "step-run-1", "task.md")),
           statusLookup,
           "axi logs --run 01STUB --step lint"
         ])
@@ -526,7 +526,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
         const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [waitExpired, checksPassedWhileMonitoring, recordedNothing])
-        expect(axiCalls(outcome.nmCalls)).toEqual([startCall(join(home, "runs", "step-run-1", "review-intent.md")), "axi run", statusLookup])
+        expect(axiCalls(outcome.nmCalls)).toEqual([startCall(join(home, "runs", "step-run-1", "task.md")), "axi run", statusLookup])
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.noMistakes?.gatesAnswered).toBe(0)
       })
@@ -539,7 +539,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         const sha = await readyToCheck(dir, home)
         const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [fixableGate, waitExpired, checksPassedWhileMonitoring, recordedNothing])
         expect(axiCalls(outcome.nmCalls)).toEqual([
-          startCall(join(home, "runs", "step-run-1", "review-intent.md")),
+          startCall(join(home, "runs", "step-run-1", "task.md")),
           fixCall(),
           "axi run",
           statusLookup

@@ -61,7 +61,7 @@ const escalationBullet = (start: string): string => {
   return bullet.slice(2)
 }
 
-const recommendedRule = "When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
+const recommendedRule = "When a review question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
 
 const escalateOn = (rule: string | undefined): string =>
   JSON.stringify({ decision: "escalate", reason: "the decider would not pick", ...(rule === undefined ? {} : { rule }) })

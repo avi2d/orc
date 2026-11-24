@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -80,9 +80,7 @@ describe("driveNoMistakes", () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-gate-"))
     try {
       const waiting = waitForAnswers === undefined ? {} : { waitForAnswers }
-      const taskFile = join(dir, "task.md")
-      await writeFile(taskFile, "# Retry the upload\n")
-      const record = await Effect.runPromise(driveNoMistakes({ runner, taskFile, runDir: dir, allow, answers, ...waiting }).pipe(Effect.provide(BunServices.layer)))
+      const record = await Effect.runPromise(driveNoMistakes({ runner, taskFile: "/task.md", runDir: dir, allow, answers, ...waiting }).pipe(Effect.provide(BunServices.layer)))
       return { record, gate: await readFile(join(dir, "gate.log"), "utf8") }
     } finally {
       await rm(dir, { recursive: true, force: true })

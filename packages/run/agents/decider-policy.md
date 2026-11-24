@@ -9,13 +9,13 @@ The written rules are what a review already holds a change to: keep the change s
 
 ## Rules
 
-A line of the question that starts with "Recommended:" names its recommended option, and the words after it are that option.
-When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure.
+A line of a review question that starts with "Recommended:" names its recommended option, and the words after it are that option.
+When a review question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure.
 
 ## How to answer
 
-The two escalation bullets for open product choices and uncertainty apply only to a question that names no recommended option.
-When you answer with the recommended option of a question, put the sentence that starts with "When a question names a recommended option" in rule, and quote in reason the words of the question that name the option.
+The two escalation bullets for open product choices and uncertainty apply to worker questions and to review questions that name no recommended option.
+When you answer with the recommended option of a review question, put the sentence that starts with "When a review question names a recommended option" in rule, and quote in reason the words of the question that name the option.
 
 ## Escalation
 

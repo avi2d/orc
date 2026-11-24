@@ -197,7 +197,7 @@ const recommendedLine = /^[\t ]*Recommended:[\t ]*(\S.*)$/m
 
 const recommendedOption = (question: string): string | undefined => recommendedLine.exec(question)?.[1]?.trim()
 
-const recommendedRule = "When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
+const recommendedRule = "When a review question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
 
 // The policy lifts only these two escalation bullets for a question that names a recommended option, so every other reason still escalates.
 const liftedBullets: ReadonlyArray<string> = ["It picks between product choices that the intent leaves open.", "You are not sure."]
