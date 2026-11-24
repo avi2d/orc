@@ -334,10 +334,10 @@ describe("reinterrupted continuations survive every handover", () => {
       try {
         const run = await Effect.runPromise(historyFor("b", home, join(home, "repo"), "2026-10-19T10:00:00.000Z"))
         await seedRun(db, "b", run.projectDir, run.taskPath, "failed", run.started)
-        const old = { round: 1, file: "/old.txt", started: run.started, ended: run.started, passed: false, failed: [], checks: [], refusals: [] }
+        const old = { round: 1, file: "/old.txt", started: run.started, ended: run.started, passed: false, failed: ["lint"], checks: [{ name: "lint", passed: false }], refusals: [] }
         await Effect.runPromise(recordChecksDone(db, "b", old))
         await Effect.runPromise(recordChecksStart(db, "b", 1, run.started))
-        await Effect.runPromise(recordChecksDone(db, "b", { ...old, file: "/new.txt", passed: true }))
+        await Effect.runPromise(recordChecksDone(db, "b", { ...old, file: "/new.txt", passed: true, failed: [], checks: [{ name: "lint", passed: true }] }))
         const rows = Schema.decodeUnknownSync(Schema.Array(Schema.Struct({ status: Schema.String, path: Schema.String })))(db.query("SELECT steps.status, evidence.path FROM steps JOIN evidence ON evidence.step_id = steps.id WHERE steps.run_id = ? ORDER BY steps.id, evidence.id").all("b"))
         expect(rows).toEqual([{ status: "failed", path: "/old.txt" }, { status: "passed", path: "/new.txt" }])
       } finally {
