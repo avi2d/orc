@@ -43,10 +43,12 @@ The tabs refresh while visible and show a reason when a command fails.
 ## Answer in the Inbox
 
 Select **Inbox** or press `cmd-4` to see everything that waits for you in one list, oldest first.
-The Inbox reads `orc backlog --json`, `orc attention --json`, `orc runs --json`, and `orc backlog thread <task> --json` for each task that waits.
-Each item shows its task, who asks, the question, and its options.
+The Inbox includes questions from runs on other machines.
+Each item shows the task ID and title, who asks, the full question, and its options.
 An option with a picture shows as a tile, and any other option shows as a button.
-On a decision the decider escalated, the option it recommends is outlined and its recommendation shows below the options.
+When the decider recommends an option, the Inbox outlines it and shows the recommendation below the options.
+
+![The Inbox on Mac with questions from two garden tasks and two holds.](images/herdr-inbox.png)
 
 To answer a question or a hold:
 
@@ -71,6 +73,9 @@ On the Board tab, click the count in the **Awaiting you** lane header to open th
 
 [Runs and chat](herdr-app-agents.md) covers the Agents tab and chat drawer.
 On the Agents tab, click the count on the **Awaiting you** status filter to open the Inbox, as `cmd-4` does.
+Select an **Awaiting you** card to see what it needs above the step list, even if the run is not on this machine.
+
+![An open Awaiting you card on Mac with its question and answer box above the steps.](images/herdr-agents-awaiting.png)
 The Project row shows runs for configured projects by default.
 Choose **All runs** to include runs from other projects.
 Opening a run of another project from the Inbox switches the Project row to **All runs**.
