@@ -105,10 +105,12 @@ So `HEAVY_TESTS_CI_ONLY=1` and the stand-in folders that `orc run` sets for its 
 
 `orc heavy path`, `orc run` and `orc runner start` write an agent wrapper for `claude`, `codex`, `opencode` and `pi` into `~/.orc/heavy/agents`.
 A wrapper sets `HEAVY_TESTS_CI_ONLY=1`, puts `~/.orc/heavy/ci-only` and `~/.orc/heavy/bin` first on `PATH`, and starts the real agent.
-It starts the agent at the absolute path orc found when it wrote the wrapper, or else the first copy of the agent on the daemon's `PATH` that is not the wrapper.
-With neither, it exits 127 with a line naming the agent.
+It starts the first copy of the agent on the daemon's `PATH` that is not the wrapper itself.
+If no such copy exists, it exits 127 with a line naming the agent.
 
-To start the agents through the wrapper, point `agent_path_override` in `~/.no-mistakes/config.yaml` at it, here for a home folder of `/home/you`:
+The skills-generated `~/.no-mistakes/config.yaml` holds the `agent_path_override` setting that starts agents through the wrapper.
+Orc never writes that global file itself.
+For a home folder of `/home/you`, the generated config holds:
 
 ```yaml
 agent: pi
