@@ -3,19 +3,19 @@ import { Avatar, AvatarFallback, AvatarImage, v_flex } from "gpui-base"
 import { exec, nextCommand } from "herdr"
 import type { palette } from "./palette"
 import { type AskOption, optionShape } from "./thread"
-import { type ShownRefresh, reloadNow } from "./views"
 
 type Palette = ReturnType<typeof palette>
 
 export type Sent = { readonly kind: "sending" } | { readonly kind: "failed"; readonly reason: string }
 
-export interface OrcSender<T> extends ShownRefresh<T> {
+export interface OrcSender {
   readonly sent: Map<string, Sent>
+  reload(cx: Context): void
 }
 
 const firstLine = (text: string): string => text.trim().split("\n")[0] ?? ""
 
-export const sendOrc = <T>(host: OrcSender<T>, cx: Context, key: string, argv: ReadonlyArray<string>, done: () => void, current: () => boolean = () => true): void => {
+export const sendOrc = (host: OrcSender, cx: Context, key: string, argv: ReadonlyArray<string>, done: () => void, current: () => boolean = () => true): void => {
   host.sent.set(key, { kind: "sending" })
   cx.spawn((task) => exec("orc", [...argv]).then(
     (result) => {
@@ -25,7 +25,7 @@ export const sendOrc = <T>(host: OrcSender<T>, cx: Context, key: string, argv: R
       } else if (current()) {
         host.sent.set(key, { kind: "failed", reason: `orc ${argv.join(" ")} exited ${result.code}: ${firstLine(result.stderr) || firstLine(result.stdout)}` })
       }
-      reloadNow(task, host)
+      host.reload(task)
       task.notify()
     },
     () => {
