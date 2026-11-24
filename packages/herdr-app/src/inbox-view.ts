@@ -9,7 +9,7 @@ import { type AskOption, whoLabel } from "./thread"
 
 type Palette = ReturnType<typeof palette>
 
-export const inboxKind: Readonly<Record<InboxItem["kind"], string>> = {
+const inboxKind: Readonly<Record<InboxItem["kind"], string>> = {
   question: "Question", decision: "Decision", hold: "Hold", pr: "PR"
 }
 
