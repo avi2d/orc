@@ -192,6 +192,7 @@ const expectedFiles = [
   "src/widgets/beat/stall.ts",
   "src/widgets/beat/subquo.ts",
   "src/entities/backlog/task-dependency.ts",
+  "src/entities/backlog/task-wait.ts",
   "src/widgets/beat/task-events.ts",
   "src/entities/backlog/task-record-render.ts",
   "src/entities/backlog/task-record.ts",
