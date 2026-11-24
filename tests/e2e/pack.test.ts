@@ -189,6 +189,7 @@ const expectedFiles = [
   "src/entities/task-copy/refresh.ts",
   "src/shared/process/runner-error.ts",
   "src/shared/process/runner-exec.ts",
+  "src/shared/process/self-command.ts",
   "src/features/queueing-a-task/runner-instructions.ts",
   "src/features/queueing-a-task/runner-request.ts",
   "src/entities/backlog/runner-label.ts",
