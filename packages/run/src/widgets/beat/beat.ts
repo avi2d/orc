@@ -2,7 +2,7 @@ import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } fro
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
 import type { ConfigError } from "../../shared/config/index"
-import { type Account, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "../../shared/config/index"
+import { type Account, type DispatchConfig, type Machine, type Project, providerOf, readDispatchConfig, readProjects } from "../../shared/config/index"
 import { type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
@@ -93,7 +93,8 @@ const startTask = (
   task: TaskRecord,
   claim: Claim,
   place: Placed,
-  credential: Credential
+  credential: Credential,
+  models: Account["models"]
 ): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     const machine = place.machine
@@ -117,6 +118,8 @@ const startTask = (
       ORC_RUN_MACHINE: machine.name,
       ORC_TASK_PROVIDER: credential.provider,
       ORC_TASK_ACCOUNT: claim.account,
+      ORC_TASK_IMPLEMENTER_MODEL: models?.implementer ?? "",
+      ORC_TASK_FIXER_MODEL: models?.fixer ?? "",
       ORC_TASK_TOKEN_FILE: credential.kind === "file" ? credential.tokenFile : "",
       ORC_TASK_CLAUDE_CONFIG_DIR: credential.kind === "claude-config" ? credential.configDirs[machine.name] ?? "" : ""
     }
@@ -155,7 +158,7 @@ const credentialFor = (
   account: Account
 ): Effect.Effect<Credential | { readonly kind: "waits"; readonly reason: string }, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    const provider = context.config.quota.provider
+    const provider = providerOf(context.config.quota, account)
     switch (account.kind) {
       case "token-file": {
         return { kind: "file", provider, tokenFile: account.tokenFile }
@@ -189,7 +192,7 @@ const considerTask = (
       return waits(placement.reason)
     }
     if (context.account === null) {
-      return waits("no " + context.config.quota.provider + " account has room")
+      return waits("no account has room")
     }
     const credential = yield* credentialFor(context, context.account)
     if (credential.kind === "waits") {
@@ -208,7 +211,7 @@ const considerTask = (
       slot.busy += 1
     }
     const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: context.account.name, takenAt: yield* nowIso }
-    const action = yield* startTask(context.root, claimed.record, claim, placement, credential)
+    const action = yield* startTask(context.root, claimed.record, claim, placement, credential, context.account.models)
     if (slot !== undefined) {
       if (action.kind === "given-back") {
         slot.busy = slot.slots

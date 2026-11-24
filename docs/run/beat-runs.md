@@ -32,8 +32,10 @@ A result that remains unreadable for 10 minutes also closes failed.
 A run still waiting for an answer stays started and the beat relays the answer.
 To stop a task yourself, run `orc backlog stop <task-id>` where the backlog lives, as [Stop a task](backlog-tasks.md#stop-a-task) describes.
 
-Custom start commands receive `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT`, `ORC_TASK_TOKEN_FILE`, `ORC_TASK_CLAUDE_CONFIG_DIR`, and `ORC_TASK_INSTRUCTIONS`.
+Custom start commands receive `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT`, `ORC_TASK_IMPLEMENTER_MODEL`, `ORC_TASK_FIXER_MODEL`, `ORC_TASK_TOKEN_FILE`, `ORC_TASK_CLAUDE_CONFIG_DIR`, and `ORC_TASK_INSTRUCTIONS`.
 `ORC_TASK_LOG` names the log path, and `ORC_RUN_MACHINE` names the machine.
+`ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` hold the picked account's models, or empty strings when the account names no `models`.
+If your custom start command forwards the task to another machine, forward both model variables with it.
 `ORC_TASK_TOKEN_FILE` holds a path, not a token.
 For a token-command account, the token arrives as `orc.token.v1` on standard input.
 For a `none` account, standard input is empty.
