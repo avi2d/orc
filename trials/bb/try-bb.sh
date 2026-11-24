@@ -12,7 +12,6 @@ plugin=$here/plugin
 real_home=$(eval echo "~$(id -un)")
 prefs=$real_home/Library/Preferences/dev.bb.desktop.plist
 trial_id=dev.bb.desktop.orc-trial
-trial_prefs=$real_home/Library/Preferences/$trial_id.plist
 real_data=("$real_home/.bb" "$real_home/Library/Application Support/bb" "$prefs")
 scratch=$here/.scratch
 for tool in curl hdiutil ditto shasum jq lsof sqlite3 orc screencapture codesign defaults; do
@@ -37,7 +36,7 @@ mkdir -p "$data" "$user_data" "$proof"
 snapshot() {
   for path in "${real_data[@]}"; do
     if [ -e "$path" ]; then
-      find -L "$path" -type f -print0 | sort -z | xargs -0 shasum -a 256
+      find -H "$path" -type f -print0 | sort -z | xargs -0 shasum -a 256
     else
       echo "missing $path"
     fi
@@ -92,10 +91,8 @@ cleanup() {
   trap - EXIT
   set +e
   stop_bb
-  if [ -e "$trial_prefs" ]; then
-    defaults delete "$trial_id" >/dev/null 2>&1
-    rm -f "$trial_prefs"
-    echo "removed $trial_prefs, the scratch bb's own launch defaults"
+  if defaults delete "$trial_id" >/dev/null 2>&1; then
+    echo "removed launch defaults for $trial_id"
   fi
   snapshot > "$proof/real-after"
   if cmp -s "$proof/real-before" "$proof/real-after"; then
@@ -122,11 +119,11 @@ if [ ! -x "$cli" ] || [ "$status" = "000" ]; then
   echo "timed out waiting 60 seconds for the bb server at $BB_SERVER_URL" >&2
   exit 1
 fi
-if [ ! -e "$trial_prefs" ]; then
-  echo "the scratch bb wrote no launch defaults to $trial_prefs" >&2
+if ! defaults read "$trial_id" >/dev/null 2>&1; then
+  echo "the scratch bb wrote no launch defaults for $trial_id" >&2
   exit 1
 fi
-echo "the scratch bb keeps its launch defaults in $trial_prefs"
+echo "the scratch bb keeps its launch defaults under $trial_id"
 "$cli" settings general telemetryEnabled false >/dev/null
 "$cli" settings show --json > "$proof/settings.json"
 jq -e '.generalSettings.telemetryEnabled == false' "$proof/settings.json" >/dev/null
