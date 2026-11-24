@@ -3,6 +3,8 @@ commands:
   build: bun run build
   lint: bun run lint
   typecheck: bun run typecheck
+test:
+  ci_only: true
 review:
   path_instructions:
     - path: "docs/**"

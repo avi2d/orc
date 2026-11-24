@@ -101,6 +101,73 @@ const skipLeading = (args: Args, valued: Args, single: (word: string) => boolean
   return args.slice(at)
 }
 
+const testScripts: Args = [
+  "test", "tests", "t", "tst", "test:*", "tests:*", "e2e", "e2e:*", "coverage", "coverage:*", "mutation", "mutation:*",
+  "vitest", "jest", "pytest", "playwright"
+]
+
+const packageName = (word: string): string => {
+  const at = word.indexOf("@", 1)
+  return at === -1 ? word : word.slice(0, at)
+}
+
+const testArgs = (args: Args): Args => skipLeading(
+  args,
+  [
+    "--filter", "-F", "--cwd", "-C", "--dir", "--workspace", "-w", "--prefix", "--package", "-p", "workspace",
+    "--config", "--env-file", "--preload", "--require", "--sdk", "--toolchain"
+  ],
+  (word) => word.startsWith("-")
+)
+
+const execTest = (args: Args): boolean => {
+  const [tool = "", ...rest] = testArgs(args)
+  return isTestCallInner(packageName(tool), rest)
+}
+
+const isTestCallInner = (tool: string, args: Args): boolean => {
+  const [sub = "", ...rest] = testArgs(args)
+  switch (tool) {
+    case "checks-test":
+    case "vitest":
+    case "jest":
+    case "pytest":
+      return true
+    case "bunx":
+    case "npx":
+      return execTest(args)
+    case "bun":
+    case "npm":
+    case "pnpm":
+    case "yarn":
+      if (["run", "run-script"].includes(sub)) {
+        return matchesAny(testArgs(rest)[0] ?? "", testScripts)
+      }
+      if (["exec", "x", "dlx"].includes(sub)) {
+        return execTest(rest)
+      }
+      return matchesAny(sub, testScripts) || isTestCallInner(packageName(sub), rest)
+    case "playwright":
+    case "go":
+    case "cargo":
+      return sub === "test" || (tool === "cargo" && sub === "t")
+    case "xcodebuild":
+      return hasAny(args, ["test", "test-without-building"])
+    case "xcrun":
+      return execTest(args)
+    default:
+      return false
+  }
+}
+
+export const isTestCall = (tool: string, args: Args): boolean => {
+  const queryFlags = tool === "pytest" ? ["--version", "--help", "-h"] : versionFlags
+  if (args.length === 1 && queryFlags.includes(args[0] ?? "")) {
+    return false
+  }
+  return isTestCallInner(tool, args)
+}
+
 const runScript = (args: Args): HeavyDecision => {
   const [script = "", ...rest] = skipLeading(args, ["--filter", "--cwd", "-w", "--workspace", "--prefix"], (word) => word.startsWith("-"))
   if (matchesAny(script, watchScripts) || !matchesAny(script, heavyScripts) || hasAny(rest, watchFlags)) {
@@ -239,74 +306,6 @@ export const classifyHeavyCall = (tool: string, commands: Args, args: Args): Hea
     return "direct"
   }
   return atLeast(result.decision, configuredDecision(tool, commands, result.rest))
-}
-
-const testScripts: Args = ["test", "tests", "test:*", "e2e", "e2e:*"]
-const testRunners: Args = ["vitest", "jest", "pytest"]
-const testDirectoryFlags: Args = ["--cwd", "-C", "--dir", "--prefix"]
-
-const packageName = (word: string): string => {
-  const at = word.indexOf("@", 1)
-  return at === -1 ? word : word.slice(0, at)
-}
-
-const execsTests = (args: Args): boolean => {
-  const [tool = "", ...rest] = skipLeading(args, testDirectoryFlags, (word) => word.startsWith("-"))
-  const name = packageName(tool)
-  return testRunners.includes(name) || (name === "playwright" && rest[0] === "test")
-}
-
-const runsTestScript = (args: Args): boolean => {
-  const [script = ""] = skipLeading(args, [...testDirectoryFlags, "--filter", "-w", "--workspace"], (word) => word.startsWith("-"))
-  return matchesAny(script, testScripts) || testRunners.includes(script)
-}
-
-const managerTests = (aliases: Args) => (all: Args): boolean => {
-  const args = skipLeading(
-    all,
-    [...testDirectoryFlags, "--filter", "-F", "--workspace", "-w", "workspace"],
-    (word) => matchesAny(word, ["--filter=*", "--workspace=*", ...testDirectoryFlags.map((flag) => flag + "=*"), "-r", "--recursive"])
-  )
-  const [sub = "", ...rest] = args
-  if (sub === "run" || sub === "run-script") {
-    return runsTestScript(rest)
-  }
-  if (sub === "exec" || sub === "dlx") {
-    return execsTests(rest[0] === "--" ? rest.slice(1) : rest)
-  }
-  return aliases.includes(sub) || matchesAny(sub, testScripts) || execsTests(args)
-}
-
-const bunTests = (all: Args): boolean => {
-  const args = skipLeading(all, [...testDirectoryFlags, "--filter"], (word) => matchesAny(word, ["--filter=*", ...testDirectoryFlags.map((flag) => flag + "=*")]))
-  const [sub = "", ...rest] = args
-  if (sub === "run") {
-    return runsTestScript(rest)
-  }
-  return sub === "test" || matchesAny(sub, testScripts) || execsTests(sub === "x" ? rest : args)
-}
-
-const testBodies: ReadonlyMap<string, (args: Args) => boolean> = new Map([
-  ["bun", bunTests],
-  ["bunx", execsTests],
-  ["npx", execsTests],
-  ["npm", managerTests(["t", "tst"])],
-  ["pnpm", managerTests(["t"])],
-  ["yarn", managerTests([])],
-  ["vitest", () => true],
-  ["jest", () => true],
-  ["pytest", () => true],
-  ["playwright", (args) => args[0] === "test"],
-  ["go", (args) => args[0] === "test"],
-  ["cargo", (args) => args[0] === "test" || args[0] === "t"]
-])
-
-export const isTestCall = (tool: string, args: Args): boolean => {
-  const queryFlags = tool === "pytest" ? ["--version", "--help", "-h"] : versionFlags
-  if (args.length === 1 && queryFlags.includes(args[0] ?? "")) {
-    return false
-  }
-  return testBodies.get(tool)?.(args) ?? false
 }
 
 export const decisionWords = (decision: HeavyDecision): string => {
