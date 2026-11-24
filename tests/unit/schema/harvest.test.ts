@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
 import {
   countedCalls,
-  decodeSavedProfiles,
   decodeQuota,
   type HarvestedReading,
   harvestedReadings,
@@ -138,7 +137,6 @@ const recordedNow = DateTime.makeUnsafe("2026-10-13T20:18:16Z");
 
 const fullReport = (text = fixture("quota-axi/full.json")) => ({ ...decodeQuota(text), capturedAt: recordedNow });
 
-const savedProfiles = () => ({ ...decodeSavedProfiles(fixture("saved-profiles/status.json")), capturedAt: recordedNow });
 
 const windowsOf = (blocks: ReadonlyArray<QuotaBlock>, title: string): ReadonlyArray<SourcedWindow> => {
   const body = blocks.find((block) => block.title === title)?.body;
@@ -156,7 +154,7 @@ const summary = (window: SourcedWindow) => ({
 // quota-axi was asked about every provider here, as it is whenever no log reading covers one.
 describe("quotaBlocks with harvested readings", () => {
   test("keeps quota-axi's window, and says so, when its read is newer than every harvested reading", () => {
-    const blocks = quotaBlocks(quotaAxiRead(fullReport(), harvest()), savedProfiles(), noOrcAccounts(recordedNow), recordedNow);
+    const blocks = quotaBlocks(quotaAxiRead(fullReport(), harvest()), noOrcAccounts(recordedNow), recordedNow);
     expect(windowsOf(blocks, "codex").map(summary)).toEqual([
       { id: "five_hour", left: 100, source: "quota-axi" },
       { id: "weekly", left: 82, source: "quota-axi" },
@@ -165,7 +163,7 @@ describe("quotaBlocks with harvested readings", () => {
       kind: "quota-axi",
       readAt: DateTime.makeUnsafe("2026-10-13T20:18:15.337Z"),
     });
-    expect(windowsOf(blocks, "claude main").map(summary)).toEqual([
+    expect(windowsOf(blocks, "claude").map(summary)).toEqual([
       { id: "five_hour", left: 98, source: "quota-axi" },
       { id: "seven_day", left: 31, source: "quota-axi" },
       { id: "model:fable", left: 100, source: "quota-axi" },
@@ -173,7 +171,7 @@ describe("quotaBlocks with harvested readings", () => {
   });
 
   test("takes the newer Codex rollout reading, joined by the rollout's own credential key", () => {
-    const blocks = quotaBlocks(quotaAxiRead(fullReport(readEarlier(fixture("quota-axi/full.json"))), harvest()), savedProfiles(), noOrcAccounts(recordedNow), recordedNow);
+    const blocks = quotaBlocks(quotaAxiRead(fullReport(readEarlier(fixture("quota-axi/full.json"))), harvest()), noOrcAccounts(recordedNow), recordedNow);
     expect(windowsOf(blocks, "codex").map(summary)).toEqual([
       { id: "five_hour", left: 81.5, source: "harvested" },
       { id: "weekly", left: 75, source: "harvested" },
@@ -189,7 +187,7 @@ describe("quotaBlocks with harvested readings", () => {
   });
 
   test("paces a harvested window against its own reading the way quota-axi paces one, not with quota-axi's pace from its older reading", () => {
-    const blocks = quotaBlocks(quotaAxiRead(fullReport(readEarlier(fixture("quota-axi/full.json"))), harvest()), savedProfiles(), noOrcAccounts(recordedNow), recordedNow);
+    const blocks = quotaBlocks(quotaAxiRead(fullReport(readEarlier(fixture("quota-axi/full.json"))), harvest()), noOrcAccounts(recordedNow), recordedNow);
     const [fiveHour, week] = windowsOf(blocks, "codex");
     expect(fiveHour.pace?.status).toBe("behind");
     expect(fiveHour.pace?.timeRemainingPercent).toBeCloseTo(70.5778, 4);
@@ -200,13 +198,13 @@ describe("quotaBlocks with harvested readings", () => {
   });
 
   test("takes a newer Claude rejection for its week as an assumption, and ignores one whose window has since reset", () => {
-    const blocks = quotaBlocks(quotaAxiRead(fullReport(readEarlier(fixture("quota-axi/full.json"))), harvest()), savedProfiles(), noOrcAccounts(recordedNow), recordedNow);
-    expect(windowsOf(blocks, "claude main").map(summary)).toEqual([
+    const blocks = quotaBlocks(quotaAxiRead(fullReport(readEarlier(fixture("quota-axi/full.json"))), harvest()), noOrcAccounts(recordedNow), recordedNow);
+    expect(windowsOf(blocks, "claude").map(summary)).toEqual([
       { id: "five_hour", left: 98, source: "quota-axi" },
       { id: "seven_day", left: 0, source: "harvested" },
       { id: "model:fable", left: 100, source: "quota-axi" },
     ]);
-    const week = windowsOf(blocks, "claude main")[1];
+    const week = windowsOf(blocks, "claude")[1];
     expect(week.source.kind === "harvested" ? week.source.join : undefined).toEqual({ kind: "only-account" });
   });
 });
@@ -227,7 +225,7 @@ const codexHomeReading: HarvestedReading = {
 };
 
 const sixBlocks = (text: string) =>
-  quotaBlocks(quotaAxiRead({ ...decodeQuota(text), capturedAt: sixNow }, [codexHomeReading]), savedProfiles(), noOrcAccounts(sixNow), sixNow);
+  quotaBlocks(quotaAxiRead({ ...decodeQuota(text), capturedAt: sixNow }, [codexHomeReading]), noOrcAccounts(sixNow), sixNow);
 
 describe("the account a harvested reading joins, against the recorded replays, never the other Codex account or an only or default account", () => {
   test("lands a rollout reading on the codex-home account and leaves the Pi Codex key's account alone", () => {
@@ -245,7 +243,7 @@ describe("the account a harvested reading joins, against the recorded replays, n
   // The recording's only Codex account renamed to a Pi key, so an assumed only-account join would take the reading.
   test("joins no account, not even the only one, when no account holds the rollout's credential key", () => {
     const piKeyed = readEarlier(fixture("quota-axi/full.json")).replace('"codex-home"', '"openai-codex"');
-    const blocks = quotaBlocks(quotaAxiRead(fullReport(piKeyed), harvest()), savedProfiles(), noOrcAccounts(recordedNow), recordedNow);
+    const blocks = quotaBlocks(quotaAxiRead(fullReport(piKeyed), harvest()), noOrcAccounts(recordedNow), recordedNow);
     expect(windowsOf(blocks, "codex").map(summary)).toEqual([
       { id: "five_hour", left: 100, source: "quota-axi" },
       { id: "weekly", left: 82, source: "quota-axi" },
@@ -268,7 +266,7 @@ const codexFiveHour = (percentRemaining: number): HarvestedReading => ({
 });
 
 const earlierBlocks = (readings: ReadonlyArray<HarvestedReading>) =>
-  quotaBlocks(quotaAxiRead(fullReport(readEarlier(fixture("quota-axi/full.json"))), readings), savedProfiles(), noOrcAccounts(recordedNow), recordedNow);
+  quotaBlocks(quotaAxiRead(fullReport(readEarlier(fixture("quota-axi/full.json"))), readings), noOrcAccounts(recordedNow), recordedNow);
 
 const unpaced = (window: QuotaWindow): QuotaWindow => {
   const { pace, ...rest } = window;
@@ -300,7 +298,7 @@ describe("the edges of a harvested window", () => {
       observedAt: at("2026-10-13T19:30:00Z"),
       file: claudePath,
     };
-    expect(windowsOf(earlierBlocks([reset]), "claude main").map(summary)[0]).toEqual({
+    expect(windowsOf(earlierBlocks([reset]), "claude").map(summary)[0]).toEqual({
       id: "five_hour",
       left: 98,
       source: "quota-axi",
@@ -316,7 +314,7 @@ describe("the edges of a harvested window", () => {
       ),
     );
     const [fiveHour] = windowsOf(
-      quotaBlocks(quotaAxiRead({ ...report, capturedAt: recordedNow }, [codexFiveHour(71)]), savedProfiles(), noOrcAccounts(recordedNow), recordedNow),
+      quotaBlocks(quotaAxiRead({ ...report, capturedAt: recordedNow }, [codexFiveHour(71)]), noOrcAccounts(recordedNow), recordedNow),
       "codex",
     );
     expect(summary(fiveHour)).toEqual({ id: "five_hour", left: 71, source: "harvested" });
@@ -354,22 +352,22 @@ const twoClaudeLogins = (defaultKey: string) =>
 const sourceOf = (window: SourcedWindow) => (window.source.kind === "harvested" ? window.source.join.kind : "quota-axi");
 
 const claudeSources = (report: Outcome<QuotaReport>) =>
-  quotaBlocks(quotaAxiRead({ ...report, capturedAt: sixNow }, [claudeWeekAt("2026-10-16T19:29:00Z")]), savedProfiles(), noOrcAccounts(sixNow), sixNow)
+  quotaBlocks(quotaAxiRead({ ...report, capturedAt: sixNow }, [claudeWeekAt("2026-10-16T19:29:00Z")]), noOrcAccounts(sixNow), sixNow)
     .filter((block) => block.body.kind === "live" && block.title.startsWith("claude"))
     .map((block) => [block.title, block.body.kind === "live" ? block.body.windows.map(sourceOf) : []]);
 
 describe("a Claude reading with more than one login, never the first login listed", () => {
   test("lands on the default login, as an assumption", () => {
     expect(claudeSources(twoClaudeLogins("default"))).toEqual([
-      ["claude main work", ["quota-axi", "quota-axi", "quota-axi"]],
-      ["claude main", ["quota-axi", "default-account", "quota-axi"]],
+      ["claude work", ["quota-axi", "quota-axi", "quota-axi"]],
+      ["claude", ["quota-axi", "default-account", "quota-axi"]],
     ]);
   });
 
   test("joins no login when none is the default", () => {
     expect(claudeSources(twoClaudeLogins("home"))).toEqual([
-      ["claude main work", ["quota-axi", "quota-axi", "quota-axi"]],
-      ["claude main home", ["quota-axi", "quota-axi", "quota-axi"]],
+      ["claude work", ["quota-axi", "quota-axi", "quota-axi"]],
+      ["claude home", ["quota-axi", "quota-axi", "quota-axi"]],
     ]);
   });
 });
@@ -389,7 +387,7 @@ describe("readQuota's choice of source", () => {
   test("leaves Codex out of quota-axi's ask and reads both its windows from a rollout 38 minutes old", () => {
     const read = recordedQuotaRead(fixture("quota-axi/full.json"), recordedNow, [rollout(), claudeLog()]);
     expect(askedOf(read)).toEqual(["claude", "opencode-go"]);
-    const codex = windowsOf(quotaBlocks(read, savedProfiles(), noOrcAccounts(recordedNow), recordedNow), "codex");
+    const codex = windowsOf(quotaBlocks(read, noOrcAccounts(recordedNow), recordedNow), "codex");
     expect(codex.map(summary)).toEqual([
       { id: "five_hour", left: 81.5, source: "harvested" },
       { id: "weekly", left: 75, source: "harvested" },
@@ -419,7 +417,7 @@ describe("readQuota's choice of source", () => {
   test("reads Claude from its log alone when both its windows were rejected within the hour", () => {
     const read = recordedQuotaRead(fixture("quota-axi/full.json"), recordedNow, [bothClaudeWindowsRejected()]);
     expect(askedOf(read)).toEqual(["codex", "opencode-go"]);
-    const claude = windowsOf(quotaBlocks(read, savedProfiles(), noOrcAccounts(recordedNow), recordedNow), "claude main");
+    const claude = windowsOf(quotaBlocks(read, noOrcAccounts(recordedNow), recordedNow), "claude");
     expect(claude.map(summary)).toEqual([
       { id: "five_hour", left: 0, source: "harvested" },
       { id: "seven_day", left: 0, source: "harvested" },

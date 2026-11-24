@@ -43,7 +43,7 @@ export {
   type Tone,
 } from "./text/palette";
 export { cycleName, quotaBar, shortLabel } from "./readouts/quota";
-export { savedName, windowName } from "./readouts/window-names";
+export { windowName } from "./readouts/window-names";
 export { failureRows, failureText, type Label, labelled, labelledReadings, leastLabelWidth, machineLabel, reading } from "./readouts/labels";
 export { machineWidthOf, sentence, sourceNotes, withinRoom } from "./readouts/notes";
 export {

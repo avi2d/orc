@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { decodeOrcQuota, decodeQuota, decodeSavedProfiles, type OrcQuota, type QuotaBlock, quotaBlocks, type Reading } from "@avi2dg/orc-schema";
+import { decodeOrcQuota, decodeQuota, type OrcQuota, type QuotaBlock, quotaBlocks, type Reading } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { type OrcQuotaFixture, orcQuotaOf, orcQuotaReading } from "../../lib/orc-quota";
 import { quotaAxiRead } from "../../lib/quota-read";
@@ -9,18 +9,17 @@ const now = DateTime.makeUnsafe("2026-11-24T18:46:36Z");
 
 const blocksWith = (orcQuota: Reading<OrcQuota>): ReadonlyArray<QuotaBlock> => {
   const quota = decodeQuota(fixture("quota-axi/full.json"));
-  const savedProfiles = decodeSavedProfiles(fixture("saved-profiles/status.json"));
-  if (quota.kind !== "ok" || savedProfiles.kind !== "ok") throw new Error("the fixtures do not decode");
-  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: now }), { ...savedProfiles, capturedAt: now }, orcQuota, now);
+  if (quota.kind !== "ok") throw new Error("the fixtures do not decode");
+  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: now }), orcQuota, now);
 };
 
 const accountBlocks = (name: OrcQuotaFixture): ReadonlyArray<QuotaBlock> =>
   blocksWith(orcQuotaOf(name, now)).filter((block) => block.title.startsWith("account"));
 
 describe("quotaBlocks over the accounts orc quota --json prints", () => {
-  test("puts one account block per account between live claude and codex, in place of the saved claude second profile", () => {
+  test("puts one account block per account between live claude and codex", () => {
     expect(blocksWith(orcQuotaOf("main-second", now)).map((block) => block.title)).toEqual([
-      "claude main",
+      "claude",
       "account main",
       "account second",
       "codex",
@@ -67,7 +66,7 @@ describe("quotaBlocks over the accounts orc quota --json prints", () => {
 
   test("draws an orc that did not answer as a failed accounts block, keeping the live blocks", () => {
     const blocks = blocksWith({ kind: "unreachable", reason: "orc is not installed on PATH", capturedAt: now });
-    expect(blocks.map((block) => block.title)).toEqual(["claude main", "accounts", "codex", "opencode-go"]);
+    expect(blocks.map((block) => block.title)).toEqual(["claude", "accounts", "codex", "opencode-go"]);
     expect(blocks[1]?.body).toEqual({ kind: "unreachable", reason: "orc is not installed on PATH" });
   });
 });

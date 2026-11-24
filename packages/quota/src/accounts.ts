@@ -44,7 +44,6 @@ export const accountDetail = (body: QuotaBlockBody): AccountDetail | undefined =
     case "accounts-unread":
       return { text: unreadHeadlines[body.cause], tone: "error" };
     case "live":
-    case "saved":
     case "absent":
     case "unread":
     case "unreachable":
