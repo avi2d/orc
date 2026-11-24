@@ -5,7 +5,7 @@ import { homedir } from "node:os"
 import { agentEnv, type AgentExec } from "./agent-exec"
 import { standinDirSuffix } from "./standin-dir"
 import { NonoProviderError, prepareSandboxShims, resolveDeveloperDir, resolveHostBinary, resolvePiAgentDir, resolveRuntime } from "./host"
-import { buildHostGitEnv, checkProfile, refuseCredentialBearingCheckout, resolveRoots, sandboxEnv, sandboxRuntimes } from "./nono"
+import { buildHostGitEnv, checkProfile, refuseCredentialBearingCheckout, resolveRoots, sandboxEnv, sandboxRuntimes, standinDirsOf } from "./nono"
 import { defaultToolchainResolver, selectNonoProfile, type ModelCredential, type ToolchainResolver } from "./nono-profile"
 
 export interface NonoExecOptions {
@@ -16,8 +16,27 @@ export interface NonoExecOptions {
   readonly modelCredential?: ModelCredential | undefined
   readonly hostEnv: Readonly<Record<string, string | undefined>>
   readonly toolchain?: ToolchainResolver | undefined
+  readonly standinHelper?: StandinHelper | undefined
   readonly env: Readonly<Record<string, string>>
 }
+
+export interface StandinHelper {
+  readonly runtime: string
+  readonly folder: string
+}
+
+const existingRealPaths = (fs: FileSystem.FileSystem, paths: ReadonlyArray<string>) =>
+  Effect.forEach(paths, (candidate) => fs.realPath(candidate).pipe(Effect.orElseSucceed(() => null))).pipe(
+    Effect.map((found) => [...new Set(found.filter((real) => real !== null))])
+  )
+
+// A stand-in the sandbox cannot read or a helper it cannot start falls back to the real tool, so the test refusal would not apply.
+const standinReads = (fs: FileSystem.FileSystem, searchPath: string | undefined, helper: StandinHelper | undefined) =>
+  Effect.gen(function*() {
+    const standinFolders = yield* existingRealPaths(fs, [...standinDirsOf(searchPath), ...(helper === undefined ? [] : [helper.folder])])
+    const standinFiles = yield* existingRealPaths(fs, helper === undefined ? [] : [helper.runtime])
+    return { standinFolders, standinFiles }
+  })
 
 export const checksCacheReads = (
   path: Path.Path,
@@ -54,9 +73,10 @@ export const openNonoExec = (
     const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
     const profileDir = yield* fs.makeTempDirectoryScoped({ prefix: "orc-nono-" })
     const profilePath = path.join(profileDir, "profile.json")
-    const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: [...toolchain.folders, ...checksCacheReads(path, hostEnv)], runtimeDirs }, options.modelCredential)
+    const standins = yield* standinReads(fs, hostEnv.PATH, options.standinHelper)
+    const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: [...toolchain.folders, ...checksCacheReads(path, hostEnv)], runtimeDirs, ...standins }, options.modelCredential)
     yield* fs.writeFileString(profilePath, `${JSON.stringify(profile, null, 2)}\n`)
-    yield* checkProfile(spawner, nono, profilePath, [profileDir, nonoBinary, path.dirname(nonoBinary)])
+    yield* checkProfile(spawner, nono, profilePath, [profileDir, nonoBinary, path.dirname(nonoBinary), ...standins.standinFolders, ...standins.standinFiles])
     yield* fs.makeDirectory(sandboxed.TMPDIR, { recursive: true })
     return { kind: "nono", cwd: roots.worktree, env, nonoBinary, profilePath } as const
   })

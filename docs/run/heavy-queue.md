@@ -65,7 +65,10 @@ With `through` set, `orc heavy watch` prints a line naming the through command a
 With `through` set, `orc heavy check` and `orc heavy watch-once` fail with a line naming the through command.
 
 ## Sandboxed runs
-Sandboxed runs do not use the heavy queue yet.
+Under the default nono sandbox, orc puts `~/.orc/heavy/bin` first on the agent's `PATH`, ahead of the runtime folders.
+The nono profile grants read and no write of `~/.orc/heavy/bin`, the helper's folder and the bun file that starts the helper.
+The sandbox sets `HEAVY_TESTS_CI_ONLY=1`, so a stand in refuses a test run such as `bun test`, `bun run test`, `bunx vitest`, `npm test` or `npx jest` with exit 1, and leaves the tests to GitHub CI.
+Under `HEAVY_TESTS_CI_ONLY=1` every other call, such as a build, a lint or a typecheck, runs at once, because the sandbox cannot reach pueue.
 
 ## Watch the queue
 `orc runner start` arms the watchdog beside the alert stream unless `through` is set.

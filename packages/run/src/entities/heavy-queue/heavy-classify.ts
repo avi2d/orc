@@ -241,6 +241,68 @@ export const classifyHeavyCall = (tool: string, commands: Args, args: Args): Hea
   return atLeast(result.decision, configuredDecision(tool, commands, result.rest))
 }
 
+const testScripts: Args = ["test", "tests", "test:*", "e2e", "e2e:*"]
+const testRunners: Args = ["vitest", "jest", "pytest"]
+
+const packageName = (word: string): string => {
+  const at = word.indexOf("@", 1)
+  return at === -1 ? word : word.slice(0, at)
+}
+
+const execsTests = (args: Args): boolean => {
+  const [tool = "", ...rest] = args.filter((word) => !word.startsWith("-"))
+  const name = packageName(tool)
+  return testRunners.includes(name) || (name === "playwright" && rest[0] === "test")
+}
+
+const runsTestScript = (args: Args): boolean => {
+  const [script = ""] = skipLeading(args, ["--filter", "--cwd", "-w", "--workspace", "--prefix"], (word) => word.startsWith("-"))
+  return matchesAny(script, testScripts)
+}
+
+const managerTests = (aliases: Args) => (all: Args): boolean => {
+  const args = skipLeading(
+    all,
+    ["--filter", "-F", "--workspace", "-w", "--prefix", "workspace"],
+    (word) => matchesAny(word, ["--filter=*", "--workspace=*", "--prefix=*", "-r", "--recursive"])
+  )
+  const [sub = "", ...rest] = args
+  if (sub === "run" || sub === "run-script") {
+    return runsTestScript(rest)
+  }
+  if (sub === "exec" || sub === "dlx") {
+    return execsTests(rest[0] === "--" ? rest.slice(1) : rest)
+  }
+  return aliases.includes(sub) || matchesAny(sub, testScripts) || execsTests(args)
+}
+
+const bunTests = (all: Args): boolean => {
+  const args = skipLeading(all, ["--filter"], (word) => word.startsWith("--filter="))
+  const [sub = "", ...rest] = args
+  if (sub === "run") {
+    return runsTestScript(rest)
+  }
+  return sub === "test" || matchesAny(sub, testScripts) || execsTests(sub === "x" ? rest : args)
+}
+
+const testBodies: ReadonlyMap<string, (args: Args) => boolean> = new Map([
+  ["bun", bunTests],
+  ["bunx", execsTests],
+  ["npx", execsTests],
+  ["npm", managerTests(["t", "tst"])],
+  ["pnpm", managerTests(["t"])],
+  ["yarn", managerTests([])],
+  ["vitest", () => true],
+  ["jest", () => true],
+  ["pytest", () => true],
+  ["playwright", (args) => args[0] === "test"],
+  ["go", (args) => args[0] === "test"],
+  ["cargo", (args) => args[0] === "test" || args[0] === "t"]
+])
+
+export const isTestCall = (tool: string, args: Args): boolean =>
+  !hasAny(args, versionFlags) && (testBodies.get(tool)?.(args) ?? false)
+
 export const decisionWords = (decision: HeavyDecision): string => {
   switch (decision) {
     case "direct":
