@@ -1,4 +1,4 @@
-import type { AskingRun, AttentionItem } from "./guard"
+import type { AskingRun, AttentionItem } from "./guard-attention"
 import { type AnswerTarget, type TaskDetail, mergeArgv } from "./task"
 import { type AskText, type Thread, type ThreadCard, type ThreadLine, askText, threadCards } from "./thread"
 

@@ -26,7 +26,7 @@ import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
 import { runDirFor, type ReportKind } from "../../entities/backlog/index"
 import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "../../entities/review-gate/index"
 import { isRunId, newRunId } from "../../shared/lib/index"
-import { prepareRunFolders, type RunFolders, runInstructions } from "./run-folders"
+import { dropEndedPiAgentDir, prepareRunFolders, type RunFolders, runInstructions } from "./run-folders"
 import { subprocessDeliverer } from "./run-deliverer"
 import type { RunDelivery } from "../../shared/config/index"
 import { closeTaskCopy, openTaskCopy, writeAgentGitConfig } from "../../entities/task-copy/index"
@@ -390,6 +390,8 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
     yield* finishRun(db, run.runId, report, new Date().toISOString())
     if (ended.stopped !== null) {
       yield* markRunStopped(db, run.runId, new Date().toISOString(), ended.stopped)
+    } else {
+      yield* dropEndedPiAgentDir(db, run, report)
     }
     return report
   })

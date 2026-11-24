@@ -76,6 +76,10 @@ On the Agents tab, click the count on the **Awaiting you** status filter to open
 Select an **Awaiting you** card to see what it needs above the step list, even if the run is not on this machine.
 
 ![An open Awaiting you card on Mac with its question and answer box above the steps.](images/herdr-agents-awaiting.png)
+The Project row shows runs for configured projects by default.
+Choose **All runs** to include runs from other projects.
+Opening a run of another project from the Inbox switches the Project row to **All runs**.
+A merged PR shows its run as Done, and a closed PR shows its run as Failed.
 
 <div id="start-a-scratch-app"><span id="recapture-the-board-screenshots"></span><span id="change-the-mods"></span></div>
 

@@ -9,7 +9,12 @@ Press `cmd-k` to open or close the chat drawer.
 ## Follow a run in the Agents tab
 
 The list shows runs and queued tasks, grouped by status.
-Pick a project or status to filter it.
+The Project row shows runs for configured projects by default.
+Choose All runs to include runs from other projects.
+Opening a run of another project from the Inbox switches the Project row to All runs.
+Pick a project or status to filter the list.
+A merged PR shows its run as Done.
+A closed PR shows its run as Failed.
 Select « to collapse the list and » to open it.
 
 Select a run to see its steps.

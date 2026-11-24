@@ -20,6 +20,7 @@ export interface Card {
   readonly delivery: string | null
   readonly title: string
   readonly project: string
+  readonly known: boolean
   readonly standing: Standing
   readonly where: string
   readonly runId: string | null
@@ -42,6 +43,7 @@ export const approveRow = "approve"
 export interface Filter {
   readonly project: string | null
   readonly status: CardStatus | null
+  readonly allRuns: boolean
 }
 
 export type Mark = "✓" | "✗" | "●" | "◆" | "○"
@@ -93,6 +95,8 @@ const stepLabel = (step: Pick<Step, "name" | "attempt">): string => {
 
 const taskBranches = (task: Task): ReadonlyArray<string> => [`orc/${task.id}`, `orc/${task.id}-parent`]
 
+const openQuestions = (task: Task): number => task.status === "closed" ? 0 : (task.parked ?? 0) + (task.hold ?? 0)
+
 const queuedWhere = (task: Task): string => task.hold === null ? "Waiting to start" : "Held"
 
 type Place = Pick<Card, "standing" | "where">
@@ -142,6 +146,22 @@ const prPlace = (runId: string, link: string, task: Task | undefined, merged: Re
   return approval?.link === link ? awaitingApproval(approval) : { standing: { status: "Done" }, where: pr }
 }
 
+const settledPlace = (run: Run, task: Task | undefined, newest: boolean): Pick<Card, "standing" | "where"> | null => {
+  if (run.prLink === null || !newest || task === undefined) {
+    return null
+  }
+  const pr = prNumber(run.prLink)
+  switch (task.prState) {
+    case "merged":
+      return { standing: { status: "Done" }, where: `Merged ${pr}` }
+    case "closed":
+      return { standing: { status: "Failed" }, where: `Closed ${pr}` }
+    case "open":
+    case null:
+      return null
+  }
+}
+
 const sendBackOf = (task: Task | undefined, standing: Standing): string | null =>
   task?.status === "closed" && standing.status === "Awaiting you" && standing.waiting.on === "approval" ? task.id : null
 
@@ -177,13 +197,14 @@ const answersByTask = (items: ReadonlyArray<InboxItem>): Map<string, Array<Inbox
   return byTask
 }
 
-const runCard = (run: Run, task: Task | undefined, place: Place): Card => ({
+const runCard = (run: Run, task: Task | undefined, place: Place, project: string, known: boolean): Card => ({
   key: run.id,
   id: task?.id ?? run.id,
   kind: run.kind ?? task?.kind ?? null,
   delivery: run.delivery,
   title: run.title ?? task?.title ?? run.branch,
-  project: task?.project ?? lastSegment(run.project),
+  project,
+  known,
   ...place,
   runId: run.id,
   checkout: run.worktree === null ? null : { worktree: run.worktree, branch: run.branch },
@@ -192,10 +213,10 @@ const runCard = (run: Run, task: Task | undefined, place: Place): Card => ({
 
 const taskCard = (task: Task, active: ReadonlySet<string>, pending: ReadonlyArray<InboxAnswer>, unread: boolean): ReadonlyArray<Card> => {
   if (task.status === "closed") return []
-  const waiting = awaitingAnswer(pending) ?? (unread && !active.has(task.id) ? awaitingUnread((task.parked ?? 0) + (task.hold ?? 0)) : null)
+  const waiting = awaitingAnswer(pending) ?? (unread && !active.has(task.id) ? awaitingUnread((task.parked ?? 0) + (task.hold ?? 0)) : null) ?? awaitingUnread(openQuestions(task) > 0 && pending.length === 0 && !unread && !active.has(task.id) ? openQuestions(task) : 0)
   if (waiting === null && active.has(task.id)) return []
   const place = waiting ?? { standing: { status: "Queued" } as const, where: queuedWhere(task) }
-  return [{ key: task.id, id: task.id, kind: task.kind, delivery: null, title: task.title, project: task.project, ...place, runId: null, checkout: null, sendBack: null }]
+  return [{ key: task.id, id: task.id, kind: task.kind, delivery: null, title: task.title, project: task.project, known: true, ...place, runId: null, checkout: null, sendBack: null }]
 }
 
 export const buildCards = (runs: Runs, backlog: Backlog, items: ReadonlyArray<InboxItem> = [], unread: ReadonlySet<string> = new Set()): ReadonlyArray<Card> => {
@@ -205,11 +226,22 @@ export const buildCards = (runs: Runs, backlog: Backlog, items: ReadonlyArray<In
   const waitingRuns = waitingRunByTask(runs, byBranch)
   const answers = answersByTask(items)
   const approvals = new Map(items.filter((item) => item.kind === "pr").map((item) => [item.task, item]))
+  const known = (project: string): boolean => backlog.projects === null || backlog.projects.some((configured) => configured.name === project)
+  const checkoutProject = new Map((backlog.projects ?? []).flatMap((project) => project.paths.map((path) => [path, project.name] as const)))
   const active = new Set<string>()
   const cards: Array<Card> = []
   for (const run of runs.runs) {
     const task = byBranch.get(run.branch)
     const id = task?.id ?? run.id
+    const settled = settledPlace(run, task, newest.has(run.id))
+    if (settled !== null) {
+      const project = task?.project ?? checkoutProject.get(run.project) ?? lastSegment(run.project)
+      if (task !== undefined && (settled.standing.status === "Running" || settled.standing.status === "Awaiting you")) {
+        active.add(task.id)
+      }
+      cards.push(runCard(run, task, settled, project, known(project)))
+      continue
+    }
     const runAnswers = waitingRuns.get(id) === run.id ? (answers.get(id) ?? []).filter((item) => item.who === "worker") : []
     const place = run.status === "running"
       ? awaitingAnswer(runAnswers) ?? (unread.has(id) ? awaitingUnread(run.questions) : null) ?? runningPlace(run)
@@ -217,10 +249,11 @@ export const buildCards = (runs: Runs, backlog: Backlog, items: ReadonlyArray<In
     if (task !== undefined && (place.standing.status === "Running" || place.standing.status === "Awaiting you")) {
       active.add(task.id)
     }
-    cards.push(runCard(run, task, place))
+    const project = task?.project ?? checkoutProject.get(run.project) ?? lastSegment(run.project)
+    cards.push(runCard(run, task, place, project, known(project)))
   }
   const queued = backlog.tasks.flatMap((task) =>
-    taskCard(task, active, (answers.get(task.id) ?? []).filter((item) => item.who !== "worker" || !waitingRuns.has(task.id)), unread.has(task.id)))
+    taskCard(task, active, (answers.get(task.id) ?? []).filter((item) => item.who !== "worker" || !waitingRuns.has(task.id)), unread.has(task.id)).map((card) => ({ ...card, known: known(task.project) })))
   return sortCards([...cards, ...queued])
 }
 
@@ -235,11 +268,14 @@ const sortCards = (cards: ReadonlyArray<Card>): ReadonlyArray<Card> =>
 
 export const filterCards = (cards: ReadonlyArray<Card>, filter: Filter): ReadonlyArray<Card> =>
   cards.filter((card) =>
-    (filter.project === null || card.project === filter.project) &&
+    (filter.project === null ? filter.allRuns || card.known : card.project === filter.project) &&
     (filter.status === null || card.standing.status === filter.status))
 
+export const openedFilter = (cards: ReadonlyArray<Card>, key: string): Filter =>
+  ({ project: null, status: null, allRuns: cards.some((card) => card.key === key && !card.known) })
+
 export const projectsOf = (cards: ReadonlyArray<Card>): ReadonlyArray<string> =>
-  [...new Set(cards.map((card) => card.project))].sort((a, b) => a.localeCompare(b))
+  [...new Set(cards.flatMap((card) => card.known ? [card.project] : []))].sort((a, b) => a.localeCompare(b))
 
 const recordedMark = (step: Step, standing: Standing): Mark => {
   switch (step.status) {
@@ -264,7 +300,7 @@ const stepsToCome = (steps: ReadonlyArray<Step>, kind: string | null, delivery: 
   }
   const last = steps.at(-1)
   const rounds = steps.filter((step) => step.name === "checks").at(-1)?.attempt ?? 0
-  const fixes = steps.reduce((max, step) => step.name === "fix" ? Math.max(max, step.attempt) : max, 0)
+  const fixes = steps.reduce((max, step) => step.name === "fix" ? Math.max(max, step.attempt) : 0, 0)
   const finalStep = delivery === "direct-PR" ? "PR" : "No mistakes"
   if (last === undefined) {
     return ["Agent", "Checks 1", finalStep]

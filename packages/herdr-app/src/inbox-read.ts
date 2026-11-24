@@ -1,4 +1,4 @@
-import { askingRuns, attention } from "./guard"
+import { askingRuns, attention } from "./guard-attention"
 import { type InboxItem, type InboxSources, inboxItems, inboxTasks } from "./inbox"
 import { type Reading, readJson } from "./orc-read"
 import { taskDetails, thread } from "./task-guard"

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
-import { type AskingRun, type AttentionItem, askingRuns, attention, guardJson } from "../../../packages/herdr-app/src/guard"
+import { guardJson } from "../../../packages/herdr-app/src/guard"
+import { type AskingRun, type AttentionItem, askingRuns, attention } from "../../../packages/herdr-app/src/guard-attention"
 import { type InboxSources, inboxItems, inboxTasks } from "../../../packages/herdr-app/src/inbox"
 import type { TaskDetail } from "../../../packages/herdr-app/src/task"
 import type { Thread, ThreadLine } from "../../../packages/herdr-app/src/thread"

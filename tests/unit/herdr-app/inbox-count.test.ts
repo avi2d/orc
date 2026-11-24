@@ -152,13 +152,13 @@ const items = inboxItems({
 })
 
 const [card] = buildCards({ schema: "orc.runs.v1", runs: [] }, {
-  schema: "orc.backlog.v1", merged: [], tasks: [
-    { id: "orc-1", title: "A task", project: "orc", kind: "ship", status: "new", hold: null, parked: 1, parkedOrigin: null, reason: null }
+  schema: "orc.backlog.v1", merged: [], projects: null, tasks: [
+    { id: "orc-1", title: "A task", project: "orc", kind: "ship", status: "new", hold: null, parked: 1, parkedOrigin: null, reason: null, prState: null }
   ]
 }, items)
 
 const queued: Card = {
-  key: "orc-2", id: "orc-2", kind: "ship", delivery: null, title: "Another task", project: "orc",
+  key: "orc-2", id: "orc-2", kind: "ship", delivery: null, title: "Another task", project: "orc", known: true,
   standing: { status: "Queued" }, where: "Waiting to start", runId: null, checkout: null, sendBack: null
 }
 
@@ -172,7 +172,7 @@ test("the Awaiting you count on the Agents tab opens the Inbox as cmd-4 does ins
   }
   ran.length = 0
   stopped.length = 0
-  const column: object = runsColumn(palette(), { cards: { kind: "ok", value: [card] }, filter: { project: null, status: null }, selectedKey: null, agents: new Map(), folded: false }, act)
+  const column: object = runsColumn(palette(), { cards: { kind: "ok", value: [card] }, filter: { project: null, status: null, allRuns: false }, selectedKey: null, agents: new Map(), folded: false }, act)
   const count = find(column, "inbox-count")
   expect(count?.kids).toEqual(["1"])
   click(count)

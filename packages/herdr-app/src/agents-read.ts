@@ -1,5 +1,6 @@
 import { type Card, buildCards } from "./agents"
-import { type Backlog, type Guard, askingRuns, attention, backlog, ok, runs } from "./guard"
+import { type Backlog, type Guard, backlog, ok, runs } from "./guard"
+import { askingRuns, attention } from "./guard-attention"
 import { readInboxItems } from "./inbox-read"
 import { type Reading, readJson } from "./orc-read"
 import type { TaskDetail } from "./task"
