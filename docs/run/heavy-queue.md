@@ -86,7 +86,7 @@ Yarn Berry wraps `node` in a temporary `PATH` folder.
 That route is unverified and not covered by these stand-ins.
 A runner started through a runtime's absolute path, or a runner the list does not name, is not blocked.
 
-The no-mistakes review runs in the shared no-mistakes daemon, under the daemon's own `PATH`, so these stand ins do not reach its steps.
+The [no-mistakes](https://github.com/kunchenguid/no-mistakes) review runs in the shared no-mistakes daemon, under the daemon's own `PATH`, so these stand ins do not reach its steps.
 
 Under `--sandbox none` every other call, such as a build, a lint or a typecheck, queues as it does without the variable.
 Under the nono sandbox it runs at once, as the next section says.
