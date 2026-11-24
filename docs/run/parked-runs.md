@@ -25,8 +25,9 @@ A question the run asks again at a later wait is open again, and the chat posts 
 ## Park a task
 
 A run whose wait ends with a question unanswered parks its task instead of closing it failed.
-The beat moves the task back to `new` with `parked_branch`, `parked_origin`, and `parked_questions` in its file.
+The beat moves the task back to `new` with `parked_branch`, `parked_origin`, `parked_at`, and `parked_questions` in its file.
 The origin records the machine and run id.
+`parked_at` records when the run parked.
 Each question keeps its id, text, blocking flag, and the time it was asked.
 It prints `parked <task-id> on <branch> for the captain's answer to <question-ids>`.
 A question the attention queue owns for the decider shows as `the decider's answer to <question-ids>` instead, after an `and` when you answer the others.
@@ -76,6 +77,7 @@ The closing beat prints `held <task-id> on <machine>: <reason>`.
 Each later beat prints `waits <task-id>: held for the captain: <reason>`.
 Run `orc backlog answer <task-id> <words>` to release the hold, and the next beat resumes the task.
 The first resume after a release gets a fresh budget of three fix attempts without repeating a passed implement step.
+A release counts as new until a run parks after it, by the task's `parked_at`.
 A later resume of that task keeps its fixer and the fix attempts it used, so an answer to a question that fixer asked reaches it.
 Every resume carries each release as guidance, oldest first, with the latest marked current.
 A send-back starts a new park, so its resume drops the releases from earlier parks.

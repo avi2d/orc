@@ -94,9 +94,9 @@ const timeOf = (at: string): number => {
   return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time
 }
 
-// An answer given while the task sits parked is no run, so only an ask or a hold placement marks a run that ended.
+// A task file written before parked_at falls back to an ask or a hold placement, since an answer given while parked is no run.
 const lastRunEndedAt = (decisions: ReadonlyArray<{ readonly at?: string | null | undefined }>, parked: Parked): number =>
-  Math.max(Number.NEGATIVE_INFINITY,
+  parked.at !== undefined ? timeOf(parked.at) : Math.max(Number.NEGATIVE_INFINITY,
     ...parked.questions.map((question) => timeOf(question.asked)),
     ...decisions.flatMap((decision) => decision.at === undefined || decision.at === null ? [] : [timeOf(decision.at)]))
 

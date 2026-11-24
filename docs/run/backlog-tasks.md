@@ -73,6 +73,7 @@ You can also select **Send back** beside a PR awaiting approval in the Agents ta
 
 Orc moves the task to `new` and parks it on `orc/<task-id>`.
 It records your words as the answer to `send-back` and saves the closing machine, run, and PR in `parked_origin`.
+It sets `parked_at` to the send-back time.
 The next beat resumes the implementer's session on the same machine and branch with your review.
 Checks run again and the push updates the same PR.
 The PR remains recorded even if the resumed run closes before pushing.

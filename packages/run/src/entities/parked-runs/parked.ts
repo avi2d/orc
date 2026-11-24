@@ -130,7 +130,7 @@ export const parkStartedTask = (
       const sentPr = record.parked?.origin?.pr
       const origin = run === undefined ? record.parked?.origin : { machine: record.state.claim.machine, run, ...(sentPr === undefined ? {} : { pr: sentPr }) }
       const hold = repeatsResume(record, questions) ? repeatHold(record, run, ended, at) : record.hold
-      const parked: TaskRecord = { ...record, hold, parked: { branch, questions, ...(origin === undefined ? {} : { origin }) }, state: { kind: "new" } }
+      const parked: TaskRecord = { ...record, hold, parked: { branch, questions, ...(origin === undefined ? {} : { origin }), at }, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(parked)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })
       }

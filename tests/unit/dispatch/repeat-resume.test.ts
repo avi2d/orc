@@ -234,6 +234,26 @@ describe("a resumed run that parks again", () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+  test("a run that saw the release and was answered during it carries the release instead of handing it as new again", async () => {
+    await withResumed(async (root) => {
+      const pickColor = { id: "ask-1", text: "Pick a color?", asked: "2026-10-27T10:30:00.000Z", blocks: false }
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }, pickColor], "2026-10-27T10:35:00.000Z", "run-2", lint))
+      await run(answerTask(root, "orc-1", "fix the lint finding first", "2026-10-27T10:40:00.000Z"))
+      const queued = async () => (await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: join(root, "new", "orc-1.md"), ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))).answers
+      expect(await queued()).toContainEqual({ question: "hold-release", answer: "Current guidance: fix the lint finding first" })
+      await run(claimTask(root, "orc-1"))
+      await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:45:00.000Z", log: root + "/logs/orc-1.log" } } }))
+      await run(answerTask(root, "orc-1", "ask-1=blue", "2026-10-27T10:50:00.000Z"))
+      const parked = await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }, pickColor], "2026-10-27T10:55:00.000Z", "run-3", lint))
+      expect(parked.hold?.answer).not.toBeNull()
+      expect(parked.parked?.at).toBe("2026-10-27T10:55:00.000Z")
+      expect(await queued()).toEqual([
+        { question: "r2", answer: "Keep it" },
+        { question: "ask-1", answer: "blue" },
+        { question: "hold-release-carried", answer: "Current guidance: fix the lint finding first" }
+      ])
+    })
+  })
   test("a send-back hands its resume only the review instead of an old release as current guidance", async () => {
     await withResumed(async (root) => {
       await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }], "2026-10-27T10:35:00.000Z", "run-2", lint))
