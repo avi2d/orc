@@ -8,6 +8,7 @@ Otherwise it merges nothing and says why.
 When the branch is behind its base, `orc merge` updates it from the base, waits for the new checks, and merges once they are green.
 The chat passes `--no-wait` and returns after requesting the update without waiting for CI or merging.
 Once the new head checks are green, ask the chat to merge again.
+The next merge call refuses a new head that leaves out the checked head, a red check, and a check that was green before the update but has not reported green since.
 When the update conflicts, or a check turns red while the command waits, orc merges nothing and sends the task back for a fix.
 
 The chat merges on your word.

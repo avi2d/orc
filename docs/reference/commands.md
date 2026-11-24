@@ -545,8 +545,8 @@ Options:
                             and yolo-green needs a project with yolo set.
   --no-wait                 When behind, return after requesting a branch update
                             without waiting for CI or merging. Run merge again
-                            once the new head checks are green. The chat uses
-                            this option.
+                            with the same basis once the new head checks are
+                            green. The chat uses this option.
 
 Examples:
   orc merge orc-9

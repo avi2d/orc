@@ -22,6 +22,7 @@ Each refusal names every reason.
 When the branch is behind its base, orc updates it from the base and merges once the new checks are green.
 Otherwise orc squash merges at the exact commit it checked, so a push that lands after the check merges nothing.
 The chat requests a branch update without waiting for CI, so a behind PR needs another merge call once the new checks are green.
+That call checks the new head against the checks that were green before the update.
 
 ## Whose word merges
 

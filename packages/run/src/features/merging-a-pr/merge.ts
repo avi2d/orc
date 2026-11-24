@@ -6,6 +6,7 @@ import type { ConfigError } from "../../shared/config/index"
 import type { RunnerError } from "../../shared/process/index"
 import type { MergeBasis } from "../../entities/pull-request/index"
 import { checkRefusals, gh, greenChecks, prPattern, type PullRequestView, readPullRequest, redChecks } from "../../entities/pull-request/index"
+import { clearPendingUpdate, readPendingUpdate, savePendingUpdate, type PendingUpdate } from "./pending-update"
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
 
@@ -32,10 +33,19 @@ type MergeError = BacklogError | ConfigError | TaskFileError | RunnerError
 export type SendBackForFix = (words: string) => Effect.Effect<string, BacklogError | ConfigError | TaskFileError, MergeRequirements>
 
 interface Landing {
+  readonly root: string
   readonly id: string
   readonly url: string
+  readonly basis: MergeBasis
   readonly sendBack: SendBackForFix
 }
+
+interface Approved {
+  readonly head: string
+  readonly green: ReadonlyArray<string>
+}
+
+const approvedAt = (view: PullRequestView): Approved => ({ head: view.headRefOid, green: greenChecks(view) })
 
 const checksMinutes = 20
 const checksTimeout = Duration.minutes(checksMinutes)
@@ -72,9 +82,9 @@ const updateBranch = (landing: Landing, view: PullRequestView) =>
     return yield* refuse(refusal(landing.id, landing.url, ["could not be updated from " + view.baseRefName + ": gh api update-branch said " + updated.said]))
   })
 
-const missingChecks = (checked: PullRequestView, fresh: PullRequestView): ReadonlyArray<string> => {
+const missingChecks = (approved: Approved, fresh: PullRequestView): ReadonlyArray<string> => {
   const green = new Set(greenChecks(fresh))
-  return greenChecks(checked).filter((name) => !green.has(name))
+  return approved.green.filter((name) => !green.has(name))
 }
 
 const commitParents = (url: string, sha: string) =>
@@ -106,10 +116,45 @@ const lineageOf = (url: string, checked: string, sha: string): Effect.Effect<Lin
     Effect.catch((error) => Effect.succeed({ sha, kind: "unknown" as const, said: error.detail }))
   )
 
+type Judgement =
+  | PolledHead
+  | { readonly kind: "waiting"; readonly lineage: Lineage | undefined }
+  | { readonly kind: "unreadable"; readonly said: string }
+
+const judgeHead = (
+  url: string,
+  approved: Approved,
+  fresh: PullRequestView,
+  known: Lineage | undefined
+): Effect.Effect<Judgement, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    if (fresh.state !== "OPEN") {
+      return { kind: "closed", view: fresh }
+    }
+    if (fresh.headRefOid === approved.head) {
+      return { kind: "waiting", lineage: known }
+    }
+    const lineage = known !== undefined && known.sha === fresh.headRefOid ? known : yield* lineageOf(url, approved.head, fresh.headRefOid)
+    if (lineage.kind === "unknown") {
+      return { kind: "unreadable", said: lineage.said }
+    }
+    if (lineage.kind === "foreign") {
+      return { kind: "foreign", view: fresh }
+    }
+    const red = redChecks(fresh)
+    if (red.length > 0) {
+      return { kind: "red", view: fresh, red }
+    }
+    if (checkRefusals(fresh).length === 0 && missingChecks(approved, fresh).length === 0) {
+      return { kind: "ready", view: fresh }
+    }
+    return { kind: "waiting", lineage }
+  })
+
 // After update-branch GitHub moves the head a few seconds later and the new head starts with no check, so neither an unmoved head nor an empty rollup is an answer yet.
 const awaitNewHead = (
   url: string,
-  checked: PullRequestView,
+  approved: Approved,
   poll: number,
   unreadable: Ref.Ref<string | null>,
   known?: Lineage
@@ -122,35 +167,18 @@ const awaitNewHead = (
     )
     if (!reading.ok) {
       yield* Ref.set(unreadable, reading.said)
-      return yield* awaitNewHead(url, checked, poll + 1, unreadable, known)
+      return yield* awaitNewHead(url, approved, poll + 1, unreadable, known)
     }
     yield* Ref.set(unreadable, null)
-    const fresh = reading.view
-    if (fresh.state !== "OPEN") {
-      return { kind: "closed", view: fresh }
+    const judged = yield* judgeHead(url, approved, reading.view, known)
+    if (judged.kind === "unreadable") {
+      yield* Ref.set(unreadable, judged.said)
+      return yield* awaitNewHead(url, approved, poll + 1, unreadable, known)
     }
-    if (fresh.headRefOid === checked.headRefOid) {
-      return yield* awaitNewHead(url, checked, poll + 1, unreadable, known)
+    if (judged.kind === "waiting") {
+      return yield* awaitNewHead(url, approved, poll + 1, unreadable, judged.lineage)
     }
-    let lineage = known
-    if (lineage === undefined || lineage.sha !== fresh.headRefOid) {
-      lineage = yield* lineageOf(url, checked.headRefOid, fresh.headRefOid)
-    }
-    if (lineage.kind === "unknown") {
-      yield* Ref.set(unreadable, lineage.said)
-      return yield* awaitNewHead(url, checked, poll + 1, unreadable, known)
-    }
-    if (lineage.kind === "foreign") {
-      return { kind: "foreign", view: fresh }
-    }
-    const red = redChecks(fresh)
-    if (red.length > 0) {
-      return { kind: "red", view: fresh, red }
-    }
-    if (checkRefusals(fresh).length === 0 && missingChecks(checked, fresh).length === 0) {
-      return { kind: "ready", view: fresh }
-    }
-    return yield* awaitNewHead(url, checked, poll + 1, unreadable, lineage)
+    return judged
   })
 
 const mergeAt = (landing: Landing, view: PullRequestView) =>
@@ -159,18 +187,43 @@ const mergeAt = (landing: Landing, view: PullRequestView) =>
     if (merged.exitCode !== 0) {
       return yield* refuse("gh pr merge refused " + landing.url + ": " + merged.said)
     }
+    yield* clearPendingUpdate(landing.root, landing.id)
     return "merged " + landing.id + " " + landing.url
   })
 
+type Unsettled = Exclude<PolledHead, { readonly kind: "ready" }>
+
+const refuseUnsettled = (landing: Landing, approved: Approved, settled: Unsettled) =>
+  Effect.gen(function*() {
+    if (settled.kind === "closed") {
+      return yield* refuse(refusal(landing.id, landing.url, ["is " + settled.view.state.toLowerCase() + ", not open"]))
+    }
+    if (settled.kind === "foreign") {
+      return yield* refuse(refusal(landing.id, landing.url, ["changed after its checks were read: update-branch found its head is no longer " + approved.head + ", so read its checks again before merging"]))
+    }
+    const view = settled.view
+    return yield* refuseAndSendBack(
+      landing,
+      "the check " + settled.red.join(", ") + " is red on its new head " + view.headRefOid + " after the update from " + view.baseRefName,
+      "orc merge updated " + landing.url + " from " + view.baseRefName + ", and the check " + settled.red.join(", ") + " is red on the new head " + view.headRefOid + ". Fix the failure and push."
+    )
+  })
+
+const retryCommand = (landing: Landing): string => "orc merge " + landing.id + " --basis " + landing.basis + " --no-wait"
+
 const landUpdated = (landing: Landing, checked: PullRequestView, noWait: boolean) =>
   Effect.gen(function*() {
-    yield* updateBranch(landing, checked)
+    const approved = approvedAt(checked)
     if (noWait) {
-      return "requested branch update for " + landing.id + " " + landing.url + "; not merged. Run orc merge " + landing.id + " --no-wait again once the new head checks are green."
+      yield* savePendingUpdate(landing.root, landing.id, { url: landing.url, ...approved })
+    }
+    yield* updateBranch(landing, checked).pipe(Effect.onError(() => clearPendingUpdate(landing.root, landing.id)))
+    if (noWait) {
+      return "requested branch update for " + landing.id + " " + landing.url + "; not merged. Run " + retryCommand(landing) + " again once the new head checks are green."
     }
     yield* Console.log("Checks running")
     const unreadable = yield* Ref.make<string | null>(null)
-    const settled = yield* awaitNewHead(landing.url, checked, 0, unreadable).pipe(
+    const settled = yield* awaitNewHead(landing.url, approved, 0, unreadable).pipe(
       Effect.timeoutOrElse({
         duration: checksTimeout,
         orElse: () =>
@@ -182,19 +235,8 @@ const landUpdated = (landing: Landing, checked: PullRequestView, noWait: boolean
           })
       })
     )
-    if (settled.kind === "closed") {
-      return yield* refuse(refusal(landing.id, landing.url, ["is " + settled.view.state.toLowerCase() + ", not open"]))
-    }
-    if (settled.kind === "foreign") {
-      return yield* refuse(refusal(landing.id, landing.url, ["changed after its checks were read: update-branch found its head is no longer " + checked.headRefOid + ", so read its checks again before merging"]))
-    }
-    if (settled.kind === "red") {
-      const view = settled.view
-      return yield* refuseAndSendBack(
-        landing,
-        "the check " + settled.red.join(", ") + " is red on its new head " + view.headRefOid + " after the update from " + view.baseRefName,
-        "orc merge updated " + landing.url + " from " + view.baseRefName + ", and the check " + settled.red.join(", ") + " is red on the new head " + view.headRefOid + ". Fix the failure and push."
-      )
+    if (settled.kind !== "ready") {
+      return yield* refuseUnsettled(landing, approved, settled)
     }
     const view = settled.view
     const behind = yield* behindBy(landing.id, landing.url, view)
@@ -202,6 +244,27 @@ const landUpdated = (landing: Landing, checked: PullRequestView, noWait: boolean
       return yield* refuse(refusal(landing.id, landing.url, ["is still " + commits(behind) + " behind " + view.baseRefName + " after the update, because " + view.baseRefName + " moved again, so run orc merge again"]))
     }
     return yield* mergeAt(landing, view)
+  })
+
+const checkUpdatedHead = (landing: Landing, pending: PendingUpdate, view: PullRequestView) =>
+  Effect.gen(function*() {
+    const judged = yield* judgeHead(landing.url, pending, view, undefined)
+    if (judged.kind === "ready") {
+      return
+    }
+    if (judged.kind === "unreadable") {
+      return yield* refuse(refusal(landing.id, landing.url, ["cannot tell whether its new head " + view.headRefOid + " comes from the update of " + pending.head + ": " + judged.said + ", so run " + retryCommand(landing) + " again once it reads"]))
+    }
+    if (judged.kind === "waiting") {
+      const missing = missingChecks(pending, view)
+      return yield* refuse(refusal(landing.id, landing.url, [
+        ...checkRefusals(view),
+        ...(missing.length === 0 ? [] : ["the check " + missing.join(", ") + " was green before the update and has not reported green on its new head " + view.headRefOid]),
+        "run " + retryCommand(landing) + " again once the new head's checks have reported"
+      ]))
+    }
+    yield* clearPendingUpdate(landing.root, landing.id)
+    return yield* refuseUnsettled(landing, pending, judged)
   })
 
 const yoloRefusal = (place: { readonly root: string }, project: string) =>
@@ -245,7 +308,11 @@ export const mergeTask = (
     if (view.state !== "OPEN") {
       return yield* refuse(refusal(id, url, ["is " + view.state.toLowerCase() + ", not open"]))
     }
-    const landing: Landing = { id, url, sendBack }
+    const landing: Landing = { root, id, url, basis, sendBack }
+    const pending = yield* readPendingUpdate(root, id)
+    if (pending !== null && pending.url === url && pending.head !== view.headRefOid) {
+      yield* checkUpdatedHead(landing, pending, view)
+    }
     const reasons = checkRefusals(view)
     if (reasons.length > 0) {
       return yield* refuse(refusal(id, url, reasons))

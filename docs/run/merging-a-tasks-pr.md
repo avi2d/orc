@@ -25,10 +25,18 @@ Once the new head is green and no longer behind, orc runs `gh pr merge <url> --s
 
 ## Return without waiting for CI
 
-For a behind PR, `orc merge <task-id> --no-wait` returns after requesting the branch update, without polling the new head or merging.
+For a behind PR, `orc merge <task-id> --no-wait` saves the PR link, the checked head and the checks that were green on it, requests the branch update, and returns without polling the new head or merging.
 The chat always passes `--no-wait`.
-Once the new head checks are green, call `merge_task` again or run `orc merge <task-id> --no-wait` again.
-Each call reads the current head and checks before merging.
+The printed retry command keeps the basis of the call, as in `orc merge <task-id> --basis yolo-green --no-wait`.
+Once the new head checks are green, call `merge_task` again or run that command again.
+The next call reads the current head and merges nothing in these cases:
+
+- The head leaves out the checked head from its parents.
+- A check is red on the head, and orc also sends the task back for a fix.
+- A check that was green on the checked head has not reported green on the head, such as a status context that has not posted yet.
+- A check has not reported.
+
+Once those hold, the call continues as a merge without a saved update, so a head that is behind its base again gets another update request.
 Without `--no-wait`, the command waits as described above.
 
 ## When an update fails
