@@ -7,6 +7,7 @@ import type { SandboxKind } from "../../shared/sandbox/index"
 import { orcCompletionLine } from "../../entities/agent/index"
 import { type AskSetup, failingFileName, idleSpan, type PiPacing, runPi } from "../../entities/agent/index"
 import { askedNote } from "./worker-question"
+import { dropPiAgentDir } from "./run-folders"
 import { askOnLoop, loopContinuePrompt, loopingNote } from "./loop-pause"
 import { historyFailure, recordRun, recordStep, updateRun, updateStep } from "../../entities/run-history/index"
 import type { OrcRunError } from "../../shared/lib/index"
@@ -140,6 +141,9 @@ export const runReport = (
       prLink: null,
       endReason: outcome.kind === "reported" ? "Pi wrote " + outcome.report : outcome.reason
     }).pipe(Effect.mapError((cause) => historyFailure("record the run in", cause)))
+    if (outcome.kind === "reported" || (outcome.kind === "unreported" && piEnd.kind !== "unanswered")) {
+      yield* dropPiAgentDir(fs, yield* Path.Path, run.runDir)
+    }
     return outcome
   })
 

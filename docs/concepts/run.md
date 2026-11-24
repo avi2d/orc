@@ -45,6 +45,8 @@ It counts as done once Pi wrote `agent-report.md` into the run folder.
 ## The record
 
 Each run keeps its task, its logs, its Pi session and its `report.md` in `~/.orc/runs/<run-id>`.
+A run that ends done or failed removes its Pi folder, `session/agent`, which holds the run's Pi settings and installed packages.
+A parked run, a stopped run and a run still waiting on CI keep that folder.
 `orc runs` lists the runs, `orc show <run-id>` shows one step by step, and `orc log <run-id> <step-id>` prints one step's output.
 
 ## Stopping and resuming
