@@ -62,6 +62,7 @@ These count as test calls:
 - An executable or a leaf target named `e2e`, such as `./scripts/e2e`.
 - The package scripts `test`, `tests`, `t`, `tst`, `e2e`, `coverage`, `mutation`, `vitest`, `jest`, `pytest`, and `playwright`.
 - The package scripts `test:*`, `tests:*`, `e2e:*`, `coverage:*`, and `mutation:*`.
+- The package-manager commands that run the `test` script: `npm it`, `npm cit`, `npm install-test`, `npm install-ci-test`, `pnpm it`, and `pnpm install-test`.
 
 A linter argument or an ancestor directory named `e2e` is not a test target.
 
