@@ -23,6 +23,28 @@ It stops waiting early once a check on the new head is red.
 It reads the new head's parents and treats a head that leaves out the checked head as changed after the approval.
 Once the new head is green and no longer behind, orc runs `gh pr merge <url> --squash --match-head-commit <new sha>`.
 
+## Return without waiting for CI
+
+For a behind PR, `orc merge <task-id> --no-wait` saves the PR link, the checked head and the checks that were green on it, requests the branch update, and returns without polling the new head or merging.
+The chat always passes `--no-wait`.
+The printed retry command keeps the basis of the call, as in `orc merge <task-id> --basis yolo-green --no-wait`.
+Once the new head checks are green, call `merge_task` again or run that command again.
+The next call reads the current head and merges nothing in these cases:
+
+- The head leaves out the checked head from its parents.
+- A check is red on the head, and orc also sends the task back for a fix.
+- A check that was green on the checked head has not reported green on the head, such as a status context that has not posted yet.
+- A check has not reported.
+
+When none of those holds, the call continues as a merge without a saved update, so a head that is behind its base again gets another update request.
+A merge conflict or a red check that sends the task back also drops the saved update, so the next call judges the fixed head on its own checks.
+
+A saved check may never report again, for example when the base renamed that CI job.
+Each `--no-wait` call keeps refusing until it reports green.
+To get past it, run `orc merge <task-id> --basis <basis>` without `--no-wait`.
+That call drops the saved checks, waits as described above for every check on the new head to report green, and merges only then.
+A red check still stops it and sends the task back.
+
 ## When an update fails
 
 Orc merges nothing and refuses when any of these holds:
@@ -35,7 +57,7 @@ Orc merges nothing and refuses when any of these holds:
 - Orc still cannot read the PR when the 20 minutes end, so it cannot tell what the new head holds.
 - The new head is still behind its base, because the base moved again.
 
-After a merge conflict or a red check on the new head, orc also sends the task back as [`orc backlog send-back`](backlog-tasks.md#send-a-task-back) does, with words that name the conflict or the red check.
+After a merge conflict, or a red check observed on the new head, orc also sends the task back as [`orc backlog send-back`](backlog-tasks.md#send-a-task-back) does, with words that name the conflict or the red check.
 The next beat resumes the task's run on its branch for a fix pass.
 
 ## Choose a merge basis
