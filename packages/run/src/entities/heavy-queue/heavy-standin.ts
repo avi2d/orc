@@ -94,20 +94,14 @@ export const ciOnlyTools: ReadonlyArray<string> = ["node", "checks-test"]
 
 export const ciOnlyBashScript = (): string => `if [ "$HEAVY_TESTS_CI_ONLY" = 1 ]; then
   orc_ci_only_command() {
-    local -a words
     local refusal
-    read -r -a words <<< "$BASH_COMMAND"
-    case "\${words[0]}" in
-      */node_modules/.bin/*)
-        refusal=$(${helperCommand.map(quoteSingle).join(" ")} ${quoteSingle(ciOnlyPathWord)} "\${words[@]}" 2>&1) || {
-          printf '%s (BASH_ENV command-shape guard)\\n' "$refusal" >&2
-          exit 1
-        }
-        ;;
-    esac
+    refusal=$(${helperCommand.map(quoteSingle).join(" ")} ${quoteSingle(ciOnlyPathWord)} "$BASH_COMMAND" 2>&1) || {
+      printf '%s (BASH_ENV command-shape guard)\\n' "$refusal" >&2
+      exit 1
+    }
   }
   set -o functrace
-  trap orc_ci_only_command DEBUG
+  trap 'case $BASH_COMMAND in *node_modules/.bin/*) orc_ci_only_command ;; esac' DEBUG
 fi
 `
 

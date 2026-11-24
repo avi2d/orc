@@ -1,11 +1,10 @@
 import { resolveCiOnly, runStandin, waitOwned } from "./heavy-standin-exec"
 import { ciOnlyPathWord, ciOnlyWord, waiterWord } from "./heavy-standin-runtime"
-import { refusedTest } from "./heavy-standin-refusal"
+import { refusedPathCall } from "./heavy-standin-refusal"
 
 const [first = "", ...rest] = process.argv.slice(2)
 if (first === ciOnlyPathWord) {
-  const [path = "", ...args] = rest
-  if (refusedTest(path.split("/").at(-1) ?? "", args, process.cwd())) {
+  if (refusedPathCall(rest[0] ?? "", process.cwd())) {
     process.exitCode = 1
   }
 } else {
