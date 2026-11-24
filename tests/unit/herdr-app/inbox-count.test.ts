@@ -1,6 +1,6 @@
 import { expect, mock, test } from "bun:test"
 import type { Context } from "gpui-kit"
-import { buildCards, type Card } from "../../../packages/herdr-app/src/agents"
+import { buildCards, cardAnswers, type Card } from "../../../packages/herdr-app/src/agents"
 import { inboxItems } from "../../../packages/herdr-app/src/inbox"
 import type { BoardTask } from "../../../packages/herdr-app/src/board"
 
@@ -96,6 +96,28 @@ test("a question on a remote run does not disappear because the Inbox reads loca
       kind: "question", task: "orc-60", title: "Pick a layout", who: "worker", ask: { question: "Which layout?", options: [{ text: "Wide" }, { text: "Narrow" }] },
       action: { kind: "answer", target: { kind: "question", id: "ask-1" } }
     }] } })
+  } finally {
+    documents.clear()
+  }
+})
+
+test("a question on a remote run puts its Agents card Awaiting you instead of Queued because the tab reads local runs only", async () => {
+  documents.set("orc backlog --json", { schema: "orc.backlog.v1", tasks: [{
+    id: "orc-60", title: "Pick a layout", project: "orc", kind: "ship", body: "", created: "2026-11-13T10:00:00Z",
+    priority: null, dependsOn: [], prState: null, status: "new", hold: null, parked: null
+  }] })
+  documents.set("orc attention --json", { schema: "orc.attention.v1", items: [] })
+  documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [] })
+  documents.set("orc runs --json", { schema: "orc.runs.v1", runs: [{ branch: "orc/orc-60", task: "orc-60", machine: "mac", questions: 1 }] })
+  documents.set("orc backlog thread orc-60 --json", { schema: "orc.thread.v1", task: "orc-60", entries: [{
+    at: "2026-11-13T11:00:00Z", who: "worker", kind: "question", id: "orc-60.ask-1.fixture", text: "Which layout?\nA) Wide\nB) Narrow"
+  }] })
+  const { readAgents } = await import("../../../packages/herdr-app/src/agents-read")
+  try {
+    const reading = await readAgents()
+    if (reading.kind !== "ok") throw new Error(reading.kind === "failed" ? reading.reason : reading.kind)
+    expect(reading.value.cards.map((card) => [card.id, card.standing.status, card.where, cardAnswers(card).map((item) => item.ask.question)]))
+      .toEqual([["orc-60", "Awaiting you", "Question 1", ["Which layout?"]]])
   } finally {
     documents.clear()
   }

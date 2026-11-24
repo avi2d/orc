@@ -85,6 +85,10 @@ test("drops a merged PR instead of still asking to merge it", () => {
   expect(open.action).toEqual({ kind: "merge", argv: ["merge", "orc-61", "--basis", "captain-word"] })
 })
 
+test("lists a closed task's PR whose state orc has not read instead of dropping it", () => {
+  expect(inboxItems({ backlog: [delivered(null)], attention: [], runs: [], threads: new Map() }).map((item) => item.key)).toEqual(["orc-61/pr"])
+})
+
 test("sorts items oldest first instead of by task", () => {
   const held: TaskDetail = { ...started, id: "orc-59", state: { status: "new" }, hold: { reason: "wait for the design", until: null, at: "2026-11-13T13:00:00.000Z", questions: [], answer: null } }
   const items = inboxItems({

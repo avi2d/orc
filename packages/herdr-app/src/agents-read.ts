@@ -1,5 +1,5 @@
 import { type Card, buildCards } from "./agents"
-import { type Backlog, type Guard, attention, backlog, ok, runs } from "./guard"
+import { type Backlog, type Guard, askingRuns, attention, backlog, ok, runs } from "./guard"
 import { readInboxItems } from "./inbox-read"
 import { type Reading, readJson } from "./orc-read"
 import type { TaskDetail } from "./task"
@@ -21,14 +21,13 @@ export const readAgents = (): Promise<Reading<AgentsDocuments>> =>
   Promise.all([
     readJson("orc", ["runs", "--json", "--local"], runs),
     readJson("orc", ["backlog", "--json"], agentsBacklog),
-    readJson("orc", ["attention", "--json"], attention)
-  ]).then(([local, listed, asked]) => {
+    readJson("orc", ["attention", "--json"], attention),
+    readJson("orc", ["runs", "--json"], askingRuns)
+  ]).then(([local, listed, asked, asking]) => {
     if (local.kind !== "ok") return local
     if (listed.kind !== "ok") return listed
     if (asked.kind !== "ok") return asked
-    return readInboxItems({
-      backlog: listed.value.details,
-      attention: asked.value,
-      runs: local.value.runs.map((run) => ({ branch: run.branch, questions: run.questions, task: null }))
-    }).then(({ items, unread }) => ({ kind: "ok" as const, value: { cards: buildCards(local.value, listed.value.backlog, items), unread } }))
+    if (asking.kind !== "ok") return asking
+    return readInboxItems({ backlog: listed.value.details, attention: asked.value, runs: asking.value })
+      .then(({ items, unread }) => ({ kind: "ok" as const, value: { cards: buildCards(local.value, listed.value.backlog, items, new Set(unread.keys())), unread } }))
   })

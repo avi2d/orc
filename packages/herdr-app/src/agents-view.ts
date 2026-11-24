@@ -214,7 +214,7 @@ const stepViews = (t: Palette, card: Card, shown: StepsShown, act: AgentsActions
 export const stepsColumn = (t: Palette, card: Card | null, shown: StepsShown, act: AgentsActions): Element => {
   const answers = cardAnswers(card)
   const approval = approvalOf(card)
-  const waiting = answers.length > 0 || approval !== null
+  const waiting = card?.standing.status === "Awaiting you"
   const column = v_flex().id("steps-column").w(waiting ? 340 : 240).h_full().flex_shrink_0().border_r(1).border_color(t.border)
   if (card === null) return column
   const runLabel = card.runId ?? (waiting ? null : "No run yet")
@@ -379,7 +379,7 @@ export const detailView = (t: Palette, card: Card | null, act: AgentsActions, sh
     return shown.back.length === 0 ? pane : detailPane(t, [...shown.back, pane])
   }
   if (card.runId === null) {
-    return cardAnswers(card).length === 0 ? detailNote(t, "The task has not started a run yet") : detailPane(t, [])
+    return card.standing.status === "Awaiting you" ? detailPane(t, []) : detailNote(t, "The task has not started a run yet")
   }
   const step = shown.step
   if (step === null) {

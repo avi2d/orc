@@ -33,7 +33,7 @@ export interface InboxSources {
 }
 
 const openPr = (task: TaskDetail): string | null =>
-  task.state.status === "closed" && task.state.pr !== null && task.prState === "open" ? task.state.pr : null
+  task.state.status === "closed" && task.state.pr !== null && (task.prState === "open" || task.prState === null) ? task.state.pr : null
 
 const runAsks = (runs: ReadonlyArray<AskingRun>, task: string): boolean =>
   runs.some((run) => run.questions > 0 && (run.task === task || run.branch === `orc/${task}` || run.branch === `orc/${task}-parent`))

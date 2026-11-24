@@ -139,6 +139,21 @@ describe("the runs list", () => {
     expect(cards.map((card) => [card.runId, card.standing.status, cardAnswers(card)])).toEqual([[running.id, "Awaiting you", [question]]])
   })
 
+  test("a running question whose thread could not be read stays Awaiting you instead of Running", () => {
+    const running = run("20261113-090000-aaaaaa", { branch: "orc/orc-7", questions: 1 })
+    const cards = buildCards(runs([running]), backlog([task("orc-7", { status: "started", parked: 1 })]), [], new Set(["orc-7"]))
+    expect(cards.map((card) => [card.runId, card.standing.status, card.where, cardAnswers(card)])).toEqual([[running.id, "Awaiting you", "Question 1", []]])
+  })
+
+  test("a parked task whose thread could not be read stays Awaiting you instead of Queued", () => {
+    const cards = buildCards(runs([]), backlog([task("orc-7", { status: "new", parked: 2 })]), [], new Set(["orc-7"]))
+    expect(cards.map((card) => [card.id, card.standing.status, card.where])).toEqual([["orc-7", "Awaiting you", "Questions 1-2"]])
+  })
+
+  test("a closed task whose PR awaits approval gets no card without a run instead of one that says it never ran", () => {
+    expect(buildCards(runs([]), backlog([task("orc-48", { status: "closed" })]), [approval])).toEqual([])
+  })
+
   test("a merged PR's run is Done, not still awaiting approval", () => {
     const cards = buildCards(
       runs([run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })]),
