@@ -2,6 +2,38 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.20.0
+
+Released 2026-11-24.
+
+### Features
+
+- **quota:** show orc quota accounts in the dashboard quota panel [#324](https://github.com/avi2d/orc/pull/324)
+- **run:** merge a behind PR without update if no files shared, alarm on failed main CI [#322](https://github.com/avi2d/orc/pull/322)
+- **run:** print the beat quota with orc quota --json [#319](https://github.com/avi2d/orc/pull/319)
+- **run:** run a recorded review turn in direct-PR delivery [#310](https://github.com/avi2d/orc/pull/310)
+- **run:** refuse test runners in --sandbox none Pi sessions through the heavy stand-in [#308](https://github.com/avi2d/orc/pull/308)
+- **run:** answer review questions by their Recommended: line [#315](https://github.com/avi2d/orc/pull/315)
+- **run:** drop session/agent once a run ends done or failed [#314](https://github.com/avi2d/orc/pull/314)
+- **run:** let the beat pick an account across Claude, OpenAI and OpenCode [#312](https://github.com/avi2d/orc/pull/312)
+- **run:** read beat quota from subquo read --json snapshot [#300](https://github.com/avi2d/orc/pull/300)
+- **run:** refuse local test runners inside the default nono sandbox [#307](https://github.com/avi2d/orc/pull/307)
+- **trials:** show task wait state and pull request link on bb Board page [#305](https://github.com/avi2d/orc/pull/305)
+
+### Fixes
+
+- **run:** refuse test runners in Orc run steps with PATH-first stand-ins [#323](https://github.com/avi2d/orc/pull/323)
+- **run:** leave clean behind branches alone during Orc delivery [#321](https://github.com/avi2d/orc/pull/321)
+- **run:** judge decider never-decide guard by intent not single words [#320](https://github.com/avi2d/orc/pull/320)
+- **run:** hold repeat resumes that park with nothing new [#309](https://github.com/avi2d/orc/pull/309)
+- **trials:** run the bb trial beside the captain's own bb settings [#318](https://github.com/avi2d/orc/pull/318)
+- **herdr-app:** show what Awaiting you cards need [#317](https://github.com/avi2d/orc/pull/317)
+- **herdr-app:** show settled runs and configured projects [#316](https://github.com/avi2d/orc/pull/316)
+- **run:** park an unchanged gate for the owner instead of restarting it [#313](https://github.com/avi2d/orc/pull/313)
+- **trials:** build the orc Board bb plugin inside its own folder [#311](https://github.com/avi2d/orc/pull/311)
+- **run:** leave repository tests to GitHub CI [#304](https://github.com/avi2d/orc/pull/304)
+- **run:** tolerate punctuation differences in decider rule quotes [#303](https://github.com/avi2d/orc/pull/303)
+
 ## 0.19.0
 
 Released 2026-11-23.
