@@ -62,6 +62,36 @@ describe("a direct-PR run opens its own PR after the checks", () => {
     })
   })
 
+  test.each(["success", "failure"])("a test-only config records skipped checks instead of passed checks and follows CI %s", async (conclusion) => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        await withOrigin(dir, async () => {
+          const sha = await readyToCheck(dir, home)
+          await writeFile(join(dir, ".no-mistakes.yaml"), "commands:\n  test: forbidden-test-runner\n")
+          const checkRuns = JSON.stringify({ total_count: 1, check_runs: [{ id: 1, name: "test", head_sha: sha, status: "completed", conclusion }] })
+          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha), async () => {
+            throw new Error("a skipped test command must not start")
+          }, checkRuns)
+          expect(outcome.steps).toContainEqual({ name: "checks", status: "skipped" })
+          expect(outcome.report.checksRounds).toHaveLength(1)
+          expect(outcome.report.checksRounds?.[0]).toMatchObject({ passed: false, checks: [], failed: [] })
+          expect(outcome.report.completed).toBe(conclusion === "success")
+          expect(runStatus(outcome.report)).toBe(conclusion === "success" ? "completed" : "CI failed")
+          expect(outcome.report.endReason).toContain("No local checks ran.")
+          expect(outcome.report.endReason).not.toContain("checks passed")
+          expect(await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8")).toContain("without local checks or no-mistakes")
+          const resumed = await runDirectPrResume(dir, home, sandboxResult(sha), async () => {
+            throw new Error("a resumed skipped test command must not start")
+          }, checkRuns, [])
+          expect(resumed.steps).toContainEqual({ name: "checks", status: "skipped" })
+          expect(resumed.report.checksRounds).toHaveLength(1)
+          expect(resumed.report.completed).toBe(conclusion === "success")
+          expect(runStatus(resumed.report)).toBe(conclusion === "success" ? "completed" : "CI failed")
+        })
+      })
+    })
+  })
+
   test("opens a new PR when the branch has no open PR instead of reusing a closed one", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {

@@ -31,6 +31,6 @@ describe("agentCommand", () => {
   test("a host exec runs the argv itself with only the env it names", () => {
     const command = agentCommand({ kind: "none", cwd: "/w", env: { PATH: "/bin" } }, ["sh", "-c", "true"])
     expect(ChildProcess.isStandardCommand(command) ? { argv: [command.command, ...command.args], cwd: command.options.cwd, env: command.options.env, extendEnv: command.options.extendEnv } : null)
-      .toEqual({ argv: ["sh", "-c", "true"], cwd: "/w", env: { PATH: "/bin" }, extendEnv: false })
+      .toEqual({ argv: ["sh", "-c", "true"], cwd: "/w", env: { PATH: "/bin", HEAVY_TESTS_CI_ONLY: "1" }, extendEnv: false })
   })
 })

@@ -4,7 +4,7 @@ kind: reference
 # Running a task
 
 In a clean project checkout, run `orc run <task-file>`.
-A ship run creates an isolated worktree, asks Pi to make the change, runs the project's checks, and opens a PR.
+A ship run creates an isolated worktree, asks Pi to make the change, runs the project's local checks, and opens a PR.
 
 ## Before you run
 
@@ -22,17 +22,30 @@ On the host they get a short list that adds the shell, the temp folder, `XDG_RUN
 No `ORC_` variable reaches Pi or the checks.
 With the default sandbox, if nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc names that error in the result.
 
-Commit a `.no-mistakes.yaml` at the project root with at least one named check for a ship run.
+Orc refuses a checkout with uncommitted changes or unsafe local git configuration.
+Set `ORC_REFUSE_MARKERS` to comma-separated names to reject a marker in the checkout or its parent.
+
+## Local checks and CI
+
+For a ship run, commit a `.no-mistakes.yaml` at the project root with at least one command.
 For example:
 
 ```yaml
 commands:
-  test: bun test
+  lint: bun run lint
 ```
 
-Replace the example with the project's check command.
-Orc refuses a checkout with uncommitted changes or unsafe local git configuration.
-Set `ORC_REFUSE_MARKERS` to comma-separated names to reject a marker in the checkout or its parent.
+Orc runs only `build`, `lint`, and `typecheck` as local checks.
+In the first checks round, orc prints a warning on stderr naming skipped commands.
+The `prepare` command runs before Pi starts and is not skipped.
+Without local checks, orc records the round as `skipped`.
+Orc then hands off to no-mistakes or opens the direct PR.
+GitHub CI runs repository tests and decides completion.
+Keep test runners out of those commands and `prepare`.
+With `--sandbox none`, the heavy-queue stand-ins refuse recognized test runners and test scripts in Pi sessions, `prepare`, and local checks.
+Commands that do not go through a stand-in are not blocked.
+In the default `nono` sandbox and in no-mistakes review, Orc relies on instructions instead of blocking test commands.
+Orc starts no-mistakes without its local Test step.
 
 ## Choose the run
 
@@ -96,8 +109,8 @@ It also leaves a reused worktree outside `$ORC_HOME` in place.
 
 ## Results
 
-A no-mistakes ship run succeeds when Pi completes with `ORC_COMPLETE` on its own line, the branch has a new commit, the checks pass, and no-mistakes opens the PR and reports green CI.
-A direct-PR run succeeds when Pi completes, the branch has a new commit, the checks pass, the PR opens, and the GitHub CI verdict on the pushed head is `passed`.
+A no-mistakes ship run succeeds when Pi completes with `ORC_COMPLETE` on its own line, the branch has a new commit, the configured local checks pass, and no-mistakes opens the PR and reports green CI.
+A direct-PR run succeeds when Pi completes, the branch has a new commit, the configured local checks pass, the PR opens, and the GitHub CI verdict on the pushed head is `passed`.
 A `pending` verdict ends the run waiting on CI without success.
 The waiting run records an open `ci-waiting` question and keeps its history row running, so the beat parks the task instead of closing it failed or done.
 A stopped or failed run exits with status 1 and records the reason.
