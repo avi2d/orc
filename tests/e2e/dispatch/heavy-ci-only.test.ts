@@ -79,6 +79,25 @@ describe("CI-only runtime launchers", () => {
     expect(child.stderr.toString()).toContain("sets run.bun = true")
   })
 
+  test.each([[["scripts/build.ts"]], [["run", "scripts/build.ts"]]] satisfies ReadonlyArray<readonly [ReadonlyArray<string>]>)("run.bun does not refuse bun %j on an existing file, which gets no node link", async (args) => {
+    await writeFile(join(root, "bunfig.toml"), "[run]\nbun = true\n")
+    await mkdir(join(root, "scripts"))
+    await writeFile(join(root, "scripts/build.ts"), "")
+    const child = launch("bun", args)
+    expect(child.exitCode).toBe(0)
+    expect(child.stdout.toString()).toBe([join(root, "real/bun"), ...args].join("\n") + "\n")
+  })
+
+  test("run.bun refuses bun run on a file that a package script of the same name shadows", async () => {
+    await writeFile(join(root, "bunfig.toml"), "[run]\nbun = true\n")
+    await writeFile(join(root, "package.json"), JSON.stringify({ scripts: { lint: "vitest run" } }))
+    await writeFile(join(root, "lint"), "")
+    const child = launch("bun", ["run", "lint"])
+    expect(child.exitCode).toBe(1)
+    expect(child.stdout.toString()).toBe("")
+    expect(child.stderr.toString()).toContain("sets run.bun = true")
+  })
+
   test("run.bun does not refuse an inline expression that starts no script or bin", async () => {
     await writeFile(join(root, "bunfig.toml"), "[run]\nbun = true\n")
     const child = launch("bun", ["--print", "1"])

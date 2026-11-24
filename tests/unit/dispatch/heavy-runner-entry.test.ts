@@ -72,7 +72,11 @@ describe("the runner a bun or node call starts", () => {
     ["--test-timeout", "100"],
     ["--test-shard", "1/2"],
     ["--test-coverage-include", "src"],
-    ["--watch-path", "src"]
+    ["--watch-path", "src"],
+    ["--test-isolation", "none"],
+    ["--experimental-test-isolation", "none"],
+    ["--disable-warning", "ExperimentalWarning"],
+    ["--env-file-if-exists", ".env"]
   ] as const)("the value of node's %s is not taken for a script, so a later --test is still a test run", (option, value) => {
     expect(interpretedRunner("node", [option, value, "--test"], root)).toBe("node --test")
   })

@@ -87,8 +87,9 @@ So a package script, a shell wrapper or a workspace-selected script that reaches
 ### Bun runtime overrides
 `--bun`, its `-b` alias and `[run] bun = true` in `bunfig.toml` make Bun put its own `node` and `bun` links ahead of the stand-ins on `PATH`.
 Under `HEAVY_TESTS_CI_ONLY=1`, the Bun stand-in refuses `--bun` and `-b` in `bun`, `bun run`, `bun x` and `bunx`.
-It also refuses script and bin calls when the effective `bunfig.toml` sets `[run] bun = true`, `bun check` included, because a package script named `check` runs in place of Bun's built-in.
+It also refuses package script and bin-name calls when the effective `bunfig.toml` sets `[run] bun = true`, `bun check` included, because a package script named `check` runs in place of Bun's built-in.
 The stand-in finds that file from the call's working directory, `--cwd` and `--config`.
+A `bun` or `bun run` call on an existing file runs, unless a package script of the same name would run in its place.
 
 ### What is not blocked
 - A `node` runner started from a Yarn 1 or Yarn Berry script, which puts a `node` wrapper first on the script's `PATH`, though no run has confirmed that route.

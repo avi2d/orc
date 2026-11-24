@@ -43,7 +43,8 @@ Orc then hands off to no-mistakes or opens the direct PR.
 GitHub CI runs repository tests and decides completion.
 Keep test runners out of those commands and `prepare`.
 In Pi sessions, `prepare` and local checks, stand-ins first on `PATH` refuse a test run when it starts, directly or through a script, as [Test runs in agent sessions](heavy-queue.md#test-runs-in-agent-sessions) lists.
-Yarn scripts and the no-mistakes review are not covered, as [What is not blocked](heavy-queue.md#what-is-not-blocked) says, so Orc starts no-mistakes without its local Test step.
+A `node` runner started from a Yarn script is not confirmed as refused, as [What is not blocked](heavy-queue.md#what-is-not-blocked) says.
+The no-mistakes review runs under the daemon's own `PATH`, so Orc starts no-mistakes with its local Test step skipped.
 
 ## Base updates and CI waits
 

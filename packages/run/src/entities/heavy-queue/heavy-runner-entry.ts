@@ -1,4 +1,4 @@
-import { readFileSync, realpathSync } from "node:fs"
+import { readFileSync, realpathSync, statSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 
 type Args = ReadonlyArray<string>
@@ -20,10 +20,19 @@ const bunValueOptions: Args = [
   "-l", "--loader", "--conditions", "--main-fields", "--extension-order", "--filter", "-F", "--shell", "--elide-lines", "--title", "--port"
 ]
 const nodeValueOptions: Args = [
-  "-r", "--require", "--import", "--loader", "--experimental-loader", "-C", "--conditions", "--env-file", "--input-type", "--title",
-  "--test-concurrency", "--test-coverage-branches", "--test-coverage-exclude", "--test-coverage-functions", "--test-coverage-include",
-  "--test-coverage-lines", "--test-global-setup", "--test-name-pattern", "--test-random-seed", "--test-reporter", "--test-reporter-destination",
-  "--test-rerun-failures", "--test-shard", "--test-skip-pattern", "--test-timeout", "--watch-kill-signal", "--watch-path"
+  "--allow-fs-read", "--allow-fs-write", "--build-snapshot-config", "-C", "--conditions", "--cpu-prof-dir", "--cpu-prof-interval",
+  "--cpu-prof-name", "--debug-port", "--inspect-port", "--diagnostic-dir", "--disable-proto", "--disable-warning", "--dns-result-order",
+  "--env-file", "--env-file-if-exists", "--experimental-config-file", "--loader", "--experimental-loader", "--experimental-package-map",
+  "--experimental-sea-config", "--experimental-test-tag-filter", "--heap-prof-dir", "--heap-prof-interval", "--heap-prof-name",
+  "--heapsnapshot-near-heap-limit", "--heapsnapshot-signal", "--icu-data-dir", "--import", "--input-type", "--inspect-publish-uid",
+  "--localstorage-file", "--max-http-header-size", "--max-old-space-size-percentage", "--network-family-autoselection-attempt-timeout",
+  "--openssl-config", "--redirect-warnings", "--report-directory", "--report-dir", "--report-filename", "--report-signal", "-r", "--require",
+  "--run", "--secure-heap", "--secure-heap-min", "--snapshot-blob", "--test-concurrency", "--test-coverage-branches",
+  "--test-coverage-exclude", "--test-coverage-functions", "--test-coverage-include", "--test-coverage-lines", "--test-global-setup",
+  "--experimental-test-isolation", "--test-isolation", "--test-name-pattern", "--test-random-seed", "--test-reporter",
+  "--test-reporter-destination", "--test-rerun-failures", "--test-shard", "--test-skip-pattern", "--test-timeout", "--title",
+  "--tls-cipher-list", "--tls-keylog", "--trace-event-categories", "--trace-event-file-pattern", "--trace-require-module",
+  "--unhandled-rejections", "--use-largepages", "--v8-pool-size", "--watch-kill-signal", "--watch-path"
 ]
 const evalOptions: Args = ["-e", "--eval", "-p", "--print"]
 
@@ -123,7 +132,8 @@ export const bunRuntimeOverride = (tool: string, args: Args, cwd: string): strin
   }
   const first = launchOf(args, bunValueOptions)
   const nested = tool === "bun" && first.kind === "script" && ["run", "x", "exec"].includes(first.file)
-  const options = nested ? [...first.options, ...launchOf(first.args, bunValueOptions).options] : first.options
+  const inner = nested && first.kind === "script" ? launchOf(first.args, bunValueOptions) : null
+  const options = inner === null ? first.options : [...first.options, ...inner.options]
   const { directory, config, bunFlag } = bunOptionsOf(options, cwd)
   if (bunFlag !== null) {
     return bunFlag
@@ -131,9 +141,33 @@ export const bunRuntimeOverride = (tool: string, args: Args, cwd: string): strin
   if (first.kind === "none" || (tool === "bun" && bunBuiltins.includes(first.file))) {
     return null
   }
+  const started = tool !== "bun" ? null : inner === null ? first.file : first.file === "run" && inner.kind === "script" ? inner.file : null
+  if (started !== null && runsFile(directory, started)) {
+    return null
+  }
   const file = resolve(directory, config)
   return bunfigRunBun(file) ? file + " sets run.bun = true" : null
 }
+
+const isFile = (file: string): boolean => {
+  try {
+    return statSync(file).isFile()
+  } catch {
+    return false
+  }
+}
+
+const hasScript = (manifest: unknown, name: string): boolean => {
+  if (typeof manifest !== "object" || manifest === null || !("scripts" in manifest)) {
+    return false
+  }
+  const { scripts } = manifest
+  return typeof scripts === "object" && scripts !== null && Object.hasOwn(scripts, name)
+}
+
+// A package script of the same name can run in place of the file, and a script gets Bun's node link.
+const runsFile = (directory: string, word: string): boolean =>
+  isFile(resolve(directory, word)) && !hasScript(owningPackage(join(directory, "package.json"))?.manifest, word)
 
 const readText = (file: string): string | null => {
   try {
