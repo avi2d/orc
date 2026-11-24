@@ -423,6 +423,39 @@ describe("the decider", () => {
     for (const question of questions) expect(neverDecidedReason(question)).not.toBeNull()
   })
 
+  test("versions, panel lists, lookups, auth headers and a loop's cost are not escalated as deleting, a site's look, logins or spending", () => {
+    const questions = [
+      "Should I drop node-18 support?",
+      "Should I remove the sha-256 fallback?",
+      "Should I remove utf-8 handling?",
+      "Should I remove the tasks list from the panel?",
+      "Should the parser look up the project by checkout path?",
+      "Should the auth header be optional in the test fixture?",
+      "Should the cost of the loop matter?",
+      "Should we spend more time on the slow test?",
+      "Should the CLI offer a --json flag?",
+      "Should the parser follow Postel's law?",
+      "Should the lexer reject legal characters after a quote?"
+    ]
+    for (const question of questions) expect(neverDecidedReason(question)).toBeNull()
+  })
+
+  test("dropping runs, paying, logging in and legal pages are not decided by the decider", () => {
+    const questions = [
+      "Should the panel drop runs with no project?",
+      "Should I remove orc-12 from the backlog?",
+      "Should we pay for the larger runner?",
+      "Is the hosting cost worth it?",
+      "Will the bigger plan cost $20 a month?",
+      "Should I log in to the npm account?",
+      "Should the dashboard add OAuth sign in?",
+      "Should the footer link the terms of service?",
+      "Should the checkout page show the public offer?",
+      "Is scraping that site legal?"
+    ]
+    for (const question of questions) expect(neverDecidedReason(question)).not.toBeNull()
+  })
+
   const guardedTopics = [
     { topic: "a site's look", text: "Which header look should the landing page get on its preview? Recommended: the dark one.", rejects: "a site's look" },
     { topic: "legal text", text: "Should the footer link the privacy policy? Recommended: yes.", rejects: "legal text" },
