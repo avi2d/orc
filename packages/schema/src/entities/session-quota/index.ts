@@ -94,10 +94,8 @@ export {
 export {
   type QuotaRead,
   logFreshMillis,
-  type SavedAge,
   staleSourceAgeSeconds,
   savedAgeSeconds,
-  staleSavedAgeSeconds,
   readQuota,
 } from "./sources/quota-read";
 export {
@@ -154,7 +152,6 @@ export {
 export {
   type AccountStanding,
   accountStandings,
-  type SavedWindow,
   type QuotaBlockBody,
   type QuotaBlock,
   quotaBlocks,

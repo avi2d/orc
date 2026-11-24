@@ -83,7 +83,7 @@ export const quotaFeedLayer: Layer.Layer<QuotaFeed, never, QuotaPanelSources | S
       const latest = Option.all({ readings: yield* readings.latest, orcQuota: yield* orcQuota.latest });
       return yield* standIn(
         Option.map(latest, (answered) => ({
-          value: quotaBlocks(answered.readings.value.quota, answered.readings.value.savedProfiles, answered.orcQuota.value, now),
+          value: quotaBlocks(answered.readings.value.quota, answered.orcQuota.value, now),
           at: Math.min(answered.readings.at, answered.orcQuota.at),
         })),
       );

@@ -1,5 +1,5 @@
 import type { DateTime } from "effect";
-import { savedAgeSeconds, staleSavedAgeSeconds, staleSourceAgeSeconds, type QuotaAvailability, type QuotaBlock, type QuotaBlockBody, type SourcedWindow } from "@avi2dg/orc-schema";
+import { savedAgeSeconds, staleSourceAgeSeconds, type QuotaAvailability, type QuotaBlock, type QuotaBlockBody, type SourcedWindow } from "@avi2dg/orc-schema";
 import {
   type Block,
   countdown,
@@ -16,7 +16,6 @@ import {
   tintOfProvider,
   widthOf,
   quotaBar,
-  savedName,
   windowName,
 } from "@avi2dg/orc-ui";
 import { accountDetail, accountReasonLines, accountRowName, type DetailTone, hiddenLine, indent, splitShown } from "./accounts";
@@ -119,28 +118,14 @@ const rowsOf = (body: QuotaBlockBody, now: DateTime.Utc): ReadonlyArray<QuotaRow
       },
     ];
   }
-  if (body.kind === "saved") {
-    const stale = staleSavedAgeSeconds(body.age, body.stale, now);
-    return body.windows.map((window) => {
-      const outlook: Outlook = stale === undefined ? (window.percentLeft <= 0 ? { kind: "used-up" } : fine) : { kind: "stale", ageSeconds: stale };
-      return {
-        name: savedName(window.label),
-        percentLeft: window.percentLeft,
-        timeRemainingPercent: undefined,
-        outlook,
-        resetSeconds: resetOf(outlook, secondsUntil(now, window.resetsAt)),
-        reserve: undefined,
-      };
-    });
-  }
   return [];
 };
 
 const flatName = (text: string): string => text.toLowerCase().replaceAll(/[\s-]/g, "");
 
 const planWords = (block: QuotaBlock): ReadonlyArray<string> => {
-  const plan = block.body.kind === "live" || block.body.kind === "saved" ? block.body.plan : undefined;
-  return plan === undefined || plan === null || flatName(plan) === flatName(block.provider) ? [] : [plan.toLowerCase()];
+  const plan = block.body.kind === "live" ? block.body.plan : undefined;
+  return plan === undefined || flatName(plan) === flatName(block.provider) ? [] : [plan.toLowerCase()];
 };
 
 const stateWords = {
@@ -160,13 +145,6 @@ const checkedAgo = (checkedAt: DateTime.Utc, now: DateTime.Utc): string => {
   return `checked ${ageSeconds > 0 ? countdown(ageSeconds) : "<1m"} ago`;
 };
 
-// Each stale row already shows the profile's age, so the header leaves it out.
-const checkedWords = (body: Extract<QuotaBlockBody, { readonly kind: "saved" }>, now: DateTime.Utc): ReadonlyArray<string> => {
-  if (body.age.kind === "undated") return ["not checked yet"];
-  if (body.windows.length > 0 && staleSavedAgeSeconds(body.age, body.stale, now) !== undefined) return [];
-  return [checkedAgo(body.age.fetchedAt, now)];
-};
-
 // quota-axi answers a refused check with its last reading marked stale, so that reading's age is all there is to say.
 const liveStateWords = (block: QuotaBlock, now: DateTime.Utc) =>
   block.body.kind === "live" &&
@@ -183,7 +161,6 @@ const headerLines = (block: QuotaBlock, width: number, now: DateTime.Utc): Block
   const details: ReadonlyArray<{ readonly text: string; readonly tone: DetailTone }> = [
     ...[accountDetail(block.body)].filter((detail) => detail !== undefined),
     ...planWords(block).map((text) => ({ text, tone: "muted" as const })),
-    ...(block.body.kind === "saved" ? checkedWords(block.body, now).map((text) => ({ text, tone: "muted" as const })) : []),
     ...(state === undefined ? [] : [state]),
   ];
   return details.reduce<Block>(
@@ -204,7 +181,6 @@ const emptyBody = (body: QuotaBlockBody, width: number): Block => {
     case "accounts-unread":
       return accountReasonLines(body, width);
     case "live":
-    case "saved":
       return body.windows.length === 0 ? [[span(`${indent}no limits reported`, "muted")]] : [];
     case "absent":
       return [[span(`${indent}no reading`, "muted")]];

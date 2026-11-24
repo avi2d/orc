@@ -165,12 +165,11 @@ describe("a block's header and its state, against the Python dash's quota_text_e
   });
 
   test("paints every claude block in the one claude colour, whatever its position", () => {
-    const saved: QuotaBlockBody = { kind: "saved", plan: null, stale: false, age: { kind: "undated" }, windows: [] };
     const blocks = [
       block(live([]), "claude"),
-      block(saved, "claude"),
+      block(live([]), "claude"),
       block(live([]), "codex"),
-      block(saved, "claude"),
+      block(live([]), "claude"),
       block(live([]), "opencode-go"),
     ];
     const headers = linesOf(blocks).filter((line) => plain(line).startsWith("●"));
@@ -203,28 +202,7 @@ describe("a block's header and its state, against the Python dash's quota_text_e
   });
 });
 
-describe("a saved claude reading, which shows its age where a live one shows pace", () => {
-  const saved = (age: Extract<QuotaBlockBody, { kind: "saved" }>["age"]): QuotaBlockBody => ({
-    kind: "saved",
-    plan: "pro",
-    stale: false,
-    age,
-    windows: [{ label: "7d", percentLeft: 99, resetsAt: DateTime.makeUnsafe("2026-10-14T20:30:00Z") }],
-  });
-
-  test.each([
-    [{ kind: "dated", fetchedAt: reportedAt, ageSeconds: 1800 }, "read 30m ago"],
-    [{ kind: "dated", fetchedAt: now, ageSeconds: 0 }, "read just now"],
-    [{ kind: "dated", fetchedAt: DateTime.makeUnsafe("2026-10-13T20:30:30Z"), ageSeconds: -30 }, "read just now"],
-    [{ kind: "undated" }, "read time unknown"],
-  ] as const)("%o reads %s", (age, words) => {
-    expect(verdictOf(saved(age))).toBe(words);
-  });
-
-  test("counts its reset from the frame's time, since a saved reading has no report time", () => {
-    expect(rowText(saved({ kind: "undated" }))[0]?.trimEnd()).toEndWith(" 1d 0h");
-  });
-
+describe("quota row verdict widths", () => {
   test("a verdict longer than the usual column widens the column for every row, and a narrow panel cuts it", () => {
     const body = live([week({ id: "five_hour", label: "session" }), week()], {
       exhaustion: [limitedBy({ status: "projected_exhaustion" })],
@@ -237,22 +215,6 @@ describe("a saved claude reading, which shows its age where a live one shows pac
     expect(narrow[1]).toBe("week    ━━────  31%  exhaustion proj… ");
   });
 
-  test("a saved window has no id to fall back on, so an empty label leaves its label cell blank", () => {
-    const body: QuotaBlockBody = {
-      kind: "saved",
-      plan: "pro",
-      stale: false,
-      age: { kind: "undated" },
-      windows: [{ label: "", percentLeft: 99, resetsAt: null }],
-    };
-    expect(rowText(body)[0]).toStartWith(`${" ".repeat(8)}━`);
-  });
-
-  test("an empty saved profile says so", () => {
-    expect(rowText({ kind: "saved", plan: "pro", stale: false, age: { kind: "undated" }, windows: [] })).toEqual([
-      "no saved windows",
-    ]);
-  });
 });
 
 describe("the edges of a quota row", () => {
@@ -295,17 +257,6 @@ describe("the edges of a quota row", () => {
     expect(lineWidth(row)).toBeLessThanOrEqual(width);
   });
 
-  test("a saved window with no reset time leaves the countdown blank", () => {
-    const body: QuotaBlockBody = {
-      kind: "saved",
-      plan: "pro",
-      stale: false,
-      age: { kind: "undated" },
-      windows: [{ label: "7d", percentLeft: 99, resetsAt: null }],
-    };
-    expect(rowText(body)[0]?.trimEnd()).toEndWith("read time unknown");
-  });
-
   test("a share row names its label in the foreground and its caption muted, with its reset under the others", () => {
     const share: QuotaWindow = { id: "sonnet", label: "Sonnet only", kind: "model", shareOf: "seven_day", resetsAt: inHours(48) };
     const lines = linesOf([block(live([week(), share]))]).slice(1);
@@ -317,15 +268,12 @@ describe("the edges of a quota row", () => {
   });
 
   test("an empty block's words are muted, and an unreachable quota-axi gives its reason in the error tone", () => {
-    const saved: QuotaBlockBody = { kind: "saved", plan: null, stale: false, age: { kind: "undated" }, windows: [] };
     const lines = linesOf([
       block(live([])),
-      block(saved),
       block({ kind: "unreachable", reason: "ssh exited 255" }, "codex"),
     ]);
     expect(lines.filter((_, index) => index % 2 === 1).map(styled)).toEqual([
       [["no windows reported", "muted", false]],
-      [["no saved windows", "muted", false]],
       [["✗ unreachable: ssh exited 255", "error", false]],
     ]);
   });

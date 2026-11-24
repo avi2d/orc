@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { decodeQuota, decodeSavedProfiles, quotaBlocks } from "@avi2dg/orc-schema";
+import { decodeQuota, quotaBlocks } from "@avi2dg/orc-schema";
 import { plain, quotaLines, quotaPlaced, quotaSection, reserveQuotaSection } from "@avi2dg/orc-quota";
 import { fixture } from "../../lib/fixtures";
 import { noOrcAccounts } from "../../lib/orc-quota";
@@ -24,9 +24,8 @@ const noneSetUp = (): string => {
 
 const blocks = () => {
   const quota = decodeQuota(noneSetUp());
-  const savedProfiles = decodeSavedProfiles(JSON.stringify({ schema: 2, active_profile: null, profiles: [] }));
-  if (quota.kind !== "ok" || savedProfiles.kind !== "ok") throw new Error("the fixtures do not decode");
-  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: now }), { ...savedProfiles, capturedAt: now }, noOrcAccounts(now), now);
+  if (quota.kind !== "ok") throw new Error("the fixtures do not decode");
+  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: now }), noOrcAccounts(now), now);
 };
 
 const look = { focused: false, title: undefined, below: [], alone: false };
