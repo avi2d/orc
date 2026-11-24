@@ -57,7 +57,7 @@ describe("quotaBlocks, against the recorded quota-axi and orc quota reports", ()
     expect(blocks.map((block) => block.provider)).toEqual(["claude", "claude", "codex", "opencode-go"]);
   });
 
-  test("the live claude block carries quota-axi's windows and plan, the account block orc quota's reason, not the saved profile's 7d window", () => {
+  test("the live claude block carries quota-axi's windows and plan and the account block orc quota's reason", () => {
     const blocks = quotaBlocks(quotaAxiRead(quotaReading(quota())), accounts(), now);
     const [live, account] = blocks;
     if (live.body.kind !== "live") throw new Error("expected a live claude block");

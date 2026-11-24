@@ -17,7 +17,7 @@ const accountBlocks = (name: OrcQuotaFixture): ReadonlyArray<QuotaBlock> =>
   blocksWith(orcQuotaOf(name, now)).filter((block) => block.title.startsWith("account"));
 
 describe("quotaBlocks over the accounts orc quota --json prints", () => {
-  test("puts one account block per account between live claude and codex, in place of the saved claude second profile", () => {
+  test("puts one account block per account between live claude and codex", () => {
     expect(blocksWith(orcQuotaOf("main-second", now)).map((block) => block.title)).toEqual([
       "claude",
       "account main",
