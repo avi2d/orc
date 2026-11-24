@@ -1,6 +1,6 @@
 import { Duration, Effect, FileSystem, Option, Schema } from "effect"
 import type { Project } from "../../shared/config/index"
-import { capture } from "../../shared/process/index"
+import { capture, type RunnerError } from "../../shared/process/index"
 import { platformFailure, publishOnce, readIfPresent } from "../../entities/backlog/index"
 import { CommitSha, gh, prPattern } from "../../entities/pull-request/index"
 import { recordMainCiAlarm } from "./main-ci"
@@ -44,6 +44,12 @@ const repositoryKey = (remote: typeof Remote.Type): string => [remote.host, remo
 const readTimeout = Duration.seconds(30)
 const remotePattern = /^(?:https:\/\/|ssh:\/\/git@|git@)([^/:]+)[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/
 
+const orNone = <A, R>(read: Effect.Effect<Option.Option<A>, RunnerError, R>) =>
+  read.pipe(
+    Effect.catchTag("RunnerError", () => Effect.succeed(Option.none<A>())),
+    Effect.timeoutOrElse({ duration: readTimeout, orElse: () => Effect.succeed(Option.none<A>()) })
+  )
+
 const readRemote = (checkout: string) =>
   capture(["git", "-C", checkout, "remote", "get-url", "origin"], null).pipe(
     Effect.flatMap((reply) => {
@@ -51,10 +57,8 @@ const readRemote = (checkout: string) =>
       return match === null
         ? Effect.succeed(Option.none())
         : Schema.decodeUnknownEffect(Remote)({ host: match[1], owner: match[2], repo: match[3] }).pipe(Effect.option)
-    }),
-    Effect.catchTag("RunnerError", () => Effect.succeed(Option.none())),
-    Effect.timeoutOrElse({ duration: readTimeout, orElse: () => Effect.succeed(Option.none()) })
-  )
+    })
+  ).pipe(orNone)
 
 const repositoryQuery = (remote: typeof Remote.Type, index: number): string =>
   "r" + String(index) + ": repository(owner: " + JSON.stringify(remote.owner) + ", name: " + JSON.stringify(remote.repo) + ") {" +
@@ -101,10 +105,8 @@ const firstSight = Effect.fnUntraced(function*(root: string, remote: typeof Remo
 
 const readReply = (host: string, remotes: ReadonlyArray<typeof Remote.Type>) =>
   gh(["api", "--hostname", host, "graphql", "-f", "query=query { " + remotes.map(repositoryQuery).join(" ") + " }"]).pipe(
-    Effect.flatMap((result) => Schema.decodeEffect(Reply)(result.stdout).pipe(Effect.option)),
-    Effect.catchTag("RunnerError", () => Effect.succeed(Option.none())),
-    Effect.timeoutOrElse({ duration: readTimeout, orElse: () => Effect.succeed(Option.none()) })
-  )
+    Effect.flatMap((result) => Schema.decodeEffect(Reply)(result.stdout).pipe(Effect.option))
+  ).pipe(orNone)
 
 const pollHost = Effect.fnUntraced(function*(root: string, host: string, remotes: ReadonlyArray<typeof Remote.Type>, at: string) {
   const reply = yield* readReply(host, remotes)
