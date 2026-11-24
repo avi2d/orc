@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -7,7 +7,13 @@ import { Effect } from "effect"
 import { addTask, answerWait, claimTask, listTasks, renderTaskFile, writeTaken, type ParkedQuestion, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 import { answerTask, askStartedTask, handAnswersToResume, parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
 import { readRequest } from "../../../packages/run/src/features/queueing-a-task/runner-request"
-import { holdReleaseGuidance, holdReleaseWordsOf } from "../../../packages/run/src/entities/review-gate/index"
+import { parseRunArgs } from "../../../packages/run/src/features/running-a-task/run-args"
+import { buildResumePlan } from "../../../packages/run/src/features/running-a-task/run-resume"
+import { runFull } from "../../../packages/run/src/features/running-a-task/run-loop"
+import { recordResumePublish } from "../../../packages/run/src/features/running-a-task/history-write"
+import { recordRun } from "../../../packages/run/src/entities/run-history/index"
+import { fakeOps } from "../../lib/fake-ops"
+import { historyFor, openDb, runLoopCheckpoints, stubGit } from "../../lib/run-loop-helpers"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -76,24 +82,14 @@ describe("a resumed run that parks again", () => {
     })
   })
   test("an unanswered non-blocking question holds the task instead of retrying the same resume endlessly", async () => {
-    const root = await mkdtemp(join(tmpdir(), "orc-repeat-"))
-    try {
-      const added = await run(addTask(root, spec))
-      const handed: [ParkedQuestion, ...ParkedQuestion[]] = [
-        { ...r2, asked, blocks: true, answer: { words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: null } },
-        { id: "ask-1", text: "Pick a color?", asked, blocks: false, answer: null }
-      ]
-      await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", origin: { machine: "mac", run: "run-1" }, questions: handed } }))
-      await run(claimTask(root, "orc-1"))
-      await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:10:00.000Z", log: root + "/logs/orc-1.log" } } }))
-      const parked = await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }, { id: "ask-1", text: "Pick a color?", asked, blocks: false }], "2026-10-27T10:35:00.000Z", "run-2", lint))
-      expect(parked.hold?.reason).toContain("run-2")
+    await withResumed(async (root) => {
+      const question = { id: "ask-1", text: "Pick a color?", asked: "2026-10-27T10:30:00.000Z", blocks: false }
+      const parked = await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }, question], "2026-10-27T10:35:00.000Z", "run-2", lint))
+      expect(parked.hold?.reason).toBe("the resumed run run-2 ended with no new blocking question and no answer given during it (" + lint + "), so the beat stops resuming it with the same answers")
       expect(answerWait(parked, () => false)).toStartWith("held for the captain: ")
       expect(await run(answerTask(root, "orc-1", "try the blue one", "2026-10-27T10:40:00.000Z"))).toMatchObject({ kind: "hold" })
       expect(answerWait(await current(root), () => false)).toBeNull()
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    })
   })
   test("a correction to the decider's answer reaches the parked question instead of releasing the hold", async () => {
     const root = await mkdtemp(join(tmpdir(), "orc-repeat-"))
@@ -124,9 +120,7 @@ describe("a resumed run that parks again", () => {
       const after = await queued()
       expect(after.body).toBe(before.body)
       expect(after.body).not.toContain("Held for the captain")
-      expect(after.answers).toEqual([{ question: "r2", answer: "Keep it" }, { question: "hold-release", answer: "fix the lint finding first" }])
-      expect(holdReleaseWordsOf(after.answers ?? [])).toEqual(["fix the lint finding first"])
-      expect(holdReleaseGuidance(["fix the lint finding first"])).toContain("fix the lint finding first")
+      expect(after.answers).toEqual([{ question: "r2", answer: "Keep it" }, { question: "hold-release", answer: "Current guidance: fix the lint finding first" }])
     })
   })
   test("an answer to a non-blocking question given during the run resumes it instead of holding it", async () => {
@@ -148,7 +142,7 @@ describe("a resumed run that parks again", () => {
       await rm(root, { recursive: true, force: true })
     }
   })
-  test("a pre-run hold decision stays in the queued task body across a repeat hold and its releases", async () => {
+  test("the next resume keeps both releases in order instead of dropping earlier guidance", async () => {
     const root = await mkdtemp(join(tmpdir(), "orc-repeat-"))
     try {
       const added = await run(addTask(root, spec))
@@ -170,15 +164,49 @@ describe("a resumed run that parks again", () => {
       await run(answerTask(root, "orc-1", "fix the lint finding first", "2026-10-27T10:46:00.000Z"))
       const released = await queued()
       expect(released.body).toBe(first.body)
-      expect(released.answers).toContainEqual({ question: "hold-release", answer: "fix the lint finding first" })
+      expect(released.answers).toContainEqual({ question: "hold-release", answer: "Current guidance: fix the lint finding first" })
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:47:00.000Z", log: root + "/logs/orc-1.log" } } }))
       await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked, blocks: true }], "2026-10-27T10:55:00.000Z", "run-4", lint))
       await run(answerTask(root, "orc-1", "try the other flag instead", "2026-10-27T10:56:00.000Z"))
       const rereleased = await queued()
       expect(rereleased.body).toBe(first.body)
-      expect(rereleased.answers).toContainEqual({ question: "hold-release", answer: "try the other flag instead" })
-
+      const guidance = "Earlier repeat hold release: fix the lint finding first\nCurrent guidance: try the other flag instead"
+      expect(rereleased.answers).toEqual([{ question: "r2", answer: "Keep it" }, { question: "hold-release", answer: guidance }])
+      const parsed = parseRunArgs(["task.md", "--branch", "orc/orc-1", ...(rereleased.answers ?? []).flatMap((answer) => ["--answer", answer.question + "=" + answer.answer])])
+      if (parsed.kind !== "RunAgent") {
+        throw new Error(parsed.detail)
+      }
+      const db = await openDb(root)
+      try {
+        const git = await stubGit(root)
+        const base = await Effect.runPromise(historyFor("run-5", root, root, "2026-10-27T10:57:00.000Z", git, ""))
+        if (parsed.branch === undefined || rereleased.resumeRun === undefined) {
+          throw new Error("the released task has no resume branch or run")
+        }
+        const workerRun = { ...base, branch: parsed.branch, resumeRun: rereleased.resumeRun, answers: parsed.answers }
+        await mkdir(workerRun.runDir, { recursive: true })
+        await writeFile(workerRun.taskPath, rereleased.body)
+        await Effect.runPromise(recordRun(db, { id: rereleased.resumeRun, project: root, branch: parsed.branch, taskFile: file, status: "failed", started: "2026-10-27T10:47:00.000Z" }).pipe(Effect.asVoid))
+        const plan = await Effect.runPromise(buildResumePlan(db, workerRun))
+        expect(plan.priorDir).toBe(join(root, "runs", "run-4"))
+        await Effect.runPromise(recordResumePublish(db, workerRun, plan))
+        const prompts: Array<string> = []
+        const ops = fakeOps({
+          runAgent: async (agentRun) => {
+            prompts.push(agentRun.prompt)
+            return { commits: [] }
+          },
+          execCheck: async () => {
+            throw new Error("checks ran before the implement finished")
+          }
+        }, workerRun.hostSessionsDir)
+        await Effect.runPromise(runFull(workerRun, ops, plan, runLoopCheckpoints(db, workerRun)))
+        expect(prompts).toHaveLength(1)
+        expect(prompts[0]).toContain(guidance)
+      } finally {
+        db.close()
+      }
     } finally {
       await rm(root, { recursive: true, force: true })
     }

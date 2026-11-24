@@ -90,8 +90,14 @@ const takenBody = (record: TaskRecord): string => {
 }
 
 const releaseAnswerOf = (record: TaskRecord): ReadonlyArray<typeof AnswerArg.Type> => {
-  const release = record.hold !== null && record.hold.repeat === true ? record.hold.answer : null
-  return release === null || release.words.trim() === "" ? [] : [{ question: holdReleaseId, answer: release.words }]
+  const hold = record.hold
+  const decisions = hold === null ? [] : [...hold.history ?? [], hold]
+  const releases = decisions.flatMap((decision) =>
+    decision.repeat === true && decision.answer !== null && decision.answer.words.trim() !== "" ? [decision.answer.words] : [])
+  return releases.length === 0 ? [] : [{
+    question: holdReleaseId,
+    answer: releases.map((words, index) => (index === releases.length - 1 ? "Current guidance: " : "Earlier repeat hold release: ") + words).join("\n")
+  }]
 }
 
 const takenResume = (task: string, record: TaskRecord): Effect.Effect<Record<string, unknown>, RunnerError> => {

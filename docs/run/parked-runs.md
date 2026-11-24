@@ -63,8 +63,10 @@ A resumed run can park again with no open blocking question and no answer given 
 Resuming it again would hand it the same answers, so the beat holds the task for you instead.
 The hold reason names the run and its end reason, and each later beat prints `waits <task-id>: held for the captain: <reason>`.
 Run `orc backlog answer <task-id> <words>` to release the hold, and the next beat resumes the task.
-To correct a parked answer on that held task, use `orc backlog answer <task-id> <question-id>=<text>`.
 Those words travel with the resume, so the retried run reads them as your guidance.
+Each resume receives every repeat hold release in order, oldest first, with the latest marked as current guidance.
+To [overturn a decider's answer](attention-queue.md#overturning-a-decider-answer) on that held task, use `orc backlog answer <task-id> <question-id>=<text>`.
+The hold stays until you release it.
 
 ## A looping run
 A run whose Pi fails one command 6 times in a row pauses the run and asks the question `looping`, as [How orc runs Pi](how-orc-runs-pi.md) shows.
