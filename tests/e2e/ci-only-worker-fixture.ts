@@ -39,7 +39,7 @@ export const exerciseCiOnlyHostPi = async (): Promise<void> => {
       ...permitted.map((command) => command + " > /dev/null")
     ].join("\n")
     for (const tool of tools) {
-      await writeScript(join(fakeBin, tool), ["printf '%s\\n' " + quote(tool) + '\" $*\" >> ' + quote(starts)])
+      await writeScript(join(fakeBin, tool), ["printf '%s\\n' " + quote(tool) + '" $*" >> ' + quote(starts)])
     }
     await writeConfig(env, {
       providers: [loginProvider],
