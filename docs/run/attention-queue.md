@@ -8,8 +8,8 @@ The queue is kept in `~/.orc/backlog/attention`.
 Each item names its task, kind, owner, text, and age.
 An open item becomes overdue after five minutes.
 
-Review and worker questions the attention queue owns for the decider start with the decider.
-A gate finding orc can neither fix nor ask about stays with you, so the decider never answers it.
+Review and worker questions start with the decider.
+A gate finding whose action is not `auto-fix`, `no-op`, or `ask-user` stays with you, so the decider never answers it.
 Looping runs, failing commands, overdue holds, and run or PR events need you.
 Three consecutive failures of one command open a notification, and six open a looping question.
 See [Parked runs](parked-runs.md) for worker questions and looping runs.

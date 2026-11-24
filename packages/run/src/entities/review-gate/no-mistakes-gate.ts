@@ -27,6 +27,8 @@ export interface NoMistakesFinding {
   readonly description: string
 }
 
+export type PendingFinding = NoMistakesFinding & Pick<OpenQuestion, "owner">
+
 export interface ParkedGate {
   readonly step: string
   readonly stage: "approval" | "fix-review"
@@ -126,10 +128,7 @@ const orcActions = new Set(["auto-fix", "no-op"])
 
 const isAskUser = (finding: Classified): boolean => !orcActions.has(finding.action) && !isQuestion(finding)
 
-const isUnknownAction = (finding: Classified): boolean => isAskUser(finding) && finding.action !== "ask-user"
-
-// The decider answers routine questions, and a finding no-mistakes gives no action orc knows is never routine.
-export const isOwnerFinding: (finding: Classified) => boolean = isUnknownAction
+export const isUnknownAction = (finding: Classified): boolean => isAskUser(finding) && finding.action !== "ask-user"
 
 export const askUserFindings = (findings: ReadonlyArray<NoMistakesFinding>, allow: ReadonlyArray<AllowWord>): ReadonlyArray<NoMistakesFinding> =>
   allow.includes(askUserWord) ? findings.filter(isUnknownAction) : findings.filter(isAskUser)

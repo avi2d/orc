@@ -232,12 +232,13 @@ describe("driveNoMistakes", () => {
     }
   })
 
-  test("reaching the gate cap parks the task with the cap as an open question instead of failing it", async () => {
+  test("reaching the gate cap parks for the decider instead of assigning the cap to the owner", async () => {
     const sent: Array<GateResponse> = []
     const { record } = await driveIn(endlessGates(sent, 100))
     expect(sent.length).toBe(20)
     expect(record.status).toBe("refused")
     expect(record.openQuestions.map((question) => question.id)).toEqual(["gate-cap"])
+    expect(record.openQuestions.map((question) => question.owner ?? "decider")).toEqual(["decider"])
     expect(record.openQuestions[0]?.text).toContain("20 no-mistakes gates")
   })
 

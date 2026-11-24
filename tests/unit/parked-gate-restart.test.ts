@@ -15,7 +15,7 @@ import { Asking } from "../../packages/run/src/entities/review-gate/index"
 import { endingFromResult, readResultThrough } from "../../packages/run/src/features/queueing-a-task/index"
 import type { GateResponse } from "../../packages/run/src/entities/review-gate/no-mistakes-gate"
 import { openDatabase, openQuestionsForRun, recordRun, recordSignal, recordStep } from "../../packages/run/src/entities/run-history/index"
-import { recordOpenAsks } from "../../packages/run/src/features/running-a-task/history-write"
+import { recordOpenAsks, recordOpenQuestion } from "../../packages/run/src/features/running-a-task/history-write"
 import { openItems, routeTaskItems } from "../../packages/run/src/entities/attention/index"
 import { runBeat } from "../../packages/run/src/widgets/beat/beat"
 import { taskLabel } from "../../packages/run/src/shared/process/pueue-status"
@@ -141,13 +141,12 @@ const restartOrc1 = async (root: string, beat: string, at: string): Promise<void
     throw new Error("orc-1 is not parked")
   }
   await run(claimTask(root, "orc-1"))
-  await run(writeTaken(root, { spec: orc1.spec, hold: orc1.hold, parked: orc1.parked, state: { kind: "started", claim: { ...claim, beat, takenAt: at }, started: { at, log: root + "/logs/orc-1.log" } } }))
+  await run(writeTaken(root, { ...handAnswersToResume(orc1), state: { kind: "started", claim: { ...claim, beat, takenAt: at }, started: { at, log: root + "/logs/orc-1.log" } } }))
 }
 
 const answersOf = async (root: string): Promise<Array<{ question: string; answer: string }>> => {
   const record = await run(findTask(root, "orc-1"))
-  const resumed = handAnswersToResume(record)
-  return (resumed.parked?.questions ?? []).flatMap((question) =>
+  return (record.parked?.questions ?? []).flatMap((question) =>
     question.answer === null ? [] : [{ question: question.id, answer: question.answer.words }]).toSorted((left, right) => left.question < right.question ? -1 : 1)
 }
 
@@ -170,26 +169,39 @@ describe("a run parked on a gate orc cannot answer", () => {
       await run(answerTask(root, "orc-1", "q1=Table B", "2026-11-18T10:02:00.000Z"))
       const answersB = await answersOf(root)
       expect(answersB).toEqual([{ question: "q1", answer: "Table B" }])
-      expect((await readOpen(root, "run-1")).map((question) => question.id)).toEqual(["q1"])
+      const priorOpen = await readOpen(root, "run-1")
+      expect(priorOpen.map((question) => question.id)).toEqual(["q1"])
+      const setup = askSetupFor(runs + "/run-2", runs + "/run-2-session", 30, answersB, priorOpen)
       const runB = await driveGate(runs, "run-2", { start: parkedB, answers: answersB })
       expect(runB.openQuestions).toEqual([{ id: "review-1", text: "needs a human", owner: "user" }])
       await recordGateRun(root, "run-2", "2026-11-18T10:03:00.000Z", runB, runB.result)
+      const db = await dbOf(root)
+      try {
+        await run(recordStep(db, { runId: "run-2", name: "implement", attempt: 1, status: "passed", started: "2026-11-18T10:03:00.000Z", ended: "2026-11-18T10:03:00.000Z", agentFile: null, piSessionFile: null }))
+        await run(recordOpenAsks((step, question) => recordOpenQuestion(db, "run-2", step, question), setup, { name: "implement", attempt: 1 }, []))
+      } finally {
+        db.close()
+      }
       expect((await readOpen(root, "run-2")).map((question) => question.id)).toEqual(["review-1"])
       await restartOrc1(root, "beat-2", "2026-11-18T10:03:00.000Z")
-      const first = await beatWith(root, doneStatus(root, "2026-11-18T10:02:00.000Z", "2026-11-18T10:05:00.000Z"))
+      const heard: Array<DeciderRequest> = []
+      const sources = { ...quietSources(), askDecider: answeringDecider("# Fix the thing", heard) }
+      const first = await beatWith(root, doneStatus(root, "2026-11-18T10:02:00.000Z", "2026-11-18T10:05:00.000Z"), sources)
       expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["orc-1:new"])
       expect(actionKinds(first.actions)).toContain("parked:orc-1")
       const parked = await run(findTask(root, "orc-1"))
       expect(parked.parked?.origin?.run).toEqual("run-2")
-      expect(parked.parked?.questions.map((question) => question.id)).toEqual(["review-1", "q1"])
-      expect(await openReviewItems(root)).toHaveLength(1)
-      const later = await beatWith(root, doneStatus(root, "2026-11-18T10:02:00.000Z", "2026-11-18T10:05:00.000Z"))
+      expect(parked.parked?.questions.map((question) => question.id)).toEqual(["review-1"])
+      const reported = await openReviewItems(root)
+      expect(reported).toHaveLength(1)
+      const later = await beatWith(root, doneStatus(root, "2026-11-18T10:02:00.000Z", "2026-11-18T10:05:00.000Z"), sources)
       const kinds = actionKinds(later.actions)
       expect(kinds).toContain("waits:orc-1")
       expect(kinds.filter((kind) => kind === "started:orc-1")).toEqual([])
       const reason = later.actions.flatMap((action) => action.kind === "waits" && action.task === "orc-1" ? [action.reason] : [])
       expect(reason).toEqual(["parked on orc/orc-1 for the captain's answer to review-1"])
-      expect(await openReviewItems(root)).toHaveLength(1)
+      expect(heard).toEqual([])
+      expect(await openReviewItems(root)).toEqual(reported)
     })
   })
 
@@ -221,7 +233,7 @@ describe("a run parked on a gate orc cannot answer", () => {
       expect(actionKinds(parkedBeat.actions)).toContain("parked:orc-1")
       await run(answerTask(root, "orc-1", "review-1=Keep it", "2026-11-18T10:06:00.000Z"))
       const answersC = await answersOf(root)
-      expect(answersC).toEqual([{ question: "q1", answer: "Table B" }, { question: "review-1", answer: "Keep it" }])
+      expect(answersC).toEqual([{ question: "review-1", answer: "Keep it" }])
       const reraised = (table: string) => (response: GateResponse) =>
         Effect.sync(() => {
           responses.push(response)

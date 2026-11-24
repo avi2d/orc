@@ -24,7 +24,7 @@ const parkedQuestions = (
       if (known === undefined) {
         return { id: question.id, text: question.text, asked: askedOf(question), blocks: question.blocks ?? true, ...choicesOf(question), answer: null, ...(question.owner === undefined ? {} : { owner: question.owner }) }
       }
-      return known.owner === question.owner ? known : { ...known, ...(question.owner === undefined ? {} : { owner: question.owner }) }
+      return known
     }),
     kept
   )

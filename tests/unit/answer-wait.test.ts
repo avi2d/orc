@@ -47,14 +47,28 @@ const askingOnceWritten = async (dir: string): Promise<typeof Asking.Type> => {
 }
 
 describe("waitForAnswers", () => {
-  test("an answer written during the wait comes back and both files are gone instead of left for the next gate", async () => {
+  test("the wait preserves explicit owners instead of assigning every synthetic question to the owner", async () => {
     await inTemp(async (dir) => {
-      const waiting = Effect.runPromise(waitForAnswers(dir, 30, "no-mistakes")([finding("r2", "changes product behavior")]).pipe(Effect.provide(BunServices.layer)))
+      const questions = [
+        finding("r2", "changes product behavior"),
+        { id: "gate-cap", description: "Continue answering gates?" },
+        { id: "looping", description: "Continue Pi?", owner: "user" }
+      ] satisfies Parameters<ReturnType<typeof waitForAnswers>>[0]
+      const waiting = Effect.runPromise(waitForAnswers(dir, 30, "no-mistakes")(questions).pipe(Effect.provide(BunServices.layer)))
       const asking = await askingOnceWritten(dir)
-      expect(asking).toMatchObject({ questions: [{ id: "r2", text: "changes product behavior" }] })
-      const answers = [{ question: "other", answer: "ignored" }, { question: "r2", answer: "Keep it" }]
+      expect(asking).toMatchObject({ questions: [{ id: "r2", text: "changes product behavior" }, { id: "gate-cap", text: "Continue answering gates?" }, { id: "looping", text: "Continue Pi?" }] })
+      expect(asking.questions.map((question) => ({ id: question.id, owner: question.owner ?? "decider" }))).toEqual([
+        { id: "r2", owner: "decider" },
+        { id: "gate-cap", owner: "decider" },
+        { id: "looping", owner: "user" }
+      ])
+      const answers = [{ question: "other", answer: "ignored" }, { question: "r2", answer: "Keep it" }, { question: "gate-cap", answer: "Continue" }, { question: "looping", answer: "Stop" }]
       await writeFile(join(dir, "answers.json"), JSON.stringify({ asking: asking.asked, answers }))
-      expect(await waiting).toEqual({ asked: asking.asked, answers: [{ question: "r2", answer: "Keep it" }], askedAt: [{ question: "r2", asked: asking.asked }] })
+      expect(await waiting).toEqual({
+        asked: asking.asked,
+        answers: [{ question: "r2", answer: "Keep it" }, { question: "gate-cap", answer: "Continue" }, { question: "looping", answer: "Stop" }],
+        askedAt: [{ question: "r2", asked: asking.asked }, { question: "gate-cap", asked: asking.asked }, { question: "looping", asked: asking.asked }]
+      })
       expect(await readdir(dir)).toEqual([])
     })
   }, 15_000)
