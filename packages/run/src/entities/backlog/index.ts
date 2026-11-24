@@ -131,6 +131,7 @@ export {
 } from "./notes"
 export {
   childCount,
+  closedUndone,
   dependencyWaits,
 } from "./task-dependency"
 export type {

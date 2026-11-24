@@ -1,5 +1,10 @@
 import { taskPr, type TaskRecord } from "./task-record"
 
+type UndoneOutcome = "failed" | "stopped" | "start-failed" | "dropped"
+
+export const closedUndone = (task: TaskRecord): UndoneOutcome | null =>
+  task.state.kind === "closed" && task.state.closing.outcome !== "done" ? task.state.closing.outcome : null
+
 const dependencyOpen = (dependency: TaskRecord | undefined): boolean =>
   dependency === undefined || dependency.state.kind !== "closed" || dependency.state.closing.outcome !== "done"
 
