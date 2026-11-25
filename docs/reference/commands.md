@@ -370,6 +370,18 @@ Examples:
   orc backlog answer orc-9 -- -1 retry is enough
 ```
 
+#### orc backlog retry
+
+```text
+Usage: orc backlog retry <task-id>
+
+Returns a failed or stopped task to the backlog. When it has kept work, the beat
+resumes it on the original machine and branch.
+
+Examples:
+  orc backlog retry orc-9
+```
+
 #### orc backlog send-back
 
 ```text

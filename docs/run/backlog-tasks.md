@@ -73,6 +73,12 @@ Tasks that depend on it no longer wait for it.
 Orc withdraws the task's open attention items and leaves the parked run's branch and PR untouched.
 The command records your decision without checking the PR on the forge.
 
+### Retry a task
+
+Run `orc backlog retry <task-id>` to run a failed or stopped task again.
+When it has kept work, the beat resumes it on the original machine and branch.
+Otherwise, the beat places it normally.
+
 ### Send a task back
 
 Run `orc backlog send-back <task-id> <words>` to request another pass on a closed task's open PR.

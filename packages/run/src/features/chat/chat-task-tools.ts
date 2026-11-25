@@ -23,6 +23,13 @@ export const taskTools = (env: Env): ReadonlyArray<ChatTool> => [
     execute: (_toolCallId, params) => runTool(StopInput, "orc_backlog_stop", params, env, (input) => ["backlog", "stop", input.id])
   },
   {
+    name: "orc_backlog_retry",
+    label: "Retry an orc task",
+    description: "Returns a failed or stopped task to the backlog. Kept work resumes on its original machine and branch.",
+    parameters: Schema.toJsonSchemaDocument(StopInput).schema,
+    execute: (_toolCallId, params) => runTool(StopInput, "orc_backlog_retry", params, env, (input) => ["backlog", "retry", input.id])
+  },
+  {
     name: "orc_backlog_drop",
     label: "Drop a new orc task",
     description:

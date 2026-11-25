@@ -5,7 +5,7 @@ import { backlogPaths, BacklogError, findTask, listTasks, markPosted, runLabel, 
 import { readAttention, routeTaskItems, withdrawTaskItems } from "../entities/attention/index"
 import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readBeatWaits, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText, taskPrState } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
-import { edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
+import { edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add, retryTask } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
 import { type ConfigError, readFailure, type DispatchConfig, readDispatchConfig, readProjects } from "../shared/config/index"
 import { holdRun, sendBack, killHeld, queueFromText, renewTask, startTask, stopNow, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson, ensureAlertStream, liveAlertStream } from "../features/queueing-a-task/index"
@@ -324,6 +324,11 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       case "DropChild": {
         yield* requireBacklog(backlogRoot(place))
         yield* Console.log(yield* taskVerbLine(args, place))
+        break
+      }
+      case "RetryTask": {
+        yield* requireBacklog(backlogRoot(place))
+        yield* Console.log(yield* retryTask(backlogRoot(place), args.id))
         break
       }
       case "StopTask": {
