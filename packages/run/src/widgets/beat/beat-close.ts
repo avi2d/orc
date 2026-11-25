@@ -318,7 +318,7 @@ const trackReading = (
 const deadRunOf = (reading: CloseReading): string | undefined =>
   reading.kind === "read" && reading.result.status === "failed" && reading.result.reason !== "the run was killed" ? reading.result.run?.id : undefined
 
-const retryDeadRun = (
+export const retryDeadRun = (
   root: string,
   task: string,
   machine: string,
@@ -385,7 +385,7 @@ export const closeFinished = (
         return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: reading.reason } } satisfies Progress
       }
       const action = yield* serveRunning(context, task, claim.machine, through, label, reading.asking)
-      return { kind: "running", outputAt: reading.outputAt, action, failing: reading.failing } satisfies Progress
+      return { kind: "running", outputAt: reading.outputAt, action, failing: reading.failing, ...(reading.result.run == null ? {} : { run: reading.result.run.id }) } satisfies Progress
     }
     const run = deadRunOf(reading)
     if (stale === null && ending.kind === "close" && ending.outcome === "failed" && task.retry === undefined && run !== undefined) {

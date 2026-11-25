@@ -3,7 +3,7 @@ import type { UpdateDocument } from "../orc-update/index"
 
 export type Progress =
   | { readonly kind: "ended"; readonly action: BeatAction }
-  | { readonly kind: "running"; readonly outputAt: string | null; readonly action: BeatAction | null; readonly failing: FailingMark | null }
+  | { readonly kind: "running"; readonly outputAt: string | null; readonly action: BeatAction | null; readonly failing: FailingMark | null; readonly run?: string }
   | { readonly kind: "unknown" }
   | { readonly kind: "own-log" }
   | { readonly kind: "untracked" }
