@@ -21,7 +21,7 @@ export class OrcReviewOutputError extends Schema.TaggedError<OrcReviewOutputErro
   message: Schema.String
 }) {}
 
-export const decodeOrcReviewFindings = (input: string) =>
+export const decodeOrcReviewFindings = (input: string): Result.Result<typeof OrcReviewFindings.Type, OrcReviewOutputError> =>
   decodeOrcFindings(input).pipe(Result.mapError((error) => new OrcReviewOutputError({ message: error.message })))
 
 export const ReviewFindings = Schema.Array(ReviewFinding)
