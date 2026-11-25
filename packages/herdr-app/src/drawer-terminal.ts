@@ -10,6 +10,7 @@ interface Result {
 interface TerminalHost {
   readonly exec: (program: string, args: string[]) => Promise<Result>
   readonly hc: (args: string[]) => Promise<Result>
+  readonly sleep: (ms: number) => Promise<void>
   readonly write: (path: string, text: string) => Promise<unknown>
 }
 
@@ -18,19 +19,29 @@ const output = (result: Result): string => {
   return result.stdout
 }
 
-const terminalLive = (hc: TerminalHost["hc"], terminal: string): Promise<boolean> => hc(["get", terminal, "--json"]).then((result) => {
-  const live = guardJson(result.stdout || result.stderr, (value, at) => {
+const terminalState = (hc: TerminalHost["hc"], terminal: string): Promise<string | null> => hc(["get", terminal, "--json"]).then((result) => {
+  const parsed = guardJson(result.stdout || result.stderr, (value, at) => {
     const record = fields(value, at)
     if (record.kind === "refused") return record
     const error = fields(record.value["error"], "error")
-    if (error.kind === "ok" && error.value["kind"] === "not_found") return ok(false)
+    if (error.kind === "ok" && error.value["kind"] === "not_found") return ok(null)
     output(result)
-    const state = string(record.value, "state", at)
-    return state.kind === "refused" ? state : ok(state.value === "live")
+    return string(record.value, "state", at)
   })
-  if (live.kind === "refused") throw new Error(live.reason)
-  return live.value
+  if (parsed.kind === "refused") throw new Error(parsed.reason)
+  return parsed.value
 })
+
+const terminalLive = (hc: TerminalHost["hc"], terminal: string): Promise<boolean> =>
+  terminalState(hc, terminal).then((state) => state === "live")
+
+const removeAfterExit = (host: TerminalHost, address: string, remaining = 100): Promise<void> =>
+  terminalState(host.hc, address).then((state) => {
+    if (state === null) return
+    if (state === "finished") return host.hc(["rm", address, "--json"]).then((result) => { output(result) })
+    if (remaining === 0) throw new Error("Drawer terminal did not exit: " + address)
+    return host.sleep(100).then(() => removeAfterExit(host, address, remaining - 1))
+  })
 
 export const previousReleaseChatKey = "orc-drawer.chat"
 const previousReleaseChatName = "orc-chat"
@@ -96,7 +107,7 @@ export const drawerTerminal = (host: TerminalHost, home: string): DrawerTerminal
             .catch((error: unknown) => release(lease).then(() => { throw error }))
         }))
     },
-    stop: (chat: DrawerChat): Promise<void> => release(chat.lease).then(() => undefined),
+    stop: (chat: DrawerChat): Promise<void> => release(chat.lease).then(() => removeAfterExit(host, chat.address)),
     live: (chat: DrawerChat): Promise<boolean> => terminalLive(host.hc, chat.address)
   }
 }

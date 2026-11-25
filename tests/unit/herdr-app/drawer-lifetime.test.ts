@@ -31,6 +31,12 @@ const fakeHerdr = (saved: ReadonlyArray<string> = [], earlierLive: ReadonlyArray
     files.set(path, { info: fileInfo, text })
   }
   const live = new Set(earlierLive)
+  const finished = new Set<string>()
+  const leases = new Map<string, string>()
+  const finish = (address: string) => {
+    live.delete(address)
+    finished.add(address)
+  }
   const kills: Array<string> = []
   for (const name of saved) store(folder + "/" + name, "")
   const launches: Array<ReadonlyArray<string>> = []
@@ -38,6 +44,8 @@ const fakeHerdr = (saved: ReadonlyArray<string> = [], earlierLive: ReadonlyArray
   let appRunning = true
   return {
     files,
+    finish,
+    finished,
     launches,
     kills,
     removals,
@@ -52,7 +60,10 @@ const fakeHerdr = (saved: ReadonlyArray<string> = [], earlierLive: ReadonlyArray
       if (program === "sh") return Promise.resolve({ ...ok, stdout: String(appPid) + "\n" })
       if (program === "rm") {
         const completed = Promise.resolve().then(() => {
-          files.delete(args[1] ?? "")
+          const lease = args[1] ?? ""
+          files.delete(lease)
+          const address = leases.get(lease)
+          if (address !== undefined) finish(address)
           return ok
         })
         removals.push(completed)
@@ -63,14 +74,24 @@ const fakeHerdr = (saved: ReadonlyArray<string> = [], earlierLive: ReadonlyArray
     },
     hc: (args: ReadonlyArray<string>) => {
       const [command, terminal = ""] = args
-      if (command === "get") return Promise.resolve(live.has(terminal) ? { ...ok, stdout: '{"state":"live"}' } : notFoundTerminal)
+      if (command === "get") {
+        const state = live.has(terminal) ? "live" : finished.has(terminal) ? "finished" : null
+        return Promise.resolve(state === null ? notFoundTerminal : { ...ok, stdout: JSON.stringify({ state }) })
+      }
+      if (command === "rm") {
+        if (!finished.delete(terminal)) throw new Error("Cannot remove a terminal before exit: " + terminal)
+        return Promise.resolve(ok)
+      }
       if (command === "kill") {
         kills.push(terminal)
         live.delete(terminal)
         return Promise.resolve(ok)
       }
+      if (command !== "run") throw new Error("Unexpected hc command " + command)
       launches.push(args)
       const address = "terminal-" + String(launches.length)
+      const binding = args.find((arg) => arg.startsWith("ORC_CHAT_DRAWER_LEASE="))
+      if (binding !== undefined) leases.set(binding.slice("ORC_CHAT_DRAWER_LEASE=".length), address)
       live.add(address)
       return Promise.resolve({ ...ok, stdout: '{"address":"' + address + '"}' })
     },
@@ -91,7 +112,7 @@ const drawer = (saved: ReadonlyArray<string> = []) => {
   const herdr = fakeHerdr(saved)
   let shows = 0
   const controller = new DrawerController({
-    ...drawerTerminal({ exec: (program, args) => herdr.exec(program, args), hc: (args) => herdr.hc(args), write: herdr.write }, home),
+    ...drawerTerminal({ exec: (program, args) => herdr.exec(program, args), hc: (args) => herdr.hc(args), sleep: unused, write: herdr.write }, home),
     show: () => String(++shows),
     hide: () => undefined
   })
@@ -136,6 +157,19 @@ const afterDrawerEnds = async (end: End, supervise: Supervisor) => {
 for (const end of ["close", "toggle", "gone:1", "dispose", "unlink", "quit app"] as const) {
   test(end + " does not leave the chat terminal or Pi running", async () => {
     expect(await afterDrawerEnds(end, whileDrawerOpen)).toEqual({ terminalRunning: false, piRunning: false })
+  })
+}
+
+for (const end of ["close", "toggle", "gone:1", "dispose"] as const) {
+  test(end + " does not leak a finished drawer terminal or discard a failed start before close", async () => {
+    const host = drawer()
+    await host.controller.obey("toggle")
+    expect(host.launches[0]).not.toContain("--rm")
+    host.finish("terminal-1")
+    expect(host.finished.has("terminal-1")).toBe(true)
+    if (end === "dispose") await host.controller.dispose()
+    else await host.controller.obey(end)
+    expect([...host.finished]).toEqual([])
   })
 }
 
