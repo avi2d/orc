@@ -2,14 +2,23 @@
 kind: reference
 ---
 # Delivery modes
-A project's `mode` in `projects.json` is `no-mistakes`, `direct-PR` or `no-mistakes-prod-only`, and a project with no `mode` reads as `no-mistakes`.
-Orc refuses any other mode with `the project <name> names the mode <word>, which is not no-mistakes, direct-PR or no-mistakes-prod-only`.
+A project's `mode` in `projects.json` is `no-mistakes`, `direct-PR`, `orc`, or `no-mistakes-prod-only`.
+A project with no `mode` reads as `no-mistakes`.
+Orc refuses any other mode with `the project <name> names the mode <word>, which is not no-mistakes, direct-PR, orc or no-mistakes-prod-only`.
 The mode decides only how a ship task ends, and any other kind ignores it.
-A `direct-PR` run never starts [no-mistakes](https://github.com/kunchenguid/no-mistakes) and does not need it installed.
+A `direct-PR` or `orc` run never starts [no-mistakes](https://github.com/kunchenguid/no-mistakes) and does not need it installed.
 
-The beat turns the mode and the task's `internal` mark into the run's delivery and sets `ORC_TASK_DELIVERY` to `no-mistakes` or `direct-PR`.
+The beat turns the mode and the task's `internal` mark into the run's delivery and sets `ORC_TASK_DELIVERY` to `no-mistakes`, `direct-PR`, or `orc`.
 A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: true` and `no-mistakes` to the rest.
 `orc runner start` reads a missing `ORC_TASK_DELIVERY` as `no-mistakes` and queues a `direct-PR` ship run as `orc run <task-file> --delivery direct-PR`.
+
+## Orc delivery
+An `orc` run fetches `origin` and rebases its branch onto the default branch recorded by `refs/remotes/origin/HEAD` before running the project checks.
+If the rebase fails, the run does not open a PR.
+After the checks pass, the run pushes the branch and opens or reuses a PR.
+The run does not perform a review or wait for a CI verdict.
+To select this delivery for a project, set its `mode` to `orc` in `projects.json`.
+For a direct run or resume, pass `--delivery orc`.
 
 ## Review the branch
 Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one Pi turn with the reviewer agent over that diff and the task file.
