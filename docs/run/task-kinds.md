@@ -21,7 +21,7 @@ It prints `orc: <kind> run <run-id> wrote its report to <path>` and records the 
 A run you stop at its looping question prints `orc: <kind> run <run-id> stopped: <reason>` and records the run stopped.
 Any other run that does not report prints why it failed, records the run failed and exits non-zero.
 The beat closes the task done with the reason `the run wrote its report` and keeps the path as `report` in the task file and in `orc backlog --json`.
-A run that wrote a report and still failed follows the [retry rule](attention-queue.md#items-for-run-events).
+A run that wrote a report and still failed follows the [retry rule](attention-queue.md#retry-a-dead-run-once).
 If no retry applies, the beat closes the task failed with the run reason and keeps the path as `report`.
 A run you stop closes the task stopped with the run reason.
 When no report exists and no retry applies, the beat closes the task failed with `the run wrote no report` and the run's reason.
@@ -127,9 +127,8 @@ When the task proposing the split has a parent, the slices join that parent as c
 The proposal's done criteria join that parent under `## Done when` as lines naming the split task, so the final check verifies them with the rest.
 The task then leaves that parent and closes done with the reason `split into <child-ids>: <reason>`, and every task that waited on it waits on all slices instead.
 The beat prints `split <task-id> on <machine> into <child-ids>: <reason>` and records the event `<task-id>.split` that orc chat posts, as in `orc-1 Ship task splitting split at run into orc-2 Record the split, orc-3 Show the plan: <reason>`.
-A run whose proposal orc refused ends as `invalid split proposal: <why>` with no children.
-The beat treats it as an ordinary failed run and retries it once before closing the task failed.
-A failure while applying a validated split does not trigger a retry, since the split may already have created children.
+A run whose proposal orc refused ends as `invalid split proposal: <why>` with no children, and the beat [retries it once](attention-queue.md#retry-a-dead-run-once) before closing the task failed.
+A failure while applying a validated split is not retried, since the split may already have created children.
 
 ### Changing a plan
 

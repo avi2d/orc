@@ -57,7 +57,7 @@ describe("a failed run", () => {
       if (task === undefined) throw new Error("missing task")
       await run(writeTaken(root, {
         ...task,
-        parked: { branch: "orc/orc-1", questions: [], origin: { machine: "mac", run: "run-0" }, at: "2026-10-27T09:00:00.000Z" },
+        parked: null,
         hold: { reason: "the resume parked again", repeat: true, until: null, questions: [], at: "2026-10-27T09:05:00.000Z", answer: { words: "fix the lint finding first", at: "2026-10-27T10:00:00.000Z" } }
       }))
       await run(retryStartedTask(root, "orc-1", "mac", "run-1", "2026-10-27T10:05:00.000Z"))

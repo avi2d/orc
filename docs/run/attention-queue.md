@@ -124,12 +124,7 @@ The beat opens an item for each run event, owned by the user:
 
 - A run that died opens a `run-died` item, when its task closes failed or its start fails.
   A run that ends done or that you stop opens none.
-  A confirmed failed run with a known run ID returns to `new` once, keeping its branch and origin for the next beat.
-  Another failure closes the task and opens a `run-died` item with the task log tail.
-  Sending a closed task back clears the retry record and gives the task another retry allowance.
-  A failed run without a run ID closes without a retry.
-  An unread machine, a quiet own log, a killed run, and a failed or partially applied split do not trigger a retry.
-  A run whose split proposal orc refused is an ordinary failed run and follows the retry rule.
+  A confirmed failed run [retries once](#retry-a-dead-run-once) first, and the item opens when the task closes after that.
   Two other failures recover without opening a `run-died` item.
   When no-mistakes refuses to start because the repository is not initialized, the run runs `no-mistakes init --skip-user-skill` and starts no-mistakes again.
   When the command that reaches a dispatch machine exits 255, as ssh does when its connection fails, or its read times out, the task stays started with an unknown state and the next beat reads it again.
@@ -144,6 +139,23 @@ The beat opens an item for each run event, owned by the user:
   On a project with `yolo` true, the item text names each change that waits for your merge word.
   Merging the PR closes it with the answer `merged`.
   Closing the PR without merging closes it with the answer `closed without merging`.
+
+### Retry a dead run once
+
+A run is confirmed failed when pueue reports its task failed, not killed, and the runner holds a run ID for it.
+The beat returns that task to `new` once, keeping its branch and origin run, so the next beat resumes the run.
+It records the `retry` mark in the task file and a chat event `<task-id>.retry.<run-id>`.
+A failure after the retry closes the task and opens a `run-died` item with the task log tail.
+Sending a closed task back clears the retry mark and gives the task another retry.
+A run you stop never retries.
+These endings close the task with no retry:
+
+- A failed run without a run ID.
+- An unread machine, and an own-log machine whose log has been quiet for 30 minutes.
+- A killed run.
+- A failed or partially applied split.
+
+A run whose split proposal orc refused is an ordinary failed run and retries.
 
 ### Items for update failures
 
