@@ -7,7 +7,7 @@ import { inheritedEnv } from "../../shared/sandbox/index"
 import { type CheckedModelWindow, type HostTools, loginCheckCommand, type ModelCredential, modelCredentialFor, piAgentModels, type ProviderKey, providerKeyOf } from "../../shared/sandbox/index"
 import type { LoginProvider, OrcConfig, PackageProvider, Provider, TokenFileProvider } from "../../shared/config/index"
 import { OrcRunError } from "../../shared/lib/index"
-import { linkSharedGit, shareInstalledGit, sharedGitDir } from "./shared-packages"
+import { linkSharedGit, shareInstalledGit, sharedGitSources } from "./shared-packages"
 
 interface OwnAgentDir {
   readonly piAgentDir: string
@@ -173,10 +173,10 @@ const planPackage = (
     const env = selectedClaudeConfig === undefined ? provider.env ?? {} : { ...provider.env, CLAUDE_CONFIG_DIR: selectedClaudeConfig }
     // Pi installs the packages into the folder it reads and lists their models only after, so they go in before the windows are read.
     yield* writeAgentDir(fs, path, dirs.piAgentDir, null, [], provider.packages)
-    const shared = sharedGitDir(path, dirs.orcHome, provider.packages)
-    yield* linkSharedGit(fs, path, shared, dirs.piAgentDir)
+    const shared = sharedGitSources(path, dirs.orcHome, dirs.piAgentDir, provider.packages)
+    yield* linkSharedGit(fs, path, shared)
     const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, { kind: "agent-dir", agentDir: dirs.piAgentDir, packages: true }, env)
-    yield* shareInstalledGit(fs, path, shared, dirs.piAgentDir)
+    yield* shareInstalledGit(fs, path, shared)
     yield* writeAgentDir(fs, path, dirs.piAgentDir, null, checked, provider.packages)
     return { kind: "none", own: { piAgentDir: dirs.piAgentDir, env } }
   })

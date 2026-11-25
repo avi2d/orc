@@ -52,9 +52,11 @@ It takes no `tokenFile` or `tokenCommand`, so it completes the `credential` list
 - `packages` lists the Pi package sources, in the form Pi's `settings.json` takes: `npm:`, `git:`, a git URL or an absolute path.
 - Orc writes them into the run's Pi folder, `session/agent/settings.json`, so the run's Pi loads the package your Pi loads.
 - Pi installs an `npm:` source into the run's folder on the first model list, so each run fetches it again.
-- Pi installs the `git:` and git URL sources once, on the first run that lists them, and orc moves that copy to `$ORC_HOME/pi-packages/<key>/git`.
-  Each later run and each resume links `session/agent/git` to that folder, and Pi loads an installed git source there without fetching or writing it.
-  The key is a hash of the git sources, so a changed ref installs a new copy beside the old one.
+- Pi installs a `git:` or git URL source pinned to a ref, such as `git:github.com/acme/bridge@v1`, once, on the first run that lists it, and orc moves that copy to `$ORC_HOME/pi-packages/<key>`.
+  Each later run and each resume links `session/agent/git/<host>/<path>` to that folder, and Pi loads an installed git source there without fetching or writing it.
+  The key is a hash of the source, so a changed ref installs a new copy beside the old one, and orc never removes the old copy.
+- A git source with no ref follows its branch, so Pi clones it into each run's own folder, as it does an `npm:` source.
+- A source that failed to install stays out of `$ORC_HOME/pi-packages` until a later run installs it.
 - An absolute path to a package already on the machine, such as one under `~/.pi/agent/git`, loads without the fetch.
 - `env` names variables orc sets for the run's Pi over your environment, for the chat's Pi when `models.orchestrator` names this provider, for the planner's Pi when `models.planner` does, and for the decider's Pi when `models.decider` does, such as the `CLAUDE_CONFIG_DIR` of the account a Claude Code package runs on.
 - The nono sandbox carries only a Pi login, so a package provider runs only with `--sandbox none`.
