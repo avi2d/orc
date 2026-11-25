@@ -59,6 +59,6 @@ export const prepareAgents = (
       return yield* refuse("orc: node is not on the host PATH")
     }
     const host: HostTools = { piBinary, nodeBinary, homeDir: homedir() }
-    const plan = yield* planSandbox(fs, path, spawner, host, { projectDir: checkout.projectDir, runDir: folders.runDir, piAgentDir: folders.piAgentDir }, models, { config, provider, tokenFileFlag: pins.tokenFile }, sandboxKind)
+    const plan = yield* planSandbox(fs, path, spawner, host, { projectDir: checkout.projectDir, runDir: folders.runDir, piAgentDir: folders.piAgentDir, orcHome: home }, models, { config, provider, tokenFileFlag: pins.tokenFile }, sandboxKind)
     return { folders, agent, fixer, reviewer, plan }
   })
