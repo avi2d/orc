@@ -8,7 +8,7 @@ import type { HarnessProcess, HerdrPane } from "../sources/live-sessions";
 import type { QuotaAvailability, QuotaProviderId, QuotaWindow } from "../sources/quota";
 import { type QuotaRead, type QuotaReadings, sourcedEntries } from "../sources/quota-read";
 import type { SessionLogs, SinceByHarness } from "../sources/session-logs";
-import { type AccountJoin, callJoin, credentialKeyOf, keysOf, sameJoin } from "../sources/account-join";
+import { type AccountJoin, callJoin, credentialKeyOf, distinctJoins, keysOf } from "../sources/account-join";
 import { byPricedShare, type Estimate, estimate, hourMillis, rateSpanHours, spendGate, verdictBeforeReset, type Weighed, weighed } from "./estimate";
 import { accountTitle } from "./quotas";
 import { localMidnight, type SessionModels, sessionModelsSinceMidnight } from "./session-models";
@@ -288,10 +288,7 @@ const accountView = (
   joined: ReadonlyArray<{ readonly call: CountedCall; readonly join: AccountJoin }>,
   { entries, inputs, sessionsById }: AccountContext,
 ): AccountView => {
-  const joins = joined.reduce<ReadonlyArray<AccountJoin>>(
-    (seen, { join }) => (seen.some((known) => sameJoin(known, join)) ? seen : [...seen, join]),
-    [],
-  );
+  const joins = distinctJoins(joined.map(({ join }) => join));
   const head = {
     provider: entry.provider,
     accountKey: entry.accountKey,

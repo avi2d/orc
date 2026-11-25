@@ -23,7 +23,7 @@ const defaults: Options = {
 
 const parseOptions = (words: ReadonlyArray<string>): Effect.Effect<Options, BenchStartError> =>
   Effect.gen(function*() {
-    let options = defaults
+    const options = { ...defaults }
     for (let index = 0; index < words.length; index += 2) {
       const flag = words[index] ?? ""
       if (index + 1 >= words.length) {
@@ -35,11 +35,11 @@ const parseOptions = (words: ReadonlyArray<string>): Effect.Effect<Options, Benc
         if (!Number.isInteger(runs) || runs < 1) {
           return yield* new BenchStartError({ message: "--runs takes a whole number above 0, not " + value })
         }
-        options = { ...options, runs }
+        options.runs = runs
       } else if (flag === "--orc") {
-        options = { ...options, orc: value }
+        options.orc = value
       } else if (flag === "--standin") {
-        options = { ...options, standin: value }
+        options.standin = value
       } else {
         return yield* new BenchStartError({ message: "unknown option " + flag + "\n" + usage })
       }

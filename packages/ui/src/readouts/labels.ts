@@ -30,13 +30,19 @@ export const labelled = (label: Label, block: Block): Block =>
 // The reason is what a reader acts on, such as an ssh error, so it wraps under the label rather than ending in an ellipsis.
 export const failureRows = (label: Label, failure: Failed, width: number): Block => labelled(label, failureLines(failure, width - label.width));
 
-export const labelledReadings = (label: Label, readings: ReadonlyArray<Reading>, width: number): Block =>
-  readings.reduce<ReadonlyArray<Line>>((lines, { parts, tone }) => {
+export const labelledReadings = (label: Label, readings: ReadonlyArray<Reading>, width: number): Block => {
+  const lines: Array<Line> = [];
+  for (const { parts, tone } of readings) {
     const last = lines.at(-1);
     const whole = span(parts.join(" "), tone);
-    if (last !== undefined && lineWidth([...last, separator, whole]) <= width) return [...lines.slice(0, -1), [...last, separator, whole]];
+    if (last !== undefined && lineWidth([...last, separator, whole]) <= width) {
+      lines[lines.length - 1] = [...last, separator, whole];
+      continue;
+    }
     const rows = wrapParts(parts, width - label.width, " ").map(
       (text, index): Line => [...machineLabel(last === undefined && index === 0 ? label.text : "", label.width), span(text, tone)],
     );
-    return [...lines, ...rows];
-  }, []);
+    lines.push(...rows);
+  }
+  return lines;
+};
