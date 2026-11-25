@@ -2,6 +2,20 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.24.0
+
+Released 2026-11-25.
+
+### Features
+
+- **run:** attach compiled orc builds to each release [#355](https://github.com/avi2d/orc/pull/355)
+- **run:** pick models per task with dispatch rules [#354](https://github.com/avi2d/orc/pull/354)
+
+### Fixes
+
+- **run:** let a compiled orc update through its launcher [#357](https://github.com/avi2d/orc/pull/357)
+- **run:** settle routine questions and retry runs that died for a retryable reason [#356](https://github.com/avi2d/orc/pull/356)
+
 ## 0.23.0
 
 Released 2026-11-25.
