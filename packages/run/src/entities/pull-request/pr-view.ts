@@ -67,6 +67,18 @@ const checkVerdicts = (view: PullRequestView): ReadonlyArray<NamedVerdict> => {
 const namesWith = (verdicts: ReadonlyArray<NamedVerdict>, verdict: CheckVerdict): ReadonlyArray<string> =>
   verdicts.filter((entry) => entry.verdict === verdict).map((entry) => entry.name || "(unnamed check)")
 
+const failedRuns = (view: PullRequestView): ReadonlyArray<CheckRun> =>
+  newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry)).filter((run) => runVerdict(run) === "red")
+
+export const redCheckLinks = (view: PullRequestView): ReadonlyArray<string> =>
+  failedRuns(view).flatMap((run) => run.detailsUrl === undefined || run.detailsUrl === "" ? [] : [run.detailsUrl])
+
+export const redRuns = (view: PullRequestView): ReadonlyArray<{ readonly run: string; readonly name: string }> =>
+  failedRuns(view).flatMap((run) => {
+    const id = run.detailsUrl?.match(/\/actions\/runs\/(\d+)(?:\/|$)/)?.[1]
+    return id === undefined ? [] : [{ run: id, name: run.workflowName === undefined || run.workflowName === "" ? run.name : run.workflowName + "/" + run.name }]
+  })
+
 export const greenChecks = (view: PullRequestView): ReadonlyArray<string> => namesWith(checkVerdicts(view), "green")
 
 export const redChecks = (view: PullRequestView): ReadonlyArray<string> => namesWith(checkVerdicts(view), "red")

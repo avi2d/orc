@@ -3,7 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, ranClosing, taskPr, type TaskRecord } from "../../entities/backlog/index"
 import type { BeatAction, StalledAction } from "../../entities/attention/index"
 import type { ChatEvent, PrState } from "../../entities/events/index"
-import { pullRequestHeld, routePullRequest } from "../../entities/attention/index"
+import { pullRequestHeld, routePullRequestWithRetry } from "../../entities/attention/index"
 import { eventRecorded, readPrState, recordEvent, writePrState } from "../../entities/events/index"
 import { checkRefusals, greenChecks, type PullRequestView } from "../../entities/pull-request/index"
 import type { RunnerError } from "../../shared/process/index"
@@ -74,9 +74,9 @@ const recordObservation = (
   at: string,
   waits: Result.Result<ReadonlyArray<string> | null, BacklogError | RunnerError>,
   prState: PrState
-): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+): Effect.Effect<void, BacklogError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    yield* routePullRequest(root, task.spec.id, pr, view, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
+    yield* routePullRequestWithRetry(root, task, pr, view, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
     const event = prEvent(task, pr, view, at, yield* eventRecorded(root, task.spec.id + ".pr-ready"))
     if (event !== null) {
       yield* recordEvent(root, event)

@@ -133,6 +133,7 @@ const expectedFiles = [
   "src/entities/task-copy/index.ts",
   "src/entities/attention/beat-action.ts",
   "src/entities/attention/beat-items.ts",
+  "src/entities/attention/pull-request-retry.ts",
   "src/widgets/beat/beat-attention.ts",
   "src/widgets/beat/beat-route.ts",
   "src/widgets/beat/beat-update.ts",

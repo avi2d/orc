@@ -113,7 +113,11 @@ type TaskState =
   | { readonly kind: "started"; readonly claim: Claim; readonly started: Started }
   | ClosedState
 
+const CiRerun = Schema.Struct({ pr: Schema.String, runs: Schema.Array(Schema.String), at: Schema.String })
+export type CiRerun = typeof CiRerun.Type
+
 export interface TaskRecord {
+  readonly ciReruns?: ReadonlyArray<CiRerun>
   readonly spec: TaskSpec
   readonly hold: Hold | null
   readonly parked: Parked | null
@@ -205,7 +209,8 @@ const Frontmatter = Schema.Struct({
   reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),
   report: Schema.optional(Schema.String),
-  posted_at: Schema.optional(Schema.String)
+  posted_at: Schema.optional(Schema.String),
+  ci_reruns: Schema.optional(Schema.Array(CiRerun))
 })
 type Frontmatter = typeof Frontmatter.Type
 
@@ -374,6 +379,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
       return yield* new TaskFileError({ file, detail: "a closed task carries an unanswered parked question" })
     }
     return {
+      ...(front.ci_reruns === undefined ? {} : { ciReruns: front.ci_reruns }),
       spec: {
         id: front.id,
         title: front.title,

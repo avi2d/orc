@@ -48,14 +48,14 @@ const claim = { beat: "beat-1", machine: "worker", account: "main", takenAt: "20
 
 const closeWithPr = async (root: string): Promise<void> => {
   await run(addTask(root, spec))
-  await run(claimTask(root, "task-1"))
-  const task = await run(findTask(root, "task-1"))
+  await run(claimTask(root, "orc-1"))
+  const task = await run(findTask(root, "orc-1"))
   await run(writeTaken(root, { ...task, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: "/tmp/task.log" } } }))
-  await run(closeStartedTask(root, "task-1", "done", "", { pr, report: null }, "2026-10-27T11:00:00.000Z"))
+  await run(closeStartedTask(root, "orc-1", "done", "", { pr, report: null }, "2026-10-27T11:00:00.000Z"))
 }
 
 const route = async (root: string, asked: Array<ReadonlyArray<string>>, view = red): Promise<void> => {
-  const task = await run(findTask(root, "task-1"))
+  const task = await run(findTask(root, "orc-1"))
   await Effect.runPromise(routePullRequestWithRetry(root, task, pr, view, "2026-10-27T12:00:00.000Z").pipe(Effect.provide(Layer.merge(BunServices.layer, recording(asked)))))
 }
 
@@ -69,7 +69,7 @@ describe("a red check on a ship task's PR", () => {
       expect(await run(openItems(root))).toEqual([])
       const events = await readdir(join(root, "events"))
       expect(events).toHaveLength(1)
-      expect(JSON.parse(await readFile(join(root, "events", events[0] ?? ""), "utf8"))).toMatchObject({ text: "task-1 Fix the login page: orc reran the failed jobs of ci/test on " + pr })
+      expect(JSON.parse(await readFile(join(root, "events", events[0] ?? ""), "utf8"))).toMatchObject({ text: "orc-1 Fix the login page: orc reran the failed jobs of ci/test on " + pr })
     })
   })
 
@@ -101,11 +101,11 @@ describe("a red check on a ship task's PR", () => {
       await closeWithPr(root)
       const asked: Array<ReadonlyArray<string>> = []
       await route(root, asked)
-      await run(sendBackClosedTask(root, "task-1", "fix it", "2026-10-27T12:10:00.000Z", { machine: "worker", run: "run-1", pr }))
-      await run(claimTask(root, "task-1"))
-      const task = await run(findTask(root, "task-1"))
+      await run(sendBackClosedTask(root, "orc-1", "fix it", "2026-10-27T12:10:00.000Z", { machine: "worker", run: "run-1", pr }))
+      await run(claimTask(root, "orc-1"))
+      const task = await run(findTask(root, "orc-1"))
       await run(writeTaken(root, { ...task, state: { kind: "started", claim, started: { at: "2026-10-27T12:11:00.000Z", log: "/tmp/task.log" } } }))
-      await run(closeStartedTask(root, "task-1", "done", "", { pr, report: null }, "2026-10-27T12:12:00.000Z"))
+      await run(closeStartedTask(root, "orc-1", "done", "", { pr, report: null }, "2026-10-27T12:12:00.000Z"))
       await route(root, asked)
       expect(asked).toHaveLength(1)
       expect((await run(openItems(root)))[0]?.item.text).toContain(details)

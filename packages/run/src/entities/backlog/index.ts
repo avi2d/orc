@@ -29,6 +29,7 @@ export {
   closeStartedTask,
   answeredOnly,
   markPosted,
+  markCiRerun,
   rewriteNew,
   rewriteTaken,
   findTask,

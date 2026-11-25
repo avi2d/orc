@@ -112,6 +112,7 @@ export const renderTaskFile = (record: TaskRecord): string =>
     field("depends_on", record.spec.dependsOn),
     ...(record.spec.priority === null ? [] : [field("priority", record.spec.priority)]),
     field("created", record.spec.created),
+    ...(record.ciReruns === undefined ? [] : [field("ci_reruns", record.ciReruns)]),
     ...holdFields(record.hold),
     ...parkedFields(record.parked),
     ...stateFields(record),
