@@ -85,6 +85,17 @@ const forgeSteps = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
 const sentBackTask = (fixture: Fixture): Promise<string> => readFile(join(fixture.home, "backlog", "new", "orc-1.md"), "utf8")
 
 describe("orc merge compares the two sides of a PR behind its base", () => {
+  test("records the approved head and checks-running stage instead of leaving the closed task unchanged", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1 })
+      const result = await runOrc(fixture, ["merge", "orc-1", "--basis", "captain-word", "--no-wait"])
+      expect(result.exitCode).toBe(0)
+      const text = await taskFile(fixture)
+      const front: unknown = Bun.YAML.parse(text.split("---\n")[1])
+      expect(front).toMatchObject({ merge: { basis: "captain-word", head, green: ["lint", "test"], stage: "checks-running" } })
+    })
+  }, 60_000)
   test("updates a disjoint PR rejected as out of date instead of refusing every retry", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await closedWithPr(fixture)
