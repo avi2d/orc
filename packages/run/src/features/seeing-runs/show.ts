@@ -206,13 +206,7 @@ export const formatShow = (document: ShowJsonDocument): string => {
   for (const step of document.steps) {
     lines.push("")
     lines.push("step " + step.name + " #" + step.attempt.toString() + ": " + step.status)
-    if (step.from !== null) {
-      lines.push("  from run " + step.from)
-    }
-    const reusedFrom = step.signals.find((signal) => signal.name === "review-reused-from")?.value
-    if (reusedFrom !== undefined) {
-      lines.push("  reused from run " + reusedFrom)
-    }
+    lines.push(...originLines(step))
     lines.push(...timingLines(step))
     lines.push("  agent: " + (step.agentFile === null ? "none" : toFileUrl(step.agentFile)))
     lines.push("  session: " + (step.piSessionFile === null ? "none" : toFileUrl(step.piSessionFile)))
@@ -228,6 +222,14 @@ export const formatShow = (document: ShowJsonDocument): string => {
     }
   }
   return lines.join("\n")
+}
+
+const originLines = (step: Pick<ShowJsonDocument["steps"][number], "from" | "signals">): ReadonlyArray<string> => {
+  const reusedFrom = step.signals.find((signal) => signal.name === "review-reused-from")?.value
+  return [
+    ...(step.from === null ? [] : ["  from run " + step.from]),
+    ...(reusedFrom === undefined ? [] : ["  reused from run " + reusedFrom])
+  ]
 }
 
 const timingLines = (step: Pick<ShowJsonDocument["steps"][number], "model" | "started" | "ended">): ReadonlyArray<string> => {
