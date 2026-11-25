@@ -6,7 +6,7 @@ import { join } from "node:path"
 export const askToolName = "orc_ask"
 export const askDirFlag = "orc-ask-dir"
 export const replySuffix = ".reply.json"
-export const askSuffix = ".ask.json"
+const askSuffix = ".ask.json"
 const deliveredSuffix = ".delivered"
 const pollMillis = 1000
 

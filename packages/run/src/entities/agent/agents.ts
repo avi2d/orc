@@ -1,5 +1,9 @@
 import { Data, Effect, FileSystem, Path } from "effect"
 import type { PlatformError } from "effect/PlatformError"
+import deciderPolicyFile from "../../../agents/decider-policy.md" with { type: "file" }
+import fixerFile from "../../../agents/fixer.md" with { type: "file" }
+import implementerFile from "../../../agents/implementer.md" with { type: "file" }
+import reviewerFile from "../../../agents/reviewer.md" with { type: "file" }
 
 export class AgentFileError extends Data.TaggedError("AgentFileError")<{
   readonly message: string
@@ -132,18 +136,24 @@ const readIfPresent = (
     )
   )
 
-export const bundledAgentsDir = (): string => import.meta.dir + "/../../../agents"
+export const bundledAgentFiles: Readonly<Record<AgentKind, string>> = {
+  implementer: implementerFile,
+  fixer: fixerFile,
+  reviewer: reviewerFile
+}
+
+export const bundledDeciderPolicyFile: string = deciderPolicyFile
 
 export const agentFileCandidates = (
   path: Path.Path,
   kind: AgentKind,
   projectDir: string,
   orcHome: string,
-  agentsDir: string = bundledAgentsDir()
+  agentsDir?: string
 ): ReadonlyArray<AgentFileLocation> => [
   { kind, path: path.join(orcHome, "agents", kind + ".md"), source: "personal" },
   { kind, path: path.join(projectDir, ".orc", "agents", kind + ".md"), source: "project" },
-  { kind, path: path.join(agentsDir, kind + ".md"), source: "bundled" }
+  { kind, path: agentsDir === undefined ? bundledAgentFiles[kind] : path.join(agentsDir, kind + ".md"), source: "bundled" }
 ]
 
 export const resolveAgentFile = (

@@ -3,6 +3,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { boardsVar } from "./chat-board"
 import { orcCommandVar } from "./chat-run"
 import { chatToolNames } from "./chat-tools"
+import { chatToolsBundle } from "./chat-tools-bundle"
 import { backlogPaths } from "../../entities/backlog/index"
 import { type LoadedInstructions, type OrcRules, readInstructions, readOrcRules } from "../../entities/orc-rules/index"
 import { type ProjectInstructions, providerEnvOf, readOrcConfig } from "../../shared/config/index"
@@ -17,7 +18,22 @@ interface ChatLaunch {
   readonly env: Record<string, string>
 }
 
-const chatToolsFile = import.meta.dir + "/chat-tools.ts"
+const chatToolsSource = import.meta.dir + "/chat-tools.ts"
+
+// Pi runs outside the compiled orc and cannot read its embedded files, so orc writes the bundle into the orc home first.
+const placeChatTools = (orcHome: string): Effect.Effect<string, ChatError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    if (chatToolsBundle === null) {
+      return chatToolsSource
+    }
+    const fs = yield* FileSystem.FileSystem
+    const placed = orcHome + "/chat-tools.js"
+    yield* fs.readFileString(chatToolsBundle).pipe(
+      Effect.flatMap((bundle) => fs.writeFileString(placed, bundle)),
+      Effect.mapError((error) => new ChatError({ message: "orc chat: cannot write the chat tools to " + placed + ": " + error.message }))
+    )
+    return placed
+  })
 
 const chatRules = (orcHome: string): Effect.Effect<OrcRules, ChatError, FileSystem.FileSystem> =>
   readOrcRules(orcHome).pipe(Effect.mapError((error) => new ChatError({ message: "orc chat: " + error.message })))
@@ -36,13 +52,13 @@ const instructionsWords = (rules: OrcRules, instructions: ReadonlyArray<ProjectI
 const instructionsPrompt = (entry: LoadedInstructions): string =>
   "The instructions file for the project " + entry.project + ", " + entry.file + ":\n\n" + entry.text
 
-const chatLaunch = (orcHome: string, model: string, rules: OrcRules, instructions: ReadonlyArray<LoadedInstructions>, self: Command, sessionFile: string | null): ChatLaunch => ({
+const chatLaunch = (orcHome: string, chatTools: string, model: string, rules: OrcRules, instructions: ReadonlyArray<LoadedInstructions>, self: Command, sessionFile: string | null): ChatLaunch => ({
   command: [
     "pi",
     "--model",
     model,
     "--extension",
-    chatToolsFile,
+    chatTools,
     "--tools",
     chatToolNames.join(","),
     ...(rules.kind === "loaded" ? ["--append-system-prompt", rules.file] : []),
@@ -70,7 +86,8 @@ export const runChat = (
     yield* Console.log(rulesWords(rules) + instructionsWords(rules, instructions))
     // Pi reads a value with no slash and no .jsonl as a session id to search for, and an absolute path is always a file.
     const absoluteSession = sessionFile === null ? null : (yield* Path.Path).resolve(sessionFile)
-    const launch = chatLaunch(orcHome, model, rules, instructions, self, absoluteSession)
+    const chatTools = yield* placeChatTools(orcHome)
+    const launch = chatLaunch(orcHome, chatTools, model, rules, instructions, self, absoluteSession)
     const [program, ...args] = launch.command
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     // extendEnv lays this over the shell's environment, so the provider's env wins over an exported variable.

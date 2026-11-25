@@ -7,7 +7,8 @@ export class AppInstallError extends Data.TaggedError("AppInstallError")<{
   readonly detail: string
 }> {}
 
-export const bundledAppDir = (): string => import.meta.dir + "/../../../dist/herdr-app"
+export const bundledAppDir = (): string =>
+  Bun.isStandaloneExecutable ? process.execPath.replace(/[\\/][^\\/]*$/, "/herdr-app") : import.meta.dir + "/../../../dist/herdr-app"
 
 export const herdrAppSourceDir = (): string => import.meta.dir + "/../../../../herdr-app"
 
@@ -114,12 +115,11 @@ const replace = (fs: FileSystem.FileSystem, from: string, to: string): Effect.Ef
   )
 
 // Rebuilt on every install when the sources are present, so a build left by an older checkout is never copied.
-export const readyBundledApp = (source: string, bundled: string): Effect.Effect<string, AppInstallError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+export const readyBundledApp = (source: string | null, bundled: string): Effect.Effect<string, AppInstallError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const hasSources = yield* fs.exists(path.join(source, "mods")).pipe(Effect.orElseSucceed(() => false))
-    if (!hasSources) {
+    if (source === null || !(yield* fs.exists(path.join(source, "mods")).pipe(Effect.orElseSucceed(() => false)))) {
       return bundled
     }
     const built = yield* capture([process.execPath, path.join(source, "scripts", "build.ts"), bundled], null).pipe(
