@@ -75,5 +75,5 @@ Otherwise the panel names the processes that share the folder, and the folder's 
 
 To print the versioned JSON report, run `orc-dash report session-quota`.
 To print the report merged with a second machine's, run `orc-dash report session-quota-composed`.
-To stream flag alerts as JSON lines, run `bun run session-quota-alerts`.
+To stream flag alerts as JSON lines, run `orc-dash report session-quota-alerts`.
 [Read the JSON report](json-report.md), [Compose two machines](compose-two-machines.md) and [Tail the alert stream](alert-stream.md) document both reports, the alert stream and how to configure the second machine.
