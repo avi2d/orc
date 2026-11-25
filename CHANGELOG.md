@@ -2,6 +2,23 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.22.0
+
+Released 2026-11-25.
+
+### Features
+
+- **run:** build the heavy stand-in as a Bun bytecode binary [#345](https://github.com/avi2d/orc/pull/345)
+- **run:** close parked tasks whose work merged elsewhere [#348](https://github.com/avi2d/orc/pull/348)
+- **herdr-app:** show user-owned attention with answers on the card [#347](https://github.com/avi2d/orc/pull/347)
+- **run:** merge a done task's green PR by itself on yolo projects [#338](https://github.com/avi2d/orc/pull/338)
+- **herdr-app:** replace Runs filter chips with Project and Status selects [#341](https://github.com/avi2d/orc/pull/341)
+
+### Fixes
+
+- **run:** read bundled assets from the compiled orc [#340](https://github.com/avi2d/orc/pull/340)
+- **run:** reuse a completed review when a resumed direct-PR run's branch is unchanged [#342](https://github.com/avi2d/orc/pull/342)
+
 ## 0.21.0
 
 Released 2026-11-24.
