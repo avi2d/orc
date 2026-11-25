@@ -23,16 +23,17 @@ Its policy is in `packages/run/agents/decider-policy.md`.
 
 No-mistakes names the action it asks of you in the `question_action` column of each `ask-user` finding and each `question-<id>` finding.
 Orc carries that value through `asking.json`, the run history and the parked question in the task file.
-When a review finding has no `question_action`, orc sends it to the decider without checking its description.
-For a review finding, `question_action` values `none` and `unknown` also bypass the description check.
-For a review question, a missing or `unknown` action falls back to the topic check on its text.
+A review finding is a row of the no-mistakes findings table, and a review question is a `question-<id>` row.
+Orc's own `gate-cap` and `ci-waiting` questions count as review questions.
+No-mistakes writes `unknown` for an `ask-user` finding its reviewer did not classify.
+A review finding with no `question_action`, or with `none` or `unknown`, goes to the decider without a topic check, because a finding describes code.
+A review question with a missing or `unknown` action falls back to the topic check on its text.
 The action `none` bypasses the topic check.
 The actions `merge`, `delete`, `login`, `push`, and `release` go to you.
 Any other action value goes to you because orc does not know it.
 
 ### The topic check
 
-No-mistakes writes `unknown` for an `ask-user` finding its reviewer did not classify.
 The topic check sends questions about deletion, security, credentials, merging, pushing, releasing, going public, spending, irreversible actions, site appearance, legal text, and logins to you.
 For a worker question, or a review question with a missing or `unknown` action, it reads the whole question, including context and reports of completed actions.
 Those questions go to you if they name `merge conflicts` or say a step pushes a tag, even if they only ask whether to continue.
@@ -74,7 +75,7 @@ When the decider still escalates a question with that line on one of those two b
 An escalation on any other bullet, or with no bullet, stays with you, and so does a question on the topic list above.
 When the decider answers a question on that Rules sentence, orc records the question's `Recommended:` option as the answer, whatever option the reply named.
 Orc escalates such an answer to a question with no `Recommended:` line.
-The rule and the override apply to review questions and worker questions alike, once they pass the topic check.
+The rule and the override apply to worker questions, review questions and review findings alike, once they reach the decider.
 
 ### Settle routine review findings
 
