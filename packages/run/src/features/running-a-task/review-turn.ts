@@ -4,23 +4,7 @@ import { runGit } from "../../shared/process/index"
 import type { HistoryRun } from "./run-record"
 import { OrcRunError } from "../../shared/lib/index"
 import type { AgentRunResult, SandboxOps } from "./run-ops"
-
-const ReviewFinding = Schema.Struct({
-  id: Schema.String,
-  file: Schema.String,
-  line: Schema.NullOr(Schema.Int),
-  severity: Schema.Literals(["blocker", "major", "minor"]),
-  action: Schema.String,
-  description: Schema.String
-})
-
-const ReviewFindings = Schema.Array(ReviewFinding)
-
-type ReviewFinding = typeof ReviewFinding.Type
-
-const RecordedReview = Schema.Struct({ status: Schema.Literal("passed"), findings: ReviewFindings, file: Schema.String })
-
-export type ReviewOutcome = typeof RecordedReview.Type | { readonly status: "failed"; readonly reason: string }
+import { RecordedReview, ReviewFindings, type ReviewFinding, type ReviewOutcome } from "./review-outcome"
 
 const ReviewCheckpoint = Schema.Struct({ head: Schema.String, outcome: RecordedReview })
 const decodeCheckpoint = Schema.decodeUnknownOption(Schema.fromJsonString(ReviewCheckpoint))

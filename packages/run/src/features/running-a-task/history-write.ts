@@ -13,7 +13,7 @@ import { ciWaitingQuestionId, type AgentStep, type ResumePlan, type RunCheckpoin
 import type { AgentFile } from "../../entities/agent/index"
 import { liveAskQuestions, type AskSetup } from "../../entities/agent/index"
 import { taskOfBranch } from "../../entities/backlog/index"
-import type { ReviewOutcome } from "./review-turn"
+import type { ReviewOutcome } from "./review-outcome"
 
 type StepAgent = Pick<AgentFile, "model" | "thinking">
 

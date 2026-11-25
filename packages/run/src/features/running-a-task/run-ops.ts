@@ -5,7 +5,7 @@ import type { OrcRunError } from "../../shared/lib/index"
 import type { AllowWord, NoMistakesRecord, OpenQuestion, QuestionAnswer } from "../../entities/review-gate/index"
 import type { DirectPrRecord } from "../../entities/pull-request/index"
 import type { ChecksRoundSummary, OrcRunCommit, RecordedFixAttempt } from "./run-record"
-import type { ReviewOutcome } from "./review-turn"
+import type { ReviewOutcome } from "./review-outcome"
 
 export interface AgentRun {
   readonly agent: AgentFile
