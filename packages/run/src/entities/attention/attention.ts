@@ -72,22 +72,22 @@ export const openReviewQuestions = (
     return Effect.asVoid(openItem(root, item.id, item.asked))
   }, { discard: true })
 
-export const openOrRefreshItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    if (yield* openItem(root, id, asked)) {
+type ItemWrite = (root: string, id: string, asked: Asked) => Effect.Effect<void, BacklogError, FileSystem.FileSystem>
+
+const whenAlreadyOpened = (onExisting: ItemWrite): ItemWrite => (root, id, asked) =>
+  Effect.flatMap(openItem(root, id, asked), (opened) => opened ? Effect.void : onExisting(root, id, asked))
+
+export const openOrRefreshItem: ItemWrite = whenAlreadyOpened((root, id, asked) =>
+  withItemClaim(root, id, Effect.gen(function*() {
+    const item = yield* readItem(root, id)
+    if (item === null || item.state.kind === "closed" || (item.state.kind === "open" && item.text === asked.text && item.owner === asked.owner)) {
       return
     }
-    yield* withItemClaim(root, id, Effect.gen(function*() {
-      const item = yield* readItem(root, id)
-      if (item === null || item.state.kind === "closed" || (item.state.kind === "open" && item.text === asked.text && item.owner === asked.owner)) {
-        return
-      }
-      const next: AttentionItem = item.state.kind === "withdrawn"
-        ? { ...asked, state: { kind: "open" } }
-        : { ...item, text: asked.text, owner: asked.owner, ...choiceOf(asked) }
-      yield* writeItem(root, id, yield* encodeItem(id, next))
-    }))
-  })
+    const next: AttentionItem = item.state.kind === "withdrawn"
+      ? { ...asked, state: { kind: "open" } }
+      : { ...item, text: asked.text, owner: asked.owner, ...choiceOf(asked) }
+    yield* writeItem(root, id, yield* encodeItem(id, next))
+  })))
 
 type CloseOutcome = "closed" | "already closed" | "missing"
 
@@ -224,16 +224,13 @@ const overdueWait = (task: TaskRecord, at: string): { readonly id: string; reado
 }
 
 // openItem publishes once and cannot rewrite a withdrawn item, so this rewrites it open with the text the task asks now.
-const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+const openOrReopenTaskItem: ItemWrite = whenAlreadyOpened((root, id, asked) =>
   Effect.gen(function*() {
-    if (yield* openItem(root, id, asked)) {
-      return
-    }
     const existing = yield* readExistingItem(root, id)
     if (existing !== null && existing.item.state.kind === "withdrawn") {
       yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, ...choiceOf(asked), state: { kind: "open" } }))
     }
-  })
+  }))
 
 // The task file holds the answer that stands, so an item closed on the answer it replaced takes the new one and keeps the old one.
 const overturnClosedItem = (root: string, id: string, existing: { readonly before: string; readonly item: AttentionItem }, answer: ItemAnswer): Effect.Effect<CloseOutcome, BacklogError, FileSystem.FileSystem> =>
