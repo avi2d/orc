@@ -26,6 +26,7 @@ const quota = {
     { name: "code-low", provider: "code", remainingPercent: 19 },
     { name: "code-at-floor", provider: "code", remainingPercent: 20 },
     { name: "review", provider: "review", remainingPercent: 40 },
+    { name: "research-less", provider: "research", remainingPercent: 50 },
     { name: "research", provider: "research", remainingPercent: 99 }
   ]
 }
@@ -89,6 +90,39 @@ test("a design task uses Fable only with room on its account and falls back to O
   expect(resolveDispatch(design, task, designQuota(19))).toEqual({
     kind: "routed", account: "standard", models: { implementer: "claude/opus" }
   })
+})
+
+test("an explicit task account pin does not choose a roomier sibling or spill onto the default", () => {
+  const pinned = decode({
+    rules: [{ when: {}, candidates: ["code/worker"] }],
+    default: ["code/default"],
+    tasks: { "editor-1": { model: { account: "fable-access", models: { implementer: "claude/fable", fixer: "claude/repair", reviewer: "claude/check" } } } }
+  })
+  const accounts = [
+    { name: "fable-access", provider: "claude", remainingPercent: 50 },
+    { name: "standard", provider: "claude", remainingPercent: 70 },
+    { name: "coder", provider: "code", remainingPercent: 90 }
+  ]
+  expect(resolveDispatch(pinned, task, { floorPercent: 20, accounts })).toEqual({
+    kind: "routed", account: "fable-access",
+    models: { implementer: "claude/fable", fixer: "claude/repair", reviewer: "claude/check" }
+  })
+  for (const unavailable of [
+    accounts.filter((entry) => entry.name !== "fable-access"),
+    accounts.map((entry) => entry.name === "fable-access" ? { ...entry, remainingPercent: 19 } : entry),
+    accounts.map((entry) => entry.name === "fable-access" ? { ...entry, remainingPercent: 0 } : entry)
+  ]) {
+    expect(resolveDispatch(pinned, task, { floorPercent: 20, accounts: unavailable })).toEqual({
+      kind: "waits", reason: "no account has room for the pinned model claude/fable"
+    })
+  }
+})
+
+test.each(["fixer", "reviewer"] as const)("a task pin rejects a %s on another provider instead of accepting an unusable credential route", (role) => {
+  expect(() => decode({
+    rules: [], default: ["code/default"],
+    tasks: { "editor-1": { model: { models: { implementer: "code/worker", [role]: "review/opus" } } } }
+  })).toThrow("the implementer, fixer, and reviewer must use one provider")
 })
 
 test("routing settings reject a candidate that would use a credential on another provider", () => {

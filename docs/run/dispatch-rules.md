@@ -19,12 +19,13 @@ Decision tasks never run, so dispatch rules do not apply to them.
 | `when.project` | The project's name in `projects.json`. |
 | `when.category` | The category set in `tasks.<id>.category`. |
 | `when.minEstimatedLines` | The minimum estimated changed lines, inclusive. A task without `tasks.<id>.estimatedLines` does not match. |
-| `tasks.<id>.model` | A model pin that replaces both the rules and the default for this task. |
+| `tasks.<id>.model` | A string or object candidate that replaces both the rules and the default for this task. |
 | `tasks.<id>.estimatedLines` | A whole number of changed lines you expect. Orc does not estimate it. |
 
 The first matching rule supplies the candidate list.
 If none of its candidates has an eligible account, the task waits rather than moving to another rule or the default.
-A pinned task waits if the pinned model's provider has no eligible account.
+A pinned task waits if its candidate has no eligible account.
+An object pin can name an account and role models, with the same fields as an object candidate.
 
 ## Candidates and quota
 
@@ -39,20 +40,22 @@ All models in a candidate must use the same provider.
 Orc takes the account on that provider with the most quota above zero and at or above `quota.floorPercent`.
 An object candidate with `account` considers only that account.
 The named account must exist in `quota.accounts`, and its provider must match the candidate's models.
-Orc refuses the dispatch configuration if either check fails.
+Orc refuses the dispatch configuration if either check fails or a candidate's provider has no quota account.
+These checks also apply to task pins.
 If no account qualifies, Orc tries the next candidate.
 Each provider in use must appear in `config.json` and have a quota account in `dispatch.json`.
 Once a run starts, Orc does not retry it on another candidate if the chosen model fails.
 The quota reading does not check whether an account can run a particular model.
-For a model that only some accounts can run, name one of those accounts in the candidate.
+For a model that only some accounts can run, name one of those accounts in the candidate or task pin.
+With routing, quota text reports per-task account selection, and quota JSON leaves `pick` null.
 
 ## Model overrides
 
 For a run started by dispatch rules, each role uses its own model override.
-The implementer and fixer each use their model flag first, then their agent file's model, then the routed model.
+The implementer and fixer each use their agent file's model first, then their model flag, then the routed model.
 `orc runner start` passes `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` as the corresponding model flags.
 A reviewer agent file's model takes precedence over the routed reviewer model.
-Without routing, an agent file's model still takes precedence over a model flag.
+Without routing, the same order applies, with the configured model as the default.
 All the final models must use the provider of the chosen quota account.
 To pin a different provider, use `tasks.<id>.model` so the beat can choose the matching account.
 
@@ -87,7 +90,8 @@ The task ID, category, account, and model names reflect the projects, quota acco
     "tasks": {
       "editor-10": { "category": "design" },
       "editor-11": { "category": "specified", "estimatedLines": 175 },
-      "editor-12": { "model": "openai/gpt-6.2-sol" }
+      "editor-12": { "model": "openai/gpt-6.2-sol" },
+      "editor-13": { "model": { "account": "fable-access", "models": { "implementer": "claude-bridge/claude-fable-5-2" } } }
     }
   }
 }

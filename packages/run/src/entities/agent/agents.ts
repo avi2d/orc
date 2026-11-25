@@ -184,8 +184,8 @@ interface AgentDefaults {
   readonly thinking?: PiThinkingLevel | undefined
 }
 
-export const finishAgentFile = (parsed: ParsedAgentFile, defaults: AgentDefaults, pin?: string): Effect.Effect<AgentFile, AgentFileError> => {
-  const model = pin ?? parsed.model ?? defaults.configModel.model
+export const finishAgentFile = (parsed: ParsedAgentFile, defaults: AgentDefaults): Effect.Effect<AgentFile, AgentFileError> => {
+  const model = parsed.model ?? defaults.configModel.model
   return model === undefined
     ? fail(parsed.path, "names no model and " + defaults.configModel.file + " names no " + parsed.kind + " model, so name one in either")
     : Effect.succeed({ ...parsed, model, thinking: defaults.thinking ?? parsed.thinking })

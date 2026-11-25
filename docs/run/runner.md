@@ -17,11 +17,8 @@ A token account also supplies `--token-file`.
 
 `ORC_TASK_ROUTED_MODELS` holds the routed models as JSON, with a required `implementer` and optional `fixer` and `reviewer`.
 The runner preserves these models for `orc run`.
-Each role uses its agent file's model before the routed model.
-For the implementer and fixer, a corresponding `ORC_TASK_IMPLEMENTER_MODEL` or `ORC_TASK_FIXER_MODEL` override takes precedence over the agent file when routing is set.
-
-Without routing, `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` select the run's models.
-A model in an agent file takes precedence over these variables.
+`ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` select the corresponding role's model before the routed or configured default.
+Each role uses its agent file's model before these variables and defaults.
 When all three model variables are empty, the run uses its config or agent files.
 If your custom start command forwards a task to another machine, forward all three model variables.
 

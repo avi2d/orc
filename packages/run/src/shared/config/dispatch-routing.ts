@@ -29,7 +29,7 @@ const Match = Schema.Struct({
 })
 
 const TaskRouting = Schema.Struct({
-  model: Schema.optionalKey(ModelRef),
+  model: Schema.optionalKey(Candidate),
   category: Schema.optionalKey(Name),
   estimatedLines: Schema.optionalKey(EstimatedLines)
 })
@@ -87,5 +87,5 @@ export const resolveDispatch = (
       return { kind: "routed", account: account.name, models: route.models }
     }
   }
-  return { kind: "waits", reason: pin === undefined ? "no account has room for the dispatch route" : "no account has room for the pinned model " + pin }
+  return { kind: "waits", reason: pin === undefined ? "no account has room for the dispatch route" : "no account has room for the pinned model " + (typeof pin === "string" ? pin : pin.models.implementer) }
 }

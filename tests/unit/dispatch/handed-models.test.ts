@@ -126,9 +126,9 @@ describe("models the beat hands to orc run", () => {
   test.each([
     ["implementer", false, ["keyed/file", "keyed/config-repair", "keyed/config-repair"]],
     ["fixer", false, ["keyed/config-worker", "keyed/file", "keyed/file"]],
-    ["implementer", true, ["keyed/flag", "keyed/repair", "keyed/repair"]],
-    ["fixer", true, ["keyed/worker", "keyed/flag", "keyed/flag"]]
-  ] as const)("a %s flag with routing %s does not change another role or unrouted file precedence", async (role, routed, expected) => {
+    ["implementer", true, ["keyed/file", "keyed/repair", "keyed/repair"]],
+    ["fixer", true, ["keyed/worker", "keyed/file", "keyed/file"]]
+  ] as const)("a %s flag with routing %s does not override its agent file or change another role", async (role, routed, expected) => {
     const root = await mkdtemp(join(tmpdir(), "orc-role-precedence-"))
     try {
       await mkdir(join(root, "agents"))

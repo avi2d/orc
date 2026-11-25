@@ -331,16 +331,25 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
         const routing = yield* Schema.decodeUnknownEffect(DispatchRouting)(config.routing, { onExcessProperty: "error" }).pipe(
           Effect.mapError((error) => new ConfigError({ file, detail: "routing: " + error.message }))
         )
-        for (const candidate of [...routing.rules.flatMap((rule) => rule.candidates), ...routing.default]) {
-          if (typeof candidate === "string" || candidate.account === undefined) continue
-          const account = accounts.find((entry) => entry.name === candidate.account)
-          if (account === undefined) {
-            return yield* new ConfigError({ file, detail: "routing names the unknown account " + candidate.account })
-          }
-          const provider = providerOf(quota, account)
-          const model = candidate.models.implementer
-          if (provider !== providerOfModel(model)) {
-            return yield* new ConfigError({ file, detail: "routing names the account " + account.name + " on provider " + provider + " with model " + model + " from another provider" })
+        const candidates = [
+          ...routing.rules.flatMap((rule) => rule.candidates),
+          ...routing.default,
+          ...Object.values(routing.tasks ?? {}).flatMap((task) => task.model === undefined ? [] : [task.model])
+        ]
+        for (const candidate of candidates) {
+          const model = typeof candidate === "string" ? candidate : candidate.models.implementer
+          const provider = providerOfModel(model)
+          if (typeof candidate !== "string" && candidate.account !== undefined) {
+            const account = accounts.find((entry) => entry.name === candidate.account)
+            if (account === undefined) {
+              return yield* new ConfigError({ file, detail: "routing names the unknown account " + candidate.account })
+            }
+            const accountProvider = providerOf(quota, account)
+            if (provider !== accountProvider) {
+              return yield* new ConfigError({ file, detail: "routing names the account " + account.name + " on provider " + accountProvider + " with model " + model + " from another provider" })
+            }
+          } else if (!accounts.some((account) => providerOf(quota, account) === provider)) {
+            return yield* new ConfigError({ file, detail: "routing names the provider " + provider + ", which has no quota account" })
           }
         }
         return { machines, quota, routing }

@@ -379,7 +379,7 @@ export const runBeat = (
     const config = yield* readDispatchConfig(paths.dispatchConfig)
     const projects = yield* readProjects(paths.projects, config.machines)
     yield* ensureBacklog(root)
-    const quota = yield* readQuota(config.quota)
+    const quota = yield* readQuota({ ...config.quota, perTaskRouting: config.routing !== undefined })
     const tasks = yield* listTasks(root)
     const merged = yield* mergedIds(root)
     const context: BeatContext = {
