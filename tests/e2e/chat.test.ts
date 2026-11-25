@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { readFile, rename, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { Schema } from "effect"
+import { BunServices } from "@effect/platform-bun"
+import { Deferred, Effect, Fiber, Layer, Schema } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { runChat } from "../../packages/run/src/features/chat/chat"
 import { binPath, type Fixture, orchestratorConfig, piFor, runOrc, sessionFor, until, withFixture } from "./chat-helpers"
+
+const loginProvider = { id: "opencode-go", credential: "pi-login", nono: { upstream: "https://example.com/v1" } }
 
 const chatToolsPath = new URL("../../packages/run/src/features/chat/chat-tools.ts", import.meta.url).pathname
 
@@ -46,7 +52,7 @@ describe("orc chat", () => {
         "--extension",
         chatToolsPath,
         "--tools",
-"orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_priority,orc_machines,orc_backlog_stop,orc_backlog_drop,orc_backlog_send_back,orc_backlog_note,orc_backlog_depend,orc_backlog_thread,orc_backlog_edit,orc_backlog_answer,orc_attention,orc_attention_answer,merge_task,orc_decision_board",
+"orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_priority,orc_machines,orc_backlog_stop,orc_backlog_retry,orc_backlog_drop,orc_backlog_send_back,orc_backlog_note,orc_backlog_depend,orc_backlog_thread,orc_backlog_edit,orc_backlog_answer,orc_attention,orc_attention_answer,merge_task,orc_decision_board",
         "ORC_CHAT_ORC=" + JSON.stringify([process.execPath, binPath]),
         "ORC_CHAT_BOARDS=" + join(fixture.home, "boards")
       ])
@@ -235,4 +241,53 @@ describe("orc chat tools", () => {
       expect(await Bun.file(join(fixture.home, "backlog", "new", "orc-1.md")).exists()).toBe(false)
     })
   }, 60_000)
+})
+
+const processGroup = async (pid: number): Promise<number> => Number((await Bun.$`ps -o pgid= -p ${pid}`.text()).trim())
+
+const hangUpChat = async () => {
+  const home = await mkdtemp(join(tmpdir(), "orc-chat-"))
+  try {
+    await writeFile(join(home, "config.json"), JSON.stringify({ providers: [loginProvider], models: { orchestrator: "opencode-go/model" } }))
+    return await Effect.runPromise(Effect.gen(function*() {
+      const spawned = yield* Deferred.make<number>()
+      const spawner = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
+        const real = yield* ChildProcessSpawner.ChildProcessSpawner
+        return ChildProcessSpawner.make((command) =>
+          ChildProcess.isStandardCommand(command) && command.command === "pi"
+            ? real.spawn(ChildProcess.make("sleep", ["30"], command.options)).pipe(
+              Effect.tap((handle) => Deferred.succeed(spawned, handle.pid))
+            )
+            : real.spawn(command)
+        )
+      })).pipe(Layer.provide(BunServices.layer))
+      const chat = yield* runChat(home, ["orc"], null).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner)), Effect.forkChild)
+      const pid = yield* Deferred.await(spawned)
+      const piGroup = yield* Effect.promise(() => processGroup(pid))
+      process.emit("SIGHUP")
+      const exit = yield* Fiber.join(chat)
+      const piRunning = yield* Effect.sync(() => {
+        try {
+          return process.kill(pid, 0)
+        } catch {
+          return false
+        }
+      })
+      return { exit, piRunning, piGroup }
+    }))
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+}
+
+describe("runChat", () => {
+  test("chat spawns Pi in the chat's process group rather than a detached session the terminal's hangup misses", async () => {
+    const { piGroup } = await hangUpChat()
+    expect(piGroup).toBe(await processGroup(process.pid))
+  })
+
+  test("a hangup of orc chat stops Pi rather than leaving it running", async () => {
+    const { exit, piRunning } = await hangUpChat()
+    expect({ exit, piRunning }).toEqual({ exit: 129, piRunning: false })
+  })
 })

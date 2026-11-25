@@ -35,13 +35,13 @@ export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, 
         const fs = yield* FileSystem.FileSystem
         const log = yield* fs.readFileString(backlogPaths(root).logFile(action.task)).pipe(Effect.orElseSucceed(() => ""))
         const tail = log.slice(-4096).trim()
-        yield* openItem(root, itemId(action.task, "run-died"), {
+        yield* openItem(root, itemId(action.task, "run-died", at), {
           kind: "run-died",
           task: action.task,
           text: "the run on " + action.machine + " died: " + action.reason + (tail === "" ? "" : "\n\n" + tail),
           ...choice(
             "the run of " + action.task + " on " + action.machine,
-            { text: "rerun", outcome: "orc backlog add <project> <task-file> adds the task again under a new id, and the next beat starts it" },
+            { text: "rerun", outcome: "orc backlog retry " + action.task + " returns the task to the backlog, and the next beat starts it" },
             { text: "close", outcome: "the task stays closed failed, and no run starts" }
           ),
           asked: at,

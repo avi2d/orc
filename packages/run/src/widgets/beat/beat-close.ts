@@ -244,7 +244,7 @@ const readClose = (
     }),
     Effect.timeoutOrElse({
       duration: Duration.seconds(closeSeconds),
-      orElse: () => Effect.succeed({ kind: "unread" as const, reason: "the close read timed out after " + closeSeconds + " seconds" })
+      orElse: () => Effect.succeed<CloseReading>({ kind: through === null ? "unread" : "unreached", reason: "the close read timed out after " + closeSeconds + " seconds" })
     })
   )
 
@@ -321,19 +321,19 @@ const retryDeadRun = (
     return { kind: "ended", action: { kind: "retry", task, machine, run } } satisfies Progress
   })
 
-const closeOwnLog = (
+const closeOwnLogRun = (
   context: CloseContext,
   task: TaskRecord,
   machine: string,
-  started: { readonly at: string, readonly log: string }
-): Effect.Effect<Progress, TaskFileError, FileSystem.FileSystem> =>
+  started: { readonly at: string; readonly log: string }
+): Effect.Effect<Progress, BacklogError | TaskFileError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const silent = ownLogEndingOf(started.at, yield* logWrittenAt(started.log), Date.parse(yield* nowIso))
     if (silent === null) {
       return { kind: "own-log" } satisfies Progress
     }
-    const ended = yield* endTask(context.root, context.home, task, machine, silent)
-    return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
+    const silentEnded = yield* endTask(context.root, context.home, task, machine, silent)
+    return Option.match(silentEnded, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   })
 
 // A finished run ends its task here, because no other beat step reads a started task after its run ends.
@@ -353,7 +353,7 @@ export const closeFinished = (
       return { kind: "untracked" } satisfies Progress
     }
     if (!ownedBySweep(machine)) {
-      return yield* closeOwnLog(context, task, claim.machine, started)
+      return yield* closeOwnLogRun(context, task, claim.machine, started)
     }
     const through = throughFor(machine)
     const reading: CloseReading = yield* readClose(task, context.home, label, through)
@@ -367,6 +367,9 @@ export const closeFinished = (
     const stale = staleEndingOf(started.at, Date.parse(nowText), reading, unreadSince)
     const ending = reading.kind === "read" ? (stale ?? reading.ending) : stale
     if (ending === null) {
+      if (reading.kind === "unreached") {
+        return { kind: "unknown" } satisfies Progress
+      }
       if (reading.kind !== "read") {
         return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: reading.reason } } satisfies Progress
       }
