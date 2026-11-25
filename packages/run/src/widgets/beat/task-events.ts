@@ -5,9 +5,10 @@ import type { BeatAction, StalledAction } from "../../entities/attention/index"
 import type { ChatEvent, PrState } from "../../entities/events/index"
 import { pullRequestHeld, routePullRequest } from "../../entities/attention/index"
 import { eventRecorded, readPrState, recordEvent, writePrState } from "../../entities/events/index"
-import { checkRefusals, greenChecks, type PullRequestView } from "../../entities/pull-request/index"
+import { checkRefusals, greenChecks, redCheckEvidence, type PullRequestView } from "../../entities/pull-request/index"
 import type { RunnerError } from "../../shared/process/index"
 import { isPendingUpdateHead, readPendingUpdate } from "../../features/merging-a-pr/index"
+import { sendBack } from "../../features/queueing-a-task/index"
 import { ownerWaits, yoloMerge } from "./yolo-merge"
 
 export type ReadPullRequest = (url: string) => Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner>
@@ -99,7 +100,8 @@ export const prEvents = (
   read: ReadPullRequest,
   at: string,
   yolo: boolean,
-  home: string
+  home: string,
+  orcMode = false
 ): Effect.Effect<Option.Option<BeatAction>, BacklogError, Requirements> =>
   Effect.gen(function*() {
     const pr = taskPr(task)
@@ -122,6 +124,16 @@ export const prEvents = (
     if (task.spec.kind !== "ship") {
       yield* writePrState(root, id, pr, prState)
       return Option.none()
+    }
+    const freshRed = view.success.state === "OPEN" && orcMode && ranClosing(task)?.outcome === "done"
+      ? redCheckEvidence(view.success).filter((check) => !(task.ciSentBack ?? []).includes(check.name))
+      : []
+    if (freshRed.length > 0) {
+      const evidence = freshRed.map((check) => check.name + (check.url === undefined ? "" : " " + check.url)).join(", ")
+      const sent = yield* sendBack(root, home, { kind: "SendBack", id, words: "Fix the red CI check: " + evidence }, at, "cleared", freshRed.map((check) => check.name)).pipe(Effect.result)
+      if (Result.isSuccess(sent)) {
+        return Option.none()
+      }
     }
     const waits = yield* readWaits(pr, view.success, yolo)
     yield* recordObservation(root, task, pr, view.success, at, waits, prState)
