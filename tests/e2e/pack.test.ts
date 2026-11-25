@@ -260,6 +260,7 @@ const expectedFiles = [
   "src/features/running-a-task/run.ts",
   "src/shared/sandbox/sandbox-kind.ts",
   "src/features/running-a-task/sandbox-plan.ts",
+  "src/features/running-a-task/shared-packages.ts",
   "src/features/seeing-runs/show.ts",
   "src/features/seeing-runs/step-log.ts",
   "src/shared/sandbox/standin-dir.ts",
