@@ -72,6 +72,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/chat/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
+| `packages/run/src/features/chat/chat-lifetime.ts` | The limits on how long the chat lives: a drawer chat's Pi stops when its lease or its session file goes away, and any chat's Pi stops when its terminal hangs up |
 | `packages/run/src/features/chat/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
 | `packages/run/src/features/chat/chat-tools-bundle.ts` | The chat tools as one JavaScript file, which is `null` from source and which the compile step replaces with the embedded bundle |
 | `packages/run/src/features/chat/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |

@@ -12,6 +12,7 @@ Use `orc chat --session <file>` to choose a session file.
 Orc passes its absolute path to Pi.
 If the file exists, Pi resumes it.
 Otherwise, Pi creates it after the first reply.
+A hangup of the chat's terminal also stops Pi.
 
 When present, `<ORC_HOME>/orchestrator.md` supplies the orchestrator's system instructions.
 The chat also loads each instructions file named in `projects.json`, labelled by project.
