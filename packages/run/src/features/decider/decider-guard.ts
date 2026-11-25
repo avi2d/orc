@@ -8,7 +8,7 @@ const deletingVerbs = "delet\\w*|remov\\w*|drop\\w*|discard\\w*|eras(?:e|es|ed|i
 const deletedVerbs = "deleted|removed|dropped|discarded|erased|wiped|purged|destroyed|pruned|abandoned|overwritten|reset|thrown away|cleaned up"
 const work = "branch(?:es)?|worktrees?|tasks?|(?<!\\btest\\s)runs?|pull requests?|releases?|tags?|backups?|databases?|user data|commit history|(?:unlanded|unmerged|unpushed) (?:work|changes|commits)"
 const notAName = "(?!\\s+(?:check|name|field|filter|guard|test|option|flag|column|label|chip|key|type|lookup|variable|param\\w*|prop\\w*|argument|list|support|fallback|handling)s?\\b)"
-const ownWork = "commits?|changes|edits|work|stash(?:es)?|modifications?|diffs?"
+const ownWork = "commits?|changes|edits|work|stash(?:es)?|modifications?|diffs?|what (?:i|we|you|it) (?:changed|edited|wrote|made|added|did)"
 const joiningWords = "on|in|of|for|from|to|at|by|with|that|which|so|and|or|but|if|when|because|then|than|while"
 const between = "(?:\\s+(?!(?:" + joiningWords + ")\\b)[\\w./`'-]+){0,3}?"
 
@@ -16,10 +16,10 @@ const computeMeasure = "time|times|timing|loops?|cpu|memory|ram|performance|runt
 
 const deletingWork = new RegExp(
   "\\b(?:" + deletingVerbs + ")" + between + "\\s+(?:" + work + ")\\b" + notAName
-    + "|\\b(?:" + work + ")\\b(?:\\s+\\w+){0,3}?\\s+(?:" + deletedVerbs + ")\\b"
+    + "|\\b(?:" + work + "|" + ownWork + ")\\b(?:\\s+\\w+){0,3}?\\s+(?:" + deletedVerbs + ")\\b"
     + "|\\b(?:" + deletingVerbs + ")" + between + "\\s+[a-z][a-z0-9]*-\\d+\\b" + notAName
     + "|\\b(?:" + deletingVerbs + ")" + between + "\\s+(?:" + ownWork + ")\\b"
-    + "|\\breset\\s+--hard|\\bbranch\\s+-D\\b|\\bstash\\s+(?:drop|clear)\\b|\\bclean\\s+-\\w*f|\\bcheckout\\s+--\\s+\\.|\\brestore\\s+\\.",
+    + "|\\breset\\s+--hard|\\bhard[- ]reset|\\bbranch\\s+-D\\b|\\bstash\\s+(?:drop|clear)\\b|\\bclean\\s+-\\w*f|\\bcheckout\\s+--\\s+\\.|\\brestore\\s+\\.",
   "i"
 )
 
@@ -39,6 +39,7 @@ const neverDecided: ReadonlyArray<NeverDecided> = [
   { topic: "merging", asks: /\bmerg\w*/i },
   { topic: "pushing", asks: /\bpush\w*\b/i },
   { topic: "releasing", asks: /\b(releas\w*|publish\w*|deploy\w*)/i },
+  { topic: "going public", asks: /(?<![\w/.-])(public|publicly|publiciz\w*|post|posts|posted|posting|announc\w*|e-?mail\w*|shar(?:e|es|ed|ing)|upstream|github issues?|gists?|discord|slack|twitter|tweet\w*|reddit|hacker news|mailing lists?)(?![\w/-])/i },
   { topic: "spending", asks: /\b(pay|pays|paying|paid|payments?|billing|purchas\w*|buy\w*|budget\w*|money|dollars?)\b|\$\s?\d+/i },
   { topic: "spending", asks: new RegExp("(?<!\\b(?:" + computeMeasure + ")\\b[^.?!]*)\\b(?:spend\\w*|spent|costs?|costing)\\b(?![^.?!]*\\b(?:" + computeMeasure + ")\\b)", "i") },
   { topic: "anything that cannot be undone", asks: /\b(irreversib\w*|irrevocab\w*|permanent\w*|undoable|(cannot|can't|can not) be (undone|reversed)|force[- ]push\w*)/i },

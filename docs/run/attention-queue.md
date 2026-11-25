@@ -26,13 +26,17 @@ Orc carries that value through `asking.json`, the run history and the parked que
 When a question names `none`, orc sends it to the decider.
 When it names `merge`, `delete` for deleting unlanded work, `login`, `push`, `release`, or any other value orc does not know, orc sends it to you.
 
+### The topic check
+
 No-mistakes writes `unknown` for an `ask-user` finding its reviewer did not classify.
 A question that names `unknown` or no action goes through a topic check instead.
-Orc sends questions about deletion, security, credentials, merging, pushing, releasing, spending, irreversible actions, site appearance, legal text, and logins to you.
+Orc sends questions about deletion, security, credentials, merging, pushing, releasing, going public, spending, irreversible actions, site appearance, legal text, and logins to you.
 The topic check reads the whole question, context included, so a question that says a step pushes a tag goes to you even when it only asks whether to continue.
 A question that only reports a merge or a release, such as one that names `merge conflicts`, also goes to you.
-Dropping, discarding, resetting, reverting, restoring, or throwing away or out commits, changes, edits, modifications, diffs, work or a stash counts as deleting work, wherever the noun sits in the sentence.
-So do `git reset --hard`, `git branch -D`, `git stash drop` or `clear`, `git clean -f`, `git checkout -- .` and `git restore .`.
+Going public means words such as public, post, announce, email, share or upstream, or an outside service such as a gist, Discord, Slack or Reddit, outside a file path.
+Dropping, discarding, resetting, reverting, restoring, or throwing away or out commits, changes, edits, modifications, diffs, work, a stash or what you changed counts as deleting work.
+The noun counts within three words after such a verb with no joining word such as `in` or `that` between, or within three words before a past form such as `discarded`.
+So do a hard reset, `git reset --hard`, `git branch -D`, `git stash drop` or `clear`, `git clean -f`, `git checkout -- .` and `git restore .`.
 The name `test runs` never counts as deleting work.
 A question with no words at all goes to you.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
@@ -63,7 +67,7 @@ When the decider still escalates a question with that line on one of those two b
 An escalation on any other bullet, or with no bullet, stays with you, and so does a question on the topic list above.
 When the decider answers a question on that Rules sentence, orc records the question's `Recommended:` option as the answer, whatever option the reply named.
 Orc escalates such an answer to a question with no `Recommended:` line.
-The rule and the override apply to review questions and worker questions alike.
+The rule and the override apply to review questions and worker questions alike, once they pass the topic check.
 
 ### Settle routine review findings
 

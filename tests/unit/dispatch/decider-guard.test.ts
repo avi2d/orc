@@ -157,13 +157,13 @@ describe("the decider guard", () => {
       "Should the Map key be a string?",
       "The Record key is path; ok?",
       "Should the cache store the key with each entry?",
-      "Should both maps share the key?",
       "Should the index store the project key on each run?",
       "Should we expose the record key to the panel?",
       "Should the lexer issue a token at end of input?",
       "Should the parser store tokens in an array?"
     ]
     for (const question of questions) expect(neverDecidedReason(question)).toBeNull()
+    expect(neverDecidedReason("Should both maps share the key?")).toContain("about going public")
   })
 
   test("deleting listed work, handling secrets and choosing a site's look are not decided by the decider", () => {
@@ -334,6 +334,15 @@ describe("a request only the owner grants, named in the context of a neutral ask
     { text: "Should I throw out my work and begin again?", topic: "deleting" },
     { text: "Should I run git clean -fd in the worktree?", topic: "deleting" },
     { text: "Should I git checkout -- . and start fresh?", topic: "deleting" },
+    { text: "Your local changes will be discarded. Continue?\nRecommended: yes", topic: "deleting" },
+    { text: "Should I hard reset to origin/main?\nRecommended: yes", topic: "deleting" },
+    { text: "Should I discard what I changed in the worktree?\nRecommended: yes", topic: "deleting" },
+    { text: "Should I make the GitHub repository public?\nRecommended: yes", topic: "going public" },
+    { text: "Should I post the benchmark results as a comment on the upstream issue #42?\nRecommended: yes", topic: "going public" },
+    { text: "Should I open a pull request against the upstream kunchenguid/no-mistakes repository with this fix?\nRecommended: A", topic: "going public" },
+    { text: "Should I email the report to the client?\nRecommended: yes", topic: "going public" },
+    { text: "Should I announce the new version on the Discord channel?\nRecommended: yes", topic: "going public" },
+    { text: "Should I share the gist publicly?\nRecommended: yes", topic: "going public" },
     { text: "The new field silently accepts an older orc instead. The narrower form is `nullableString(record.value, \"from\", at)` as a required field, matching `model`. Removing the fallback changes compatibility with older orc builds, so confirm before removing it.", topic: "deleting" }
   ]
 
