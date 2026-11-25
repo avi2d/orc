@@ -77,6 +77,8 @@ export {
   fullPrUrl,
   ranClosing,
   decisionAnswer,
+  landedClosing,
+  taskLandedIn,
   isCalendarDate,
   taskPriorities,
   isTaskPriority,
@@ -133,3 +135,4 @@ export {
 export type {
   ChildCount,
 } from "./task-dependency"
+export { closeNewTask } from "./close-new"

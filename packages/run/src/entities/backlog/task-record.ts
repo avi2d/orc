@@ -91,11 +91,20 @@ export interface RanClosing {
   readonly report: string | null
 }
 
+interface LandedClosing {
+  readonly outcome: "done"
+  readonly reason: string
+  readonly landedIn: string
+}
+
+export const landedClosing = (landedIn: string): LandedClosing =>
+  ({ outcome: "done", reason: "work landed in " + landedIn, landedIn })
+
 type Closing = { readonly outcome: "start-failed"; readonly reason: string } | RanClosing
 
 type ClosedState = { readonly kind: "closed"; readonly closedAt: string; readonly postedAt: string | null } & (
   | { readonly claim: Claim; readonly closing: Closing }
-  | { readonly claim: null; readonly closing: { readonly outcome: "dropped"; readonly reason: string } | AnsweredClosing }
+  | { readonly claim: null; readonly closing: { readonly outcome: "dropped"; readonly reason: string } | AnsweredClosing | LandedClosing }
 )
 
 type TaskState =
@@ -122,7 +131,10 @@ export const ranClosing = (task: TaskRecord): RanClosing | null =>
   task.state.kind === "closed" && task.state.claim !== null && task.state.closing.outcome !== "start-failed" ? task.state.closing : null
 
 export const decisionAnswer = (task: TaskRecord): Answer | null =>
-  task.state.kind === "closed" && task.state.claim === null && task.state.closing.outcome === "done" ? task.state.closing.answer : null
+  task.state.kind === "closed" && task.state.claim === null && "answer" in task.state.closing ? task.state.closing.answer : null
+
+export const taskLandedIn = (task: TaskRecord): string | null =>
+  task.state.kind === "closed" && "landedIn" in task.state.closing ? task.state.closing.landedIn : null
 
 export const taskPr = (task: TaskRecord): string | null => ranClosing(task)?.pr ?? null
 
@@ -189,6 +201,7 @@ const Frontmatter = Schema.Struct({
   start_log: Schema.optional(Schema.String),
   outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed", "dropped"])),
   closed_at: Schema.optional(Schema.String),
+  landed_in: Schema.optional(Schema.String),
   reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),
   report: Schema.optional(Schema.String),
@@ -292,6 +305,12 @@ const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => 
     }
     return claim === null ? "a started task names no claim" : { kind: "started", claim, started }
   }
+  if (front.landed_in !== undefined) {
+    const landedIn = fullPrUrl(front.landed_in)
+    return landedIn === null || claim !== null || started !== null || front.outcome !== "done" || front.closed_at === undefined
+      ? "a task completed elsewhere needs a PR URL, a done outcome and a close time, with no claim or start time"
+      : { kind: "closed", claim: null, closing: landedClosing(landedIn), closedAt: front.closed_at, postedAt: front.posted_at ?? null }
+  }
   if (front.outcome === "dropped") {
     return front.closed_at === undefined
       ? "a dropped task names no close time"
@@ -351,7 +370,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (typeof parked === "string") {
       return yield* new TaskFileError({ file, detail: parked })
     }
-    if (parked?.questions.some((question) => question.answer === null) === true && state.kind === "closed") {
+    if (parked?.questions.some((question) => question.answer === null) === true && state.kind === "closed" && state.closing.outcome !== "start-failed") {
       return yield* new TaskFileError({ file, detail: "a closed task carries an unanswered parked question" })
     }
     return {

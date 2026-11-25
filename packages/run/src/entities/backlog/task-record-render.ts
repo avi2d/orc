@@ -89,6 +89,7 @@ const stateFields = (record: TaskRecord): ReadonlyArray<string> => {
         field("outcome", state.closing.outcome),
         field("closed_at", state.closedAt),
         field("reason", state.closing.reason),
+        ...("landedIn" in state.closing ? [field("landed_in", state.closing.landedIn)] : []),
         ...(answer === null ? [] : [field("answer", answer.words), field("answered_at", answer.at)]),
         ...ran.pr,
         ...(state.postedAt === null ? [] : [field("posted_at", state.postedAt)])
