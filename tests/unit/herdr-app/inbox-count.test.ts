@@ -163,16 +163,16 @@ const queued: Card = {
 }
 
 test("the Awaiting you count on the Agents tab opens the Inbox as cmd-4 does instead of filtering the runs", async () => {
-  const { runsColumn } = await import("../../../packages/herdr-app/src/agents-view")
+  const { runsColumn } = await import("../../../packages/herdr-app/src/runs-view")
   const { palette } = await import("../../../packages/herdr-app/src/palette")
   const filtered: Array<unknown> = []
   const act = {
     select: () => undefined, toggleFold: () => undefined, choose: () => undefined, setPane: () => undefined, askMerge: () => undefined,
-    setFilter: (_cx: unknown, filter: unknown) => filtered.push(filter)
+    openMenu: () => undefined, setFilter: (_cx: unknown, filter: unknown) => filtered.push(filter)
   }
   ran.length = 0
   stopped.length = 0
-  const column: object = runsColumn(palette(), { cards: { kind: "ok", value: [card] }, filter: { project: null, status: null, allRuns: false }, selectedKey: null, agents: new Map(), folded: false }, act)
+  const column: object = runsColumn(palette(), { cards: { kind: "ok", value: [card] }, filter: { project: null, status: null, allRuns: false }, menu: "status", selectedKey: null, agents: new Map(), folded: false }, act)
   const count = find(column, "inbox-count")
   expect(count?.kids).toEqual(["1"])
   click(count)

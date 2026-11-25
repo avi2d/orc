@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, cardAnswers, cardPlace, filterCards, namedModels, openedFilter, opensTurns, projectsOf, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
+import { buildCards, cardAnswers, cardPlace, cardStatuses, filterCards, namedModels, openedFilter, opensTurns, projectsOf, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
+import { projectMenu, statusMenu } from "../../../packages/herdr-app/src/run-menus"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 import type { InboxAnswer, InboxApproval } from "../../../packages/herdr-app/src/inbox"
 import { askText } from "../../../packages/herdr-app/src/thread"
@@ -213,6 +214,24 @@ describe("the runs list", () => {
   test("both filters together keep runs that match both, not either", () => {
     expect(filterCards(board, { project: "herdr", status: "Running", allRuns: false })).toEqual([])
   })
+
+  test("a status choice does not differ from the count shown by its replaced chip", () => {
+    const filter = { project: "herdr", status: null, allRuns: false } as const
+    expect(statusMenu(board, filter).choices.map(({ name, count }) => [name, count])).toEqual([
+      ["All", 1], ["Awaiting you", 1], ["Running", 0], ["Queued", 0], ["Failed", 0], ["Done", 0]
+    ])
+    expect(statusMenu(board, { project: null, status: null, allRuns: false }).choices.slice(1).map(({ name }) => name)).toEqual([...cardStatuses])
+  })
+
+  test("a select does not lose its chosen filter when the run list refreshes", () => {
+    const filter = { project: "herdr", status: "Running", allRuns: false } as const
+    const refreshed = buildCards(runs([run("20261113-100000-ffffff", { status: "running" })]), backlog([task("orc-50", {}), task("orc-51", {})]))
+    expect(projectMenu(refreshed, filter).chosen).toEqual({ value: { project: "herdr", allRuns: false }, name: "herdr", count: 0 })
+    expect(projectMenu(refreshed, filter).choices.map(({ name }) => name)).toEqual(["All", "orc", "All runs"])
+    expect(statusMenu(refreshed, filter).chosen).toEqual({ value: "Running", name: "Running", count: 0 })
+    expect(statusMenu(refreshed, { project: null, status: "Queued", allRuns: false }).chosen.count).toBe(2)
+  })
+
 })
 
 describe("the selected run's steps", () => {

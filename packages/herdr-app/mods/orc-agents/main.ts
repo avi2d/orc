@@ -3,7 +3,8 @@ import { InputState, h_flex } from "gpui-base"
 import { layout, run, setShared, shared } from "herdr"
 import { type Card, type Filter, type RunAgent, cardAnswers, filterCards, goesOn, openedFilter, recordedStatus, runAgent } from "../../src/agents"
 import { readAgents } from "../../src/agents-read"
-import { type AgentsActions, type Chosen, type DetailShown, type Keyed, approvalOf, askMerge, detailView, runsColumn, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
+import { type AgentsActions, type Chosen, type DetailShown, type Keyed, approvalOf, askMerge, detailView, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
+import { type MenuName, runsColumn } from "../../src/runs-view"
 import { type Merge, mergeCommand, mergedNote, runMerge, watchMerges } from "../../src/agents-merge"
 import { type RunChanges, changesKey } from "../../src/changes"
 import { readChanges } from "../../src/changes-read"
@@ -32,6 +33,7 @@ const readingOf = <A>(keyed: Keyed<A> | null, of: string | null): Reading<A> =>
 export default class OrcAgents extends View {
   cards: Reading<ReadonlyArray<Card>> = { kind: "reading" }
   filter: Filter = { project: null, status: null, allRuns: false }
+  menu: MenuName | null = null
   selectedKey: string | null = null
   chosen: Chosen | null = null
   pane: Pane = "parsed"
@@ -245,6 +247,7 @@ export default class OrcAgents extends View {
   moveSelection(cx: Context, change: () => void): void {
     const before = this.selectedCard()?.key ?? null
     this.chosen = null
+    this.menu = null
     change()
     if ((this.selectedCard()?.key ?? null) !== before) {
       this.changesProblem = null
@@ -278,17 +281,8 @@ export default class OrcAgents extends View {
     cx.notify()
   }
 
-  toggleFold(cx: Context): void {
-    this.folded = !this.folded
-    cx.notify()
-  }
-
   sendBack(cx: Context): void {
     submitSendBack(this, cx)
-  }
-
-  setFilter(cx: Context, filter: Filter): void {
-    this.moveSelection(cx, () => { this.filter = filter })
   }
 
   openAsked(cx: Context): void {
@@ -306,14 +300,15 @@ export default class OrcAgents extends View {
     const card = this.selectedCard()
     const act: AgentsActions = {
       select: (spot, key) => this.select(spot, key),
-      toggleFold: (spot) => this.toggleFold(spot),
-      setFilter: (spot, filter) => this.setFilter(spot, filter),
+      toggleFold: (spot) => { this.folded = !this.folded; this.menu = null; spot.notify() },
+      setFilter: (spot, filter) => this.moveSelection(spot, () => { this.filter = filter }),
+      openMenu: (spot, menu) => { this.menu = menu; spot.notify() },
       choose: (spot, chosen) => this.choose(spot, chosen),
       setPane: (spot, pane) => this.setPane(spot, pane),
       askMerge: (asked, approval) => askMerge(approval, `${thisView}.${mergeCommand}${asked.id}`)
     }
     return h_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)
-      .child(runsColumn(t, { cards: this.cards, filter: this.filter, selectedKey: card?.key ?? null, agents: this.agents, folded: this.folded }, act))
+      .child(runsColumn(t, { cards: this.cards, filter: this.filter, menu: this.menu, selectedKey: card?.key ?? null, agents: this.agents, folded: this.folded }, act))
       .child(stepsColumn(t, card, {
         reading: card === null ? null : this.currentSteps(card),
         target: this.target(),
