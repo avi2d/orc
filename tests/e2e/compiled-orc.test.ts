@@ -107,7 +107,7 @@ const seedRun = async (home: string): Promise<void> => {
 }
 
 describe("compiled orc", () => {
-  test("bun run compile builds one bytecode file that answers help, beat, score, show, chat's self command and reads its embedded agent file", async () => {
+  test("bun run compile builds one bytecode file that answers help, beat, score, show, chat's self command, embeds chat tools, and reads its embedded agent file on POSIX", async () => {
     const compiled = await run([process.execPath, "run", "compile"], {}, repoRoot)
     if (compiled.exitCode !== 0) {
       throw new Error("bun run compile exited " + compiled.exitCode + ": " + compiled.stderr)
