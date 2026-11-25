@@ -1,4 +1,4 @@
-import { Array as Arr, Data, Effect, Schema } from "effect"
+import { Data, Effect, Schema } from "effect"
 import { Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-record-decision"
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 import { deciderAnswerKinds, OverturnedFront, parkedAnswerOf } from "./task-record-answer"
@@ -80,7 +80,7 @@ export interface Parked {
   readonly at?: string
   readonly sentBackAt?: string
   readonly branch: string
-  readonly questions: Arr.NonEmptyReadonlyArray<ParkedQuestion>
+  readonly questions: ReadonlyArray<ParkedQuestion>
 }
 
 export interface RanClosing {
@@ -113,9 +113,12 @@ type TaskState =
   | { readonly kind: "started"; readonly claim: Claim; readonly started: Started }
   | ClosedState
 
+const Retry = Schema.Struct({ run: Schema.String.check(Schema.isNonEmpty()), at: Schema.String.check(Schema.isNonEmpty()) })
+
 export interface TaskRecord {
   readonly spec: TaskSpec
   readonly hold: Hold | null
+  readonly retry?: typeof Retry.Type
   readonly parked: Parked | null
   readonly state: TaskState
 }
@@ -188,6 +191,7 @@ const Frontmatter = Schema.Struct({
   hold_history: Schema.optional(Schema.Array(AnsweredHold)),
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
+  retry: Schema.optional(Retry),
   parked_branch: Schema.optional(Schema.String),
   parked_origin: Schema.optional(ParkedOrigin),
   parked_at: Schema.optional(Schema.String),
@@ -264,7 +268,7 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (typeof questions === "string") {
     return questions
   }
-  return Arr.isReadonlyArrayNonEmpty(questions)
+  return questions.length > 0 || (front.retry !== undefined && front.parked_origin !== undefined)
     ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }), ...(front.parked_at === undefined ? {} : { at: front.parked_at }), ...(front.parked_sent_back_at === undefined ? {} : { sentBackAt: front.parked_sent_back_at }) }
     : "a parked task names no question"
 }
@@ -389,6 +393,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
         body: parts.body
       },
       hold,
+      ...(front.retry === undefined ? {} : { retry: front.retry }),
       parked,
       state
     }

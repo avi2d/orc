@@ -236,7 +236,7 @@ const failingReads = (started: ReadonlyArray<TaskRecord>, progress: ReadonlyArra
     if (entry.kind === "running") {
       return [{ task: task.spec.id, failing: entry.failing }]
     }
-    if (entry.kind === "ended" && (entry.action.kind === "closed" || entry.action.kind === "parked" || entry.action.kind === "held" || entry.action.kind === "split")) {
+    if (entry.kind === "ended" && (entry.action.kind === "retry" || entry.action.kind === "closed" || entry.action.kind === "parked" || entry.action.kind === "held" || entry.action.kind === "split")) {
       return [{ task: task.spec.id, failing: null }]
     }
     return []
@@ -247,7 +247,7 @@ const routeRunItems = (root: string, started: ReadonlyArray<TaskRecord>, progres
 
 const releaseClosedSlots = (live: BeatContext["live"], closed: ReadonlyArray<BeatAction>): void => {
   for (const action of closed) {
-    if (action.kind === "closed" || action.kind === "parked" || action.kind === "held" || action.kind === "split") {
+    if (action.kind === "retry" || action.kind === "closed" || action.kind === "parked" || action.kind === "held" || action.kind === "split") {
       const slot = live.find((entry) => entry.machine === action.machine)
       if (slot !== undefined) {
         slot.busy -= 1
@@ -372,7 +372,8 @@ export const runBeat = (
     yield* routeRunItems(root, started, progress, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
     const { reported, queue, deciderOwns } = yield* attentionActions(root, latest, [...settled.closed, ...relayed.closed, ...settled.asking, ...relayed.asking], at)
-    const queued = latest.filter((task) => task.state.kind === "new").toSorted(startOrder)
+    const retried = new Set(settled.closed.flatMap((action) => action.kind === "retry" ? [action.task] : []))
+    const queued = latest.filter((task) => task.state.kind === "new" && !retried.has(task.spec.id)).toSorted(startOrder)
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))

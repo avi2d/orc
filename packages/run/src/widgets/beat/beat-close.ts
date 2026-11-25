@@ -1,13 +1,14 @@
 import { Array as Arr, DateTime, Duration, Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, closeStartedTask, runLabel, runDirFor, taskBranch, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { recordEvent } from "../../entities/events/index"
 import { type BeatAction, openUnreachedMachine, type Progress, withdrawTaskItems, withdrawUnreachedMachine } from "../../entities/attention/index"
 import type { FailingMark } from "../../entities/agent/index"
 import type { DispatchConfig } from "../../shared/config/index"
 import { ownedBySweep, throughFor } from "../../shared/config/index"
 import { logWrittenAt, stallMillis } from "./stall"
 import { endSplit } from "./beat-split"
-import { answersFor, askStartedTask, type AskedQuestion, correctionsDue, markAnswersRelayed, markCorrectionsQueued, parkStartedTask } from "../../entities/parked-runs/index"
+import { answersFor, askStartedTask, type AskedQuestion, correctionsDue, markAnswersRelayed, markCorrectionsQueued, parkStartedTask, retryStartedTask } from "../../entities/parked-runs/index"
 import { Asking, askingFileName, hasBlockingQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
 import { readJsonFileIfPresent } from "../../shared/config/index"
 import { type RunnerRequirements } from "../../features/queueing-a-task/index"
@@ -339,10 +340,17 @@ export const closeFinished = (
       const action = yield* serveRunning(context, task, claim.machine, through, label, reading.asking)
       return { kind: "running", outputAt: reading.outputAt, action, failing: reading.failing } satisfies Progress
     }
+    const run = reading.kind === "read" && reading.result.status === "failed" ? reading.result.run?.id : undefined
+    if (stale === null && ending.kind === "close" && ending.outcome === "failed" && task.retry === undefined && run !== undefined) {
+      const at = yield* nowIso
+      yield* retryStartedTask(context.root, task.spec.id, claim.machine, run, at)
+      yield* recordEvent(context.root, { key: task.spec.id + ".retry", at, text: task.spec.id + " will retry from run " + run + " on its kept branch" })
+      return { kind: "ended", action: { kind: "retry", task: task.spec.id, machine: claim.machine, run } } satisfies Progress
+    }
     const ended = yield* endTask(context.root, context.home, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   }).pipe(
-    Effect.tap((progress) => progress.kind === "ended" && (progress.action.kind === "closed" || (progress.action.kind === "split" && task.spec.parent !== null))
+    Effect.tap((progress) => progress.kind === "ended" && (progress.action.kind === "retry" || progress.action.kind === "closed" || (progress.action.kind === "split" && task.spec.parent !== null))
       ? nowIso.pipe(Effect.flatMap((at) => withdrawTaskItems(context.root, [task.spec.id], at)))
       : Effect.void)
   )

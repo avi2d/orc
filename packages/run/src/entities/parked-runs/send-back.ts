@@ -20,7 +20,7 @@ export const addSendBackWords = (
 ): Effect.Effect<NonNullable<Parked["origin"]>, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   rewriteNew(root, id, (fresh) => {
     const parked = fresh.parked
-    if (parked === null || parked.origin === undefined || parked.branch !== taskBranch(id) || !parked.questions.every((question) => isSendBackQuestion(question.id))) {
+    if (parked === null || parked.origin === undefined || parked.branch !== taskBranch(id) || parked.questions.length === 0 || !parked.questions.every((question) => isSendBackQuestion(question.id))) {
       return Effect.fail(notSentBack(id, fresh.state.kind))
     }
     const question = sendBackQuestion(sendBackQuestionId + "-" + (parked.questions.length + 1).toString(), words, at)

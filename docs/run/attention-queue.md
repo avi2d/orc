@@ -124,7 +124,10 @@ The beat opens an item for each run event, owned by the user:
 
 - A run that died opens a `run-died` item, when its task closes failed or its start fails.
   A run that ends done or that you stop opens none.
-  Two failures retry instead of opening the item.
+  A confirmed failed run with a known run ID returns to `new` once, keeping its branch and origin for the next beat.
+  The retry record stays with the task, so another failure closes it and opens a `run-died` item with the task log tail.
+  A failed run without a run ID closes without a retry.
+  An unread machine, a quiet own log, and a failed split do not trigger a retry.
   When no-mistakes refuses to start because the repository is not initialized, the run runs `no-mistakes init --skip-user-skill` and starts no-mistakes again.
   When the command that reaches a dispatch machine exits 255, as ssh does when its connection fails, the task stays started and the next beat reads it again.
 - A dispatch machine that orc has not reached for 10 minutes, counted from the first beat that could not reach it, opens a `machine-unreached` item for each started task on that machine.
