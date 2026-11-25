@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { AbsolutePath, readDispatchConfig, readFailure } from "../../shared/config/index"
-import { ModelRef, ProviderId } from "../../shared/config/index"
+import { ModelRef, ProviderId, RoutedModels, RoutedModelsJson } from "../../shared/config/index"
 import { TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type Parked, type TaskRecord, withDecisions } from "../../entities/backlog/index"
 import { isSendBackQuestion, latestPerId } from "../../entities/parked-runs/index"
 import { carriedHoldReleaseId, holdReleaseId } from "../../entities/review-gate/index"
@@ -21,6 +21,7 @@ const taskFields = {
   provider: ProviderId,
   implementerModel: Schema.optional(ModelRef),
   fixerModel: Schema.optional(ModelRef),
+  routedModels: Schema.optional(RoutedModels),
   implementerThinking: Schema.optional(Schema.Literals(piThinkingLevels)),
   fixerThinking: Schema.optional(Schema.Literals(piThinkingLevels)),
   body: Schema.String,
@@ -182,8 +183,12 @@ const readRequestFields = (
     const machineName = env["ORC_RUN_MACHINE"] ?? ""
     const machine = machineName === "" ? {} : { machine: machineName }
     const models = handedModels(env)
+    const route = env["ORC_TASK_ROUTED_MODELS"] ?? ""
+    const routedModels = route === "" ? undefined : yield* Schema.decodeEffect(RoutedModelsJson)(route, { onExcessProperty: "error" }).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot read the models routed for " + task + ": " + error.message }))
+    )
     const thinking = yield* handedThinking(env)
-    return yield* Schema.decodeEffect(RequestSchema)({ task, checkout, provider, body, ...models, ...thinking, ...kind, ...delivery, ...instructions, ...machine, ...resume }).pipe(
+    return yield* Schema.decodeEffect(RequestSchema)({ task, checkout, provider, body, ...models, routedModels, ...thinking, ...kind, ...delivery, ...instructions, ...machine, ...resume }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
     )
   })

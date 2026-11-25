@@ -1,7 +1,7 @@
-export const reportKinds = ["scout", "task", "parent"] as const
+import { reportKinds, runKinds, type RunKind } from "../../shared/lib/index"
+
+export { reportKinds, runKinds, type RunKind }
 export type ReportKind = typeof reportKinds[number]
-export const runKinds = ["ship", ...reportKinds] as const
-export type RunKind = typeof runKinds[number]
 export const taskKinds = [...runKinds, "decision"] as const
 export type TaskKind = typeof taskKinds[number]
 

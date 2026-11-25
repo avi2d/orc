@@ -1,6 +1,6 @@
 import { Clock, DateTime, Effect, Result, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { duplicateOf } from "../../shared/config/index"
+import { duplicateOf, roomAtFloor } from "../../shared/config/index"
 import { type AccountReading, type CommandFailureCause, runQuotaCommand } from "./quota-command"
 import { decodeSubquo, isSubquoDocument, type SubquoFailureCause } from "./subquo"
 
@@ -20,6 +20,7 @@ export type QuotaReading =
   }
 
 export interface QuotaSettings {
+  readonly perTaskRouting?: boolean
   readonly command: readonly [string, ...Array<string>]
   readonly accounts: ReadonlyArray<{ readonly name: string }>
   readonly floorPercent: number
@@ -126,11 +127,11 @@ const readAccounts = (document: unknown, settings: QuotaSettings): UnreadQuota |
 const choose = (accounts: ReadonlyArray<AccountReading>, settings: QuotaSettings): QuotaReading => {
   let pick: { readonly account: string; readonly remainingPercent: number } | null = null
   for (const reading of accounts) {
-    if (reading.kind === "usable" && reading.remainingPercent > 0 && reading.remainingPercent >= settings.floorPercent && reading.remainingPercent > (pick?.remainingPercent ?? -1)) {
+    if (reading.kind === "usable" && roomAtFloor(reading.remainingPercent, settings.floorPercent) && reading.remainingPercent > (pick?.remainingPercent ?? -1)) {
       pick = reading
     }
   }
-  return { kind: "read", floorPercent: settings.floorPercent, accounts, pick: pick?.account ?? null }
+  return { kind: "read", floorPercent: settings.floorPercent, accounts, pick: settings.perTaskRouting === true ? null : pick?.account ?? null }
 }
 
 export const assessQuota = (document: unknown, settings: QuotaSettings): QuotaReading => {
@@ -156,7 +157,7 @@ export const readQuota = (
       : assessQuota(run.document, settings)
   })
 
-export const describeQuota = (reading: QuotaReading): string => {
+export const describeQuota = (reading: QuotaReading, perTaskRouting = false): string => {
   if (reading.kind === "unread") {
     return "quota unread: " + reading.reason
   }
@@ -165,6 +166,8 @@ export const describeQuota = (reading: QuotaReading): string => {
       ? account.account + " " + account.remainingPercent + "% left" + (account.resetsAt === undefined ? "" : " until " + account.resetsAt)
       : account.account + " unusable, " + account.reason
   )
-  const verdict = reading.pick === null ? "no account has room at or above the floor" : "runs use " + reading.pick
+  const verdict = perTaskRouting && reading.accounts.some((account) => account.kind === "usable" && roomAtFloor(account.remainingPercent, reading.floorPercent))
+    ? "dispatch rules pick an account for each task"
+    : reading.pick === null ? "no account has room at or above the floor" : "runs use " + reading.pick
   return "quota: " + accounts.join(", ") + ", floor " + reading.floorPercent + "%: " + verdict
 }
