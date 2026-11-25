@@ -232,6 +232,7 @@ const expectedFiles = [
   "src/features/running-a-task/history-write.ts",
   "src/features/running-a-task/index.ts",
   "src/features/running-a-task/loop-pause.ts",
+  "src/features/running-a-task/rebase-delivery.ts",
   "src/features/running-a-task/worker-question.ts",
   "src/shared/sandbox/host.ts",
   "src/shared/config/json-file.ts",
