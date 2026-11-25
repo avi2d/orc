@@ -4,6 +4,7 @@ import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 import { deciderAnswerKinds, OverturnedFront, parkedAnswerOf } from "./task-record-answer"
 import { ChoicesFront, choicesOf, type ParkedQuestion } from "./task-record-question"
 import { MergeRecord } from "./task-record-merge"
+import { closedWithUnansweredQuestion, heldWhileActive, priorPrOf, splitFrontmatter } from "./task-record-parts"
 
 export { isDeciderAnswer } from "./task-record-answer"
 export type { CaptainAnswer, DeciderAnswer, ParkedAnswer } from "./task-record-answer"
@@ -213,7 +214,7 @@ const Frontmatter = Schema.Struct({
 })
 type Frontmatter = typeof Frontmatter.Type
 
-export const fence = "---"
+export { fence } from "./task-record-parts"
 
 const claimOf = (front: Frontmatter): Claim | null =>
   front.beat === undefined || front.taken_for === undefined || front.account === undefined || front.taken_at === undefined
@@ -327,20 +328,6 @@ const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => 
   return { kind: "closed", claim, closing, closedAt: front.closed_at, postedAt: front.posted_at ?? null }
 }
 
-const splitFrontmatter = (text: string): { readonly head: string; readonly body: string } | null => {
-  if (!text.startsWith(fence + "\n")) {
-    return null
-  }
-  const end = text.indexOf("\n" + fence + "\n", fence.length)
-  if (end === -1) {
-    return null
-  }
-  return { head: text.slice(fence.length + 1, end + 1), body: text.slice(end + fence.length + 2) }
-}
-
-const closedWithUnansweredQuestion = (parked: Parked | null, state: TaskState): boolean =>
-  state.kind === "closed" && state.closing.outcome !== "start-failed" && parked?.questions.some((question) => question.answer === null) === true
-
 export const parseTaskFile = (file: string, folder: TaskFolder, text: string): Effect.Effect<TaskRecord, TaskFileError> =>
   Effect.gen(function*() {
     const parts = splitFrontmatter(text)
@@ -370,7 +357,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (typeof hold === "string") {
       return yield* new TaskFileError({ file, detail: hold })
     }
-    if (hold !== null && hold.answer === null && (state.kind === "started" || state.kind === "closed")) {
+    if (heldWhileActive(hold, state)) {
       return yield* new TaskFileError({ file, detail: "a " + state.kind + " task carries an unanswered hold" })
     }
     const parked = parkedOf(front)
@@ -398,7 +385,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
       hold,
       parked,
       ...(front.merge === undefined ? {} : { merge: front.merge }),
-      ...(front.pr === undefined || (state.kind === "closed" && state.closing.outcome !== "start-failed") ? {} : { priorPr: front.pr }),
+      ...priorPrOf(front.pr, state),
       state
     }
   })
