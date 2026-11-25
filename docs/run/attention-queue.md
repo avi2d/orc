@@ -65,12 +65,14 @@ The rule and the override apply to review questions and worker questions alike.
 
 ### Settle routine review findings
 
-The policy's Rules section settles these findings only for review questions classified as `none`:
+The policy's Rules section settles these findings in a review question classified as `none`, and in an unclassified question that passes the topic check:
 
 - A fix round that landed no diff gets `fix with instructions`, and orc sends the answers to the review's other findings with the fix.
 - A missing changelog entry, in a repository whose release writes the changelog from commit subjects, gets the commit subject as its entry.
 - A merge conflict with the base branch or a failed check gets a fix from the run, which then runs the checks again.
 - A finding with one remedy inside the task's intent and one that widens it gets the remedy inside the intent.
+
+An unclassified merge conflict, or an unclassified changelog finding that names a release, still goes to you on its words.
 
 ### Handle a failed call
 
