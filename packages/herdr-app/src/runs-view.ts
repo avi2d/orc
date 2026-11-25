@@ -1,8 +1,9 @@
 import { type Color, type Context, type Element, div } from "gpui-kit"
 import { h_flex, v_flex } from "gpui-base"
-import { type Card, type CardStatus, type Filter, type FilterMenu, type RunAgent, cardPlace, filterCards, projectMenu, railLabel, statusMenu } from "./agents"
+import { type Card, type CardStatus, type Filter, type RunAgent, cardPlace, filterCards, railLabel } from "./agents"
 import { type Reading } from "./orc-read"
 import type { palette } from "./palette"
+import { type FilterMenu, projectMenu, statusMenu } from "./run-menus"
 import { openInbox } from "./views"
 
 type Palette = ReturnType<typeof palette>
@@ -56,6 +57,7 @@ const trigger = (t: Palette, name: MenuName, menu: FilterMenu<unknown>, open: Me
 
 const menuList = <A>(t: Palette, name: MenuName, menu: FilterMenu<A>, left: number, pick: (cx: Context, value: A | null) => void): Element =>
   v_flex().id(`filter-${name}-menu`).absolute().top(headerHeight + triggerHeight + 4).left(left).w(menuWidth).max_h(320).overflow_y_scrollbar()
+    .on_mouse_down("left", (_event, cx) => cx.stop_propagation())
     .p(4).gap(2).rounded(6).border_1().border_color(t.border).bg(t.raised).shadow_md()
     .children(menu.choices.map((choice) => {
       const chosen = choice === menu.chosen

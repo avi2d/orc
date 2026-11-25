@@ -329,23 +329,8 @@ export default class OrcAgents extends View {
     cx.notify()
   }
 
-  toggleFold(cx: Context): void {
-    this.folded = !this.folded
-    this.menu = null
-    cx.notify()
-  }
-
   sendBack(cx: Context): void {
     submitSendBack(this, cx)
-  }
-
-  setFilter(cx: Context, filter: Filter): void {
-    this.moveSelection(cx, () => { this.filter = filter })
-  }
-
-  openMenu(cx: Context, menu: MenuName | null): void {
-    this.menu = menu
-    cx.notify()
   }
 
   openAsked(cx: Context): void {
@@ -363,9 +348,9 @@ export default class OrcAgents extends View {
     const card = this.selectedCard()
     const act: AgentsActions = {
       select: (spot, key) => this.select(spot, key),
-      toggleFold: (spot) => this.toggleFold(spot),
-      setFilter: (spot, filter) => this.setFilter(spot, filter),
-      openMenu: (spot, menu) => this.openMenu(spot, menu),
+      toggleFold: (spot) => { this.folded = !this.folded; this.menu = null; spot.notify() },
+      setFilter: (spot, filter) => this.moveSelection(spot, () => { this.filter = filter }),
+      openMenu: (spot, menu) => { this.menu = menu; spot.notify() },
       choose: (spot, chosen) => this.choose(spot, chosen),
       setPane: (spot, pane) => this.setPane(spot, pane),
       askMerge: (asked, approval) => askMerge(approval, `${thisView}.${mergeCommand}${asked.id}`)
