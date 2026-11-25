@@ -60,7 +60,7 @@ test("opens the newest run in the local list instead of a newer run outside it",
   expect(runToOpen(runs, new Set(["20261113-100000-a"]))).toBe("20261113-100000-a")
 })
 
-test("shows no Open run when the local list misses the task instead of opening by machine", () => {
+test("shows no Open run when no run of the task is in the local list instead of opening the newest run anyway", () => {
   const runs = runsOfTask([{ id: "20261113-120000-b", branch: "orc/orc-34", machine: null }], "orc-34")
   expect(runToOpen(runs, new Set([]))).toBeNull()
 })
