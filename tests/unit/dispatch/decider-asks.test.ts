@@ -12,6 +12,7 @@ import { Asking, askingFileName, waitForAnswers } from "../../../packages/run/sr
 import { driveNoMistakes, type NoMistakesRunner } from "../../../packages/run/src/entities/review-gate/no-mistakes"
 import { type AskDecider, type DeciderRequest, decideReviewQuestions } from "../../../packages/run/src/features/decider/index"
 import { openQuestions } from "../../lib/open-questions-2026-11-25"
+import { guardReason, neverDecidedReason } from "../../../packages/run/src/features/decider/decider-guard"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -64,16 +65,18 @@ const withStartedTask = async (body: (root: string) => Promise<void>): Promise<v
   }
 }
 
-const parkThroughGate = async (root: string, stdout: string): Promise<void> => {
+const parkWithRunner = async (root: string, runner: NoMistakesRunner): Promise<void> => {
   const runDir = await mkdtemp(join(tmpdir(), "orc-decider-asks-run-"))
   try {
-    const record = await run(driveNoMistakes({ runner: parkedAt(stdout), taskFile: "/task.md", runDir }))
+    const record = await run(driveNoMistakes({ runner, taskFile: "/task.md", runDir }))
     assert.ok(Arr.isReadonlyArrayNonEmpty(record.openQuestions))
     await run(parkStartedTask(root, "orc-1", "orc/orc-1", record.openQuestions, "2026-11-02T10:35:00.000Z"))
   } finally {
     await rm(runDir, { recursive: true, force: true })
   }
 }
+
+const parkThroughGate = (root: string, stdout: string): Promise<void> => parkWithRunner(root, parkedAt(stdout))
 
 const decideAll = async (root: string, heard: Array<DeciderRequest>) => run(decideReviewQuestions(root, await run(listTasks(root)), listening(heard)))
 
@@ -89,6 +92,61 @@ const readAskingRaw = async (runDir: string, deadline: number): Promise<string> 
     }
   }
 }
+
+describe("Orc-authored question routing", () => {
+  test.each([
+    ["push", "escalated", 0],
+    ["review", "answered", 1]
+  ] as const)("a gate cap at %s retains topic routing instead of bypassing the guard", async (step, verdict, calls) => {
+    await withStartedTask(async (root) => {
+      const stdout = gateAsking("3,warning,,auto-fix,Retry the upload.,none").replace("gate: review", "gate: " + step)
+      let responses = 0
+      const runner: NoMistakesRunner = {
+        ...parkedAt(stdout),
+        respond: () => Effect.sync(() => {
+          responses += 1
+          return { stdout, stderr: "", exitCode: 0 }
+        })
+      }
+      await parkWithRunner(root, runner)
+      expect(responses).toBe(20)
+      const question = (await run(listTasks(root))).at(0)?.parked?.questions.at(0)
+      expect(question).toMatchObject({ id: "gate-cap" })
+      if (step === "push" && question !== undefined) {
+        expect(guardReason(question, "review-finding")).toBeNull()
+      }
+      const heard: Array<DeciderRequest> = []
+      const decided = await decideAll(root, heard)
+      expect(heard).toHaveLength(calls)
+      expect(decided.map((entry) => entry.verdict.kind)).toEqual([verdict])
+      if (step === "push") {
+        expect(decided.at(0)?.verdict).toMatchObject({ kind: "escalated", reason: expect.stringContaining("about pushing") })
+        expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
+        expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)?.answer).toBeNull()
+      }
+    })
+  })
+
+  test.each([
+    ["release check pending", "escalated", 0],
+    ["unit check pending", "answered", 1]
+  ] as const)("a CI-waiting question with %s retains topic routing instead of becoming a finding", async (reason, verdict, calls) => {
+    await withStartedTask(async (root) => {
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{
+        id: "ci-waiting",
+        text: "GitHub CI has not finished on abc123 for https://github.com/owner/repo/pull/1: " + reason + ". The PR stays open while the run waits on CI."
+      }], "2026-11-02T10:35:00.000Z"))
+      const heard: Array<DeciderRequest> = []
+      const decided = await decideAll(root, heard)
+      expect(heard).toHaveLength(calls)
+      expect(decided.map((entry) => entry.verdict.kind)).toEqual([verdict])
+      if (verdict === "escalated") {
+        expect(decided.at(0)?.verdict).toMatchObject({ kind: "escalated", reason: expect.stringContaining("about releasing") })
+        expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
+      }
+    })
+  })
+})
 
 describe("the asked action of a no-mistakes review question", () => {
   test("a routine question with action none reaches the decider without a guarded word", async () => {
@@ -160,14 +218,15 @@ describe("the asked action of a no-mistakes review question", () => {
     })
   })
 
-  test("an action orc does not know goes to the owner", async () => {
+  test("an unrecognized question action reaches the owner instead of the decider", async () => {
     await withStartedTask(async (root) => {
-      await parkThroughGate(root, gateAsking("question-1,warning,,ask-user,Is this branch ready?,spend"))
+      await parkThroughGate(root, gateAsking("question-1,warning,,ask-user,Is this branch ready?,inspect"))
       const heard: Array<DeciderRequest> = []
       const decided = await decideAll(root, heard)
-      expect(heard.length).toBe(0)
+      expect(heard).toHaveLength(0)
       const verdict = decided.at(0)?.verdict
       expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("which orc does not know")
+      expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
     })
   })
 
@@ -182,14 +241,28 @@ describe("the asked action of a no-mistakes review question", () => {
     })
   })
 
-  test("an unclassified question that asks for a merge still goes to the owner by its words", async () => {
+  test("an unclassified merge question reaches the owner instead of bypassing the text check", async () => {
     await withStartedTask(async (root) => {
       await parkThroughGate(root, gateAsking("question-1,warning,,ask-user,Merge this branch now?,unknown"))
       const heard: Array<DeciderRequest> = []
       const decided = await decideAll(root, heard)
-      expect(heard.length).toBe(0)
+      expect(heard).toHaveLength(0)
       const verdict = decided.at(0)?.verdict
       expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("about merging")
+      expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
+    })
+  })
+
+  test("an omitted review question reaches the owner instead of receiving an answer without text", async () => {
+    await withStartedTask(async (root) => {
+      await parkThroughGate(root, "run:\n  id: 01RUN\n  status: awaiting_approval\nreview-questions-omitted: question-5\ngate: review")
+      expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)).toMatchObject({ id: "question-5", text: "", asks: "unknown" })
+      const heard: Array<DeciderRequest> = []
+      const decided = await decideAll(root, heard)
+      expect(heard).toHaveLength(0)
+      const verdict = decided.at(0)?.verdict
+      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("carries no words")
+      expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
     })
   })
 
@@ -201,6 +274,51 @@ describe("the asked action of a no-mistakes review question", () => {
       expect(heard.length).toBe(0)
       const verdict = decided.at(0)?.verdict
       expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("about merging")
+    })
+  })
+
+  test.each([
+    "The normal send-back path deletes the terminal result before the App can show it. Preserve the existing optional merge record when constructing both closed states.",
+    "A beat can therefore erase the result before the next App poll. Preserve the existing optional merge record when constructing both closed states.",
+    "The step selection is accepted at packages/herdr-app/mods/orc-agents/main.ts:270-272, but this return always replaces its output with the merge note.",
+    "After a conflict or red check sends a task back, the next beat can fail to spawn the start command or write its token before the App's completion refresh reads the backlog. The closed state constructed at packages/run/src/widgets/beat/beat.ts:143 discards merge, so JSON returns merge:null and the App shows the raw refusal again."
+  ])("a finding reaches the decider instead of routing its code description to the owner: %s", async (description) => {
+    expect(neverDecidedReason(description)).not.toBeNull()
+    await withStartedTask(async (root) => {
+      await parkThroughGate(root, gateAsking("3,warning,,ask-user," + JSON.stringify(description), "id,severity,file,action,description"))
+      const heard: Array<DeciderRequest> = []
+      const decided = await decideAll(root, heard)
+      expect(heard).toHaveLength(1)
+      expect(decided.map((entry) => entry.verdict.kind)).toEqual(["answered"])
+    })
+  })
+
+  test.each([
+    "inspect",
+    "go-public",
+    "share",
+    "merge the PR",
+    "delete the branch",
+    "delete files outside the task",
+    "log in",
+    "publish the release",
+    "push the branch",
+    "make the repository public",
+    "spend money",
+    "change the privacy policy",
+    "change the screenshot",
+    "rotate the access token",
+    "change security",
+    "make it irreversible"
+  ])("a finding with unrecognized action %s reaches the owner instead of the decider", async (action) => {
+    await withStartedTask(async (root) => {
+      await parkThroughGate(root, gateAsking("3,warning,,ask-user,Choose the next step.," + action))
+      const heard: Array<DeciderRequest> = []
+      const decided = await decideAll(root, heard)
+      expect(heard).toHaveLength(0)
+      const verdict = decided.at(0)?.verdict
+      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("which orc does not know")
+      expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
     })
   })
 

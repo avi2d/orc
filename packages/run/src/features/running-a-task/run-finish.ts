@@ -1,11 +1,11 @@
 import { Effect, FileSystem } from "effect"
 import { driveNoMistakes, waitForAnswers, type AllowWord, type OpenQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
-import { ciVerdictLine, type CiVerdict, type DirectPrRecord, openDirectPr, type PullRequestOpener, readCiVerdict } from "../../entities/pull-request/index"
+import { ciWaitingQuestionId, ciVerdictLine, type CiVerdict, type DirectPrRecord, openDirectPr, type PullRequestOpener, readCiVerdict } from "../../entities/pull-request/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
 import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
-import { ciWaitingQuestionId, type RunCheckpoints, type SandboxOps } from "./run-ops"
+import type { RunCheckpoints, SandboxOps } from "./run-ops"
 import { recordOpenAsks } from "./history-write"
 import { reviewSentence, reviewAtHead } from "./review-turn"
 

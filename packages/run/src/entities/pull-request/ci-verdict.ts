@@ -2,6 +2,8 @@ import { Effect, Result, Schema } from "effect"
 import { prPattern } from "./pr-view"
 import type { CommandReply } from "./direct-pr"
 
+export const ciWaitingQuestionId = "ci-waiting"
+
 const CheckRun = Schema.Struct({
   id: Schema.Number,
   name: Schema.String,

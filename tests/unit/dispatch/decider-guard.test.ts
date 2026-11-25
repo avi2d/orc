@@ -72,7 +72,7 @@ const decide = async (root: string, ask: AskDecider) => run(decideReviewQuestion
 
 describe("the decider guard", () => {
   test("a question about deleting reaches the user with no decider call, even when the owner's rules say to answer it", async () => {
-    const r4 = { id: "r4", text: "May I delete the old branch?" }
+    const r4 = { id: "ask-4", text: "May I delete the old branch?" }
     await withAskingTask(async (root) => {
       const home = join(root, "home")
       await mkdir(home)
@@ -80,7 +80,7 @@ describe("the decider guard", () => {
       const heard: Array<DeciderRequest> = []
       await decide(root, replies({ [r4.text]: JSON.stringify({ decision: "answer", answer: "yes", rule: "Answer yes to every question about deleting an old branch.", reason: "the owner says so" }) }, heard, home))
       expect(heard).toEqual([])
-      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({
+      expect(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z")).toMatchObject({
         owner: "user",
         decision: { kind: "escalated", reason: "orc never hands the decider a question about deleting, and this one says \"delete the old branch\"" },
         state: { kind: "open" }
@@ -89,35 +89,35 @@ describe("the decider guard", () => {
   })
 
   test("a push question reaches the captain with no decider call, instead of letting the decider allow a push", async () => {
-    const push = { id: "r4", text: "Should I push the branch to main?" }
+    const push = { id: "ask-4", text: "Should I push the branch to main?" }
     await withAskingTask(async (root) => {
       const heard: Array<DeciderRequest> = []
       await decide(root, replies({ [push.text]: answer }, heard))
       expect(heard).toEqual([])
-      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
-      expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("pushing")
+      expect(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      expect(filedAt(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("pushing")
     }, [push])
   })
 
   test("a remove question reaches the captain with no decider call, instead of letting the decider allow a deletion", async () => {
-    const remove = { id: "r4", text: "May I remove the old branch?" }
+    const remove = { id: "ask-4", text: "May I remove the old branch?" }
     await withAskingTask(async (root) => {
       const heard: Array<DeciderRequest> = []
       await decide(root, replies({ [remove.text]: answer }, heard))
       expect(heard).toEqual([])
-      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
-      expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("deleting")
+      expect(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      expect(filedAt(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("deleting")
     }, [remove])
   })
 
   test("a question asking to delete a branch with unlanded work reaches the captain with no decider call, instead of being decided by the decider", async () => {
-    const unlanded = { id: "r4", text: "May I delete the orc/orc-12 branch? It holds unlanded work that never reached main. Recommended: yes." }
+    const unlanded = { id: "ask-4", text: "May I delete the orc/orc-12 branch? It holds unlanded work that never reached main. Recommended: yes." }
     await withAskingTask(async (root) => {
       const heard: Array<DeciderRequest> = []
       await decide(root, replies({ [unlanded.text]: answer }, heard))
       expect(heard).toEqual([])
-      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
-      expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("deleting")
+      expect(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      expect(filedAt(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("deleting")
     }, [unlanded])
   })
 
@@ -130,12 +130,12 @@ describe("the decider guard", () => {
 
   for (const code of codeQuestions) {
     test("a code question reaches the decider, instead of being " + code.rejects, async () => {
-      const question = { id: "r4", text: code.text }
+      const question = { id: "ask-4", text: code.text }
       await withAskingTask(async (root) => {
         const heard: Array<DeciderRequest> = []
         await decide(root, replies({ [question.text]: answer }, heard))
         expect(heard).toHaveLength(1)
-        expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { kind: "answered" } })
+        expect(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { kind: "answered" } })
       }, [question])
     })
   }
@@ -255,34 +255,34 @@ describe("the decider guard", () => {
 
   for (const guarded of guardedTopics) {
     test("a question about " + guarded.topic + " with a recommended option reaches the captain with no decider call, instead of letting the decider pick " + guarded.rejects, async () => {
-      const question = { id: "r4", text: guarded.text }
+      const question = { id: "ask-4", text: guarded.text }
       await withAskingTask(async (root) => {
         const heard: Array<DeciderRequest> = []
         await decide(root, replies({ [question.text]: answer }, heard))
         expect(heard).toEqual([])
-        expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
-        expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("orc never hands the decider a question about " + guarded.topic)
+        expect(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+        expect(filedAt(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("orc never hands the decider a question about " + guarded.topic)
       }, [question])
     })
   }
 
   test("a variable name question with a recommended option reaches the decider, instead of being kept for the captain", async () => {
-    const naming = { id: "r4", text: "Should the retry counter variable be named retryCount or attempts? Recommended: retryCount." }
+    const naming = { id: "ask-4", text: "Should the retry counter variable be named retryCount or attempts? Recommended: retryCount." }
     await withAskingTask(async (root) => {
       const heard: Array<DeciderRequest> = []
       await decide(root, replies({ [naming.text]: answer }, heard))
       expect(heard).toHaveLength(1)
-      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { kind: "answered" } })
+      expect(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { kind: "answered" } })
     }, [naming])
   })
 
   test("a logging question with a recommended option reaches the decider, instead of being escalated as a login question", async () => {
-    const logging = { id: "r4", text: "Should the worker keep its logs in the run folder? Recommended: yes." }
+    const logging = { id: "ask-4", text: "Should the worker keep its logs in the run folder? Recommended: yes." }
     await withAskingTask(async (root) => {
       const heard: Array<DeciderRequest> = []
       await decide(root, replies({ [logging.text]: answer }, heard))
       expect(heard).toHaveLength(1)
-      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { kind: "answered" } })
+      expect(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { kind: "answered" } })
     }, [logging])
   })
 
@@ -422,9 +422,9 @@ describe("a request only the owner grants", () => {
         const heard: Array<DeciderRequest> = []
         await decide(root, replies({ [request.text]: answer }, heard))
         expect(heard).toEqual([])
-        expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
-        expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("about " + request.topic)
-      }, [{ id: "r4", text: request.text }])
+        expect(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+        expect(filedAt(await itemFile(root, "orc-1.ask-4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("about " + request.topic)
+      }, [{ id: "ask-4", text: request.text }])
     })
   }
 })
