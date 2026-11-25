@@ -1,5 +1,6 @@
 import { Effect, FileSystem } from "effect"
-import { BacklogError, listTasks, childCount, dependencyWaits, isHeld, newGrab, parseTaskFile, ranClosing, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { BacklogError, listTasks, childCount, dependencyWaits, isHeld, newGrab, parseTaskFile, ranClosing, taskLandedIn, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { withdrawTaskItems } from "../../entities/attention/index"
 import { mergedIds } from "../../entities/events/index"
 
 type Requirements = FileSystem.FileSystem
@@ -44,7 +45,7 @@ export const planText = (root: string, id: string): Effect.Effect<string, Backlo
     const merged = yield* mergedIds(root)
     const parent = yield* parentIn(tasks, id)
     const count = childCount(parent, tasks, merged)
-    const children = tasks.filter((task) => task.spec.parent === id)
+    const children = tasks.filter((task) => task.spec.parent === id && taskLandedIn(task) === null)
     return [
       parent.spec.id + " parent " + parent.spec.project + " " + count.done + " of " + count.total + " done " + parent.spec.title,
       parent.spec.split === null ? "split by hand" : "split at " + parent.spec.split.by + ": " + parent.spec.split.reason,
@@ -84,7 +85,7 @@ const removeNew = (root: string, child: TaskRecord, parent: string, tasks: Reado
     yield* fs.remove(grabbed).pipe(Effect.mapError((error) => new BacklogError({ detail: "cannot remove " + grabbed + ": " + error.message })))
   })
 
-export const dropChild = (root: string, parent: string, child: string): Effect.Effect<string, BacklogError | TaskFileError, Requirements> =>
+export const dropChild = (root: string, parent: string, child: string, at: string): Effect.Effect<string, BacklogError | TaskFileError, Requirements> =>
   Effect.gen(function*() {
     const tasks = yield* listTasks(root)
     const record = yield* parentIn(tasks, parent)
@@ -97,6 +98,7 @@ export const dropChild = (root: string, parent: string, child: string): Effect.E
       return yield* new BacklogError({ detail: refused })
     }
     yield* removeNew(root, dropped, parent, tasks)
+    yield* withdrawTaskItems(root, [child], at)
     const left = childCount(record, tasks.filter((task) => task.spec.id !== child), yield* mergedIds(root))
     return "dropped " + child + " from the plan of " + parent + ", which now waits on " + left.total + " children, " + left.done + " of them done"
   })

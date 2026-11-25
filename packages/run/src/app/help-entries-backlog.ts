@@ -49,11 +49,11 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
     examples: ["orc backlog origin orc-9 linux-box run-42"]
   },
   close: {
-    usage: ["orc backlog close <task-id> <done|failed> [<reason>]"],
-    summary: "Close a task by hand as done or failed",
-    about: "Closes a started task as done or failed, with an optional reason, for a machine whose start command orc does not run. On a decision, failed drops it, and done is refused, since only orc backlog answer closes a decision done.",
+    usage: ["orc backlog close <task-id> <done|failed> [<reason>]", "orc backlog close <task-id> --landed-in <pr-url>"],
+    summary: "Close a started task or a parked task whose work landed elsewhere",
+    about: "Closes a started task as done or failed. For a parked task, --landed-in records where the work merged and closes the task done without changing its branch. For a decision, failed drops it, and only orc backlog answer closes it done.",
     options: [],
-    examples: ["orc backlog close orc-9 failed \"the machine was rebuilt\""]
+    examples: ["orc backlog close orc-9 failed \"the runner lost the worktree\"", "orc backlog close orc-9 --landed-in https://github.com/example/project/pull/42"]
   },
   stop: {
     usage: ["orc backlog stop <task-id>"],
@@ -131,7 +131,7 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
   plan: {
     usage: ["orc backlog plan <task-id> [--drop <task-id>]"],
     summary: "Show a parent task's plan, or drop a child from it",
-    about: "Prints a parent task's count, how it was split, and one line per child with its state and what it waits on.",
+    about: "Prints a parent task's progress, how it was split, and what each child waits on. Children closed with --landed-in count as done but leave the list.",
     options: [{ flag: "--drop <task-id>", meaning: "Remove this new child from the plan." }],
     examples: ["orc backlog plan orc-12", "orc backlog plan orc-12 --drop orc-14"]
   },

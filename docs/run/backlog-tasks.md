@@ -65,6 +65,15 @@ Orc records the reason, withdraws attention items, and posts the close in chat.
 Use `orc backlog stop` for a taken or started task and `orc backlog plan <parent> --drop <child>` for a child.
 A parent with an open child or a task another open task depends on cannot be dropped.
 
+### Close a parked task whose work merged elsewhere
+
+Run `orc backlog close <task-id> --landed-in <pr-url>` with the full URL of the merged PR.
+Orc records that URL in the close reason and marks the parked task done.
+The task leaves its parent's list of children but still counts toward the parent's done total.
+Tasks that depend on it no longer wait for it.
+Orc withdraws the task's open attention items and leaves the parked run's branch and PR untouched.
+The command records your decision without checking the PR on the forge.
+
 ### Send a task back
 
 Run `orc backlog send-back <task-id> <words>` to request another pass on a closed task's open PR.
@@ -98,6 +107,7 @@ Every task in `orc backlog --json` carries `prState` as `open`, `closed`, `merge
 A recorded `<task-id>.merged` event makes it `merged`, and a recorded `<task-id>.pr-closed` event makes it `closed`.
 Without either event it is the last state the beat read for the PR.
 `orc backlog --json` reads those records without contacting the forge.
+For a task closed with `--landed-in`, `landedIn` names the merged PR instead of `pr`.
 
 The beat prints `closed <task-id> <done|failed|stopped> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds, until it stays unread for 10 minutes.
 

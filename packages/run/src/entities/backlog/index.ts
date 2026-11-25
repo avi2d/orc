@@ -77,6 +77,8 @@ export {
   fullPrUrl,
   ranClosing,
   decisionAnswer,
+  landedClosing,
+  taskLandedIn,
   isCalendarDate,
   taskPriorities,
   isTaskPriority,

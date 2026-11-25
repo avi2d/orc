@@ -2,10 +2,10 @@ import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs } from "./dispatch-args"
 import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted, runLabel, backlogPresent, backlogRoot as backlogRootOf, noBacklog, type TaskFileError } from "../entities/backlog/index"
-import { readAttention, routeTaskItems } from "../entities/attention/index"
+import { readAttention, routeTaskItems, withdrawTaskItems } from "../entities/attention/index"
 import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readBeatWaits, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText, taskPrState } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
-import { dropTask, edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
+import { closeLandedTask, dropTask, edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
 import { type ConfigError, readFailure, type DispatchConfig, readDispatchConfig, readProjects } from "../shared/config/index"
 import { holdRun, sendBack, killHeld, queueFromText, renewTask, startTask, stopNow, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson, ensureAlertStream, liveAlertStream } from "../features/queueing-a-task/index"
@@ -139,8 +139,7 @@ const closeDecision = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }
       return yield* new BacklogError({ detail: args.id + " is a decision, so it closes done only by its answer: orc backlog answer " + args.id + " <words>" })
     }
     const reason = args.reason.trim() === "" ? "the captain dropped the decision" : args.reason
-    const dropped = yield* dropTask(backlogRoot(place), args.id, reason, at)
-    yield* routeTaskItems(backlogRoot(place), [dropped], at)
+    yield* dropTask(backlogRoot(place), args.id, reason, at)
     return "dropped " + args.id + ": " + reason
   })
 
@@ -150,16 +149,23 @@ const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, pl
     if ((yield* findTask(backlogRoot(place), args.id)).spec.kind === "decision") {
       return yield* closeDecision(args, place, at)
     }
-    const closed = yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, { pr: null, report: null }, at)
-    yield* routeTaskItems(backlogRoot(place), [closed], at)
+    yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, { pr: null, report: null }, at)
+    yield* withdrawTaskItems(backlogRoot(place), [args.id], at)
     return "closed " + args.id + " " + args.outcome
+  })
+
+const closeLandedNow = (args: Extract<CommandArgs, { readonly kind: "CloseLandedTask" }>, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    const root = backlogRoot(place)
+    const at = DateTime.formatIso(yield* DateTime.now)
+    const reason = yield* closeLandedTask(root, args.id, args.pr, at)
+    return "closed " + args.id + " done: " + reason
   })
 
 const dropNow = (args: Extract<CommandArgs, { readonly kind: "DropTask" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
     const at = DateTime.formatIso(yield* DateTime.now)
-    const dropped = yield* dropTask(backlogRoot(place), args.id, args.reason, at)
-    yield* routeTaskItems(backlogRoot(place), [dropped], at)
+    yield* dropTask(backlogRoot(place), args.id, args.reason, at)
     return "dropped " + args.id + ": " + args.reason
   })
 
@@ -194,10 +200,11 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
   Effect.gen(function*() {
     const at = DateTime.formatIso(yield* DateTime.now)
     const answered = yield* answerTask(backlogRoot(place), args.id, args.words, at, args.expect)
-    yield* routeTaskItems(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)], at)
     if (answered.kind === "decision") {
+      yield* withdrawTaskItems(backlogRoot(place), [args.id], at)
       return "answered " + args.id + " and closed it done, so the tasks that wait on it may start"
     }
+    yield* routeTaskItems(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)], at)
     if (answered.kind === "hold") {
       return "answered " + args.id + ", so the beat may start it"
     }
@@ -217,7 +224,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "SendBack" | "NoteTask" | "ShowThread" | "DependTask" | "PrioritizeTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "CloseLandedTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "SendBack" | "NoteTask" | "ShowThread" | "DependTask" | "PrioritizeTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -232,6 +239,9 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "CloseTask": {
       return closeNow(args, place)
+    }
+    case "CloseLandedTask": {
+      return closeLandedNow(args, place)
     }
     case "DropTask": {
       return dropNow(args, place)
@@ -270,7 +280,7 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
       return planText(backlogRoot(place), args.parent)
     }
     case "DropChild": {
-      return dropChild(backlogRoot(place), args.parent, args.child)
+      return DateTime.now.pipe(Effect.flatMap((now) => dropChild(backlogRoot(place), args.parent, args.child, DateTime.formatIso(now))))
     }
   }
 }
@@ -327,6 +337,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       case "EditTask":
       case "RecordOrigin":
       case "CloseTask":
+      case "CloseLandedTask":
       case "DropTask":
       case "MarkPosted":
       case "MarkEventPosted":

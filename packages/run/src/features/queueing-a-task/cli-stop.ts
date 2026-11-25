@@ -1,7 +1,7 @@
 import { DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, backlogPaths, closeStartedTask, listTasks, runLabel, type TaskFileError } from "../../entities/backlog/index"
-import { routeTaskItems } from "../../entities/attention/index"
+import { withdrawTaskItems } from "../../entities/attention/index"
 import { readDispatchConfig } from "../../shared/config/index"
 import type { ConfigError } from "../../shared/config/index"
 import { ownedBySweep, throughFor } from "../../shared/config/index"
@@ -40,7 +40,7 @@ export const stopNow = (
       : yield* readResultThrough(through, id, label).pipe(Effect.orElseSucceed(() => null))
     const closed = after?.run ?? null
     const at = DateTime.formatIso(yield* DateTime.now)
-    const ended = yield* closeStartedTask(root, id, "stopped", closed?.endReason ?? "the captain stopped " + id, { pr: closed?.prLink ?? null, report: null }, at)
-    yield* routeTaskItems(root, [ended], at)
+    yield* closeStartedTask(root, id, "stopped", closed?.endReason ?? "the captain stopped " + id, { pr: closed?.prLink ?? null, report: null }, at)
+    yield* withdrawTaskItems(root, [id], at)
     return line
   })

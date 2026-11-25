@@ -1,6 +1,6 @@
 import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
+import { answeredOnly, backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
 import type { ConfigError } from "../../shared/config/index"
 import { type Account, type DispatchConfig, isYolo, type Machine, type Project, providerOf, readDispatchConfig, readProjects } from "../../shared/config/index"
 import { type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
@@ -10,7 +10,7 @@ import { checkToken, type TokenCache } from "./beat-token"
 import type { BeatAction, Progress } from "../../entities/attention/index"
 import { closeFinished } from "./beat-close"
 import { parkedResumeWait } from "./beat-resume"
-import { type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems } from "../../entities/attention/index"
+import { type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems, withdrawTaskItems } from "../../entities/attention/index"
 import { attentionActions } from "./beat-attention"
 import { type AskDecider, askDeciderWithPi, decideReviewQuestions } from "../../features/decider/index"
 import { handAnswersToResume } from "../../entities/parked-runs/index"
@@ -133,10 +133,15 @@ const startTask = (
     if (result.kind === "started") {
       return { kind: "started", task: task.spec.id, machine: machine.name, account: claim.account, log } satisfies BeatAction
     }
-    yield* publishClosed(root, {
+    const at = yield* nowIso
+    const closed = yield* publishClosed(root, {
       ...task,
-      state: { kind: "closed", claim, closing: { outcome: "start-failed", reason: result.reason }, closedAt: yield* nowIso, postedAt: null }
+      parked: answeredOnly(task.parked),
+      state: { kind: "closed", claim, closing: { outcome: "start-failed", reason: result.reason }, closedAt: at, postedAt: null }
     })
+    if (closed) {
+      yield* withdrawTaskItems(root, [task.spec.id], at)
+    }
     return { kind: "start-failed", task: task.spec.id, machine: machine.name, reason: result.reason } satisfies BeatAction
   })
 
@@ -307,6 +312,12 @@ export interface BeatSources {
 
 export const liveSources = (home: string): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream, askDecider: askDeciderWithPi(home), readBaseCi })
 
+const withdrawNewlyClosedItems = (root: string, before: ReadonlyArray<TaskRecord>, after: ReadonlyArray<TaskRecord>, at: string) => {
+  const open = new Set(before.filter((task) => task.state.kind !== "closed").map((task) => task.spec.id))
+  const closed = after.filter((task) => task.state.kind === "closed" && open.has(task.spec.id)).map((task) => task.spec.id)
+  return withdrawTaskItems(root, closed, at)
+}
+
 const decideAndRelay = (
   root: string,
   context: BeatContext,
@@ -325,7 +336,8 @@ const decideAndRelay = (
       : yield* Effect.forEach(latest.filter((task) => task.state.kind === "started" && answeredTasks.has(task.spec.id) && firstRunning.has(task.spec.id)), (task) => closeFinished(context, task))
     const relayed = settledProgress(relayProgress)
     releaseClosedSlots(context.live, relayed.closed)
-    return { latest, relayed }
+    const changed = relayed.closed.some((action) => action.kind === "closed" || action.kind === "split")
+    return { latest: changed ? yield* listTasks(root) : latest, relayed }
   })
 
 const yoloTask = (projects: ReadonlyArray<Project>, task: TaskRecord): boolean =>
@@ -367,9 +379,11 @@ export const runBeat = (
     releaseClosedSlots(context.live, settled.closed)
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
     const current = yield* listTasks(root)
+    yield* withdrawNewlyClosedItems(root, tasks, current, at)
     yield* routeTaskItems(root, current, at)
     yield* routeRunItems(root, started, progress, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
+    yield* withdrawNewlyClosedItems(root, current, latest, at)
     const { reported, queue, deciderOwns } = yield* attentionActions(root, latest, [...settled.closed, ...relayed.closed, ...settled.asking, ...relayed.asking], at)
     const queued = latest.filter((task) => task.state.kind === "new").toSorted(startOrder)
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)

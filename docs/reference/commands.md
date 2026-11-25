@@ -197,7 +197,7 @@ Subcommands:
   add        Add a task to the backlog
   edit       Replace the text of a task that has not started
   origin     Record where a parked task's run lives
-  close      Close a task by hand as done or failed
+  close      Close a started task or a parked task whose work landed elsewhere
   stop       Kill a task's run and close the task stopped
   drop       Drop a new task with a reason
   posted     Mark a closed task or an event as posted to the chat
@@ -278,13 +278,15 @@ Examples:
 
 ```text
 Usage: orc backlog close <task-id> <done|failed> [<reason>]
+       orc backlog close <task-id> --landed-in <pr-url>
 
-Closes a started task as done or failed, with an optional reason, for a machine
-whose start command orc does not run. On a decision, failed drops it, and done
-is refused, since only orc backlog answer closes a decision done.
+Closes a started task as done or failed. For a parked task, --landed-in records
+where the work merged and closes the task done without changing its branch. For
+a decision, failed drops it, and only orc backlog answer closes it done.
 
 Examples:
-  orc backlog close orc-9 failed "the machine was rebuilt"
+  orc backlog close orc-9 failed "the runner lost the worktree"
+  orc backlog close orc-9 --landed-in https://github.com/example/project/pull/42
 ```
 
 #### orc backlog stop
@@ -437,8 +439,8 @@ Examples:
 ```text
 Usage: orc backlog plan <task-id> [--drop <task-id>]
 
-Prints a parent task's count, how it was split, and one line per child with its
-state and what it waits on.
+Prints a parent task's progress, how it was split, and what each child waits on.
+Children closed with --landed-in count as done but leave the list.
 
 Options:
   --drop <task-id>  Remove this new child from the plan.
