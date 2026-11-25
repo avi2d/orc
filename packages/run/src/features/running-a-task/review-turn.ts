@@ -122,22 +122,18 @@ export const reviewAtHead = (
   priorDir: string | null
 ): Effect.Effect<ReviewOutcome> =>
   Effect.gen(function*() {
-    const headOfBranch = () => runGit(run.spawner, run.git, ["rev-parse", "--verify", run.branch], run.worktreeDir).pipe(
+    const head = yield* runGit(run.spawner, run.git, ["rev-parse", "--verify", run.branch], run.worktreeDir).pipe(
       Effect.map((result) => result.exitCode === 0 ? result.stdout.trim() : ""),
       Effect.orElseSucceed(() => "")
     )
-    const head = yield* headOfBranch()
     const saved = priorDir === null ? null : yield* run.fs.readFileString(run.path.join(priorDir, checkpointFileName)).pipe(Effect.orElseSucceed(() => null))
     const decoded = saved === null ? Option.none() : decodeCheckpoint(saved)
     const outcome = head !== "" && Option.isSome(decoded) && decoded.value.head === head
       ? yield* recordReview(run, decoded.value.outcome.findings)
       : yield* runReviewTurn(run, runAgent, reviewer)
-    const after = yield* headOfBranch()
-    if (outcome.status === "passed" && head !== "" && head === after) {
+    if (outcome.status === "passed" && head !== "") {
       const file = run.path.join(run.runDir, checkpointFileName)
-      yield* run.fs.writeFileString(file, JSON.stringify({ head, outcome }) + "\n").pipe(
-        Effect.ignore
-      )
+      yield* run.fs.writeFileString(file, JSON.stringify({ head, outcome }) + "\n").pipe(Effect.result)
     }
     return outcome
   })
