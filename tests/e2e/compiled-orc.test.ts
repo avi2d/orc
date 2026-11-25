@@ -13,6 +13,31 @@ const repoRoot = fileURLToPath(new URL("../..", import.meta.url))
 const compiledOrc = join(repoRoot, "packages/run/dist/orc")
 const sourceOrc = [process.execPath, join(repoRoot, "packages/run/src/bin.ts")]
 const compileTimeout = 300_000
+const baseline = "d01fbf7ba11da25ea8f847c53ab91ab8b9d10360"
+
+const compileBaseline = async (outfile: string): Promise<void> => {
+  const bin = join(repoRoot, "packages/run/src/bin.ts")
+  const chat = join(repoRoot, "packages/run/src/features/chat")
+  const original = Bun.spawnSync(["git", "show", baseline + ":packages/run/src/bin.ts"], { cwd: repoRoot, stdout: "pipe", stderr: "pipe" })
+  if (original.exitCode !== 0) {
+    throw new Error(original.stderr.toString())
+  }
+  const tools = await Bun.build({ entrypoints: [join(chat, "chat-tools.ts")], target: "node", format: "esm" })
+  const built = await Bun.build({
+    entrypoints: [bin],
+    compile: { outfile },
+    bytecode: true,
+    format: "esm",
+    files: {
+      [bin]: original.stdout.toString(),
+      [join(chat, "chat-tools-bundle.ts")]: 'import file from "./orc-chat-tools.js" with { type: "file" }\nexport const chatToolsBundle: string | null = file\n',
+      [join(chat, "orc-chat-tools.js")]: await tools.outputs[0].text()
+    }
+  })
+  if (!built.success) {
+    throw new Error(built.logs.map((log) => log.message).join("\n"))
+  }
+}
 
 interface Ran {
   readonly exitCode: number
@@ -80,6 +105,18 @@ const withFixture = async (body: (fixture: Fixture) => Promise<void>, pi: string
   }
 }
 
+const pythonStandinResult = async (orc: string, { dir, env }: Fixture): Promise<Ran> => {
+  await writeFile(join(dir, "bin", "python3"), "#!/bin/sh\nprintf '<%s>\\n' \"$@\"\n", { mode: 0o755 })
+  const setup = await run([orc, "heavy", "path"], { ...env, HEAVY_QUEUE_BYPASS: "fixture" }, dir)
+  expect(setup.exitCode).toBe(0)
+  return run([join(setup.stdout.trim(), "python3"), "-c", "print(1)", "a b", ""], { ...env, HEAVY_QUEUE_UNREACHABLE: "1" }, dir)
+}
+
+const expectPythonResult = (result: Ran): void => {
+  expect(result.exitCode).toBe(0)
+  expect(result.stdout).toBe("<-c>\n<print(1)>\n<a b>\n<>\n")
+}
+
 const seedRun = async (home: string): Promise<void> => {
   const db = await Effect.runPromise(openDatabase(home).pipe(Effect.provide(BunServices.layer)))
   try {
@@ -110,6 +147,40 @@ const seedRun = async (home: string): Promise<void> => {
 }
 
 describe("compiled orc", () => {
+  test("a generated python stand-in passes each argument instead of treating its settings as a command", async () => {
+    await compileOrc()
+    await withFixture(async (fixture) => {
+      expectPythonResult(await pythonStandinResult(compiledOrc, fixture))
+    })
+  }, compileTimeout)
+
+  test("the same python assertion rejects the pre-fix compiled CLI", async () => {
+    await withFixture(async (fixture) => {
+      const oldOrc = join(fixture.dir, "old-orc")
+      await compileBaseline(oldOrc)
+      const result = await pythonStandinResult(oldOrc, fixture)
+      expect(result.stderr).toContain("unknown command:")
+      expect(() => expectPythonResult(result)).toThrow()
+    })
+  }, compileTimeout)
+
+  test("compiled helper words reach the waiter and CI guards instead of the CLI usage error", async () => {
+    await compileOrc()
+    await withFixture(async ({ dir, env }) => {
+      const waiter = await run([compiledOrc, "orc-heavy-wait", String(process.pid), "/bin/sh", "-c", 'printf "%s" "$1"', "sh", "a b"], env, dir)
+      expect(waiter.exitCode).toBe(0)
+      expect(waiter.stdout).toBe("a b")
+
+      const ciOnly = await run([compiledOrc, "orc-ci-only", "pi", join(dir, "absent"), "-c", "echo ok"], env, dir)
+      expect(ciOnly.exitCode).toBe(0)
+      expect(ciOnly.stdout).toBe(join(dir, "bin", "pi"))
+
+      const ciPath = await run([compiledOrc, "orc-ci-only-path", "./node_modules/.bin/vitest run"], { ...env, HEAVY_TESTS_CI_ONLY: "1" }, dir)
+      expect(ciPath.exitCode).toBe(1)
+      expect(ciPath.stderr).toContain("repository tests run only in GitHub CI")
+    })
+  }, compileTimeout)
+
   test("bun run compile builds one bytecode file that answers help, beat, score, show, chat's self command and reads its embedded agent file", async () => {
     await compileOrc()
     await withFixture(async ({ dir, env }) => {
