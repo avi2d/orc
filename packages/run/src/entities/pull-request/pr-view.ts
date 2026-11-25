@@ -46,7 +46,7 @@ const newestRuns = (runs: ReadonlyArray<CheckRun>): ReadonlyArray<CheckRun> => {
   for (const run of runs) {
     const key = runScope(run) + "\0" + run.name
     const seen = newest.get(key)
-    if (seen === undefined || run.startedAt > seen.startedAt) {
+    if (seen === undefined || (run.status !== "COMPLETED" && seen.status === "COMPLETED") || (run.status === seen.status && run.startedAt > seen.startedAt)) {
       newest.set(key, run)
     }
   }
