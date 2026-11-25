@@ -11,7 +11,8 @@ Select **Resources** or press `cmd-2` to see quota and machine capacity.
 ![Board showing example garden tasks in five lanes](images/herdr-board.png)
 
 The Board places new tasks in Planned, running tasks in Running, and closed tasks in Done.
-Held tasks, unanswered questions, open attention items for you, and closed tasks with an open PR appear in Awaiting you.
+A task appears in Awaiting you when the Inbox lists an item for it, so the lane and the Inbox agree.
+A question the agent owns leaves the task in its own lane.
 Backlog stays empty.
 A queued card names the machine and, when available, how many tasks are ahead.
 

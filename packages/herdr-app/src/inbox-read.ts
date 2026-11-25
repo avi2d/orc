@@ -1,36 +1,30 @@
-import { askingRuns, attention } from "./guard-attention"
-import { type InboxItem, type InboxSources, inboxItems, inboxTasks } from "./inbox"
+import { type AttentionItem, type AttentionQueue, type DecidedAttention, attention } from "./guard-attention"
+import { type InboxItem, inboxItems } from "./inbox"
 import { type Reading, readJson } from "./orc-read"
-import { taskDetails, thread } from "./task-guard"
-import type { Thread } from "./thread"
+import type { TaskDetail } from "./task"
+import { taskDetails } from "./task-guard"
+
+export interface AgentAttention {
+  readonly pending: ReadonlyArray<AttentionItem>
+  readonly decided: ReadonlyArray<DecidedAttention>
+}
 
 export interface InboxDocuments {
   readonly items: ReadonlyArray<InboxItem>
-  readonly unread: ReadonlyMap<string, string>
+  readonly agent: AgentAttention
 }
 
-export const readInboxItems = (sources: Omit<InboxSources, "threads">): Promise<InboxDocuments> =>
-  Promise.all(inboxTasks(sources).map((id) =>
-    readJson("orc", ["backlog", "thread", id, "--json"], thread).then((reading) => ({ id, reading }))
-  )).then((told) => {
-    const threads = new Map<string, Thread>()
-    const unread = new Map<string, string>()
-    for (const { id, reading } of told) {
-      if (reading.kind === "failed") unread.set(id, reading.reason)
-      if (reading.kind === "ok") threads.set(reading.value.task, reading.value)
-    }
-    return { items: inboxItems({ ...sources, threads }), unread }
-  })
+export const inboxDocuments = (backlog: ReadonlyArray<TaskDetail>, queue: AttentionQueue): InboxDocuments => ({
+  items: inboxItems(backlog, queue.items),
+  agent: { pending: queue.items.filter((item) => item.owner === "decider"), decided: queue.decided }
+})
 
 export const readInbox = (): Promise<Reading<InboxDocuments>> =>
   Promise.all([
     readJson("orc", ["backlog", "--json"], taskDetails),
-    readJson("orc", ["attention", "--json"], attention),
-    readJson("orc", ["runs", "--json"], askingRuns)
-  ]).then(([backlog, asked, runs]) => {
+    readJson("orc", ["attention", "--json"], attention)
+  ]).then(([backlog, asked]) => {
     if (backlog.kind !== "ok") return backlog
     if (asked.kind !== "ok") return asked
-    if (runs.kind !== "ok") return runs
-    return readInboxItems({ backlog: backlog.value, attention: asked.value, runs: runs.value })
-      .then((value) => ({ kind: "ok" as const, value }))
+    return { kind: "ok", value: inboxDocuments(backlog.value, asked.value) }
   })

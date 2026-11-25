@@ -2,14 +2,12 @@ import { type Color, type Context, type Element, div } from "gpui-kit"
 import { Input, type InputState, type ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { openOverlay } from "herdr"
 import { monospace } from "./fonts"
-import { type Card, type Mark, type StepRow, approveRow, cardAnswers, namedModels, opensTurns, prNumber, sendBackArgs, stepRows } from "./agents"
+import { type Card, type Mark, type StepRow, approveRow, namedModels, opensTurns, prNumber, sendBackArgs, stepRows } from "./agents"
 import { type ChecksSummary, logLines } from "./checks"
 import { checksView } from "./checks-view"
 import type { RunsActions } from "./runs-view"
 import type { Show, ShownStep } from "./guard"
-import { optionView } from "./ask-view"
-import type { InboxAnswer, InboxApproval } from "./inbox"
-import { inboxItemView } from "./inbox-view"
+import type { InboxApproval } from "./inbox"
 import { linkedText } from "./links-view"
 import { type Reading, readText } from "./orc-read"
 import type { palette } from "./palette"
@@ -73,8 +71,6 @@ const rowView = (t: Palette, row: StepRow, target: Chosen | null, model: string 
 interface StepsShown {
   readonly reading: Reading<Show> | null
   readonly target: Chosen | null
-  readonly answers: (item: InboxAnswer) => Element
-  readonly threadProblem: string | null
   readonly changesProblem: string | null
 }
 
@@ -89,21 +85,16 @@ const stepViews = (t: Palette, card: Card, shown: StepsShown, act: AgentsActions
 }
 
 export const stepsColumn = (t: Palette, card: Card | null, shown: StepsShown, act: AgentsActions): Element => {
-  const answers = cardAnswers(card)
-  const approval = approvalOf(card)
   const waiting = card?.standing.status === "Awaiting you"
-  const column = v_flex().id("steps-column").w(waiting ? 340 : 240).h_full().flex_shrink_0().border_r(1).border_color(t.border)
+  const column = v_flex().id("steps-column").w(240).h_full().flex_shrink_0().border_r(1).border_color(t.border)
   if (card === null) return column
   const runLabel = card.runId ?? (waiting ? null : "No run yet")
   const header = v_flex().px(12).py(10).gap(2).border_b(1).border_color(t.border)
     .child(div().font_semibold().truncate().child(card.title))
     .children(runLabel === null ? [] : [div().text_size(12).text_color(t.dim).truncate().child(runLabel)])
-  const { threadProblem, changesProblem } = shown
+  const { changesProblem } = shown
   return column.child(header)
     .child(v_flex().id("steps").flex_1().min_h_0().overflow_y_scrollbar().p(6).gap(4)
-      .children(answers.map(shown.answers))
-      .children(approval === null ? [] : [inboxItemView(t, approval, (option) => optionView(t, `option-${approval.key}-${option.letter}`, option), [], undefined)])
-      .children(threadProblem === null ? [] : [div().px(6).py(4).text_color(t.blocked).whitespace_normal().child(threadProblem)])
       .children(stepViews(t, card, shown, act)))
     .children(changesProblem === null ? [] : [div().px(12).py(8).border_t(1).border_color(t.border).text_size(12).text_color(t.blocked).child(`No Changes column: ${changesProblem}`)])
 }

@@ -10,7 +10,7 @@ import { checkToken, type TokenCache } from "./beat-token"
 import type { BeatAction, Progress } from "../../entities/attention/index"
 import { closeFinished } from "./beat-close"
 import { parkedResumeWait } from "./beat-resume"
-import { type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems } from "../../entities/attention/index"
+import { type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems, withdrawTaskItems } from "../../entities/attention/index"
 import { attentionActions } from "./beat-attention"
 import { type AskDecider, askDeciderWithPi, decideReviewQuestions } from "../../features/decider/index"
 import { handAnswersToResume } from "../../entities/parked-runs/index"
@@ -135,10 +135,14 @@ const startTask = (
     if (result.kind === "started") {
       return { kind: "started", task: task.spec.id, machine: machine.name, account: claim.account, log } satisfies BeatAction
     }
-    yield* publishClosed(root, {
+    const at = yield* nowIso
+    const closed = yield* publishClosed(root, {
       ...task,
-      state: { kind: "closed", claim, closing: { outcome: "start-failed", reason: result.reason }, closedAt: yield* nowIso, postedAt: null }
+      state: { kind: "closed", claim, closing: { outcome: "start-failed", reason: result.reason }, closedAt: at, postedAt: null }
     })
+    if (closed) {
+      yield* withdrawTaskItems(root, [task.spec.id], at)
+    }
     return { kind: "start-failed", task: task.spec.id, machine: machine.name, reason: result.reason } satisfies BeatAction
   })
 

@@ -33,7 +33,9 @@ Other steps without a Pi session show their log.
 
 ### Approve a run's PR
 
-An open PR awaiting your decision has an Approve step.
+When Orc asks you to merge a PR, select **merge** on its **Awaiting you** card and confirm the dialog.
+Select **hold** to leave the PR open and clear that request.
+You can also merge from the Approve step.
 Select the PR address to open it in your browser.
 
 ![Agents tab on the Approve step of a run whose PR waits](images/herdr-agents-approve.png)

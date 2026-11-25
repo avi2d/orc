@@ -129,6 +129,8 @@ The text view shows the decider's answers under `Decided:`.
 Run `orc attention --json` for an `orc.attention.v1` document with `at`, `items`, and `decided`.
 An open item in `items` carries its `subject`, `options` and `recommendation` when it has them.
 The output shape is in `packages/run/src/features/attention-list/attention-view.ts`.
+Closing a task withdraws the items open at the time of the close.
+The beat can open new items about the run's failure or the PR it tracks after the close.
 An answered item leaves `decided` when its task closes.
 
 Run `orc backlog thread <task-id>` to see one task's items alongside its holds, questions, answers, and notes.

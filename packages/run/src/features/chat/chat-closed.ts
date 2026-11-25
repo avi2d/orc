@@ -11,6 +11,7 @@ export const ClosedTask = Schema.Struct({
   parked: Schema.NullOr(ParkedJson),
   outcome: Schema.Literals(["done", "failed", "stopped", "start-failed", "dropped"]),
   reason: Schema.String,
+  landedIn: Schema.optional(Schema.String),
   pr: Schema.NullOr(Schema.String),
   report: Schema.NullOr(Schema.String),
   answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String })),
@@ -19,7 +20,7 @@ export const ClosedTask = Schema.Struct({
 export type ClosedTask = typeof ClosedTask.Type
 
 const deliveredPart = (task: ClosedTask): string => {
-  if (task.outcome === "dropped") {
+  if (task.outcome === "dropped" || task.landedIn !== undefined) {
     return ""
   }
   if (task.kind === "decision") {

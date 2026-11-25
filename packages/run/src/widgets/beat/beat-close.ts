@@ -1,8 +1,8 @@
 import { Array as Arr, DateTime, Duration, Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { backlogPaths, closeStartedTask, findTask, listTasks, applyRunSplit, splitEventText, runLabel, runDirFor, taskBranch, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { backlogPaths, type BacklogError, closeStartedTask, findTask, listTasks, applyRunSplit, splitEventText, runLabel, runDirFor, taskBranch, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { recordEvent } from "../../entities/events/index"
-import type { BeatAction, Progress } from "../../entities/attention/index"
+import { type BeatAction, type Progress, withdrawTaskItems } from "../../entities/attention/index"
 import type { FailingMark } from "../../entities/agent/index"
 import type { DispatchConfig } from "../../shared/config/index"
 import { ownedBySweep, throughFor } from "../../shared/config/index"
@@ -345,7 +345,7 @@ const clearUnread = (
 export const closeFinished = (
   context: CloseContext,
   task: TaskRecord
-): Effect.Effect<Progress, TaskFileError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+): Effect.Effect<Progress, BacklogError | TaskFileError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     if (task.state.kind !== "started") {
       return { kind: "untracked" } satisfies Progress
@@ -384,4 +384,8 @@ export const closeFinished = (
     }
     const ended = yield* endTask(context.root, context.home, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
-  })
+  }).pipe(
+    Effect.tap((progress) => progress.kind === "ended" && (progress.action.kind === "closed" || (progress.action.kind === "split" && task.spec.parent !== null))
+      ? nowIso.pipe(Effect.flatMap((at) => withdrawTaskItems(context.root, [task.spec.id], at)))
+      : Effect.void)
+  )
