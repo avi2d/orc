@@ -91,13 +91,13 @@ const escalation = (reply: EscalateReply, question: string): Verdict => {
 const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlier: ReadonlyArray<Earlier>, kind: AttentionItem["kind"], question: string): Verdict => {
   switch (reply.decision) {
     case "escalate": {
-      return recommendedAnswer(reply, sources, kind, question) ?? escalation(reply, question)
+      return recommendedAnswer(reply, sources, question) ?? escalation(reply, question)
     }
     case "answer": {
       const found = quotedSource(reply.rule, sources)
       return found === undefined
         ? { kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on a rule in none of the rules it read word for word from a clause start to a clause end: " + JSON.stringify(reply.rule) }
-        : answerOnRule(found, reply, kind, question)
+        : answerOnRule(found, reply, question)
     }
     case "duplicate": {
       const linked = earlier.find((entry) => entry.id === reply.of.trim())

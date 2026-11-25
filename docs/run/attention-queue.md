@@ -24,10 +24,15 @@ Its policy is in `packages/run/agents/decider-policy.md`.
 No-mistakes names the action it asks of you in the `question_action` column of each `ask-user` finding and each `question-<id>` finding.
 Orc carries that value through `asking.json`, the run history and the parked question in the task file.
 When a question names `none`, orc sends it to the decider.
-When it names `merge`, `delete` for deleting unlanded work, `login`, or any other value, orc sends it to you.
+When it names `merge`, `delete` for deleting unlanded work, `login`, `push`, `release`, or any other value orc does not know, orc sends it to you.
 
-A question that names no action goes through a topic check instead.
+No-mistakes writes `unknown` for an `ask-user` finding its reviewer did not classify.
+A question that names `unknown` or no action goes through a topic check instead.
 Orc sends questions about deletion, security, credentials, merging, pushing, releasing, spending, irreversible actions, site appearance, legal text, and logins to you.
+The topic check reads only the sentences that ask something: a sentence that ends with a question mark, an option line such as `A)` or `Recommended:`, and a sentence that speaks to the reader, such as one with `you`, `please` or `the owner needs`.
+A topic word in the rest, such as "the card says orc pushes the branch and opens the PR", does not send the question to you.
+A question with no asking sentence is checked whole, and names such as `merge conflicts`, `pre-push` and `release parser` there do not send it to you.
+A question with no words at all goes to you.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
 Rules and policy do not widen either check.
 
@@ -50,13 +55,22 @@ The decider can:
 
 ### Follow the recommended option
 
-A line of a review question that starts with `Recommended:` names its recommended option, and leading whitespace before it is allowed.
+A line of a question that starts with `Recommended:` names its recommended option, and leading whitespace before it is allowed.
 The policy tells the decider to answer such a question with that option, even when it picks between product choices the intent leaves open or the decider is not sure.
-When the decider still escalates a review question with that line on one of those two bullets, orc answers it with the recommended option and records the policy's Rules sentence as the rule.
+When the decider still escalates a question with that line on one of those two bullets, orc answers it with the recommended option and records the policy's Rules sentence as the rule.
 An escalation on any other bullet, or with no bullet, stays with you, and so does a question on the topic list above.
-When the decider answers a review question on that Rules sentence, orc records the question's `Recommended:` option as the answer, whatever option the reply named.
-Orc escalates such an answer to a review question with no `Recommended:` line, and to a worker question.
-The rule and the override apply only to review questions, so a worker question that leaves a product choice open still escalates, even when the worker recommends an option.
+When the decider answers a question on that Rules sentence, orc records the question's `Recommended:` option as the answer, whatever option the reply named.
+Orc escalates such an answer to a question with no `Recommended:` line.
+The rule and the override apply to review questions and worker questions alike.
+
+### Settle routine review findings
+
+The policy's Rules section also settles these review findings, so the decider answers them:
+
+- A fix round that landed no diff gets `fix with instructions`, and orc sends the answers to the review's other findings with the fix.
+- A missing changelog entry, in a repository whose release writes the changelog from commit subjects, gets the commit subject as its entry.
+- A merge conflict with the base branch or a failed check gets a fix from the run, which then runs the checks again.
+- A finding with one remedy inside the task's intent and one that widens it gets the remedy inside the intent.
 
 ### Handle a failed call
 
@@ -86,6 +100,9 @@ The beat opens an item for each run event, owned by the user:
 
 - A run that died opens a `run-died` item, when its task closes failed or its start fails.
   A run that ends done or that you stop opens none.
+  Two failures retry instead of opening the item.
+  When no-mistakes refuses to start because the repository is not initialized, the run runs `no-mistakes init --skip-user-skill` and starts no-mistakes again.
+  When the command that reaches a dispatch machine exits 255, as ssh does when its connection fails, the task stays started and the next beat reads it again.
 - A red check on a closed ship task's PR opens a `check-red` item for the PR's head commit.
   Checks that turn green on that commit, or a new commit, withdraw it.
   Merging the PR or closing it without merging withdraws it.

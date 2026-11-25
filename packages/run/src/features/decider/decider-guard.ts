@@ -1,11 +1,12 @@
 interface NeverDecided {
   readonly topic: string
   readonly asks: RegExp
+  readonly about?: RegExp
 }
 
 const deletingVerbs = "delet\\w*|remov\\w*|drop\\w*|discard\\w*|eras(?:e|es|ed|ing)|wip(?:e|es|ed|ing)|purg\\w*|destroy\\w*|prun\\w*|abandon\\w*|overwrit\\w*|reset\\w*|(?:throw|throws|throwing|threw|thrown) away|clean(?:s|ed|ing)? up|rm"
 const deletedVerbs = "deleted|removed|dropped|discarded|erased|wiped|purged|destroyed|pruned|abandoned|overwritten|reset|thrown away|cleaned up"
-const work = "branch(?:es)?|worktrees?|tasks?|runs?|pull requests?|releases?|tags?|backups?|databases?|user data|commit history"
+const work = "branch(?:es)?|worktrees?|tasks?|runs?|pull requests?|releases?|tags?|backups?|databases?|user data|commit history|(?:unlanded|unmerged|unpushed) (?:work|changes|commits)"
 const notAName = "(?!\\s+(?:check|name|field|filter|guard|test|option|flag|column|label|chip|key|type|lookup|variable|param\\w*|prop\\w*|argument|list|support|fallback|handling)s?\\b)"
 const between = "(?:\\s+(?!(?:on|in|of|for|from|to|at|by|with|that|which|so|and|or|but|if|when|because|then|than|while)\\b)[\\w./`'-]+){0,3}?"
 
@@ -19,17 +20,22 @@ const deletingWork = new RegExp(
   "i"
 )
 
+const deletingPronoun = new RegExp("\\b(?:" + deletingVerbs + ")\\s+(?:it|them|this|that|these|those)\\b", "i")
+
+const namesUnlandedWork = /\b(?:unlanded|unmerged|unpushed|unfinished|uncommitted)\b/i
+
 const neverDecided: ReadonlyArray<NeverDecided> = [
   { topic: "deleting", asks: deletingWork },
+  { topic: "deleting", asks: deletingPronoun, about: namesUnlandedWork },
   { topic: "security", asks: /\b(secur\w*|insecur\w*|vulnerab\w*|exploit\w*)\b/i },
   {
     topic: "credentials",
     asks: /\b(credentials?|secrets?|passwords?|passphrases?|(?:api|ssh|gpg|pgp|private|public|secret|access|deploy|signing|encryption|license|licence|session|openai|anthropic|github|gitlab|stripe|aws|npm|slack|google|cloudflare)[- ](?:keys?|tokens?)|keychains?|key ?files?|key ?pairs?)\b|\b(?:rotate|revoke|leak|regenerate)\w*\s+(?:the\s+)?(?:keys?|tokens?)\b|(?<![\w])\.env\b/i
   },
   { topic: "credentials", asks: /\b[A-Z][A-Z0-9_]*_(?:TOKEN|KEY|SECRET)\b/ },
-  { topic: "merging", asks: /\bmerg\w*/i },
-  { topic: "pushing", asks: /\bpush\w*\b/i },
-  { topic: "releasing", asks: /\b(releas\w*|publish\w*|deploy\w*)/i },
+  { topic: "merging", asks: /\bmerg\w*\b(?![-\s]+(?:conflicts?|base)\b)/i },
+  { topic: "pushing", asks: /(?<!\bpre-|\b(?:not|never)\s)\bpush\w*\b/i },
+  { topic: "releasing", asks: new RegExp("(?<![-\\w])(?<!\\b(?:until|at|by|before|after|from|since|till)\\s+)\\b(?:releas\\w*|publish\\w*|deploy\\w*)\\b(?!-)" + notAName + "(?!\\s+(?:parser|script|workflow|job|step|notes?|tool\\w*|commit|entry|entries)s?\\b)", "i") },
   { topic: "spending", asks: /\b(pay|pays|paying|paid|payments?|billing|purchas\w*|buy\w*|budget\w*|money|dollars?)\b|\$\s?\d+/i },
   { topic: "spending", asks: new RegExp("(?<!\\b(?:" + computeMeasure + ")\\b[^.?!]*)\\b(?:spend\\w*|spent|costs?|costing)\\b(?![^.?!]*\\b(?:" + computeMeasure + ")\\b)", "i") },
   { topic: "anything that cannot be undone", asks: /\b(irreversib\w*|irrevocab\w*|permanent\w*|undoable|(cannot|can't|can not) be (undone|reversed)|force[- ]push\w*)/i },
@@ -38,10 +44,27 @@ const neverDecided: ReadonlyArray<NeverDecided> = [
   { topic: "logins", asks: /\b(log-?ins?|log in|sign[- ]in|auth|authn|authz|authenticat\w*|authoriz\w*|oauth\w*)\b(?!\s+(?:header|fixture|test|mock|stub|helper|type)s?\b)/i }
 ]
 
+const readerWords = /\b(?:you|your|yours|please)\b|\bthe (?:person|owner|captain|user)(?:['’]s)? (?:needs?|must|has to|should|may|can|decides?|decision|call|word|confirm\w*|chooses?|approv\w*|answer\w*)\b/i
+
+const optionStart = /^(?:[A-Z]\)|\([a-z]\)|option \d|recommended:|recommendation:)/i
+
+const isAsking = (sentence: string): boolean => sentence.endsWith("?") || optionStart.test(sentence) || readerWords.test(sentence)
+
+const sentencesOf = (question: string): ReadonlyArray<string> =>
+  question.split("\n").flatMap((line) => line.trim().split(/(?<=[.?!])\s+(?=\S)/)).map((sentence) => sentence.trim()).filter((sentence) => sentence !== "")
+
+// A word in the context a question explains, such as "the PR has merge conflicts", asks the owner for nothing, so only the asking sentences count.
+// With no asking sentence the request cannot be told from its context, so the whole text counts.
+export const askingPart = (question: string): string => {
+  const asking = sentencesOf(question).filter(isAsking)
+  return asking.length === 0 ? question : asking.join("\n")
+}
+
 export const neverDecidedReason = (question: string): string | null => {
+  const asking = askingPart(question)
   for (const entry of neverDecided) {
-    const found = entry.asks.exec(question)
-    if (found !== null) {
+    const found = entry.asks.exec(asking)
+    if (found !== null && (entry.about === undefined || entry.about.test(question))) {
       return "orc never hands the decider a question about " + entry.topic + ", and this one says " + JSON.stringify(found[0])
     }
   }
@@ -62,8 +85,13 @@ const askedActionReason = (asks: string): string | null => {
     : "the review question asks the owner to " + named + ", and orc hands every asked action to the owner"
 }
 
+const unclassified = "unknown"
+
+const textReason = (text: string): string | null =>
+  text.trim() === "" ? "the question carries no words orc can check, so orc hands it to the owner" : neverDecidedReason(text)
+
 export const guardReason = (question: { readonly text: string; readonly asks?: string | undefined }): string | null =>
-  question.asks === undefined ? neverDecidedReason(question.text) : askedActionReason(question.asks)
+  question.asks === undefined || question.asks === unclassified ? textReason(question.text) : askedActionReason(question.asks)
 
 export const askBackWords = (question: string): string =>
   "Before it answers, orc's decider asks you: " + question + "\nPut your reply in a new orc_ask question."

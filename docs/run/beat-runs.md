@@ -31,6 +31,7 @@ See [Parked runs](parked-runs.md) and [A worker split proposal](task-kinds.md#a-
 
 A runner task with no pueue record after 10 minutes closes failed.
 A result that remains unreadable for 10 minutes also closes failed.
+A result the beat cannot read because the command that reaches the machine exits 255, as ssh does when its connection fails, never closes the task, and the next beat reads it again.
 A run still waiting for an answer stays started and the beat relays the answer.
 To stop a task yourself, run `orc backlog stop <task-id>` where the backlog lives, as [Stop a task](backlog-tasks.md#stop-a-task) describes.
 

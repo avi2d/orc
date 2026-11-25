@@ -9,6 +9,7 @@ import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/features/decider/index"
 import { neverDecidedReason } from "../../../packages/run/src/features/decider/decider-guard"
 import { askStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
+import { openQuestions } from "../../lib/open-questions-2026-11-25"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -264,4 +265,53 @@ describe("the decider guard", () => {
     }, [logging])
   })
 
+})
+
+describe("the open questions of a queue that all waited on the owner", () => {
+  for (const [name, question] of Object.entries(openQuestions)) {
+    test(name + " passes the guard, instead of reaching the owner on a word from the context it explains", () => {
+      expect(neverDecidedReason(question.text)).toBeNull()
+    })
+  }
+
+  const routine = [
+    { kind: "a worker question with a Recommended: line", id: "ask-1", text: openQuestions.startTimeJob.text },
+    { kind: "a fix round that landed no diff", id: "fix-round-no-diff", text: openQuestions.fixRoundNoDiff.text },
+    { kind: "a missing CHANGELOG entry", id: "changelog-entry-absent", text: openQuestions.changelogEntryAbsent.text },
+    { kind: "a test-coverage finding", id: "finished-run-test-uses-failed-path", text: openQuestions.finishedRunTestUsesFailedPath.text },
+    { kind: "a merge conflict", id: "ci-1", text: openQuestions.mergeConflict.text }
+  ]
+
+  for (const question of routine) {
+    test(question.kind + " reaches the decider and closes on its answer, instead of waiting on the owner", async () => {
+      await withAskingTask(async (root) => {
+        const heard: Array<DeciderRequest> = []
+        await decide(root, replies({ [question.text]: answer }, heard))
+        expect(heard).toHaveLength(1)
+        expect(await itemFile(root, "orc-1." + question.id + ".2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "decider", decision: { kind: "answered" }, state: { kind: "closed" } })
+      }, [{ id: question.id, text: question.text }])
+    })
+  }
+})
+
+describe("a request only the owner grants", () => {
+  const ownerOnly = [
+    { kind: "discarding unlanded work", text: "May I delete the unmerged branch orc-12 and its worktree? Recommended: yes", topic: "deleting" },
+    { kind: "a merge with no standing permission", text: "#262 is green. Should I merge it? Recommended: yes.", topic: "merging" },
+    { kind: "a login", text: "npm refuses the first publish of the new package from CI. Should I run npm login on a dispatch machine? Recommended: yes.", topic: "logins" },
+    { kind: "spending money", text: "The free CI minutes ran out this month. Should I buy 1000 more minutes for $8? Recommended: yes.", topic: "spending" },
+    { kind: "publishing", text: "The checks are green and the version is bumped. Should I publish 0.22.0 to npm now? Recommended: yes.", topic: "releasing" }
+  ]
+
+  for (const request of ownerOnly) {
+    test("asking for " + request.kind + " reaches the owner with no decider call, instead of being answered with its recommended option", async () => {
+      await withAskingTask(async (root) => {
+        const heard: Array<DeciderRequest> = []
+        await decide(root, replies({ [request.text]: answer }, heard))
+        expect(heard).toEqual([])
+        expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+        expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("about " + request.topic)
+      }, [{ id: "r4", text: request.text }])
+    })
+  }
 })

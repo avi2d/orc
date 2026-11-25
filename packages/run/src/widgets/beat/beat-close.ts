@@ -13,7 +13,7 @@ import { readJsonFileIfPresent } from "../../shared/config/index"
 import { type RunnerRequirements } from "../../features/queueing-a-task/index"
 import { type RunnerError } from "../../shared/process/index"
 import { type Command } from "../../shared/process/index"
-import { correctThrough, endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "../../features/queueing-a-task/index"
+import { correctThrough, endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultReaching, type RunnerResult } from "../../features/queueing-a-task/index"
 
 export interface CloseContext {
   readonly root: string
@@ -31,9 +31,14 @@ const missingRunnerGraceMillis = 10 * 60 * 1000
 type CloseReading =
   | { readonly kind: "read"; readonly result: RunnerResult; readonly ending: RunEnding | null; readonly outputAt: string | null; readonly asking: typeof Asking.Type | null; readonly failing: FailingMark | null }
   | { readonly kind: "unread"; readonly reason: string }
+  | { readonly kind: "unreached"; readonly reason: string }
 
 // A close read that stays unread past the queue delay releases the machine, measured from its first unread beat.
 export const staleEndingOf = (startedAt: string, nowMillis: number, reading: CloseReading, unreadSinceMillis: number | null): RunEnding | null => {
+  // The run lives on the machine orc cannot reach, so it may still be working or already done there.
+  if (reading.kind === "unreached") {
+    return null
+  }
   if (reading.kind === "unread") {
     if (unreadSinceMillis === null || Number.isNaN(unreadSinceMillis) || nowMillis - unreadSinceMillis <= missingRunnerGraceMillis) {
       return null
@@ -305,9 +310,12 @@ const readClose = (
   label: string,
   through: Command | null
 ): Effect.Effect<CloseReading, never, RunnerRequirements> =>
-  (through === null ? readResult(task.spec.id, home, label) : readResultThrough(through, task.spec.id, label)).pipe(
-    Effect.map((result) => ({ kind: "read" as const, result, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result), asking: askingOf(result), failing: failingOf(result) })),
-    Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail })),
+  (through === null ? readResult(task.spec.id, home, label) : readResultReaching(through, task.spec.id, label)).pipe(
+    Effect.map((result): CloseReading => ({ kind: "read", result, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result), asking: askingOf(result), failing: failingOf(result) })),
+    Effect.catchTags({
+      RunnerError: (error) => Effect.succeed<CloseReading>({ kind: "unread", reason: error.detail }),
+      MachineUnreached: (error) => Effect.succeed<CloseReading>({ kind: "unreached", reason: error.detail })
+    }),
     Effect.timeoutOrElse({
       duration: Duration.seconds(closeSeconds),
       orElse: () => Effect.succeed({ kind: "unread" as const, reason: "the close read timed out after " + closeSeconds + " seconds" })
@@ -372,11 +380,11 @@ export const closeFinished = (
     const nowText = yield* nowIso
     const unreadSince = reading.kind === "unread"
       ? yield* readUnreadSince(fs, unreadFile, nowText)
-      : yield* clearUnread(fs, unreadFile)
+      : reading.kind === "read" ? yield* clearUnread(fs, unreadFile) : null
     const stale = staleEndingOf(started.at, Date.parse(nowText), reading, unreadSince)
     const ending = reading.kind === "read" ? (stale ?? reading.ending) : stale
     if (ending === null) {
-      if (reading.kind === "unread") {
+      if (reading.kind !== "read") {
         return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: reading.reason } } satisfies Progress
       }
       const action = yield* serveRunning(context, task, claim.machine, through, label, reading.asking)

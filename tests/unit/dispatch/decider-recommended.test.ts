@@ -8,6 +8,7 @@ import { routeTaskItems } from "../../../packages/run/src/entities/attention/att
 import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/features/decider/index"
 import { askStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
+import { openQuestions } from "../../lib/open-questions-2026-11-25"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -61,7 +62,7 @@ const escalationBullet = (start: string): string => {
   return bullet.slice(2)
 }
 
-const recommendedRule = "When a review question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
+const recommendedRule = "When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
 
 const escalateOn = (rule: string | undefined): string =>
   JSON.stringify({ decision: "escalate", reason: "the decider would not pick", ...(rule === undefined ? {} : { rule }) })
@@ -155,28 +156,39 @@ describe("a review question with no Recommended: line", () => {
 })
 
 describe("a worker question with a Recommended: line", () => {
-  test("answered by the decider on the rule for review questions stays with the owner, instead of closing on the worker's own preference", async () => {
-    const flag = { id: "ask-1", text: "Name the flag --retries or --attempts?\nRecommended: --retries" }
+  const flag = { id: "ask-1", text: "Name the flag --retries or --attempts?\nRecommended: --retries" }
+
+  test("answered by the decider on the recommended-option rule is answered with its Recommended: option, instead of reaching the owner", async () => {
     await withAskingTask([flag], async (root) => {
       await decide(root, replying(answerOn("--retries")))
-      expect(await itemFile(root, itemOf(flag))).toMatchObject({ kind: "worker-question", owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      expect(await itemFile(root, itemOf(flag))).toMatchObject({ kind: "worker-question", owner: "decider", state: { kind: "closed", answer: { words: "--retries" } } })
     })
   })
 
-  test("answered by the decider on the policy's definition of a Recommended: line stays with the owner, instead of closing on the worker's own preference", async () => {
-    const flag = { id: "ask-1", text: "Name the flag --retries or --attempts?\nRecommended: --retries" }
-    const definition = 'A line of a review question that starts with "Recommended:" names its recommended option, and the words after it are that option.'
+  test("answered by the decider on the policy's definition of a Recommended: line stays with the owner, instead of closing on a sentence outside the policy's Rules", async () => {
+    const definition = 'A line of a question that starts with "Recommended:" names its recommended option, and the words after it are that option.'
     await withAskingTask([flag], async (root) => {
       await decide(root, replying(JSON.stringify({ decision: "answer", answer: "--retries", rule: definition, reason: "the question names its recommended option" })))
       expect(await itemFile(root, itemOf(flag))).toMatchObject({ kind: "worker-question", owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
     })
   })
 
-  test("escalated by the decider on an open product choice stays with the owner, instead of orc answering with the worker's own preference", async () => {
-    const flag = { id: "ask-1", text: "Name the flag --retries or --attempts?\nRecommended: --retries" }
+  test("escalated by the decider on an open product choice is answered with its Recommended: option, instead of reaching the owner", async () => {
     await withAskingTask([flag], async (root) => {
       await decide(root, replying(escalateOn(escalationBullet("It picks between product choices"))))
-      expect(await itemFile(root, itemOf(flag))).toMatchObject({ kind: "worker-question", owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      expect(await itemFile(root, itemOf(flag))).toMatchObject({ kind: "worker-question", owner: "decider", state: { kind: "closed", answer: { words: "--retries" } } })
+    })
+  })
+
+  test("from a real queue, escalated by the decider as unsure, is answered with its lettered Recommended: option, instead of reaching the owner", async () => {
+    const startTimeJob = { id: "ask-1", text: openQuestions.startTimeJob.text }
+    await withAskingTask([startTimeJob], async (root) => {
+      await decide(root, replying(escalateOn(escalationBullet("You are not sure"))))
+      expect(await itemFile(root, itemOf(startTimeJob))).toMatchObject({
+        kind: "worker-question",
+        owner: "decider",
+        state: { kind: "closed", answer: { words: "A) Remove the start-time job from main.yml, keep --save and --previous in scripts/bench-start.ts, and drop the CI job lines from docs/contribute.md" } }
+      })
     })
   })
 })
