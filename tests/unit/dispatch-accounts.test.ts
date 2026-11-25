@@ -32,6 +32,48 @@ const configProblem = async (root: string, quota: object): Promise<string | null
   ))
 }
 
+describe("routing account references", () => {
+  const accounts = [
+    ...config.quota.accounts,
+    { name: "code", kind: "token-file", tokenFile: "/secrets/code-token", provider: "code", models: { implementer: "code/legacy", fixer: "code/legacy" } }
+  ]
+
+  for (const location of ["rule", "default"] as const) {
+    test.each([
+      ["missing", "keyed/work", "unknown account"],
+      ["main", "code/work", "provider keyed"],
+      ["code", "keyed/work", "provider code"]
+    ] as const)("a " + location + " candidate on %s rejects %s instead of silently falling back", async (account, implementer, reason) => {
+      await withBacklog(async (root) => {
+        const file = join(root, "dispatch.json")
+        const candidates = ["keyed/valid", { account, models: { implementer } }]
+        const routing = location === "rule"
+          ? { rules: [{ when: {}, candidates }], default: ["keyed/default"] }
+          : { rules: [], default: candidates }
+        await writeFile(file, JSON.stringify({ ...config, quota: { ...config.quota, accounts }, routing }))
+        const problem = await run(readDispatchConfig(file).pipe(
+          Effect.map(() => null),
+          Effect.catchTag("ConfigError", (error) => Effect.succeed(error.detail))
+        ))
+        expect(problem).toContain(account)
+        expect(problem).toContain(reason)
+      })
+    })
+  }
+
+  test("named accounts accept inherited and explicit providers instead of rejecting valid routes", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      const routing = {
+        rules: [{ when: {}, candidates: [{ account: "main", models: { implementer: "keyed/work", fixer: "keyed/fix", reviewer: "keyed/review" } }] }],
+        default: [{ account: "code", models: { implementer: "code/work" } }]
+      }
+      await writeFile(file, JSON.stringify({ ...config, quota: { ...config.quota, accounts }, routing }))
+      expect((await run(readDispatchConfig(file))).routing).toEqual(routing)
+    })
+  })
+})
+
 describe("readDispatchConfig", () => {
   test("accepts a quota without a floor instead of requiring a percentage", async () => {
     await withBacklog(async (root) => {

@@ -326,6 +326,18 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
         const routing = yield* Schema.decodeUnknownEffect(DispatchRouting)(config.routing, { onExcessProperty: "error" }).pipe(
           Effect.mapError((error) => new ConfigError({ file, detail: "routing: " + error.message }))
         )
+        for (const candidate of [...routing.rules.flatMap((rule) => rule.candidates), ...routing.default]) {
+          if (typeof candidate === "string" || candidate.account === undefined) continue
+          const account = accounts.find((entry) => entry.name === candidate.account)
+          if (account === undefined) {
+            return yield* new ConfigError({ file, detail: "routing names the unknown account " + candidate.account })
+          }
+          const provider = providerOf(quota, account)
+          const model = candidate.models.implementer
+          if (provider !== providerOfModel(model)) {
+            return yield* new ConfigError({ file, detail: "routing names the account " + account.name + " on provider " + provider + " with model " + model + " from another provider" })
+          }
+        }
         return { machines, quota, routing }
       })
     )

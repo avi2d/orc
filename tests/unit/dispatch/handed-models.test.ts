@@ -83,9 +83,9 @@ describe("models the beat hands to orc run", () => {
     expect(run).not.toContain("--fixer-model")
   })
 
-  test("a handed implementer pin reaches both routed roles instead of leaving the fixer on the route", async () => {
+  test.each(["implementer", "fixer"] as const)("a handed %s pin does not replace the other routed role", async (role) => {
     const models = { implementer: "keyed/worker", fixer: "keyed/repair" }
-    const run = await queuedRun({ ORC_TASK_ROUTED_MODELS: JSON.stringify(models), ORC_TASK_IMPLEMENTER_MODEL: "keyed/pinned" })
+    const run = await queuedRun({ ORC_TASK_ROUTED_MODELS: JSON.stringify(models), ["ORC_TASK_" + role.toUpperCase() + "_MODEL"]: "keyed/pinned" })
     const args = parseArgs(run.slice(run.indexOf("run")))
     if (args.kind !== "RunAgent") {
       throw new Error("the runner did not queue orc run")
@@ -95,21 +95,55 @@ describe("models the beat hands to orc run", () => {
       { file: "config.json" },
       undefined, args, models
     ).pipe(Effect.provide(BunServices.layer)))
-    expect([roles.agent.model, roles.fixer.model]).toEqual(["keyed/pinned", "keyed/pinned"])
+    expect([roles.agent.model, roles.fixer.model]).toEqual(role === "implementer"
+      ? ["keyed/pinned", "keyed/repair"]
+      : ["keyed/worker", "keyed/pinned"])
   })
 
-  test("an agent-file model pins both routed roles instead of changing only the implementer", async () => {
+  test.each([
+    ["implementer", "personal"],
+    ["fixer", "project"]
+  ] as const)("a %s agent-file model from %s settings does not replace the other routed roles", async (role, source) => {
     const root = await mkdtemp(join(tmpdir(), "orc-routed-pin-"))
     try {
-      await mkdir(join(root, "agents"))
-      await writeFile(join(root, "agents", "implementer.md"), "---\nmodel: keyed/pinned\nthinking: high\ntools: read\n---\nImplement the task.\n")
+      const folder = source === "personal" ? join(root, "agents") : join(root, ".orc", "agents")
+      await mkdir(folder, { recursive: true })
+      await writeFile(join(folder, role + ".md"), "---\nmodel: keyed/pinned\nthinking: high\ntools: read\n---\nPerform the task.\n")
       const roles = await Effect.runPromise(prepareRoles(
         { projectDir: root, orcHome: root, agentsDir: undefined },
         { file: "config.json" },
-        undefined, { implementerModel: undefined, fixerModel: undefined, implementerThinking: undefined, fixerThinking: undefined },
-        { implementer: "keyed/worker", fixer: "keyed/repair" }
+        "direct-PR", { implementerModel: undefined, fixerModel: undefined, implementerThinking: undefined, fixerThinking: undefined },
+        { implementer: "keyed/worker", fixer: "keyed/repair", reviewer: "keyed/check" }
       ).pipe(Effect.provide(BunServices.layer)))
-      expect([roles.agent.model, roles.fixer.model]).toEqual(["keyed/pinned", "keyed/pinned"])
+      expect([roles.agent.model, roles.fixer.model, roles.reviewer.kind === "direct-PR" ? roles.reviewer.reviewer.model : null]).toEqual(role === "implementer"
+        ? ["keyed/pinned", "keyed/repair", "keyed/check"]
+        : ["keyed/worker", "keyed/pinned", "keyed/check"])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test.each([
+    ["implementer", false, ["keyed/file", "keyed/config-repair", "keyed/config-repair"]],
+    ["fixer", false, ["keyed/config-worker", "keyed/file", "keyed/file"]],
+    ["implementer", true, ["keyed/flag", "keyed/repair", "keyed/repair"]],
+    ["fixer", true, ["keyed/worker", "keyed/flag", "keyed/flag"]]
+  ] as const)("a %s flag with routing %s does not change another role or unrouted file precedence", async (role, routed, expected) => {
+    const root = await mkdtemp(join(tmpdir(), "orc-role-precedence-"))
+    try {
+      await mkdir(join(root, "agents"))
+      await writeFile(join(root, "agents", role + ".md"), "---\nmodel: keyed/file\nthinking: high\ntools: read\n---\nPerform the task.\n")
+      const roles = await Effect.runPromise(prepareRoles(
+        { projectDir: root, orcHome: root, agentsDir: undefined },
+        { file: "config.json", models: { implementer: "keyed/config-worker", fixer: "keyed/config-repair" } },
+        "direct-PR", {
+          implementerModel: role === "implementer" ? "keyed/flag" : undefined,
+          fixerModel: role === "fixer" ? "keyed/flag" : undefined,
+          implementerThinking: undefined, fixerThinking: undefined
+        },
+        routed ? { implementer: "keyed/worker", fixer: "keyed/repair" } : undefined
+      ).pipe(Effect.provide(BunServices.layer)))
+      expect([roles.agent.model, roles.fixer.model, roles.reviewer.kind === "direct-PR" ? roles.reviewer.reviewer.model : null]).toEqual(expected)
     } finally {
       await rm(root, { recursive: true, force: true })
     }

@@ -42,11 +42,9 @@ export const prepareRoles = Effect.fnUntraced(function*(
   })
   const implementerFile = yield* readAgentFile("implementer", location)
   const fixerFile = yield* readAgentFile("fixer", location)
-  const pairPin = route === undefined ? undefined
-    : pins.implementerModel ?? pins.fixerModel ?? implementerFile.model ?? fixerFile.model ?? undefined
   const configModel = (model: string | undefined) => ({ file: config.file, model })
-  const agent = yield* finishAgentFile(implementerFile, { configModel: configModel(configured.implementer), thinking: pins.implementerThinking }, pairPin)
-  const fixer = yield* finishAgentFile(fixerFile, { configModel: configModel(configured.fixer), thinking: pins.fixerThinking }, pairPin)
+  const agent = yield* finishAgentFile(implementerFile, { configModel: configModel(configured.implementer), thinking: pins.implementerThinking }, route === undefined ? undefined : pins.implementerModel)
+  const fixer = yield* finishAgentFile(fixerFile, { configModel: configModel(configured.fixer), thinking: pins.fixerThinking }, route === undefined ? undefined : pins.fixerModel)
   const reviewer: PreparedReviewer = delivery === "direct-PR"
     ? { kind: "direct-PR", reviewer: yield* resolveAgentFile("reviewer", { ...location, configModel: configModel(route?.reviewer ?? fixer.model) }) }
     : { kind: "no-mistakes" }

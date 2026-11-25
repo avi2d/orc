@@ -81,8 +81,11 @@ An account may name its own `provider`, and the `models` its runs take from that
 ```
 
 Without [dispatch rules](dispatch-rules.md), the beat picks the account with the most remaining quota across every provider.
-The run it starts takes that account's provider and models, through `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL`.
-An account without a `provider` takes the quota's `provider`, and without `models` the run takes the models of `config.json` or the agent files.
+Without routing, the run takes that account's provider and models through `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL`.
+With routing, the run takes the selected account's provider and receives the routed models as JSON through `ORC_TASK_ROUTED_MODELS`.
+The beat leaves the other two model variables empty.
+An account without a `provider` takes the quota's `provider`.
+When neither routing nor account `models` is set, the run takes its models from `config.json` or the agent files.
 An account whose provider differs from the quota's must name `models`, and each model must come from the account's provider.
 A model an agent file names still takes precedence, so the agent files of a project that runs on several providers name no model.
 

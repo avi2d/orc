@@ -6,6 +6,7 @@ kind: reference
 The beat reads `routing` in `$ORC_HOME/backlog/dispatch.json` to pick an account and models for each task.
 Without `routing`, the beat uses the account with the most remaining quota and keeps the usual account and agent model settings.
 A direct `orc run` does not read dispatch rules.
+Decision tasks never run, so dispatch rules do not apply to them.
 
 ## Rules and task settings
 
@@ -37,6 +38,8 @@ The no-mistakes reviewer has its own settings.
 All models in a candidate must use the same provider.
 Orc takes the account on that provider with the most quota above zero and at or above `quota.floorPercent`.
 An object candidate with `account` considers only that account.
+The named account must exist in `quota.accounts`, and its provider must match the candidate's models.
+Orc refuses the dispatch configuration if either check fails.
 If no account qualifies, Orc tries the next candidate.
 Each provider in use must appear in `config.json` and have a quota account in `dispatch.json`.
 The quota reading does not check whether an account can run a particular model.
@@ -44,18 +47,19 @@ For a model that only some accounts can run, name one of those accounts in the c
 
 ## Model overrides
 
-For a run started by dispatch rules, a model flag applies to the implementer and fixer together.
-`--implementer-model` wins over `--fixer-model`.
-`orc runner start` passes `ORC_TASK_IMPLEMENTER_MODEL` as `--implementer-model`.
-If neither flag is set, a model in the implementer agent file wins over a model in the fixer agent file.
-A reviewer agent file can still name its own model.
+For a run started by dispatch rules, each role uses its own model override.
+The implementer and fixer each use their model flag first, then their agent file's model, then the routed model.
+`orc runner start` passes `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` as the corresponding model flags.
+A reviewer agent file's model takes precedence over the routed reviewer model.
+Without routing, an agent file's model still takes precedence over a model flag.
 All the final models must use the provider of the chosen quota account.
 To pin a different provider, use `tasks.<id>.model` so the beat can choose the matching account.
 
 ## Example routing
 
 This `routing` section puts design, CI, release, and diagnosis rules before the broader implementation rule.
-Design work tries Fable on `fable-access` first and falls back to Opus when that account is missing, unusable, or below the floor.
+Design work tries Fable on `fable-access` first.
+It falls back to Opus when that account's quota reading is absent, unusable, zero, or below the floor.
 The task ID, category, account, and model names reflect the projects, quota accounts, and providers you configure.
 
 ```json
