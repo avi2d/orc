@@ -39,7 +39,8 @@ const runVerdict = (run: CheckRun): CheckVerdict => {
 }
 
 // GitHub keeps a cancelled run beside its re-run under one run and name, so only the newest run of each run and name speaks for the check.
-const runScope = (run: CheckRun): string => run.detailsUrl?.match(/\/actions\/runs\/(\d+)(?:\/|$)/)?.[1] ?? run.workflowName ?? ""
+const actionsRunId = (run: CheckRun): string | undefined => run.detailsUrl?.match(/\/actions\/runs\/(\d+)(?:\/|$)/)?.[1]
+const runScope = (run: CheckRun): string => actionsRunId(run) ?? run.workflowName ?? ""
 const newestRuns = (runs: ReadonlyArray<CheckRun>): ReadonlyArray<CheckRun> => {
   const newest = new Map<string, CheckRun>()
   for (const run of runs) {
@@ -73,11 +74,21 @@ const failedRuns = (view: PullRequestView): ReadonlyArray<CheckRun> =>
 export const redCheckLinks = (view: PullRequestView): ReadonlyArray<string> =>
   failedRuns(view).flatMap((run) => run.detailsUrl === undefined || run.detailsUrl === "" ? [] : [run.detailsUrl])
 
-export const redRuns = (view: PullRequestView): ReadonlyArray<{ readonly run: string; readonly name: string }> =>
-  failedRuns(view).flatMap((run) => {
-    const id = run.detailsUrl?.match(/\/actions\/runs\/(\d+)(?:\/|$)/)?.[1]
-    return id === undefined ? [] : [{ run: id, name: run.workflowName === undefined || run.workflowName === "" ? run.name : run.workflowName + "/" + run.name }]
+const unfinishedScopes = (view: PullRequestView): ReadonlySet<string> =>
+  new Set(newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry)).filter((run) => run.status !== "COMPLETED").map(runScope))
+
+export const pendingRedRuns = (view: PullRequestView): boolean => {
+  const unfinished = unfinishedScopes(view)
+  return failedRuns(view).some((run) => actionsRunId(run) !== undefined && unfinished.has(runScope(run)))
+}
+
+export const redRuns = (view: PullRequestView): ReadonlyArray<{ readonly run: string; readonly name: string }> => {
+  const unfinished = unfinishedScopes(view)
+  return failedRuns(view).flatMap((run) => {
+    const id = actionsRunId(run)
+    return id === undefined || unfinished.has(runScope(run)) ? [] : [{ run: id, name: run.workflowName === undefined || run.workflowName === "" ? run.name : run.workflowName + "/" + run.name }]
   })
+}
 
 export const greenChecks = (view: PullRequestView): ReadonlyArray<string> => namesWith(checkVerdicts(view), "green")
 

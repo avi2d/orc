@@ -1,6 +1,6 @@
 export { mergeBases, isMergeBasis } from "./merge-basis"
 export type { MergeBasis } from "./merge-basis"
-export { readPullRequest, checkRefusals, CommitSha, gh, prPattern, greenChecks, redChecks, redCheckLinks, redRuns } from "./pr-view"
+export { readPullRequest, checkRefusals, CommitSha, gh, prPattern, greenChecks, redChecks, redCheckLinks, redRuns, pendingRedRuns } from "./pr-view"
 export type { PullRequestView } from "./pr-view"
 export type { DirectPrRecord, PullRequestOpener } from "./direct-pr"
 export { subprocessPullRequestOpener, openDirectPr } from "./direct-pr"

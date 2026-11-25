@@ -3,13 +3,15 @@ import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, Layer } from "effect"
+import { Deferred, Effect, Fiber, FileSystem, Layer, Result } from "effect"
+import { TestClock } from "effect/testing"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { openItems } from "../../../packages/run/src/entities/attention/attention"
 import { routePullRequestWithRetry } from "../../../packages/run/src/entities/attention/pull-request-retry"
-import { addTask, claimTask, closeStartedTask, findTask, writeTaken } from "../../../packages/run/src/entities/backlog/index"
+import { addTask, claimTask, closeStartedTask, findTask, markCiRerun, markPosted, writeTaken } from "../../../packages/run/src/entities/backlog/index"
+import { unpostedEvents } from "../../../packages/run/src/entities/events/index"
 import { sendBackClosedTask } from "../../../packages/run/src/entities/parked-runs/index"
-import type { PullRequestView } from "../../../packages/run/src/entities/pull-request/pr-view"
+import { redRuns, type PullRequestView } from "../../../packages/run/src/entities/pull-request/pr-view"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -70,6 +72,104 @@ describe("a red check on a ship task's PR", () => {
       const events = await readdir(join(root, "events"))
       expect(events).toHaveLength(1)
       expect(JSON.parse(await readFile(join(root, "events", events[0] ?? ""), "utf8"))).toMatchObject({ text: "orc-1 Fix the login page: orc reran the failed jobs of ci/test on " + pr })
+    })
+  })
+
+  test.each(["IN_PROGRESS", "QUEUED"])("does not spend the rerun allowance while a sibling job is %s", async (status) => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      const asked: Array<ReadonlyArray<string>> = []
+      const pending: PullRequestView = {
+        ...red,
+        statusCheckRollup: [
+          ...red.statusCheckRollup,
+          { workflowName: "ci", detailsUrl: details, name: "parallel", status: "COMPLETED", conclusion: "CANCELLED", startedAt: "2026-10-27T11:00:00.000Z" },
+          { workflowName: "ci", detailsUrl: details, name: "parallel", status, conclusion: "", startedAt: "2026-10-27T11:10:00.000Z" },
+          { workflowName: "ci", detailsUrl: "https://github.com/acme/orc/actions/runs/5252/job/1", name: "other", status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-10-27T11:10:00.000Z" }
+        ]
+      }
+      await route(root, asked, pending)
+      expect(asked).toEqual([])
+      expect((await run(findTask(root, "orc-1"))).ciReruns).toBeUndefined()
+      expect(await run(openItems(root))).toEqual([])
+      expect(redRuns(pending)).toEqual([{ run: "5252", name: "ci/other" }])
+      const completed: PullRequestView = {
+        ...pending,
+        statusCheckRollup: pending.statusCheckRollup.map((entry) => "status" in entry && entry.status === status ? { ...entry, status: "COMPLETED", conclusion: "SUCCESS" } : entry)
+      }
+      await route(root, asked, completed)
+      expect(asked).toEqual([
+        ["run", "rerun", "4242", "--failed", "-R", "github.com/acme/orc"],
+        ["run", "rerun", "5252", "--failed", "-R", "github.com/acme/orc"]
+      ])
+      expect(await run(openItems(root))).toEqual([])
+      await route(root, asked, completed)
+      expect(asked).toHaveLength(2)
+      expect((await run(openItems(root)))[0]?.item.text).toContain(details)
+    })
+  })
+
+  test("interrupts a stalled rerun after 30 seconds instead of blocking the beat", async () => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      const task = await run(findTask(root, "orc-1"))
+      await Effect.runPromise(Effect.gen(function*() {
+        const started = yield* Deferred.make<void>()
+        let interrupted = false
+        const spawner = ChildProcessSpawner.make(() =>
+          Deferred.succeed(started, undefined).pipe(
+            Effect.andThen(Effect.never),
+            Effect.onInterrupt(() => Effect.sync(() => { interrupted = true }))
+          ))
+        const fiber = yield* routePullRequestWithRetry(root, task, pr, red, "2026-10-27T12:00:00.000Z").pipe(
+          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+          Effect.forkChild
+        )
+        yield* Deferred.await(started)
+        yield* TestClock.adjust("30 seconds")
+        expect(interrupted).toBe(true)
+        yield* Fiber.join(fiber)
+      }).pipe(Effect.provide(Layer.merge(BunServices.layer, TestClock.layer()))))
+      expect((await run(openItems(root)))[0]?.item.text).toContain(details)
+      expect((await run(findTask(root, "orc-1"))).ciReruns).toHaveLength(1)
+      const events = await run(unpostedEvents(root))
+      expect(events).toHaveLength(1)
+      expect(events[0]?.text).toContain("timed out after 30 seconds")
+    })
+  })
+
+  test.each(["posting", "rerun"])("does not lose state when %s holds the closed-task grab", async (writer) => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      const marker = { pr, runs: ["4242"], at: "2026-10-27T12:00:00.000Z" }
+      await run(Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        let overlapped = false
+        const grabbedFs = {
+          ...fs,
+          readFileString: (path: string, options?: Parameters<typeof fs.readFileString>[1]) =>
+            fs.readFileString(path, options).pipe(Effect.tap(() => {
+              if (!path.startsWith(join(root, "closed") + "/")) {
+                return Effect.void
+              }
+              return Effect.gen(function*() {
+                overlapped = true
+                const attempt = yield* (writer === "posting" ? markCiRerun(root, "orc-1", marker) : markPosted(root, "orc-1", marker.at)).pipe(
+                  Effect.provideService(FileSystem.FileSystem, fs),
+                  Effect.result
+                )
+                expect(Result.isFailure(attempt)).toBe(true)
+              })
+            }))
+        } satisfies FileSystem.FileSystem
+        expect(yield* (writer === "posting" ? markPosted(root, "orc-1", marker.at) : markCiRerun(root, "orc-1", marker)).pipe(Effect.provideService(FileSystem.FileSystem, grabbedFs))).toBe(true)
+        expect(overlapped).toBe(true)
+        expect(yield* (writer === "posting" ? markCiRerun(root, "orc-1", marker) : markPosted(root, "orc-1", marker.at))).toBe(true)
+      }))
+      const task = await run(findTask(root, "orc-1"))
+      expect(task.ciReruns).toEqual([marker])
+      expect(task.state.kind === "closed" ? task.state.postedAt : null).toBe(marker.at)
+      expect(await run(markPosted(root, "orc-1", marker.at))).toBe(false)
     })
   })
 

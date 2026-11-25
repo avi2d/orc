@@ -127,7 +127,7 @@ type Claimed =
 // A hold can land after a beat listed the task, so the file the claim took is read again and a held or parked one goes back to new.
 export const claimUnheld = (root: string, id: string, deciderOwns: DeciderOwns): Effect.Effect<Claimed, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const record = (yield* claimTask(root, id)) ? yield* readTask(root, "taken", id) : null
+    const record = (yield* claimTask(root, id)) ? yield* readTaken(root, id) : null
     if (record === null) {
       return { kind: "lost" } satisfies Claimed
     }
@@ -263,47 +263,19 @@ export const reopenStartedTask = (
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   settleStarted(root, id, "new", (fresh) => ({ ...fresh, spec: reshape(fresh.spec), parked: null, state: { kind: "new" } }))
 
-const readTask = (
+const readTaken = (
   root: string,
-  folder: TaskFolder,
   id: string
 ): Effect.Effect<TaskRecord | null, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    const file = backlogPaths(root).taskFile(folder, id)
+    const file = backlogPaths(root).taskFile("taken", id)
     const text = yield* fs.readFileString(file).pipe(
       Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
       Effect.mapError(platformFailure("read " + file))
     )
-    return text === null ? null : yield* parseTaskFile(file, folder, text)
+    return text === null ? null : yield* parseTaskFile(file, "taken", text)
   })
-
-const readClosed = (root: string, id: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  readTask(root, "closed", id).pipe(
-    Effect.filterOrFail((record) => record !== null, () => new BacklogError({ detail: "the backlog holds no closed " + id }))
-  )
-
-const writePosted = (root: string, id: string, postedAt: string): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const paths = backlogPaths(root)
-    const record = yield* readClosed(root, id)
-    if (record.state.kind !== "closed" || record.state.postedAt !== null) {
-      return false
-    }
-    const posted: TaskRecord = { ...record, state: { ...record.state, postedAt } }
-    const file = paths.taskFile("closed", id)
-    const scratch = scratchName(paths.folder("closed"), id)
-    yield* fs.writeFileString(scratch, renderTaskFile(posted)).pipe(Effect.mapError(platformFailure("write " + scratch)))
-    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
-    return true
-  })
-
-export const markPosted = (
-  root: string,
-  id: string,
-  postedAt: string
-): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> => writePosted(root, id, postedAt)
 
 export type Rewrite<A> = { readonly kind: "write"; readonly record: TaskRecord; readonly result: A } | { readonly kind: "keep"; readonly result: A }
 
@@ -344,6 +316,12 @@ const rewriteIn = (folder: "new" | "taken" | "closed") => <A>(
 export const rewriteNew = rewriteIn("new")
 
 export const rewriteTaken = rewriteIn("taken")
+
+export const markPosted = (root: string, id: string, postedAt: string): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  rewriteIn("closed")(root, id, (record) =>
+    Effect.succeed(record.state.kind !== "closed" || record.state.postedAt !== null
+      ? { kind: "keep", result: false }
+      : { kind: "write", record: { ...record, state: { ...record.state, postedAt } }, result: true }))
 
 export const markCiRerun = (root: string, id: string, rerun: CiRerun): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   rewriteIn("closed")(root, id, (record) =>

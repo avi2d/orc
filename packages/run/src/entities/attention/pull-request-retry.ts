@@ -1,8 +1,8 @@
-import { Effect, type FileSystem } from "effect"
+import { Duration, Effect, type FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, markCiRerun, type TaskRecord } from "../backlog/index"
 import { recordEvent } from "../events/index"
-import { gh, prPattern, redRuns, type PullRequestView } from "../pull-request/index"
+import { gh, pendingRedRuns, prPattern, redRuns, type PullRequestView } from "../pull-request/index"
 import { itemId } from "./attention"
 import { routePullRequest } from "./beat-items"
 
@@ -17,6 +17,9 @@ export const routePullRequestWithRetry = (
   Effect.gen(function*() {
     const runs = redRuns(view)
     const repo = pr.match(prPattern)
+    if (view.state === "OPEN" && task.state.kind === "closed" && task.spec.kind === "ship" && pendingRedRuns(view)) {
+      return
+    }
     if (view.state === "OPEN" && task.state.kind === "closed" && task.spec.kind === "ship" && runs.length > 0 && repo !== null && task.ciReruns?.some((entry) => entry.pr === pr) !== true) {
       const ids = [...new Set(runs.map((run) => run.run))]
       const recorded = yield* markCiRerun(root, task.spec.id, { pr, runs: ids, at }).pipe(
@@ -27,7 +30,8 @@ export const routePullRequestWithRetry = (
         for (const id of ids) {
           const said = yield* gh(["run", "rerun", id, "--failed", "-R", repo[1] + "/" + repo[2] + "/" + repo[3]]).pipe(
             Effect.map((result) => result.exitCode === 0 ? null : result.said),
-            Effect.catchTag("RunnerError", (error) => Effect.succeed(error.detail))
+            Effect.catchTag("RunnerError", (error) => Effect.succeed(error.detail)),
+            Effect.timeoutOrElse({ duration: Duration.seconds(30), orElse: () => Effect.succeed("the rerun timed out after 30 seconds") })
           )
           if (said !== null) {
             failures.push("gh run rerun " + id + " --failed failed: " + said)
