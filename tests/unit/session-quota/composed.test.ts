@@ -147,7 +147,7 @@ describe("the composed session panel at every width from 30 to 120 columns", () 
     }
   });
 
-  test("names the whole session-quota-composed-json command for the flags that do not fit, within the rows it has", () => {
+  test("keeps the full public composed report command visible without clipping wrapped overflow lines", () => {
     const view = views.composed;
     const tripled = { ...view, accounts: [...view.accounts, ...view.accounts, ...view.accounts] };
     for (const width of widths) {
@@ -155,7 +155,8 @@ describe("the composed session panel at every width from 30 to 120 columns", () 
       const lines = flagLines(tripled, width, caption + 2).map(plain);
       expect(lines.length).toBeLessThanOrEqual(caption + 2);
       const pointer = lines.slice(lines.findIndex((line) => /^\+\d/u.test(line)));
-      expect(pointer.join(" ")).toMatch(/^\+[56] .*bun run session-quota-composed-json$/u);
+      expect(pointer.join(" ")).toMatch(/^\+[56] .*orc-dash report session-quota-composed$/u);
+      for (const line of flagLines(tripled, width, caption + 2)) expect(lineWidth(line)).toBeLessThanOrEqual(width);
     }
   });
 });
@@ -215,6 +216,6 @@ describe("the composed session panel's notes", () => {
   test("points a flag that does not fit at the composed report", () => {
     const view = composedSessionQuota(machineView("north"), "north", [southReading()]);
     const doubled = { ...view, accounts: [...view.accounts, ...view.accounts] };
-    expect(flagLines(doubled, 84, 2).map(plain).at(-1)).toBe("+4 more flags, see bun run session-quota-composed-json");
+    expect(flagLines(doubled, 84, 2).map(plain).at(-1)).toBe("+4 more flags, see orc-dash report session-quota-composed");
   });
 });

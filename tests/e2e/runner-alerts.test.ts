@@ -1,22 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { type Fixture, mainToken, type OrcResult, runnerTimeout, runOrc, withFixture } from "./runner-helpers"
+import { type Fixture, type OrcResult, runnerStartEnv, runnerTimeout, runOrc, withFixture } from "./runner-helpers"
 import { watchGroup } from "../../packages/run/src/features/heavy-commands/heavy-watch"
 
-const startTask = async (fixture: Fixture, home: string = fixture.home): Promise<OrcResult> => {
-  await mkdir(join(home, "backlog", "taken"), { recursive: true })
-  const taskFile = join(home, "backlog", "taken", "task-9.md")
-  await writeFile(taskFile, ["---", "id: 'task-9'", "title: 'Do the thing'", "project: 'orc'", "machine: null", "depends_on: []", "beat: 'beat-1'", "taken_for: 'linux'", "account: 'main'", "taken_at: '2026-10-27T10:01:00.000Z'", "created: '2026-10-27T10:00:00.000Z'", "---", "# Do the thing", ""].join("\n"))
-  return runOrc(fixture, ["runner", "start"], {
-    ORC_HOME: home,
-    ORC_TASK_ID: "task-9",
-    ORC_TASK_FILE: taskFile,
-    ORC_TASK_CHECKOUT: fixture.checkout,
-    ORC_TASK_PROVIDER: "acme",
-    ORC_TASK_TOKEN_FILE: mainToken
-  })
-}
+const startTask = async (fixture: Fixture, home = fixture.home): Promise<OrcResult> =>
+  runOrc(fixture, ["runner", "start"], await runnerStartEnv(fixture, home))
 
 const linesOf = async (file: string): Promise<ReadonlyArray<string> | null> =>
   readFile(file, "utf8").then((text) => text.split("\n").slice(0, -1), () => null)

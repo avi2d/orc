@@ -339,7 +339,7 @@ const macTaskProcessesCommand = {
   argv: [
     "zsh",
     "-c",
-    'setopt err_exit; zmodload zsh/datetime; reader=$1; sample() { print -r -- "at $EPOCHREALTIME"; TZ=UTC LC_ALL=C ps -A -o pid= -o ppid= -o rss= -o utime= -o stime= -o lstart=; "$reader" -e "' +
+    'setopt err_exit; zmodload zsh/datetime; reader=$1; sample() { print -r -- "at $EPOCHREALTIME"; TZ=UTC LC_ALL=C ps -A -o pid= -o ppid= -o rss= -o utime= -o stime= -o lstart=; BUN_BE_BUN=1 "$reader" -e "' +
       macRusageReader +
       '" ${=$(ps -A -o pid= -o ppid=)}; }; sample; sleep 1; sample; lsof -a -d cwd -F pn',
     "zsh",

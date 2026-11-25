@@ -18,6 +18,8 @@ export const releasesUrl = packageJson.repository.url.replace(/^git\+/, "").repl
 
 const downloadTimeoutMs = 600_000
 
+const dashboardCommands = ["orc-dash", "orc-dash-capture"] as const
+
 const sourceEntry = (path: Path.Path, checkout: string): string => path.join(checkout, "packages", "run", "src", "bin.ts")
 
 const releaseOf = (path: Path.Path, directory: string, version: string): string => path.join(directory, "v" + version)
@@ -39,12 +41,24 @@ const runInstallerStep = (command: Command, action: string) => capture(command, 
     : Effect.fail(new InstallFailure({ detail: action + " exited " + String(exitCode), output: (stdout + stderr).trim() })))
 )
 
-const checkRelease = (command: Command, version: string) =>
+const checkOrcVersion = (command: Command, version: string) =>
   runInstallerStep([...command, "--version"], "verify launcher release " + version).pipe(
     Effect.flatMap((reported) => reported === "orc " + version
       ? Effect.void
       : Effect.fail(new InstallFailure({ detail: "launcher release " + version + " reported the wrong version", output: reported, retryable: false })))
   )
+
+const checkRelease = Effect.fnUntraced(function*(root: string, version: string, build: LauncherBuild) {
+  const path = yield* Path.Path
+  if (build.kind === "source") {
+    yield* checkOrcVersion([build.bun, sourceEntry(path, root)], version)
+    return
+  }
+  yield* checkOrcVersion([path.join(root, "orc")], version)
+  for (const name of dashboardCommands) {
+    yield* runInstallerStep([path.join(root, name), "--help"], "verify " + name + " in launcher release " + version)
+  }
+})
 
 const download = (url: string) => {
   const failure = (cause: unknown) => new InstallFailure({ detail: "download " + url + ": " + (cause instanceof Error ? cause.message : String(cause)), output: null })
@@ -85,15 +99,16 @@ const unpackRelease = Effect.fnUntraced(function*(staging: string, version: stri
   yield* fs.writeFile(file, archive)
   yield* runInstallerStep(["tar", "-xzf", file, "-C", staging], "unpack launcher release " + version)
   yield* fs.remove(file)
-  yield* fs.chmod(path.join(staging, "orc"), 0o755)
+  for (const command of ["orc", ...dashboardCommands]) {
+    yield* fs.chmod(path.join(staging, command), 0o755)
+  }
 })
 
 const prepareRelease = Effect.fnUntraced(function*(directory: string, version: string, build: LauncherBuild) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const checkout = releaseOf(path, directory, version)
-  const launched = (root: string): Command => build.kind === "compiled" ? [path.join(root, "orc")] : [build.bun, sourceEntry(path, root)]
-  const checkExisting = checkRelease(launched(checkout), version)
+  const checkExisting = checkRelease(checkout, version, build)
   if (yield* fs.exists(checkout)) {
     yield* checkExisting
     return
@@ -102,7 +117,7 @@ const prepareRelease = Effect.fnUntraced(function*(directory: string, version: s
     fs.makeTempDirectory({ directory, prefix: ".v" + version + "." }),
     (staging) => Effect.gen(function*() {
       yield* build.kind === "compiled" ? unpackRelease(staging, version, build) : cloneRelease(staging, version, build.bun)
-      yield* checkRelease(launched(staging), version)
+      yield* checkRelease(staging, version, build)
       yield* fs.rename(staging, checkout).pipe(
         Effect.catch((error) => fs.exists(checkout).pipe(
           Effect.flatMap((exists) => exists
