@@ -216,7 +216,13 @@ const login = (account: AccountName) => signIn(orcHomeDir(Bun.env.ORC_HOME), acc
 
 const update = (args: Extract<OrcArgs, { readonly kind: "Update" }>) =>
   Effect.gen(function*() {
-    const result = yield* runUpdate({ home: orcHomeDir(Bun.env.ORC_HOME), env: Bun.env, running: packageJson.version }).pipe(Effect.provide(BunServices.layer))
+    const result = yield* runUpdate({
+      home: orcHomeDir(Bun.env.ORC_HOME),
+      env: Bun.env,
+      running: packageJson.version,
+      main: Bun.main,
+      executable: process.execPath
+    }).pipe(Effect.provide(BunServices.layer))
     yield* Console.log(args.json ? yield* encodeUpdateJson(result) : formatUpdate(result))
     if (result.outcome === "failed") {
       return yield* Effect.fail("orc update failed")
