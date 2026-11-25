@@ -14,7 +14,7 @@ import { orcGroup, PueueResult, PueueStatus } from "../../shared/process/index"
 import { LabelArg } from "../../entities/token/index"
 import { capture, decodeJson, type Command } from "../../shared/process/index"
 import { readHeld, refuse, resolveProjectDir, type RunnerRequirements } from "./runner"
-import { RunnerError } from "../../shared/process/index"
+import { MachineUnreached, RunnerError } from "../../shared/process/index"
 
 const RUNNER_JSON_SCHEMA = "orc.runner.v1" as const
 
@@ -293,17 +293,33 @@ export const readStdinLabel = (stdin: Effect.Effect<string, RunnerError>): Effec
     )
   )
 
-export const readResultThrough = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> => {
+// ssh exits 255 for its own failure and passes the remote command's code on otherwise, so 255 says the machine was not reached.
+const unreachedExit = 255
+
+// Shorter than the beat's 30-second close read, so a machine that never answers ends as ssh's own 255 and not as a timeout.
+const connectSeconds = 10
+
+const boundedConnect = (command: Command): Command => {
+  const [program, ...rest] = command
+  return program.split("/").at(-1) === "ssh" ? [program, "-o", "ConnectTimeout=" + connectSeconds.toString(), ...rest] : command
+}
+
+export const readResultReaching = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError | MachineUnreached, ChildProcessSpawner.ChildProcessSpawner> => {
   const stdin = label == null ? null : JSON.stringify({ label })
-  return capture([...command, "runner", "result", task, "--json", ...(stdin === null ? [] : ["--stdin-label"])], stdin).pipe(
-    Effect.flatMap((result) =>
-      result.exitCode === 0
-        ? decodeJson(result.stdout, RunnerDocument, command.join(" ") + " runner result")
-        : refuse(command.join(" ") + " runner result exited " + result.exitCode + ": " + result.stderr.trim())
-    ),
+  return capture([...boundedConnect(command), "runner", "result", task, "--json", ...(stdin === null ? [] : ["--stdin-label"])], stdin).pipe(
+    Effect.flatMap((result): Effect.Effect<typeof RunnerDocument.Type, RunnerError | MachineUnreached> => {
+      if (result.exitCode === 0) {
+        return decodeJson(result.stdout, RunnerDocument, command.join(" ") + " runner result")
+      }
+      const detail = command.join(" ") + " runner result exited " + result.exitCode + ": " + result.stderr.trim()
+      return Effect.fail(result.exitCode === unreachedExit ? new MachineUnreached({ detail }) : new RunnerError({ detail }))
+    }),
     Effect.map((document) => document.result)
   )
 }
+
+export const readResultThrough = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  readResultReaching(command, task, label).pipe(Effect.catchTag("MachineUnreached", (error) => refuse(error.detail)))
 
 export const readRunResult = (id: string, home: string, label: string | null | undefined, machine: Machine): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> => {
   const through = throughFor(machine)

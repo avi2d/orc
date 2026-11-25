@@ -36,6 +36,7 @@ export interface NoMistakesReply {
 
 // A runner that cannot reach no-mistakes resolves with a nonzero exit code, so the driver records why the step stopped.
 export interface NoMistakesRunner {
+  readonly init: Effect.Effect<NoMistakesReply>
   readonly start: (intentFile: string) => Effect.Effect<NoMistakesReply>
   readonly reattach: Effect.Effect<NoMistakesReply>
   readonly respond: (response: GateResponse) => Effect.Effect<NoMistakesReply>
@@ -113,6 +114,7 @@ const spawnBinary = (options: NoMistakesHost, cwd: string, args: ReadonlyArray<s
 export const subprocessNoMistakesRunner = (options: SubprocessRunnerOptions): NoMistakesRunner => {
   const spawn = (args: ReadonlyArray<string>) => spawnBinary(options, options.worktreeDir, args)
   return {
+    init: spawn(["init", "--skip-user-skill"]),
     start: (intentFile) => spawn(["axi", "run", "--intent-file", intentFile, "--skip", "test,rebase"]),
     reattach: spawn(["axi", "run"]),
     respond: (response) => spawn(respondArgs(response)),
@@ -300,11 +302,31 @@ const advanceParked = (
     return { kind: "next", current, sent: { kind: "respond", gate } }
   })
 
+const repoNotInitialized = (command: NoMistakesReply): boolean =>
+  command.exitCode !== 0 && /\brepo not initialized\b/.test(errorDetail(command))
+
+const initFailed = (command: NoMistakesReply): NoMistakesReply => ({
+  stdout: "",
+  stderr: "no-mistakes init failed: " + firstLine(command.stderr + "\n" + command.stdout),
+  exitCode: command.exitCode === 0 ? 1 : command.exitCode
+})
+
+const startRun = (input: NoMistakesInput): Effect.Effect<NoMistakesReply, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const first = yield* input.runner.start(input.taskFile)
+    if (!repoNotInitialized(first)) {
+      return first
+    }
+    yield* appendGate(input.runDir, "init")
+    const init = yield* input.runner.init
+    return init.exitCode === 0 ? yield* input.runner.start(input.taskFile) : initFailed(init)
+  })
+
 const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     let sent: Sent = { kind: "start" }
     yield* appendGate(input.runDir, "start")
-    let current = yield* input.runner.start(input.taskFile)
+    let current = yield* startRun(input)
     const supplied = new Map((input.answers ?? []).filter((entry) => entry.question !== gateCapQuestionId).map((entry) => [entry.question, entry.answer] as const))
     for (;;) {
       const step: CurrentStep = yield* stepCurrent(input, log, sent, current)

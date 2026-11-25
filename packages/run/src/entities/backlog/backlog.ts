@@ -236,6 +236,7 @@ const settleStarted = (
     }
     yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
     yield* fs.remove(paths.unreadFile(id), { force: true }).pipe(Effect.orElseSucceed(() => undefined))
+    yield* fs.remove(paths.unreachedFile(id), { force: true }).pipe(Effect.orElseSucceed(() => undefined))
     return settled
   })
 

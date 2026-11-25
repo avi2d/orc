@@ -11,6 +11,7 @@ import { askStartedTask, parkStartedTask } from "../../../packages/run/src/entit
 import { Asking, askingFileName, waitForAnswers } from "../../../packages/run/src/entities/review-gate/answer-wait"
 import { driveNoMistakes, type NoMistakesRunner } from "../../../packages/run/src/entities/review-gate/no-mistakes"
 import { type AskDecider, type DeciderRequest, decideReviewQuestions } from "../../../packages/run/src/features/decider/index"
+import { openQuestions } from "../../lib/open-questions-2026-11-25"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -34,6 +35,7 @@ const gateAsking = (row: string, columns = "id,severity,file,action,description,
 ].join("\n")
 
 const parkedAt = (stdout: string): NoMistakesRunner => ({
+  init: Effect.die("the repository is initialized in this test"),
   start: () => Effect.succeed({ stdout, stderr: "", exitCode: 0 }),
   reattach: Effect.succeed({ stdout, stderr: "", exitCode: 0 }),
   respond: () => Effect.die("no gate response is expected"),
@@ -160,11 +162,34 @@ describe("the asked action of a no-mistakes review question", () => {
 
   test("an action orc does not know goes to the owner", async () => {
     await withStartedTask(async (root) => {
-      await parkThroughGate(root, gateAsking("question-1,warning,,ask-user,Is this branch ready?,unknown"))
+      await parkThroughGate(root, gateAsking("question-1,warning,,ask-user,Is this branch ready?,spend"))
       const heard: Array<DeciderRequest> = []
       const decided = await decideAll(root, heard)
       expect(heard.length).toBe(0)
-      expect(decided.map((entry) => entry.verdict.kind)).toEqual(["escalated"])
+      const verdict = decided.at(0)?.verdict
+      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("which orc does not know")
+    })
+  })
+
+  test("a routine question no-mistakes left unclassified reaches the decider, instead of the owner", async () => {
+    await withStartedTask(async (root) => {
+      await parkThroughGate(root, gateAsking("question-1,warning,,ask-user," + JSON.stringify(openQuestions.finishedRunTestUsesFailedPath.text) + ",unknown"))
+      expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)?.asks).toBe("unknown")
+      const heard: Array<DeciderRequest> = []
+      const decided = await decideAll(root, heard)
+      expect(heard.length).toBe(1)
+      expect(decided.map((entry) => entry.verdict.kind)).toEqual(["answered"])
+    })
+  })
+
+  test("an unclassified question that asks for a merge still goes to the owner by its words", async () => {
+    await withStartedTask(async (root) => {
+      await parkThroughGate(root, gateAsking("question-1,warning,,ask-user,Merge this branch now?,unknown"))
+      const heard: Array<DeciderRequest> = []
+      const decided = await decideAll(root, heard)
+      expect(heard.length).toBe(0)
+      const verdict = decided.at(0)?.verdict
+      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("about merging")
     })
   })
 

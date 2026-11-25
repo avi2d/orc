@@ -1,19 +1,19 @@
 import { Array as Arr, DateTime, Duration, Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { backlogPaths, type BacklogError, closeStartedTask, findTask, listTasks, applyRunSplit, splitEventText, runLabel, runDirFor, taskBranch, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
-import { recordEvent } from "../../entities/events/index"
-import { type BeatAction, type Progress, withdrawTaskItems } from "../../entities/attention/index"
+import { backlogPaths, type BacklogError, closeStartedTask, runLabel, runDirFor, taskBranch, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { type BeatAction, openUnreachedMachine, type Progress, withdrawTaskItems, withdrawUnreachedMachine } from "../../entities/attention/index"
 import type { FailingMark } from "../../entities/agent/index"
 import type { DispatchConfig } from "../../shared/config/index"
 import { ownedBySweep, throughFor } from "../../shared/config/index"
 import { logWrittenAt, stallMillis } from "./stall"
+import { endSplit } from "./beat-split"
 import { answersFor, askStartedTask, type AskedQuestion, correctionsDue, markAnswersRelayed, markCorrectionsQueued, parkStartedTask } from "../../entities/parked-runs/index"
 import { Asking, askingFileName, hasBlockingQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
 import { readJsonFileIfPresent } from "../../shared/config/index"
 import { type RunnerRequirements } from "../../features/queueing-a-task/index"
 import { type RunnerError } from "../../shared/process/index"
 import { type Command } from "../../shared/process/index"
-import { correctThrough, endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "../../features/queueing-a-task/index"
+import { correctThrough, endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultReaching, type RunnerResult } from "../../features/queueing-a-task/index"
 
 export interface CloseContext {
   readonly root: string
@@ -31,9 +31,14 @@ const missingRunnerGraceMillis = 10 * 60 * 1000
 type CloseReading =
   | { readonly kind: "read"; readonly result: RunnerResult; readonly ending: RunEnding | null; readonly outputAt: string | null; readonly asking: typeof Asking.Type | null; readonly failing: FailingMark | null }
   | { readonly kind: "unread"; readonly reason: string }
+  | { readonly kind: "unreached"; readonly reason: string }
 
 // A close read that stays unread past the queue delay releases the machine, measured from its first unread beat.
 export const staleEndingOf = (startedAt: string, nowMillis: number, reading: CloseReading, unreadSinceMillis: number | null): RunEnding | null => {
+  // The run lives on the machine orc cannot reach, so it may still be working or already done there.
+  if (reading.kind === "unreached") {
+    return null
+  }
   if (reading.kind === "unread") {
     if (unreadSinceMillis === null || Number.isNaN(unreadSinceMillis) || nowMillis - unreadSinceMillis <= missingRunnerGraceMillis) {
       return null
@@ -65,7 +70,6 @@ export const ownLogEndingOf = (startedAt: string, logAt: string | null, nowMilli
 }
 
 type ParkEnding = Extract<RunEnding, { readonly kind: "park" }>
-type SplitEnding = Extract<RunEnding, { readonly kind: "split" }>
 type CloseEnding = Extract<RunEnding, { readonly kind: "close" }>
 
 const endParked = (
@@ -107,80 +111,6 @@ const endParked = (
     }
     const questions = (parked.parked?.questions ?? []).filter((question) => question.answer === null).map((question) => question.id)
     return Option.some({ kind: "parked", task: id, machine, branch, questions, decider: [] } satisfies BeatAction)
-  })
-
-const childIdsOf = (tasks: ReadonlyArray<TaskRecord>, parent: string): ReadonlyArray<string> =>
-  tasks.filter((candidate) => candidate.spec.parent === parent).map((candidate) => candidate.spec.id)
-
-const siblingIdsOf = (tasks: ReadonlyArray<TaskRecord>, parent: string, created: string): ReadonlyArray<string> =>
-  tasks.filter((candidate) => candidate.spec.parent === parent && candidate.spec.created === created).map((candidate) => candidate.spec.id)
-
-const splitFailureText = (id: string, children: ReadonlyArray<string>, detail: string): string =>
-  "split " + id + " into " + (children.length === 0 ? "no children" : children.join(", ")) + " failed: " + detail
-
-const listTasksOrEmpty = (root: string): Effect.Effect<ReadonlyArray<TaskRecord>, never, FileSystem.FileSystem> =>
-  listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>))
-
-const endSplitParentFailure = (
-  root: string,
-  id: string,
-  machine: string,
-  detail: string
-): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const children = childIdsOf(yield* listTasksOrEmpty(root), id)
-    return Option.some({ kind: "close-failed", task: id, machine, reason: splitFailureText(id, children, detail) } satisfies BeatAction)
-  })
-
-const endSplitFailure = (
-  root: string,
-  task: TaskRecord,
-  machine: string,
-  detail: string,
-  at: string
-): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const id = task.spec.id
-    const reopened = yield* findTask(root, id).pipe(Effect.orElseSucceed(() => null))
-    if (reopened !== null && reopened.state.kind === "new" && reopened.spec.kind === "parent") {
-      return yield* endSplitParentFailure(root, id, machine, detail)
-    }
-    const parent = task.spec.parent
-    if (parent === null || reopened === null) {
-      return Option.none()
-    }
-    const created = siblingIdsOf(yield* listTasksOrEmpty(root), parent, at)
-    const reason = splitFailureText(id, created, detail)
-    const closed = yield* closeStartedTask(root, id, "failed", reason, { pr: null, report: null }, at).pipe(
-      Effect.catchTag("BacklogError", () => Effect.succeed(null))
-    )
-    return closed === null || closed.state.kind !== "closed"
-      ? Option.none()
-      : Option.some({ kind: "closed", task: id, machine, outcome: "failed", reason: closed.state.closing.reason, pr: null, report: null } satisfies BeatAction)
-  })
-
-const endSplit = (
-  root: string,
-  task: TaskRecord,
-  machine: string,
-  ending: SplitEnding
-): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const id = task.spec.id
-    const at = yield* nowIso
-    const applied = yield* applyRunSplit(root, task, ending.plan, at).pipe(
-      Effect.map((value) => ({ kind: "applied" as const, value })),
-      Effect.catchTags({
-        BacklogError: (error) => Effect.succeed({ kind: "failed" as const, detail: error.detail }),
-        TaskFileError: (error) => Effect.succeed({ kind: "failed" as const, detail: error.detail })
-      })
-    )
-    if (applied.kind === "applied") {
-      const reason = ending.plan.reason.trim()
-      yield* recordEvent(root, { key: id + ".split", at, text: splitEventText(applied.value, "run", reason) }).pipe(Effect.catchTag("BacklogError", () => Effect.void))
-      return Option.some({ kind: "split", task: id, machine, children: applied.value.children.map((child) => child.spec.id), reason } satisfies BeatAction)
-    }
-    return yield* endSplitFailure(root, task, machine, applied.detail, at)
   })
 
 const endClosed = (
@@ -305,26 +235,29 @@ const readClose = (
   label: string,
   through: Command | null
 ): Effect.Effect<CloseReading, never, RunnerRequirements> =>
-  (through === null ? readResult(task.spec.id, home, label) : readResultThrough(through, task.spec.id, label)).pipe(
-    Effect.map((result) => ({ kind: "read" as const, result, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result), asking: askingOf(result), failing: failingOf(result) })),
-    Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail })),
+  (through === null ? readResult(task.spec.id, home, label) : readResultReaching(through, task.spec.id, label)).pipe(
+    Effect.map((result): CloseReading => ({ kind: "read", result, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result), asking: askingOf(result), failing: failingOf(result) })),
+    Effect.catchTags({
+      RunnerError: (error) => Effect.succeed<CloseReading>({ kind: "unread", reason: error.detail }),
+      MachineUnreached: (error) => Effect.succeed<CloseReading>({ kind: "unreached", reason: error.detail })
+    }),
     Effect.timeoutOrElse({
       duration: Duration.seconds(closeSeconds),
       orElse: () => Effect.succeed({ kind: "unread" as const, reason: "the close read timed out after " + closeSeconds + " seconds" })
     })
   )
 
-const readUnreadSince = (
+const readSince = (
   fs: FileSystem.FileSystem,
-  unreadFile: string,
+  sinceFile: string,
   nowText: string
 ): Effect.Effect<number | null> =>
-  fs.readFileString(unreadFile).pipe(
+  fs.readFileString(sinceFile).pipe(
     Effect.map((text) => Date.parse(text)),
     Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null)),
     Effect.flatMap((parsed) =>
       parsed === null || Number.isNaN(parsed)
-        ? fs.writeFileString(unreadFile, nowText).pipe(
+        ? fs.writeFileString(sinceFile, nowText).pipe(
           Effect.as<number | null>(null),
           Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null))
         )
@@ -332,14 +265,37 @@ const readUnreadSince = (
     )
   )
 
-const clearUnread = (
+const clearSince = (
   fs: FileSystem.FileSystem,
-  unreadFile: string
+  sinceFile: string
 ): Effect.Effect<number | null> =>
-  fs.remove(unreadFile, { force: true }).pipe(
+  fs.remove(sinceFile, { force: true }).pipe(
     Effect.as<number | null>(null),
     Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null))
   )
+
+const trackUnreached = (
+  root: string,
+  task: string,
+  machine: string,
+  reading: CloseReading,
+  fs: FileSystem.FileSystem,
+  nowText: string
+): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const unreachedFile = backlogPaths(root).unreachedFile(task)
+    if (reading.kind === "unreached") {
+      const since = yield* readSince(fs, unreachedFile, nowText)
+      if (since !== null && Date.parse(nowText) - since > missingRunnerGraceMillis) {
+        yield* openUnreachedMachine(root, task, machine, new Date(since).toISOString(), reading.reason, nowText)
+      }
+      return
+    }
+    if (yield* fs.exists(unreachedFile).pipe(Effect.orElseSucceed(() => false))) {
+      yield* clearSince(fs, unreachedFile)
+      yield* withdrawUnreachedMachine(root, task, nowText)
+    }
+  })
 
 // A finished run ends its task here, because no other beat step reads a started task after its run ends.
 export const closeFinished = (
@@ -371,12 +327,13 @@ export const closeFinished = (
     const unreadFile = backlogPaths(context.root).unreadFile(task.spec.id)
     const nowText = yield* nowIso
     const unreadSince = reading.kind === "unread"
-      ? yield* readUnreadSince(fs, unreadFile, nowText)
-      : yield* clearUnread(fs, unreadFile)
+      ? yield* readSince(fs, unreadFile, nowText)
+      : yield* clearSince(fs, unreadFile)
+    yield* trackUnreached(context.root, task.spec.id, claim.machine, reading, fs, nowText)
     const stale = staleEndingOf(started.at, Date.parse(nowText), reading, unreadSince)
     const ending = reading.kind === "read" ? (stale ?? reading.ending) : stale
     if (ending === null) {
-      if (reading.kind === "unread") {
+      if (reading.kind !== "read") {
         return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: reading.reason } } satisfies Progress
       }
       const action = yield* serveRunning(context, task, claim.machine, through, label, reading.asking)

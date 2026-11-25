@@ -5,6 +5,29 @@ import type { AttentionItem } from "./attention-item"
 import type { BeatAction } from "./beat-action"
 import { choice, closeItem, itemId, openItem, openItems, readItem, withdrawItem, openOrRefreshItem } from "./attention"
 
+const unreachedPrefix = (task: string): string => itemId(task, "machine-unreached") + "."
+
+// An item opens once per id, so the id carries the stretch's start for a machine lost again after it answered.
+export const openUnreachedMachine = (root: string, task: string, machine: string, since: string, reason: string, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.asVoid(openItem(root, itemId(task, "machine-unreached", since), {
+    kind: "machine-unreached",
+    task,
+    text: "orc has not reached " + machine + " since " + since + ", so it cannot tell whether the run of " + task + " still works there, and the task stays started: " + reason,
+    ...choice(
+      "the run of " + task + " on " + machine,
+      { text: "wait", outcome: "the task stays started, and each beat reads its run again" },
+      { text: "close", outcome: "orc backlog close " + task + " failed closes the task failed and frees its slot on " + machine }
+    ),
+    asked: at,
+    owner: "user"
+  }))
+
+export const withdrawUnreachedMachine = (root: string, task: string, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const open = yield* openItems(root, (name) => name.startsWith(unreachedPrefix(task)))
+    yield* Effect.forEach(open, (entry) => Effect.asVoid(withdrawItem(root, entry.id, "the machine answered again", at)), { discard: true })
+  })
+
 export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.forEach(actions, (action) =>
     (action.kind === "closed" && action.outcome === "failed") || action.kind === "start-failed"

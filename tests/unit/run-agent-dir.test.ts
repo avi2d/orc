@@ -124,6 +124,7 @@ describe("the Pi agent folder after a run ends", () => {
         const session = await writeSession(run, "success-1")
         await writeFile(session, JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "ORC_COMPLETE" }] } }) + "\n")
         const runner = {
+          init: Effect.die("unexpected init"),
           start: () => Effect.succeed({ stdout: "outcome: passed\npr: https://example.com/pr/1\n", stderr: "", exitCode: 0 }),
           reattach: Effect.die("unexpected reattach"),
           respond: () => Effect.die("unexpected gate"),
