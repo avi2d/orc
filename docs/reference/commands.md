@@ -57,7 +57,7 @@ Run orc <command> --help to learn what a command does and the options it takes.
 
 ```text
 Usage: orc run [<task-file>] [--kind <ship|scout|task|parent>]
-           [--delivery <no-mistakes|direct-PR>] [--branch <name>]
+           [--delivery <no-mistakes|direct-PR|orc>] [--branch <name>]
            [--sandbox <nono|none>] [--token-file <path>] [--provider <id>]
            [--implementer-model <model>] [--fixer-model <model>]
            [--implementer-thinking <level>] [--fixer-thinking <level>]
@@ -72,11 +72,11 @@ Options:
                             What the task ends in. ship ends in a PR, scout and
                             task end in a report, and parent runs a parent's
                             final check. Defaults to ship.
-  --delivery <no-mistakes|direct-PR>
+  --delivery <no-mistakes|direct-PR|orc>
                             How a ship task reaches its PR. Defaults to
-                            no-mistakes, and direct-PR opens the PR after a
-                            review turn that records findings and blocks
-                            nothing.
+                            no-mistakes. direct-PR records a review before
+                            opening the PR, and orc rebases and opens the PR
+                            without review or a CI verdict.
   --branch <name>           The branch to commit to, or to resume. Defaults to
                             orc/<run-id>.
   --sandbox <nono|none>     Where the agent runs. Defaults to nono, and none

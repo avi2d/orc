@@ -327,7 +327,7 @@ const stepsToCome = (steps: ReadonlyArray<Step>, kind: string | null, delivery: 
   const last = steps.at(-1)
   const rounds = steps.filter((step) => step.name === "checks").at(-1)?.attempt ?? 0
   const fixes = steps.reduce((max, step) => step.name === "fix" ? Math.max(max, step.attempt) : max, 0)
-  const finalStep = delivery === "direct-PR" ? "PR" : "No mistakes"
+  const finalStep = delivery === "direct-PR" || delivery === "orc" ? "PR" : "No mistakes"
   if (last === undefined) {
     return ["Agent", "Checks 1", finalStep]
   }
