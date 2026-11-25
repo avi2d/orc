@@ -140,6 +140,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/features/running-a-task/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
 | `packages/run/src/features/running-a-task/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
+| `packages/run/src/features/running-a-task/shared-packages.ts` | The shared install of a package provider's pinned git sources under `$ORC_HOME/pi-packages` and the links to it from a run's Pi folder |
 | `packages/run/src/features/running-a-task/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `packages/run/src/features/running-a-task/run-exec.ts` | The sandbox a run opens, the install that prepares the copy and the steps that run in it |
 | `packages/run/src/features/running-a-task/run-loop.ts` | The implement, check and fix steps of one run |
