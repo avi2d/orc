@@ -41,6 +41,13 @@ const board = buildCards(
 )
 
 describe("sending a PR back", () => {
+  test("a sent-back conflict retains its approval card instead of losing the recorded error", () => {
+    const id = "20261113-090000-aaaaaa"
+    const prRun = run(id, { status: "succeeded", branch: "orc/orc-48", prLink: approval.link })
+    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "new", parkedOrigin: id, merge: { stage: "conflicted", detail: "Merge conflict with main" } })]))
+    expect(card.standing.status).toBe("Awaiting you")
+    expect(card.merge?.stage).toBe("conflicted")
+  })
   test("the approval card retains each recorded merge stage instead of showing only a generic merge", () => {
     const prRun = run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: approval.link })
     for (const stage of ["updating", "checks-running", "conflicted", "check-failed", "merged"] as const) {
