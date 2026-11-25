@@ -4,7 +4,6 @@ export { readPullRequest, checkRefusals, CommitSha, gh, prPattern, greenChecks, 
 export type { PullRequestView } from "./pr-view"
 export type { DirectPrRecord, PullRequestOpener } from "./direct-pr"
 export { subprocessPullRequestOpener, openDirectPr } from "./direct-pr"
-export { ciWaitingQuestionId, ciVerdictOf, ciVerdictLine, readCiVerdict } from "./ci-verdict"
-export type { CiVerdict } from "./ci-verdict"
+export { ciWaitingQuestionId } from "./ci-verdict"
 export { ownerWordChanges, readChangedFiles } from "./changed-files"
 export type { ChangedFile } from "./changed-files"

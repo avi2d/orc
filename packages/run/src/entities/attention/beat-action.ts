@@ -51,6 +51,7 @@ export type BeatAction =
   | { readonly kind: "answer-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | StalledAction
   | { readonly kind: "pr-unread"; readonly task: string; readonly reason: string }
+  | { readonly kind: "pr-checks"; readonly task: string; readonly reason: string }
   | { readonly kind: "yolo-merged"; readonly task: string; readonly pr: string }
   | { readonly kind: "yolo-updating"; readonly task: string; readonly pr: string }
   | { readonly kind: "merge-refused"; readonly task: string; readonly reason: string }

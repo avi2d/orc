@@ -93,7 +93,7 @@ Its state is files on disk and queues in pueue, so a restart picks up where it s
 | Beat | One pass of `orc beat`, which starts what can start and closes what finished |
 | Slot | One place for a running task on a machine, counted in `dispatch.json` |
 | Pi | The coding agent orc runs, and the only one |
-| no-mistakes | The review tool that takes a checked branch to a pull request with green CI |
+| no-mistakes | The review tool that takes a checked branch to a pull request |
 | pueue | The queue on each machine that holds the runs |
 | [nono](https://nono.sh) | The sandbox a run you start by hand works in by default |
 | Decider | The model that answers a run's routine questions from written instructions |
