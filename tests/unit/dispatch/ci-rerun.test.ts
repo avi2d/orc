@@ -84,4 +84,16 @@ describe("a red check on a ship task's PR", () => {
     })
   })
 
+  test("keeps non-Actions failure links instead of dropping them after a rerun", async () => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      const asked: Array<ReadonlyArray<string>> = []
+      await route(root, asked)
+      const external = "https://ci.example/build/42"
+      await route(root, asked, { ...red, statusCheckRollup: [{ workflowName: "security", detailsUrl: external, name: "scan", status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-10-27T11:10:00.000Z" }] })
+      expect((await run(openItems(root)))[0]?.item.text).toContain(external)
+      expect(asked).toHaveLength(1)
+    })
+  })
+
 })
