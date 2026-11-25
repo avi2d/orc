@@ -197,6 +197,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/attention/attention-store.ts` | The item files and their exclusive write claims |
 | `packages/run/src/entities/attention/attention-overdue.ts` | The age of an attention item and whether an open item is overdue |
 | `packages/run/src/entities/attention/attention-item.ts` | The item file shape, the decider's decisions it records and their text |
+| `packages/run/src/entities/attention/pull-request-retry.ts` | The one rerun of a red PR's failed Actions jobs, before the `check-red` item |
 | `packages/run/src/entities/attention/failing-command.ts` | The `failing-command` items of running runs whose command keeps failing |
 | `packages/run/src/entities/attention/update-result.ts` | The update lines and the `update-failed` items for dispatch machines |
 
