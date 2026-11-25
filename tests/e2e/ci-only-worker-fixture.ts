@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { git, loginProvider, prUrl, runOrc, withNoSandboxFixture, writeConfig, writeScript } from "./no-sandbox-fixture"
 
@@ -11,11 +11,11 @@ const forbidden = [
   "bunx vitest run", "bun x jest", "npm test", "npm t", "npm run test:e2e",
   "npm --prefix . run test", "npm exec -- vitest run", "npx --yes jest",
   "pnpm test", "pnpm run test:unit", "pnpm exec pytest", "yarn test",
-  "vitest run", "vitest --watch", "jest", "pytest", "playwright test", "go test ./...", "cargo test",
+  "vitest run", "vitest --watch", "jest", "pytest", "./node_modules/.bin/vitest run", "playwright test", "go test ./...", "cargo test",
   "xcodebuild test", "xcodebuild -scheme Example test"
 ]
 const permitted = [
-  "bun run build", "npm run lint", "pnpm run typecheck", "playwright install",
+  "bun run build", "npm run lint", "pnpm run typecheck", "playwright install", "./node_modules/.bin/tsc",
   "bunx checks-lint", "bun x checks-lint", "bun checks-lint", "npx checks-lint",
   "npm exec -- checks-lint", "pnpm exec checks-lint", "pnpm dlx checks-lint",
   "yarn exec checks-lint", "xcrun checks-lint"
@@ -32,15 +32,21 @@ export const exerciseCiOnlyHostPi = async (): Promise<void> => {
     const roundFile = join(fakeBin, "lint-round")
     const probe = [
       ...forbidden.map((command) => [
-        command + " > /dev/null 2> " + quote(join(fakeBin, "last-error")),
+        "/bin/bash -c " + quote(command) + " > /dev/null 2> " + quote(join(fakeBin, "last-error")),
         "printf '%s %s\\n' \"$?\" " + quote(command) + " >> " + quote(attempts),
         "cat " + quote(join(fakeBin, "last-error")) + " >> " + quote(errors)
       ].join("\n")),
-      ...permitted.map((command) => command + " > /dev/null")
+      ...permitted.map((command) => "/bin/bash -c " + quote(command) + " > /dev/null")
     ].join("\n")
     for (const tool of tools) {
       await writeScript(join(fakeBin, tool), ["printf '%s\\n' " + quote(tool) + '" $*" >> ' + quote(starts)])
     }
+    const localBin = join(repo, "node_modules", ".bin")
+    await mkdir(localBin, { recursive: true })
+    for (const tool of ["vitest", "tsc"]) {
+      await writeScript(join(localBin, tool), ["printf '%s\\n' " + quote("./node_modules/.bin/" + tool) + " >> " + quote(starts)])
+    }
+    git(repo, ["add", "-f", "node_modules/.bin/vitest", "node_modules/.bin/tsc"], env)
     await writeConfig(env, {
       providers: [loginProvider],
       models: { implementer: "acme-go/coder-1", fixer: "acme-go/coder-1" },
@@ -77,6 +83,7 @@ export const exerciseCiOnlyHostPi = async (): Promise<void> => {
     const refusals = (await readFile(errors, "utf8")).trim().split("\n")
     assert.equal(refusals.length, statuses.length)
     assert.equal(refusals.every((line) => line.includes("starts a test run")), true)
+    assert.equal(refusals.filter((line) => line.includes("BASH_ENV command-shape guard")).length, 3)
     assert.deepEqual((await readFile(starts, "utf8")).trim().split("\n"), Array.from({ length: 3 }, () => permitted).flat())
     assert.equal((result.stderr.match(/skipped local commands:/g) ?? []).length, 1)
     const outside = Bun.spawn([join(env["ORC_HOME"] ?? "", "heavy", "bin", "bun"), "test"], {

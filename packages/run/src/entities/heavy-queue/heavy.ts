@@ -7,6 +7,7 @@ export const heavyBinDir = (home: string): string => home + heavyDirSuffix
 
 export const ciOnlyBinDir = (home: string): string => home + ciOnlyDirSuffix
 
+export const ciOnlyBashFile = (home: string): string => home + "/heavy/ci-only.bash"
 export const agentWrapperDir = (home: string): string => home + agentWrapperDirSuffix
 
 export const withHeavyPath = (home: string, path: string): string => heavyBinDir(home) + ":" + path
@@ -25,6 +26,12 @@ export const defaultHeavyTools: ReadonlyArray<string> = [
   "jest",
   "go",
   "cargo",
+  "node",
+  "python",
+  "python3",
+  "uv",
+  "make",
+  "deno",
   "pytest",
   "tsc",
   "oxlint",

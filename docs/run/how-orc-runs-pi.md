@@ -2,11 +2,14 @@
 kind: reference
 ---
 # How orc runs Pi
-Orc runs only Pi, and it starts Pi itself as `pi -p --mode json` in the task copy, inside `nono run` by default or on the host with `--sandbox none`.
+Orc runs only Pi, and it starts Pi itself as `pi -p --mode json` in the task copy, inside [`nono run`](https://nono.sh) by default or on the host with `--sandbox none`.
 
 ## Pi sessions and output
 
 - Orc passes the agent file's model, thinking level and tools, and the run's `sessions` folder as `--session-dir`.
+- When `~/.pi/agent/extensions/tool-time-cap.ts` exists, orc passes it to Pi with `-e`, because a run's own Pi folder in `PI_CODING_AGENT_DIR` hides your `~/.pi/agent/extensions`.
+  Orc passes it in the nono sandbox, where it adds the resolved file as a read-only grant, and on `--sandbox none` with a token file or package provider.
+  Pi on a login provider without a sandbox loads it itself.
 - Orc writes the prompt to Pi’s standard input, and the prompt asks the agent to print `ORC_COMPLETE` on its own line once the work is committed.
 - The prompt also tells the agent to leave repository tests to GitHub CI, to run only `build`, `lint`, or `typecheck` locally, not to start or rerun CI by hand once a pull request run exists, not to wait for CI in a tool call, and to print `ORC_SPLIT` on its own line and then a JSON document when the change outgrows the budget.
 - Pi prints one JSON event per line, and its first line is the `session` header with the session id and timestamp.

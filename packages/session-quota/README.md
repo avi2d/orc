@@ -8,8 +8,7 @@ Every number is an estimate from local logs and an upper bound, never a quota re
 
 - Bun, at the version `.bun-version` pins.
 - `quota-axi` 0.1.56 on the `PATH`, since the windows the harness logs do not cover come from `quota-axi --full --json --provider`.
-- Optionally `ORC_DASH_SAVED_PROFILES`, the shell command that prints the saved profiles, since the Claude account title comes from the active one.
-  The command prints JSON with `schema` 2, `active_profile`, and `profiles`.
+- Optionally `orc` on the `PATH` with dispatch quota configured, so the panel can read account names from `orc quota --json`.
 - Optionally `herdr` 0.9.5 on the `PATH` to name live sessions by pane, since the tool reads `herdr agent list` and changes nothing in Herdr.
   Without it, live sessions show from their processes and logs.
 - `/proc` on Linux or `lsof` on macOS to find headless Pi, Claude Code and Codex processes.

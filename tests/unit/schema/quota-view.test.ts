@@ -53,7 +53,7 @@ const notSetUp = (provider: string): string => {
 describe("quotaBlocks, against the recorded quota-axi and orc quota reports", () => {
   test("names one block per account: live claude, orc quota's account, codex and opencode-go", () => {
     const blocks = quotaBlocks(quotaAxiRead(quotaReading(quota())), accounts(), now);
-    expect(blocks.map((block) => block.title)).toEqual(["claude", "account second", "codex", "opencode-go"]);
+    expect(blocks.map((block) => block.title)).toEqual(["claude second", "account second", "codex", "opencode-go"]);
     expect(blocks.map((block) => block.provider)).toEqual(["claude", "claude", "codex", "opencode-go"]);
   });
 
@@ -73,7 +73,7 @@ describe("quotaBlocks, against the recorded quota-axi and orc quota reports", ()
 
   test("a provider quota-axi reports not set up gets no block", () => {
     const blocks = quotaBlocks(quotaAxiRead(quotaReading(notSetUp("codex"))), accounts(), now);
-    expect(blocks.map((block) => block.title)).toEqual(["claude", "account second", "opencode-go"]);
+    expect(blocks.map((block) => block.title)).toEqual(["claude second", "account second", "opencode-go"]);
   });
 
   test("an unreachable quota-axi reaches every live block with its reason", () => {
@@ -91,7 +91,7 @@ describe("quotaBlocks, against the recorded quota-axi and orc quota reports", ()
     if (decoded.kind !== "ok") throw new Error("expected ok, got " + JSON.stringify(decoded));
     const blocks = quotaBlocks(quotaAxiRead({ ...decoded, capturedAt: now }), accounts(), now);
     expect(blocks.map((block) => block.title)).toEqual([
-      "claude",
+      "claude second",
       "account second",
       "codex codex-home",
       "codex openai-codex",

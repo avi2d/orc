@@ -85,6 +85,14 @@ describe("the runner a bun or node call starts", () => {
     expect(interpretedRunner("node", ["-e", "1", "node_modules/.bin/jest"], root)).toBeNull()
   })
 
+  test("node's option terminator keeps a script named --test from becoming a test run", () => {
+    expect(interpretedRunner("node", ["--", "--test"], root)).toBeNull()
+  })
+
+  test("a runner after node's option terminator is still refused instead of bypassing detection", () => {
+    expect(interpretedRunner("node", ["--", "node_modules/.bin/jest"], root)).toBe("jest")
+  })
+
   test("a tool other than bun or node starts no script of its own", () => {
     expect(interpretedRunner("npm", ["node_modules/.bin/jest"], root)).toBeNull()
   })

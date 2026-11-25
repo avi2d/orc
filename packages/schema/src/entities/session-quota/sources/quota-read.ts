@@ -1,6 +1,7 @@
 import { DateTime, Effect } from "effect";
 import { failureOf, type Reading } from "../../../shared/lib";
 import type { AccountCaptured } from "./capture";
+import { type OrcQuota, OrcQuotaSource } from "./orc-quota";
 import { type HarvestedReading, harvestedReadings } from "./harvest";
 import { type AccountJoin, nativeKeys } from "./account-join";
 import {
@@ -26,6 +27,13 @@ export interface QuotaRead {
   readonly logAccounts: ReadonlyArray<SourcedProvider>;
   readonly logReadings: ReadonlyArray<HarvestedReading>;
   readonly accounts: ReadonlyArray<AccountRead>;
+}
+
+export type QuotaReadSources = QuotaSource | HarvestLogSource | OrcQuotaSource;
+
+export interface QuotaReadings {
+  readonly quota: QuotaRead;
+  readonly orcQuota: Reading<OrcQuota>;
 }
 
 type LoggedProvider = HarvestedReading["provider"];
@@ -149,6 +157,10 @@ export const readQuota: Effect.Effect<QuotaRead, never, QuotaSource | HarvestLog
   const accounts = read.captured.accounts.map((account) => accountRead(account, now));
   return { quotaAxi, logAccounts: choice.logAccounts, logReadings, accounts };
 });
+
+export const readQuotas: Effect.Effect<QuotaReadings, never, QuotaReadSources> = Effect.flatMap(OrcQuotaSource, (source) =>
+  Effect.all({ quota: readQuota, orcQuota: source.read }, { concurrency: "unbounded" }),
+);
 
 const providerRank = (entry: SourcedEntry): number => shownQuotaProviders.indexOf(entry.provider);
 

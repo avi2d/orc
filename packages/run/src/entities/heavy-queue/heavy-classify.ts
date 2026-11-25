@@ -1,3 +1,5 @@
+import { nodeTestCall } from "./heavy-runner-entry"
+
 export type HeavyDecision = "direct" | "queued" | "prioritized"
 
 type Args = ReadonlyArray<string>
@@ -115,7 +117,8 @@ const testArgs = (args: Args): Args => skipLeading(
   args,
   [
     "--filter", "-F", "--cwd", "-C", "--dir", "--workspace", "-w", "--prefix", "--package", "-p", "workspace",
-    "--config", "--env-file", "--preload", "--require", "--sdk", "--toolchain"
+    "--config", "--env-file", "--preload", "--require", "--sdk", "--toolchain", "--python", "--project",
+    "--directory", "--with", "--with-editable", "--with-requirements", "--group", "--extra"
   ],
   (word) => word.startsWith("-")
 )
@@ -123,6 +126,26 @@ const testArgs = (args: Args): Args => skipLeading(
 const execTest = (args: Args): boolean => {
   const [tool = "", ...rest] = testArgs(args)
   return isTestCallInner(packageName(tool), rest)
+}
+
+const makeValueOptions: Args = [
+  "-C", "-f", "-I", "-o", "-W", "-E", "--directory", "--file", "--makefile", "--include-dir",
+  "--old-file", "--assume-old", "--what-if", "--new-file", "--assume-new", "--eval"
+]
+
+const makeTest = (args: Args): boolean => {
+  let options = true
+  for (let at = 0; at < args.length; at += 1) {
+    const word = args[at] ?? ""
+    if (options && word === "--") {
+      options = false
+    } else if (options && makeValueOptions.includes(word)) {
+      at += 1
+    } else if (word === "test" || word === "check") {
+      return true
+    }
+  }
+  return false
 }
 
 const isTestCallInner = (tool: string, args: Args): boolean => {
@@ -147,6 +170,20 @@ const isTestCallInner = (tool: string, args: Args): boolean => {
         return execTest(rest)
       }
       return matchesAny(sub, testScripts) || isTestCallInner(packageName(sub), rest)
+    case "node":
+      return nodeTestCall(args)
+    case "python":
+    case "python3": {
+      const module = skipLeading(args, ["-W", "-X"], (word) =>
+        word.startsWith("-") && !["-m", "-c", "--", "-"].includes(word))
+      return module[0] === "-m" && module[1] === "pytest"
+    }
+    case "uv":
+      return sub === "run" && execTest(rest)
+    case "make":
+      return makeTest(args)
+    case "deno":
+      return sub === "test"
     case "playwright":
     case "go":
     case "cargo":
@@ -257,6 +294,11 @@ const subcommandBody = (heavy: Args) => (args: Args): BodyResult => {
   return heavy.includes(sub) ? fellThrough(queueOn(targeted(rest)), rest) : fellThrough("direct", args)
 }
 
+const testRunnerBody = (tool: string) => (args: Args): BodyResult =>
+  isTestCall(tool, args) && !hasAny(args, watchFlags)
+    ? fellThrough(queueOn(targeted(args)), args)
+    : fellThrough("direct", args)
+
 const xcodeBody = (args: Args): BodyResult => (hasAny(args, versionFlags) ? returned : fellThrough("queued", args))
 
 const xcrunBody = (args: Args): BodyResult =>
@@ -277,7 +319,13 @@ const builtinBodies: ReadonlyMap<string, (args: Args) => BodyResult> = new Map([
   ["eslint", queueAll(targeted)],
   ["playwright", playwrightBody],
   ["go", subcommandBody(["test", "build", "vet"])],
-  ["cargo", subcommandBody(["test", "build", "clippy"])],
+  ["cargo", subcommandBody(["test", "t", "build", "clippy"])],
+  ["node", testRunnerBody("node")],
+  ["python", testRunnerBody("python")],
+  ["python3", testRunnerBody("python3")],
+  ["uv", testRunnerBody("uv")],
+  ["make", testRunnerBody("make")],
+  ["deno", testRunnerBody("deno")],
   ["xcodebuild", xcodeBody],
   ["xcrun", xcrunBody]
 ])

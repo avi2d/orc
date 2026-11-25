@@ -16,8 +16,8 @@ type Env = Readonly<Record<string, string>>
 export type Argv = readonly [string, ...Array<string>]
 
 export type AgentExec =
-  | { readonly kind: "none"; readonly cwd: string; readonly env: Env }
-  | { readonly kind: "nono"; readonly cwd: string; readonly env: Env; readonly nonoBinary: string; readonly profilePath: string }
+  | { readonly kind: "none"; readonly cwd: string; readonly env: Env; readonly piExtension: string | null }
+  | { readonly kind: "nono"; readonly cwd: string; readonly env: Env; readonly nonoBinary: string; readonly profilePath: string; readonly piExtension: string | null }
 
 export const sandboxedEnvNames: ReadonlyArray<string> = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TERM"]
 
@@ -47,8 +47,8 @@ export const pickEnv = (hostEnv: Readonly<Record<string, string | undefined>>, n
 export const agentEnv = (base: Env, extra: Env): Env =>
   Object.fromEntries(Object.entries({ ...base, ...extra, BUN_OPTIONS: "--no-install" }).filter(([name]) => !name.startsWith("ORC_")))
 
-export const hostExec = (cwd: string, hostEnv: Readonly<Record<string, string | undefined>>, extra: Env): AgentExec =>
-  ({ kind: "none", cwd, env: agentEnv(pickEnv(hostEnv, hostEnvNames), extra) })
+export const hostExec = (cwd: string, hostEnv: Readonly<Record<string, string | undefined>>, extra: Env): Extract<AgentExec, { readonly kind: "none" }> =>
+  ({ kind: "none", cwd, env: agentEnv(pickEnv(hostEnv, hostEnvNames), extra), piExtension: null })
 
 export const nonoRunArgs = (profilePath: string, argv: Argv): ReadonlyArray<string> => ["run", "--silent", "--profile", profilePath, "--", ...argv]
 

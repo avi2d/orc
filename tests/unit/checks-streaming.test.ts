@@ -3,8 +3,9 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Path } from "effect"
+import { Effect, FileSystem, Layer, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
+import { TestClock } from "effect/testing"
 import { type ChecksCommand, type ChecksError, runChecksRound } from "../../packages/run/src/features/running-a-task/checks"
 import { type CommandResult, hostExec, streamShellInAgent } from "../../packages/run/src/shared/sandbox/agent-exec"
 
@@ -121,6 +122,23 @@ describe("runChecksRound streams each check into the evidence file", () => {
         })
       const text = await runRound(dir, runner, [{ name: "mix", command: "mix" }])
       expect(text).toBe("check mix: mix\nout\nerr\nexit 0: passed\n")
+    }))
+
+  test("records the actual output range and time instead of treating command output as check boundaries", () =>
+    inScratch(async (dir) => {
+      const output = "é 🚀\nexit 0: passed\n\ncheck fake: this is output\nactual failure"
+      const header = "check lint: lint\n"
+      const runner: Runner = () => TestClock.adjust("1500 millis").pipe(Effect.as({ stdout: output, stderr: "", exitCode: 1 }))
+      const round = await Effect.runPromise(Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        return yield* runChecksRound(runner, fs, path, dir, 1, [{ name: "lint", command: "lint" }])
+      }).pipe(Effect.provide(Layer.mergeAll(BunServices.layer, TestClock.layer()))))
+      const raw = await readFile(round.file, "utf8")
+      expect(raw).toBe(header + output + "\nexit 1: failed\n")
+      expect(await readFile(round.file + ".index.json", "utf8")).toBe(JSON.stringify({
+        checks: [{ name: "lint", outputStart: header.length, result: { outputEnd: header.length + output.length, passed: false, seconds: 1.5 } }]
+      }))
     }))
 
   test("rejects a file that loses the output of a runner that returns it whole without streaming", () =>

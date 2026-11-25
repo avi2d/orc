@@ -3,7 +3,6 @@ import { DateTime } from "effect";
 import {
   composedSessionQuota,
   type CountedCall,
-  decodeSavedProfiles,
   decodeQuota,
   type LogFile,
   sessionQuotaAlerts,
@@ -15,6 +14,7 @@ import {
   sessionQuotaViewOf,
 } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
+import { noOrcAccounts } from "../../lib/orc-quota";
 import { valueOf } from "../../lib/outcomes";
 import { quotaAxiRead, recordedQuotaRead } from "../../lib/quota-read";
 import { call, ended, fifthIn, hour, ledgerOf, reset, type Scenario, six, viewOf, windowOf } from "../../lib/quota-view-fixture";
@@ -230,9 +230,8 @@ describe("sessionQuotaView where this machine logged nothing", () => {
 
 const schema6 = () => {
   const quota = decodeQuota(fixture("quota-axi/schema-6.json"));
-  const savedProfiles = decodeSavedProfiles(fixture("saved-profiles/status.json"));
   const now = DateTime.makeUnsafe("2026-10-16T19:28:55.289Z");
-  return { quota: quotaAxiRead({ ...quota, capturedAt: now }), savedProfiles: { ...savedProfiles, capturedAt: now }, now, timeZone: DateTime.zoneMakeNamedUnsafe("UTC") };
+  return { quota: quotaAxiRead({ ...quota, capturedAt: now }), orcQuota: noOrcAccounts(now), now, timeZone: DateTime.zoneMakeNamedUnsafe("UTC") };
 };
 
 describe("sessionQuotaView account joins, against the recorded schema-6 replay", () => {
@@ -258,7 +257,7 @@ describe("sessionQuotaView account joins, against the recorded schema-6 replay",
   test("joins a Codex call to the account whose keys hold its credential", () => {
     const joins = view().accounts.map((account) => [account.title, account.joins]);
     expect(joins).toEqual([
-      ["claude main", [{ kind: "only-account" }]],
+      ["claude", [{ kind: "only-account" }]],
       ["codex codex-home", [{ kind: "credential-key", key: "codex-home" }]],
       ["codex openai-codex", [{ kind: "credential-key", key: "openai-codex" }]],
       ["opencode-go", []],
@@ -288,10 +287,10 @@ describe("sessionQuotaView account joins, against the recorded schema-6 replay",
     ],
   };
   const harvestedView = () => {
-    const { savedProfiles, now, timeZone } = schema6();
+    const { orcQuota, now, timeZone } = schema6();
     return sessionQuotaView({
       quota: recordedQuotaRead(fixture("quota-axi/schema-6.json"), now, [freshRollout]),
-      savedProfiles,
+      orcQuota,
       panes: undefined,
       processes: undefined,
       ledger: ledgerOf(calls),
@@ -306,7 +305,7 @@ describe("sessionQuotaView account joins, against the recorded schema-6 replay",
   test("joins no account to a Codex call keyed to a credential the rollout did not read", () => {
     const harvested = harvestedView();
     expect(harvested.accounts.map((account) => [account.title, account.joins])).toEqual([
-      ["claude main", [{ kind: "only-account" }]],
+      ["claude", [{ kind: "only-account" }]],
       ["codex", [{ kind: "credential-key", key: "codex-home" }]],
       ["opencode-go", []],
     ]);
@@ -360,7 +359,7 @@ describe("sessionQuotaView account joins, against the recorded schema-6 replay",
   });
 
   test("names a row quota-axi coalesced with the native login by codex-home, as the rollout names it", () => {
-    const { quota: read, savedProfiles, now, timeZone } = schema6();
+    const { quota: read, orcQuota, now, timeZone } = schema6();
     const quota = read.quotaAxi;
     if (quota.kind !== "ok") throw new Error("the schema-6 fixture does not decode");
     const providers = quota.value.providers.map((entry) =>
@@ -370,7 +369,7 @@ describe("sessionQuotaView account joins, against the recorded schema-6 replay",
     );
     const coalesced = sessionQuotaView({
       quota: quotaAxiRead({ ...quota, value: { ...quota.value, providers } }),
-      savedProfiles,
+      orcQuota,
       panes: undefined,
       processes: undefined,
       ledger: ledgerOf([]),

@@ -2,6 +2,26 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.21.0
+
+Released 2026-11-24.
+
+### Features
+
+- **run:** refuse test runners called by node_modules/.bin path [#332](https://github.com/avi2d/orc/pull/332)
+- **schema:** read account names from orc quota --json, drop clauth profiles [#336](https://github.com/avi2d/orc/pull/336)
+- **run:** compile orc to a Bun bytecode file that spawns itself [#331](https://github.com/avi2d/orc/pull/331)
+- **run:** refuse node --test, pytest, make test, deno test and cargo t runners [#334](https://github.com/avi2d/orc/pull/334)
+- **herdr-app:** add Summary view for Checks steps in the Agents tab [#335](https://github.com/avi2d/orc/pull/335)
+- **run:** add agent wrappers that refuse test runners in no-mistakes agents [#327](https://github.com/avi2d/orc/pull/327)
+
+### Fixes
+
+- **run:** count review logs as run output [#337](https://github.com/avi2d/orc/pull/337)
+- **run:** pass the tool-time-cap extension to agents in the nono sandbox [#330](https://github.com/avi2d/orc/pull/330)
+- **quota:** drop clauth saved-profiles source from the dashboard quota panel [#329](https://github.com/avi2d/orc/pull/329)
+- **run:** route review questions to the decider by the owner action they ask for [#328](https://github.com/avi2d/orc/pull/328)
+
 ## 0.20.0
 
 Released 2026-11-24.

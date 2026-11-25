@@ -25,7 +25,8 @@ Select a step to read its output.
 
 Pi steps open in Turns, with a card for each reply.
 Select Raw to follow the log, or Turns to return to the cards.
-Steps without a Pi session show their log.
+Checks steps open in Summary, as [Read a Checks step](herdr-app.md#read-a-checks-step) describes.
+Other steps without a Pi session show their log.
 
 ![Agents tab with a running run's Agent step in the Turns view and its Changes column](images/herdr-agents-turns.png)
 

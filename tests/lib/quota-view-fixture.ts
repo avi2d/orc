@@ -1,7 +1,6 @@
 import { DateTime } from "effect";
 import {
   type CountedCall,
-  decodeSavedProfiles,
   decodeQuota,
   type Ledger,
   type Session,
@@ -9,7 +8,7 @@ import {
   sessionQuotaView,
   type WindowView,
 } from "@avi2dg/orc-schema";
-import { fixture } from "./fixtures";
+import { noOrcAccounts } from "./orc-quota";
 import { quotaAxiRead } from "./quota-read";
 
 export const hour = 3_600_000;
@@ -156,11 +155,10 @@ export const ledgerOf = (calls: ReadonlyArray<CountedCall>): Ledger => ({
 
 export const viewOf = (scenario: Scenario, sessions: ReadonlyArray<Session>, calls: ReadonlyArray<CountedCall>): SessionQuotaView => {
   const quota = decodeQuota(quotaReport(scenario));
-  const savedProfiles = decodeSavedProfiles(fixture("saved-profiles/status.json"));
   const now = DateTime.makeUnsafe(scenario.now);
   return sessionQuotaView({
     quota: quotaAxiRead({ ...quota, capturedAt: now }),
-    savedProfiles: { ...savedProfiles, capturedAt: now },
+    orcQuota: noOrcAccounts(now),
     panes: undefined,
     processes: undefined,
     ledger: ledgerOf(calls),
