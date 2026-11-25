@@ -68,7 +68,7 @@ const entryOf = (invocation: Invocation) => {
   return topic.entry
 }
 
-const parserFlags = ["--json", "--local", "--kind", "--delivery", "--branch", "--sandbox", "--token-file", "--provider", "--implementer-model", "--fixer-model", "--implementer-thinking", "--fixer-thinking", "--instructions", "--allow", "--answer", "--internal", "--machine", "--parent", "--depends-on", "--reason", "--until", "--question", "--expect", "--generation", "--on", "--clear", "--drop", "--basis", "--priority", "--label", "--stdin-label", "--force", "--dry-run", "--all", "--verbose", "--session", "--no-wait"]
+const parserFlags = ["--json", "--local", "--kind", "--delivery", "--branch", "--sandbox", "--token-file", "--provider", "--implementer-model", "--fixer-model", "--implementer-thinking", "--fixer-thinking", "--instructions", "--allow", "--answer", "--internal", "--machine", "--parent", "--depends-on", "--reason", "--until", "--question", "--expect", "--generation", "--on", "--clear", "--drop", "--basis", "--priority", "--label", "--stdin-label", "--force", "--dry-run", "--all", "--verbose", "--session", "--no-wait", "--landed-in"]
 
 const values = ["", "x", "1", "orc-1", "q=1", "2026-12-01", "ship", "no-mistakes", "none", "ask-user", "parked", "yolo-green", "high"]
 

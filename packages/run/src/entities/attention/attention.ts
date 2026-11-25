@@ -1,5 +1,5 @@
 import { Effect, FileSystem, Schema } from "effect"
-import { readNames, BacklogError, isDeciderAnswer, type ParkedQuestion, platformFailure, publishOnce, readIfPresent, scratchName, type TaskRecord } from "../backlog/index"
+import { readNames, BacklogError, isDeciderAnswer, type ParkedQuestion, platformFailure, publishOnce, readIfPresent, scratchName, taskPr, type TaskRecord } from "../backlog/index"
 import { isWorkerQuestion, loopQuestionId } from "../agent/index"
 
 export const deciderTimeoutMillis = 180 * 1000
@@ -347,6 +347,27 @@ const routeTask = (root: string, task: TaskRecord, at: string): Effect.Effect<Re
     return live
   })
 
+export const withdrawTaskItems = (root: string, tasks: ReadonlyArray<string>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const closing = new Set(tasks)
+    for (const entry of yield* openItems(root)) {
+      if (closing.has(entry.item.task)) {
+        yield* withdrawItem(root, entry.id, "task closed", at)
+      }
+    }
+  })
+
+const staleItemReason = (item: AttentionItem, task: TaskRecord, live: boolean): string | null => {
+  if (taskItemKinds.has(item.kind) && !live) {
+    return task.state.kind === "closed" ? "task closed" : item.kind === "overdue-wait" ? "hold no longer waits" : "question no longer asked"
+  }
+  if (task.state.kind !== "closed") {
+    return null
+  }
+  const prItem = item.kind === "check-red" || item.kind === "pr-ready"
+  return item.kind === "failing-command" || (prItem && taskPr(task) === null) ? "task closed" : null
+}
+
 export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const live = new Set<string>()
@@ -356,15 +377,13 @@ export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, a
       }
     }
     const tasksById = new Map(tasks.map((task) => [task.spec.id, task] as const))
-    const stale = (yield* openItems(root)).filter((entry) => taskItemKinds.has(entry.item.kind) && tasksById.has(entry.item.task) && !live.has(entry.id))
-    yield* Effect.forEach(stale, (entry) => {
-      const ended = entry.item.kind === "overdue-wait" ? "hold no longer waits" : "question no longer asked"
-      const reason = tasksById.get(entry.item.task)?.state.kind === "closed" ? "task closed" : ended
-      return Effect.asVoid(withdrawItem(root, entry.id, reason, at))
-    }, { discard: true })
-    const closedTasks = new Set(tasks.filter((task) => task.state.kind === "closed").map((task) => task.spec.id))
-    const staleFailing = (yield* openItems(root)).filter((entry) => entry.item.kind === "failing-command" && closedTasks.has(entry.item.task))
-    yield* Effect.forEach(staleFailing, (entry) => Effect.asVoid(withdrawItem(root, entry.id, "task closed", at)), { discard: true })
+    for (const entry of yield* openItems(root)) {
+      const task = tasksById.get(entry.item.task)
+      const reason = task === undefined ? null : staleItemReason(entry.item, task, live.has(entry.id))
+      if (reason !== null) {
+        yield* withdrawItem(root, entry.id, reason, at)
+      }
+    }
   })
 
 export type AnswerItemOutcome = CloseOutcome | { readonly kind: "answered elsewhere"; readonly task: string }
