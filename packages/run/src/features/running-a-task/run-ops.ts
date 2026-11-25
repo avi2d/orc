@@ -69,5 +69,3 @@ export interface RunCheckpoints {
 }
 
 export type AgentStep = { readonly name: "implement"; readonly attempt: 1 } | { readonly name: "fix"; readonly attempt: number } | { readonly name: "pr"; readonly attempt: 1 }
-
-export const ciWaitingQuestionId = "ci-waiting"
