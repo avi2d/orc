@@ -73,4 +73,15 @@ describe("a red check on a ship task's PR", () => {
     })
   })
 
+  test("opens a red item instead of rerunning a second time", async () => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      const asked: Array<ReadonlyArray<string>> = []
+      await route(root, asked)
+      await route(root, asked)
+      expect(asked).toHaveLength(1)
+      expect((await run(openItems(root)))[0]?.item.text).toContain(details)
+    })
+  })
+
 })
