@@ -52,9 +52,9 @@ const carryInto = (root: string, task: TaskRecord, questions: Questions): Effect
       if (fresh.state.kind !== "new" || fresh.parked === null) {
         return Effect.succeed({ kind: "keep", result: fresh })
       }
-      const questions = withAnswers(fresh.spec.id, fresh.parked.questions, recorded)
-      const record: TaskRecord = { ...fresh, parked: { ...fresh.parked, questions } }
-      return Effect.succeed(changed(fresh.parked.questions, questions) ? { kind: "write", record, result: record } : { kind: "keep", result: fresh })
+      const carried = withAnswers(fresh.spec.id, fresh.parked.questions, recorded)
+      const record: TaskRecord = { ...fresh, parked: { ...fresh.parked, questions: carried } }
+      return Effect.succeed(changed(fresh.parked.questions, carried) ? { kind: "write", record, result: record } : { kind: "keep", result: fresh })
     }).pipe(
       // Another command can hold the task file this beat, and the next beat carries the answer then.
       Effect.catchTags({ BacklogError: () => Effect.succeed(task), TaskFileError: () => Effect.succeed(task) })
