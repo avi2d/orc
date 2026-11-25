@@ -4,14 +4,13 @@ interface NeverDecided {
   readonly about?: RegExp
 }
 
-const deletingVerbs = "delet\\w*|remov\\w*|drop\\w*|discard\\w*|eras(?:e|es|ed|ing)|wip(?:e|es|ed|ing)|purg\\w*|destroy\\w*|prun\\w*|abandon\\w*|overwrit\\w*|reset\\w*|(?:throw|throws|throwing|threw|thrown) away|clean(?:s|ed|ing)? up|start(?:s|ed|ing)? over|rm"
+const deletingVerbs = "delet\\w*|remov\\w*|drop\\w*|discard\\w*|eras(?:e|es|ed|ing)|wip(?:e|es|ed|ing)|purg\\w*|destroy\\w*|prun\\w*|abandon\\w*|overwrit\\w*|reset\\w*|(?:throw|throws|throwing|threw|thrown) away|clean(?:s|ed|ing)? up|start(?:s|ed|ing)? over|(?:throw|throws|throwing|threw|thrown) out|revert\\w*|restor(?:e|es|ed|ing)|rm"
 const deletedVerbs = "deleted|removed|dropped|discarded|erased|wiped|purged|destroyed|pruned|abandoned|overwritten|reset|thrown away|cleaned up"
 const work = "branch(?:es)?|worktrees?|tasks?|(?<!\\btest\\s)runs?|pull requests?|releases?|tags?|backups?|databases?|user data|commit history|(?:unlanded|unmerged|unpushed) (?:work|changes|commits)"
 const notAName = "(?!\\s+(?:check|name|field|filter|guard|test|option|flag|column|label|chip|key|type|lookup|variable|param\\w*|prop\\w*|argument|list|support|fallback|handling)s?\\b)"
-const ownWork = "commits?|changes|edits|work|stash(?:es)?"
+const ownWork = "commits?|changes|edits|work|stash(?:es)?|modifications?|diffs?"
 const joiningWords = "on|in|of|for|from|to|at|by|with|that|which|so|and|or|but|if|when|because|then|than|while"
 const between = "(?:\\s+(?!(?:" + joiningWords + ")\\b)[\\w./`'-]+){0,3}?"
-const phraseEnd = "(?=[^\\S\\n]*(?:[.,;:?!)\\n]|$)|\\s+(?:" + joiningWords + ")\\b)"
 
 const computeMeasure = "time|times|timing|loops?|cpu|memory|ram|performance|runtime|latency|complexity|allocations?|iterations?|cycles?|speed|startup|overhead"
 
@@ -19,8 +18,8 @@ const deletingWork = new RegExp(
   "\\b(?:" + deletingVerbs + ")" + between + "\\s+(?:" + work + ")\\b" + notAName
     + "|\\b(?:" + work + ")\\b(?:\\s+\\w+){0,3}?\\s+(?:" + deletedVerbs + ")\\b"
     + "|\\b(?:" + deletingVerbs + ")" + between + "\\s+[a-z][a-z0-9]*-\\d+\\b" + notAName
-    + "|\\b(?:" + deletingVerbs + ")" + between + "\\s+(?:" + ownWork + ")\\b" + phraseEnd
-    + "|\\breset\\s+--hard|\\bbranch\\s+-D\\b|\\bstash\\s+(?:drop|clear)\\b",
+    + "|\\b(?:" + deletingVerbs + ")" + between + "\\s+(?:" + ownWork + ")\\b"
+    + "|\\breset\\s+--hard|\\bbranch\\s+-D\\b|\\bstash\\s+(?:drop|clear)\\b|\\bclean\\s+-\\w*f|\\bcheckout\\s+--\\s+\\.|\\brestore\\s+\\.",
   "i"
 )
 

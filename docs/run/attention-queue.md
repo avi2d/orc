@@ -31,7 +31,8 @@ A question that names `unknown` or no action goes through a topic check instead.
 Orc sends questions about deletion, security, credentials, merging, pushing, releasing, spending, irreversible actions, site appearance, legal text, and logins to you.
 The topic check reads the whole question, context included, so a question that says a step pushes a tag goes to you even when it only asks whether to continue.
 A question that only reports a merge or a release, such as one that names `merge conflicts`, also goes to you.
-Dropping, discarding, resetting or throwing away commits, changes, edits, work or a stash counts as deleting work, and so does `git stash drop`.
+Dropping, discarding, resetting, reverting, restoring, or throwing away or out commits, changes, edits, modifications, diffs, work or a stash counts as deleting work, wherever the noun sits in the sentence.
+So do `git reset --hard`, `git branch -D`, `git stash drop` or `clear`, `git clean -f`, `git checkout -- .` and `git restore .`.
 The name `test runs` never counts as deleting work.
 A question with no words at all goes to you.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.

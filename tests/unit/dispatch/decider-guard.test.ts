@@ -123,10 +123,6 @@ describe("the decider guard", () => {
 
   const codeQuestions = [
     {
-      rejects: "escalated as deleting because it says Removing",
-      text: "The new field silently accepts an older orc instead. The narrower form is `nullableString(record.value, \"from\", at)` as a required field, matching `model`. Removing the fallback changes compatibility with older orc builds, so confirm before removing it."
-    },
-    {
       rejects: "escalated as credentials because it says keys",
       text: "The projects file keys each checkout path separately (`checkouts: Record<machine, path>`), and the folder name need not equal the project name. Matching `run.project` against the printed checkout paths would make this exact."
     }
@@ -330,7 +326,15 @@ describe("a request only the owner grants, named in the context of a neutral ask
     { text: "Should I discard my local changes and start over from main?\nRecommended: A", topic: "deleting" },
     { text: "Throw away the current changes in the worktree and restart?\nRecommended: yes", topic: "deleting" },
     { text: "Should I discard my work so far and restart from main?\nRecommended: yes", topic: "deleting" },
-    { text: "Should I git stash drop the saved work?\nRecommended: yes", topic: "deleting" }
+    { text: "Should I git stash drop the saved work?\nRecommended: yes", topic: "deleting" },
+    { text: "Should I discard the commits I made today?", topic: "deleting" },
+    { text: "Should I throw away the changes I made and restart from main?", topic: "deleting" },
+    { text: "Should I discard changes made in the worktree?", topic: "deleting" },
+    { text: "Should I discard all local modifications?", topic: "deleting" },
+    { text: "Should I throw out my work and begin again?", topic: "deleting" },
+    { text: "Should I run git clean -fd in the worktree?", topic: "deleting" },
+    { text: "Should I git checkout -- . and start fresh?", topic: "deleting" },
+    { text: "The new field silently accepts an older orc instead. The narrower form is `nullableString(record.value, \"from\", at)` as a required field, matching `model`. Removing the fallback changes compatibility with older orc builds, so confirm before removing it.", topic: "deleting" }
   ]
 
   for (const request of ownerOnly) {
