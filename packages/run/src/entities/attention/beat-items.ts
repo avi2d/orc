@@ -31,13 +31,13 @@ export const withdrawUnreachedMachine = (root: string, task: string, at: string)
 export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.forEach(actions, (action) =>
     (action.kind === "closed" && action.outcome === "failed") || action.kind === "start-failed"
-      ? Effect.asVoid(openItem(root, itemId(action.task, "run-died"), {
+      ? Effect.asVoid(openItem(root, itemId(action.task, "run-died", at), {
         kind: "run-died",
         task: action.task,
         text: "the run on " + action.machine + " died: " + action.reason,
         ...choice(
           "the run of " + action.task + " on " + action.machine,
-          { text: "rerun", outcome: "orc backlog add <project> <task-file> adds the task again under a new id, and the next beat starts it" },
+          { text: "rerun", outcome: "orc backlog retry " + action.task + " returns the task to the backlog, and the next beat starts it" },
           { text: "close", outcome: "the task stays closed failed, and no run starts" }
         ),
         asked: at,

@@ -12,6 +12,7 @@ Use `orc chat --session <file>` to choose a session file.
 Orc passes its absolute path to Pi.
 If the file exists, Pi resumes it.
 Otherwise, Pi creates it after the first reply.
+A hangup of the chat's terminal also stops Pi.
 
 When present, `<ORC_HOME>/orchestrator.md` supplies the orchestrator's system instructions.
 The chat also loads each instructions file named in `projects.json`, labelled by project.
@@ -30,6 +31,7 @@ The chat gives Pi these tools:
 | `orc_backlog_priority` | Set or clear a new task's priority from 0 to 4. |
 | `orc_machines` | Read the orc version each dispatch machine runs, through `orc machines --json`. |
 | `orc_backlog_stop` | Kill a started task's run and close the task stopped. |
+| `orc_backlog_retry` | Run a failed or stopped task again, on the machine it ran on, reusing its kept branch when one exists. |
 | `orc_backlog_drop` | Close a new task as dropped, with a reason. |
 | `orc_backlog_send_back` | Send a closed task's open PR back with your review. |
 | `orc_backlog_note` | Leave a note on a task. |

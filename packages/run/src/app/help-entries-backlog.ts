@@ -62,6 +62,13 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
     options: [],
     examples: ["orc backlog stop orc-9"]
   },
+  retry: {
+    usage: ["orc backlog retry <task-id>"],
+    summary: "Run a failed or stopped task again",
+    about: "Returns a failed or stopped task to the backlog on the machine it ran on, reusing its kept branch when one exists. A failed start keeps its pending answers and any machine pin; without a pin, the beat places it normally.",
+    options: [],
+    examples: ["orc backlog retry orc-9"]
+  },
   drop: {
     usage: ["orc backlog drop <task-id> <reason>"],
     summary: "Drop a new task with a reason",

@@ -121,6 +121,7 @@ export interface TaskRecord {
   readonly spec: TaskSpec
   readonly hold: Hold | null
   readonly parked: Parked | null
+  readonly priorPr?: string
   readonly state: TaskState
 }
 
@@ -339,6 +340,9 @@ const splitFrontmatter = (text: string): { readonly head: string; readonly body:
   return { head: text.slice(fence.length + 1, end + 1), body: text.slice(end + fence.length + 2) }
 }
 
+const closedWithUnansweredQuestion = (parked: Parked | null, state: TaskState): boolean =>
+  state.kind === "closed" && state.closing.outcome !== "start-failed" && parked?.questions.some((question) => question.answer === null) === true
+
 export const parseTaskFile = (file: string, folder: TaskFolder, text: string): Effect.Effect<TaskRecord, TaskFileError> =>
   Effect.gen(function*() {
     const parts = splitFrontmatter(text)
@@ -375,7 +379,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (typeof parked === "string") {
       return yield* new TaskFileError({ file, detail: parked })
     }
-    if (parked?.questions.some((question) => question.answer === null) === true && state.kind === "closed" && state.closing.outcome !== "start-failed") {
+    if (closedWithUnansweredQuestion(parked, state)) {
       return yield* new TaskFileError({ file, detail: "a closed task carries an unanswered parked question" })
     }
     return {
@@ -394,6 +398,9 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
         created: front.created,
         body: parts.body
       },
-      hold, parked, state
+      hold,
+      parked,
+      ...(front.pr === undefined || (state.kind === "closed" && state.closing.outcome !== "start-failed") ? {} : { priorPr: front.pr }),
+      state
     }
   })
