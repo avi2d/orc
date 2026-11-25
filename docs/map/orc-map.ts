@@ -67,7 +67,7 @@ export const parts: readonly MapPart[] = [
     title: "Sixteen tools, each an orc command",
     short: "Shape, move, read and merge tasks",
     details: {
-      points: ["four shape the backlog: add, edit, priority and hold", "six move a task along: stop, drop, send back, note, depend and thread", "five read it and answer: backlog, backlog answer, attention, attention answer and board", "one merges a pull request"]
+      points: ["four shape the backlog: add, edit, priority and hold", "seven move a task along: stop, retry, drop, send back, note, depend and thread", "five read it and answer: backlog, backlog answer, attention, attention answer and board", "one merges a pull request"]
     }
   },
   {
@@ -285,7 +285,7 @@ export const links: readonly MapLink[] = [
   { from: "backlog-new", to: "backlog-taken", label: "a beat takes it", tone: "work" },
   { from: "backlog-taken", to: "backlog-closed", label: "the run ends", tone: "work" },
   { from: "backlog-taken", to: "backlog-new", label: "its run stops on a question", tone: "ask" },
-  { from: "backlog-closed", to: "backlog-new", label: "orc backlog send-back", tone: "aside" },
+  { from: "backlog-closed", to: "backlog-new", label: "orc backlog send-back or retry", tone: "aside" },
   { from: "backlog-new", to: "beat-holds", tone: "work" },
 
   { from: "quota-config", to: "quota-command", tone: "work" },

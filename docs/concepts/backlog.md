@@ -58,6 +58,7 @@ Priority runs from 0, which starts first, to 4.
 Holds, questions, answers and notes all stay with the task.
 `orc backlog thread <task-id>` prints them in order, with who said each one.
 To send a closed task's open pull request back for another pass, run `orc backlog send-back <task-id> <words>`, and the same run resumes with your words as the review.
+To run a failed or stopped task again, run `orc backlog retry <task-id>`.
 
 ## Related topics
 

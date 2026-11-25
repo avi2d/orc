@@ -13,6 +13,7 @@ A task starts when it has a priority, no unanswered hold or question, and its de
 A ship prerequisite must also have its PR merged.
 No beat reopens a closed task, so a prerequisite that closed failed, stopped, start-failed or dropped holds its dependents until you change their dependencies with `orc backlog depend`.
 Their wait names it, as in `waits on orc-2, and orc-2 closed failed, which no beat reopens`.
+A failed, stopped or start-failed prerequisite also stops holding them once `orc backlog retry` runs it again and it finishes.
 A parent waits for its report children to finish and its ship children's PRs to merge.
 A decision never starts.
 

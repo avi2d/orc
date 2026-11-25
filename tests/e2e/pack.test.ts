@@ -122,6 +122,7 @@ const expectedFiles = [
   "src/features/backlog-planning/backlog-hold.ts",
   "src/features/backlog-planning/backlog-plan.ts",
   "src/features/backlog-planning/backlog-priority.ts",
+  "src/features/backlog-planning/backlog-retry.ts",
   "src/entities/backlog/backlog-write.ts",
   "src/entities/backlog/close-new.ts",
   "src/entities/backlog/decision.ts",
