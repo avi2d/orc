@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import packageJson from "../../packages/run/package.json" with { type: "json" }
+import { runnerStartEnv, withFixture } from "./runner-helpers"
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url))
 const buildTimeout = 300_000
@@ -16,7 +17,7 @@ const run = async (command: ReadonlyArray<string>, cwd: string, env = process.en
 }
 
 describe("release assets", () => {
-  test("the checksummed release runs both dashboard commands without Bun", async () => {
+  test("the checksummed release runs both dashboard commands without Bun and queues its own orc-dash instead of a PATH copy", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-release-assets-e2e-"))
     try {
       const out = join(dir, "out")
@@ -50,6 +51,13 @@ describe("release assets", () => {
       expect(capture.exitCode, capture.stderr).toBe(0)
       expect(capture.stdout).toContain("usage: orc-dash-capture (pi-call | claude-statusline)")
 
+      await withFixture(async (fixture) => {
+        const env = { ...process.env, ...fixture.env, ...await runnerStartEnv(fixture), HOME: fixture.home }
+        const started = await run([join(unpacked, "orc"), "runner", "start"], fixture.dir, env)
+        expect(started.exitCode, started.stderr).toBe(0)
+        const args = await readFile(join(fixture.pueue, "alerts-add-args"), "utf8")
+        expect(args.trimEnd().split("\n").slice(-3)).toEqual([join(await realpath(unpacked), "orc-dash"), "alerts", "--json"])
+      })
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
