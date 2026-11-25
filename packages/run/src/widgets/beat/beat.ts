@@ -12,7 +12,7 @@ import { parkedResumeWait } from "./beat-resume"
 import { type BeatAction, type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems, withdrawTaskItems, type Progress } from "../../entities/attention/index"
 import { attentionActions } from "./beat-attention"
 import { type AskDecider, askDeciderWithPi, decideReviewQuestions } from "../../features/decider/index"
-import { handAnswersToResume } from "../../entities/parked-runs/index"
+import { carryRecordedAnswers, handAnswersToResume } from "../../entities/parked-runs/index"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
 import { flagStall } from "./stall"
 import { readPullRequest } from "../../entities/pull-request/index"
@@ -367,7 +367,7 @@ export const runBeat = (
     const stalls = yield* Effect.forEach(started, (task, index) => flagStall(root, task, progress[index] ?? { kind: "untracked" }))
     releaseClosedSlots(context.live, settled.closed)
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
-    const current = yield* listTasks(root)
+    const current = yield* carryRecordedAnswers(root, yield* listTasks(root))
     yield* routeTaskItems(root, current, at)
     yield* routeRunItems(root, started, progress, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)

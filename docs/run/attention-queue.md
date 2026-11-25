@@ -111,6 +111,12 @@ Answering a review question or a worker question with `orc backlog answer <task-
 A question asked again with the same words keeps its item.
 A question asked again with different words opens a new item, and the old item is withdrawn.
 An answered question asked again opens a new item, and the old item keeps its answer.
+A resumed run that reports again a question of the asking it resumes keeps the answer that asking took.
+
+Each beat writes the answer of a closed item into its task file when the task file still lists that question unanswered.
+The next resume hands that answer to the run.
+A blocking question with no answer and no open item opens one `unasked-question` item for its task, owned by the user.
+The item names each such question, and answering each with `orc backlog answer` withdraws it.
 
 ## Items for run events
 
@@ -153,11 +159,12 @@ The `recommendation` names one option:
 - A `failing-command` item offers `continue` or `stop`, and recommends `continue`.
 - A `machine-unreached` item offers `wait` or `close`, and recommends `wait`.
 - An `overdue-wait` item offers `answer` or `drop`, and recommends `answer`.
+- An `unasked-question` item offers `answer` or `drop`, and recommends `answer`.
 
 To record a choice on a `run-died`, `check-red`, `pr-ready`, `failing-command` or `machine-unreached` item, run `orc attention answer <item-id> <words>`.
 Run the command the outcome names to carry out the option.
 `orc attention answer` only records the choice and closes the item.
-It refuses a review question, a worker question or an overdue wait and names the task to answer with `orc backlog answer` instead.
+It refuses a review question, a worker question, an overdue wait or an unasked question and names the task to answer with `orc backlog answer` instead.
 
 A held task whose `--until` date has passed opens an `overdue-wait` item, owned by the user and asked at the start of the next day on the machine local clock.
 Answering the hold closes the item with the hold's answer.
