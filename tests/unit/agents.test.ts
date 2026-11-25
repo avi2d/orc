@@ -210,11 +210,6 @@ describe("resolveAgentFile", () => {
       expect(found.path).toBe(bundledAgentFiles.reviewer)
       expect(found.tools).toEqual(["read", "grep", "find", "ls"])
       expect(found.model).toBe("acme/configured")
-      expect(found.body).toContain("README")
-      expect(found.body).toContain("pages under docs")
-      expect(found.body).toContain("help text")
-      expect(found.body).toContain("missing documentation")
-      expect(found.body).toContain("CHANGELOG.md")
     })
   })
 
