@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { readFile, rename, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { Schema } from "effect"
+import { BunServices } from "@effect/platform-bun"
+import { Deferred, Effect, Fiber, Layer, Schema } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { runChat } from "../../packages/run/src/features/chat/chat"
 import { binPath, type Fixture, orchestratorConfig, piFor, runOrc, sessionFor, until, withFixture } from "./chat-helpers"
+
+const loginProvider = { id: "opencode-go", credential: "pi-login", nono: { upstream: "https://example.com/v1" } }
 
 const chatToolsPath = new URL("../../packages/run/src/features/chat/chat-tools.ts", import.meta.url).pathname
 
@@ -235,4 +241,42 @@ describe("orc chat tools", () => {
       expect(await Bun.file(join(fixture.home, "backlog", "new", "orc-1.md")).exists()).toBe(false)
     })
   }, 60_000)
+})
+
+describe("runChat", () => {
+  test("a hangup of orc chat stops Pi rather than leaving it running detached from the terminal", async () => {
+    const home = await mkdtemp(join(tmpdir(), "orc-chat-"))
+    try {
+      await writeFile(join(home, "config.json"), JSON.stringify({ providers: [loginProvider], models: { orchestrator: "opencode-go/model" } }))
+      const outcome = await Effect.runPromise(Effect.gen(function*() {
+        const spawned = yield* Deferred.make<number>()
+        const spawner = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
+          const real = yield* ChildProcessSpawner.ChildProcessSpawner
+          return ChildProcessSpawner.make((command) =>
+            ChildProcess.isStandardCommand(command) && command.command === "pi"
+              ? real.spawn(ChildProcess.make("sleep", ["30"], command.options)).pipe(
+                Effect.tap((handle) => Deferred.succeed(spawned, handle.pid))
+              )
+              : real.spawn(command)
+          )
+        })).pipe(Layer.provide(BunServices.layer))
+        const chat = yield* runChat(home, ["orc"], null).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner)), Effect.forkChild)
+        const pid = yield* Deferred.await(spawned)
+        const group = yield* Effect.promise(() => Bun.$`ps -o pgid= -p ${pid}`.text())
+        process.emit("SIGHUP")
+        const exit = yield* Fiber.join(chat)
+        const piRunning = yield* Effect.sync(() => {
+          try {
+            return process.kill(pid, 0)
+          } catch {
+            return false
+          }
+        })
+        return { exit, piRunning, piGroup: Number(group.trim()) }
+      }))
+      expect(outcome).toEqual({ exit: 129, piRunning: false, piGroup: Number((await Bun.$`ps -o pgid= -p ${process.pid}`.text()).trim()) })
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
 })

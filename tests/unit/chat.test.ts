@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Deferred, Effect, Fiber, Layer } from "effect"
+import { Effect, Layer } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { runChat } from "../../packages/run/src/features/chat/chat"
 
@@ -97,39 +97,4 @@ describe("runChat", () => {
     expect(await piSeesAccount([packageProvider], "other/model", "/accounts/main")).toBe("/accounts/main")
   })
 
-  test("a hangup of orc chat stops Pi rather than leaving it running detached from the terminal", async () => {
-    const home = await mkdtemp(join(tmpdir(), "orc-chat-"))
-    try {
-      await writeFile(join(home, "config.json"), JSON.stringify({ providers: [loginProvider], models: { orchestrator: "opencode-go/model" } }))
-      const outcome = await Effect.runPromise(Effect.gen(function*() {
-        const spawned = yield* Deferred.make<number>()
-        const spawner = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
-          const real = yield* ChildProcessSpawner.ChildProcessSpawner
-          return ChildProcessSpawner.make((command) =>
-            ChildProcess.isStandardCommand(command) && command.command === "pi"
-              ? real.spawn(ChildProcess.make("sleep", ["30"], command.options)).pipe(
-                Effect.tap((handle) => Deferred.succeed(spawned, handle.pid))
-              )
-              : real.spawn(command)
-          )
-        })).pipe(Layer.provide(BunServices.layer))
-        const chat = yield* runChat(home, ["orc"], null).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner)), Effect.forkChild)
-        const pid = yield* Deferred.await(spawned)
-        const group = yield* Effect.promise(() => Bun.$`ps -o pgid= -p ${pid}`.text())
-        process.emit("SIGHUP")
-        const exit = yield* Fiber.join(chat)
-        const piRunning = yield* Effect.sync(() => {
-          try {
-            return process.kill(pid, 0)
-          } catch {
-            return false
-          }
-        })
-        return { exit, piRunning, piGroup: Number(group.trim()) }
-      }))
-      expect(outcome).toEqual({ exit: 129, piRunning: false, piGroup: Number((await Bun.$`ps -o pgid= -p ${process.pid}`.text()).trim()) })
-    } finally {
-      await rm(home, { recursive: true, force: true })
-    }
-  })
 })
