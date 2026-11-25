@@ -44,4 +44,5 @@ Orc keeps that body as `pr-body.md` in the run folder and records the step as `p
 ## After the PR opens
 A direct-PR run succeeds as soon as the PR opens.
 A failed local check, push, or PR creation ends the run failed.
+The beat [retries a confirmed failed run once](attention-queue.md#retry-a-dead-run-once) before closing the task failed.
 The beat reads the open PR and places it in the attention queue when its checks are green.

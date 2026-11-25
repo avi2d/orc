@@ -199,6 +199,7 @@ const expectedFiles = [
   "src/entities/parked-runs/item-answers.ts",
   "src/entities/parked-runs/parked.ts",
   "src/entities/parked-runs/repeat-hold.ts",
+  "src/entities/parked-runs/retry.ts",
   "src/entities/parked-runs/send-back.ts",
   "src/entities/pull-request/changed-files.ts",
   "src/entities/pull-request/pr-view.ts",

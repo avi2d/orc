@@ -117,6 +117,8 @@ Without either event it is the last state the beat read for the PR.
 For a task closed with `--landed-in`, `landedIn` names the merged PR instead of `pr`.
 
 The beat prints `closed <task-id> <done|failed|stopped> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds, until it stays unread for 10 minutes.
+A confirmed failed run with a known run ID can [retry once](attention-queue.md#retry-a-dead-run-once) instead of closing.
+The beat prints `retry <task-id> on <machine> from run <run-id>` when it returns the task to `new` on its kept branch.
 
 ## Hold a task for an answer
 

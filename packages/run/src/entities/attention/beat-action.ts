@@ -34,6 +34,7 @@ export type BeatAction =
     readonly pr: string | null
     readonly report: string | null
   }
+  | { readonly kind: "retry"; readonly task: string; readonly machine: string; readonly run: string }
   | { readonly kind: "split"; readonly task: string; readonly machine: string; readonly children: ReadonlyArray<string>; readonly reason: string }
   | { readonly kind: "close-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | {

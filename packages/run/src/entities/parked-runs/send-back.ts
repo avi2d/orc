@@ -20,7 +20,7 @@ export const addSendBackWords = (
 ): Effect.Effect<NonNullable<Parked["origin"]>, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   rewriteNew(root, id, (fresh) => {
     const parked = fresh.parked
-    if (parked === null || parked.origin === undefined || parked.branch !== taskBranch(id) || !parked.questions.every((question) => isSendBackQuestion(question.id))) {
+    if (parked === null || parked.origin === undefined || parked.branch !== taskBranch(id) || parked.questions.length === 0 || !parked.questions.every((question) => isSendBackQuestion(question.id))) {
       return Effect.fail(notSentBack(id, fresh.state.kind))
     }
     const question = sendBackQuestion(sendBackQuestionId + "-" + (parked.questions.length + 1).toString(), words, at)
@@ -45,8 +45,9 @@ export const sendBackClosedTask = (
         return yield* new BacklogError({ detail: id + " closed without a run, so it has no branch to send back" })
       }
       const parked: Parked = { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at)], origin: ran.pr === null ? origin : { ...origin, pr: ran.pr }, at, sentBackAt: at }
-      const { merge: _merge, ...unmerged } = record
-      const sent: TaskRecord = { ...(mergeRecord === "kept" ? record : unmerged), parked, state: { kind: "new" } }
+      const { retry: _retry, ...retryable } = record
+      const { merge: _merge, ...unmerged } = retryable
+      const sent: TaskRecord = { ...(mergeRecord === "kept" ? retryable : unmerged), parked, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(sent)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })
       }
