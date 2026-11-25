@@ -223,7 +223,8 @@ const overdueWait = (task: TaskRecord, at: string): { readonly id: string; reado
   return { id, asked, answer: hold.answer }
 }
 
-// openItem publishes once and cannot rewrite a withdrawn item, so this rewrites it open with the text the task asks now.
+// openItem publishes once and cannot rewrite an item, so this rewrites a withdrawn or open one with the text the task asks now.
+// A lost replace means another writer changed the item, so the item is live exactly when it reads open now.
 const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     if (yield* openItem(root, id, asked)) {
@@ -233,10 +234,13 @@ const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Ef
     if (existing === null || existing.item.state.kind === "closed") {
       return false
     }
-    if (existing.item.state.kind === "open") {
+    if (existing.item.state.kind === "open" && existing.item.text === asked.text) {
       return true
     }
-    return yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, ...choiceOf(asked), state: { kind: "open" } }))
+    if (yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, ...choiceOf(asked), state: { kind: "open" } }))) {
+      return true
+    }
+    return (yield* readItem(root, id))?.state.kind === "open"
   })
 
 // The task file holds the answer that stands, so an item closed on the answer it replaced takes the new one and keeps the old one.

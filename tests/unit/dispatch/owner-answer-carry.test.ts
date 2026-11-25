@@ -185,6 +185,23 @@ describe("the beat's safety net for a parked question no open item asks", () => 
     })
   })
 
+  test("names a question that loses its item later in the open item instead of keeping only the first one", async () => {
+    await withParked174(async (root) => {
+      await run(routeTaskItems(root, [await current(root)], "2026-11-21T21:30:00.000Z"))
+      const r5Asked = "2026-11-21T21:00:00.000Z"
+      const r5Text = "Should the record keep the old owner field name?"
+      const taskFile = join(root, "new", task174 + ".md")
+      const withR5 = (await readFile(taskFile, "utf8")).replace(`parked_questions: [`, `parked_questions: [${JSON.stringify({ id: "R5", text: r5Text, asked_at: r5Asked })},`)
+      await writeFile(taskFile, withR5)
+      await writeFile(join(root, "attention", task174 + ".R5.2026-11-21T21_00_00_000Z.json"), JSON.stringify({ ...closedItem, text: r5Text, asked: r5Asked }, null, 2) + "\n")
+      await run(routeTaskItems(root, [await current(root)], "2026-11-21T21:32:00.000Z"))
+      const open = await run(openItems(root))
+      expect(open.map((entry) => entry.id)).toEqual([unaskedId])
+      expect(open[0]?.item.subject).toBe("the unasked questions of orc-174: R5, R3")
+      expect(open[0]?.item.text).toContain("R5: " + r5Text)
+    })
+  })
+
   test("opens nothing more for a question its own open item still asks, instead of asking it twice", async () => {
     await withParked174(async (root) => {
       await rm(join(root, "attention", r3Item + ".json"))
