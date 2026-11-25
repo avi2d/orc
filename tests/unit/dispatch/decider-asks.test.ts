@@ -12,7 +12,7 @@ import { Asking, askingFileName, waitForAnswers } from "../../../packages/run/sr
 import { driveNoMistakes, type NoMistakesRunner } from "../../../packages/run/src/entities/review-gate/no-mistakes"
 import { type AskDecider, type DeciderRequest, decideReviewQuestions } from "../../../packages/run/src/features/decider/index"
 import { openQuestions } from "../../lib/open-questions-2026-11-25"
-import { neverDecidedReason } from "../../../packages/run/src/features/decider/decider-guard"
+import { guardReason, neverDecidedReason } from "../../../packages/run/src/features/decider/decider-guard"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -110,7 +110,11 @@ describe("Orc-authored question routing", () => {
       }
       await parkWithRunner(root, runner)
       expect(responses).toBe(20)
-      expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)).toMatchObject({ id: "gate-cap" })
+      const question = (await run(listTasks(root))).at(0)?.parked?.questions.at(0)
+      expect(question).toMatchObject({ id: "gate-cap" })
+      if (step === "push" && question !== undefined) {
+        expect(guardReason(question, "review-finding")).toBeNull()
+      }
       const heard: Array<DeciderRequest> = []
       const decided = await decideAll(root, heard)
       expect(heard).toHaveLength(calls)
