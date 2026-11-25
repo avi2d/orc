@@ -217,14 +217,17 @@ const harvestedFirst = (windows: ReadonlyArray<SourcedWindow>): ReadonlyArray<So
   ...windows.filter((window) => window.source.kind === "quota-axi"),
 ];
 
-const sourceGroups = (windows: ReadonlyArray<SourcedWindow>, now: DateTime.Utc): ReadonlyArray<SourceGroup> =>
-  harvestedFirst(windows).reduce<ReadonlyArray<SourceGroup>>((groups, window) => {
+const sourceGroups = (windows: ReadonlyArray<SourcedWindow>, now: DateTime.Utc): ReadonlyArray<SourceGroup> => {
+  const groups: Array<SourceGroup & { readonly labels: Array<string> }> = [];
+  for (const window of harvestedFirst(windows)) {
     const source = sourceWords(window.source, now);
     const join = joinWords(joinOf(window));
     const known = groups.find((group) => group.source === source && group.join === join);
-    if (known === undefined) return [...groups, { labels: [shortLabel(window)], source, join }];
-    return groups.map((group) => (group === known ? { ...group, labels: [...group.labels, shortLabel(window)] } : group));
-  }, []);
+    if (known === undefined) groups.push({ labels: [shortLabel(window)], source, join });
+    else known.labels.push(shortLabel(window));
+  }
+  return groups;
+};
 
 interface Phrase {
   readonly joiner: string;
@@ -238,24 +241,28 @@ const groupTexts = (group: SourceGroup, room: number): ReadonlyArray<string> => 
     { joiner: " ", text: `from ${group.source}` },
     ...(group.join === undefined ? [] : [{ joiner: " · ", text: group.join }]),
   ];
-  return phrases.reduce<ReadonlyArray<string>>((lines, { joiner, text }) => {
+  const lines: Array<string> = [];
+  for (const { joiner, text } of phrases) {
     const last = lines.at(-1);
-    if (last === undefined) return [text];
-    const joined = last + joiner + text;
-    return widthOf(joined) <= room ? [...lines.slice(0, -1), joined] : [...lines, text];
-  }, []);
+    const joined = last === undefined ? undefined : last + joiner + text;
+    if (joined !== undefined && widthOf(joined) <= room) lines[lines.length - 1] = joined;
+    else lines.push(text);
+  }
+  return lines;
 };
 
 // A block read wholly by quota-axi keeps quota-axi's own layout, so only a block holding a harvested window names its sources.
 const sourceLines = (windows: ReadonlyArray<SourcedWindow>, width: number, now: DateTime.Utc): Block => {
   if (windows.every((window) => window.source.kind === "quota-axi")) return [];
   const room = width - sourceIndent.length;
-  const texts = sourceGroups(windows, now).reduce<ReadonlyArray<string>>((lines, group) => {
+  const texts: Array<string> = [];
+  for (const group of sourceGroups(windows, now)) {
     const own = groupTexts(group, room);
-    const last = lines.at(-1);
+    const last = texts.at(-1);
     const shared = last === undefined || own.length !== 1 ? undefined : `${last} · ${own.join("")}`;
-    return shared !== undefined && widthOf(shared) <= room ? [...lines.slice(0, -1), shared] : [...lines, ...own];
-  }, []);
+    if (shared !== undefined && widthOf(shared) <= room) texts[texts.length - 1] = shared;
+    else texts.push(...own);
+  }
   return texts.map((text) => [span(`${sourceIndent}${ellipsize(text, room)}`, "muted")]);
 };
 

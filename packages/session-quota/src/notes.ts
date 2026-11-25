@@ -19,13 +19,16 @@ interface NotePart {
 }
 
 // The folder is what a reader acts on, so the note breaks between its parts rather than ellipsizing the folder.
-const noteTexts = (parts: ReadonlyArray<NotePart>, width: number): ReadonlyArray<string> =>
-  parts.reduce<ReadonlyArray<string>>((lines, { joiner, text }) => {
+const noteTexts = (parts: ReadonlyArray<NotePart>, width: number): ReadonlyArray<string> => {
+  const lines: Array<string> = [];
+  for (const { joiner, text } of parts) {
     const last = lines.at(-1);
-    if (last === undefined) return [text];
-    const joined = last + joiner + text;
-    return widthOf(joined) <= (lines.length === 1 ? width : width - 2) ? [...lines.slice(0, -1), joined] : [...lines, text];
-  }, []);
+    const joined = last === undefined ? undefined : last + joiner + text;
+    if (joined !== undefined && widthOf(joined) <= (lines.length === 1 ? width : width - 2)) lines[lines.length - 1] = joined;
+    else lines.push(text);
+  }
+  return lines;
+};
 
 const unmatchedNotes = (view: SessionQuotaView, width: number): Block =>
   view.unmatched.flatMap((runs) => {
