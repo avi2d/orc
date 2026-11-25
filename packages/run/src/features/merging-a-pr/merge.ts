@@ -45,14 +45,22 @@ interface Approved {
 
 const approvedAt = (view: PullRequestView): Approved => ({ head: view.headRefOid, green: greenChecks(view) })
 
-const recordStage = (landing: Landing, approved: Approved, stage: MergeRecord["stage"], detail?: string) =>
-  rewriteClosed(landing.root, landing.id, (record) => {
+const writeMergeRecord = (landing: Landing, merge: MergeRecord | null) =>
+  rewriteClosed<void>(landing.root, landing.id, (record) => {
     if (taskPr(record) !== landing.url) {
       return Effect.fail(new BacklogError({ detail: landing.id + " changed while orc merge was running" }))
     }
-    const merge: MergeRecord = { basis: landing.basis, ...approved, stage, ...(detail === undefined ? {} : { detail }) }
-    return Effect.succeed({ kind: "write", record: { ...record, merge }, result: undefined })
-  })
+    if (merge === null && record.merge === undefined) {
+      return Effect.succeed({ kind: "keep", result: undefined })
+    }
+    const { merge: _earlier, ...rest } = record
+    return Effect.succeed({ kind: "write", record: merge === null ? rest : { ...rest, merge }, result: undefined })
+  }).pipe(
+    Effect.catch((error) => landing.progress("orc merge could not record its stage in " + landing.id + ": " + ("file" in error ? error.file + ": " : "") + error.detail))
+  )
+
+const recordStage = (landing: Landing, approved: Approved, stage: MergeRecord["stage"], detail?: string) =>
+  writeMergeRecord(landing, { basis: landing.basis, ...approved, stage, ...(detail === undefined ? {} : { detail }) })
 
 const checksMinutes = 20
 const checksTimeout = Duration.minutes(checksMinutes)
@@ -79,7 +87,7 @@ const updateBranch = (landing: Landing, view: PullRequestView, approved: Approve
     }
     const said = updated.stderr + "\n" + updated.stdout
     if (/conflict/i.test(said)) {
-      yield* recordStage(landing, approved, "conflicted", "Merge conflict with " + view.baseRefName)
+      yield* recordStage(landing, approved, "conflicted", view.baseRefName)
       return yield* refuseAndSendBack(
         landing,
         "has a merge conflict with " + view.baseRefName + ", so update-branch could not bring it up to date",
@@ -377,6 +385,7 @@ export const mergeTask = (
   Effect.gen(function*() {
     const { url, view } = yield* openPullRequest(root, id, basis)
     const landing: Landing = { root, id, url, basis, sendBack, progress: options.progress ?? Console.log }
+    yield* writeMergeRecord(landing, null)
     if (basis === "yolo-green") {
       const waits = ownerWordChanges(yield* readChangedFiles(url))
       if (waits.length > 0) {

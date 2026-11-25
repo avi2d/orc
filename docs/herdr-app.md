@@ -87,9 +87,7 @@ The **Project** select shows runs for configured projects by default.
 Choose **All runs** in it to include runs from other projects.
 Opening a run of another project from the Inbox switches the **Project** select to **All runs**.
 A merged PR shows its run as Done, and a closed PR shows its run as Failed.
-When an approved PR needs an update, the Approve card shows **Updating from main** and then **Checks running**.
-If the update conflicts or a check fails, the card names the conflict or failed check.
-Orc records the approval basis and merge stage in the task file.
+The Approve step names each stage of a merge, as [Approve a run's PR](herdr-app-agents.md#approve-a-run-s-pr) says.
 
 <div id="start-a-scratch-app"><span id="recapture-the-board-screenshots"></span><span id="change-the-mods"></span></div>
 

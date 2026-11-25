@@ -194,9 +194,24 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
       expect(merged.stderr).toContain("sent orc-1 back, so the next beat resumes run origin-run")
       expect(await mergeCalls(fixture)).toEqual([])
       const sent = await sentBackTask(fixture)
-    expect(sent).toContain("update-branch reported a merge conflict between " + head + " and main")
-    const front: unknown = Bun.YAML.parse(sent.split("---\n")[1])
-    expect(front).toMatchObject({ merge: { basis: "captain-word", head, stage: "conflicted" } })
+      expect(sent).toContain("update-branch reported a merge conflict between " + head + " and main")
+      const front: unknown = Bun.YAML.parse(sent.split("---\n")[1])
+      expect(front).toMatchObject({ merge: { basis: "captain-word", head, stage: "conflicted", detail: "main" } })
+    })
+  }, 60_000)
+
+  test("a later refusal clears the red check an earlier attempt recorded instead of keeping the stale stage", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { checks: [passed("lint"), red("test")] })
+      expect((await runOrc(fixture, ["merge", "orc-1"])).exitCode).not.toBe(0)
+      const first: unknown = Bun.YAML.parse((await taskFile(fixture)).split("---\n")[1])
+      expect(first).toMatchObject({ merge: { stage: "check-failed", detail: "ci/test" } })
+      await stubGh(fixture, { checks: [passed("lint"), running("test")] })
+      const second = await runOrc(fixture, ["merge", "orc-1"])
+      expect(second.stderr).toContain("the check ci/test has not reported")
+      const front: unknown = Bun.YAML.parse((await taskFile(fixture)).split("---\n")[1])
+      expect(front).not.toHaveProperty("merge")
     })
   }, 60_000)
 

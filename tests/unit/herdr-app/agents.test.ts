@@ -41,12 +41,20 @@ const board = buildCards(
 )
 
 describe("sending a PR back", () => {
-  test("a sent-back conflict retains its approval card instead of losing the recorded error", () => {
+  test("a sent-back conflict names the conflict on its Sent back card instead of turning into an approval the captain cannot press", () => {
     const id = "20261113-090000-aaaaaa"
     const prRun = run(id, { status: "succeeded", branch: "orc/orc-48", prLink: approval.link })
-    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "new", parkedOrigin: id, merge: { stage: "conflicted", detail: "Merge conflict with main" } })]))
-    expect(card.standing.status).toBe("Awaiting you")
-    expect(card.merge?.stage).toBe("conflicted")
+    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "new", parked: 0, parkedOrigin: id, merge: { stage: "conflicted", detail: "main" } })]))
+    expect(cards.map((card) => [card.standing.status, card.where])).toEqual([
+      ["Queued", "Waiting to start"],
+      ["Done", "Sent back PR #48: Merge conflict"]
+    ])
+  })
+  test("a sent-back red check names the failed check stage instead of a bare Sent back", () => {
+    const id = "20261113-090000-aaaaaa"
+    const prRun = run(id, { status: "succeeded", branch: "orc/orc-48", prLink: approval.link })
+    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "new", parked: 0, parkedOrigin: id, merge: { stage: "check-failed", detail: "ci/test" } })]))
+    expect(cards.map((card) => card.where)).toContain("Sent back PR #48: Check failed")
   })
   test("the approval card retains each recorded merge stage instead of showing only a generic merge", () => {
     const prRun = run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: approval.link })

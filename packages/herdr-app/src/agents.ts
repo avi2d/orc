@@ -1,7 +1,6 @@
 import type { Backlog, Run, Runs, ShownStep, Step, Task } from "./guard"
 import type { InboxAnswer, InboxApproval, InboxItem } from "./inbox"
-import { mergeArgv } from "./task"
-import { askText } from "./thread"
+import { sentBackLabel } from "./approval-stage"
 
 export const cardStatuses = ["Awaiting you", "Running", "Queued", "Failed", "Done"] as const
 export type CardStatus = typeof cardStatuses[number]
@@ -131,11 +130,7 @@ const prPlace = (runId: string, link: string, task: Task | undefined, merged: Re
     return { standing: { status: "Done" }, where: pr }
   }
   if (task.status !== "closed" && task.parkedOrigin === runId) {
-    if (task.merge?.stage === "conflicted" || task.merge?.stage === "check-failed") {
-      const recorded: InboxApproval = { key: `${task.id}/merge`, kind: "pr", task: task.id, title: task.title, who: "beat", asked: null, link, ask: askText(`Merge ${pr}?`), recommendation: null, action: { kind: "merge", argv: mergeArgv(task.id) } }
-      return awaitingApproval(recorded)
-    }
-    return { standing: { status: "Done" }, where: `Sent back ${pr}` }
+    return { standing: { status: "Done" }, where: sentBackLabel(pr, task.merge) }
   }
   if (!newest) {
     return { standing: { status: "Done" }, where: `Sent back ${pr}` }

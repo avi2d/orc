@@ -1,4 +1,4 @@
-import { mergeStages, type MergeStage } from "./approval-stage"
+import { mergeStages, type RecordedMerge } from "./approval-stage"
 
 export type Guarded<A> =
   | { readonly kind: "ok"; readonly value: A }
@@ -140,7 +140,7 @@ export interface Task {
   readonly parkedOrigin: string | null
   readonly reason: string | null
   readonly prState: typeof prStates[number] | null
-  readonly merge?: { readonly stage: MergeStage; readonly detail: string | null }
+  readonly merge?: RecordedMerge
 }
 
 const parkedOrigin = (record: Fields, at: string): Guarded<string | null> => {
