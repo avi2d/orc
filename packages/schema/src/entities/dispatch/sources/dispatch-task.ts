@@ -177,7 +177,7 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
       const renewed = decodedMachines.value.machines.find((entry) => entry.renew !== undefined);
       if (tokenless !== undefined && commandAccount === undefined && renewed !== undefined) {
         return unreachable(
-          machinesFile + ": the account " + tokenless.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes"
+          machinesFile + ": the machine " + renewed.name + " names a renew command it never takes, because no account uses a token command"
         );
       }
       return ok(decodedMachines.value.machines);

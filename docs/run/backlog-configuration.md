@@ -188,7 +188,7 @@ Each account sits beside the Claude account the runs already take, and the beat 
     "accounts": [
       { "name": "main", "kind": "claude-config", "configDirs": { "mac": "/Users/me/claude/main" } },
       { "name": "codex", "kind": "none", "provider": "openai", "models": { "implementer": "openai/gpt-5.5", "fixer": "openai/gpt-5.5" } },
-      { "name": "opencode-go", "kind": "none", "provider": "opencode-go", "models": { "implementer": "opencode-go/kimi-k2", "fixer": "opencode-go/kimi-k2" } }
+      { "name": "opencode-go", "kind": "none", "provider": "opencode-go", "models": { "implementer": "opencode-go/kimi-k3", "fixer": "opencode-go/kimi-k3" } }
     ]
   }
 }

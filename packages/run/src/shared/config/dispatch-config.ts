@@ -320,7 +320,7 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
           return yield* new ConfigError({ file, detail: "the machine " + unrenewed.name + " has no renew command, which the account " + commandAccount.name + " needs to carry its token past its expiry" })
         }
         const renewed = config.machines.find((entry) => entry.renew !== undefined)
-        if (tokenless !== undefined && commandAccount === undefined && renewed !== undefined) return yield* new ConfigError({ file, detail: "the account " + tokenless.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes" })
+        if (tokenless !== undefined && commandAccount === undefined && renewed !== undefined) return yield* new ConfigError({ file, detail: "the machine " + renewed.name + " names a renew command it never takes, because no account uses a token command" })
         return { machines, quota: { ...config.quota, floorPercent: config.quota.floorPercent ?? 0, accounts } }
       })
     )

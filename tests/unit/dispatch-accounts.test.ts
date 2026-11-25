@@ -129,7 +129,7 @@ describe("readDispatchConfig", () => {
       const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
       await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts: [{ name: "main", kind: "none" }] } }))
       const read = await run(readDispatchConfig(file).pipe(Effect.as("read"), Effect.catchTag("ConfigError", (error) => Effect.succeed(error.detail))))
-      expect(read).toBe("the account main takes kind none and holds no token, so the machine mac names a renew command it never takes")
+      expect(read).toBe("the machine mac names a renew command it never takes, because no account uses a token command")
     })
   })
   test("refuses a second account beside a kind none account instead of spending the wrong login", async () => {

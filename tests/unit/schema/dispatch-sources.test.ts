@@ -62,8 +62,7 @@ describe("the dispatch panel reader", () => {
     );
     expect(machines.kind).toBe("unreachable");
     if (machines.kind === "unreachable") {
-      expect(machines.reason).toContain("takes kind none and holds no token");
-      expect(machines.reason).toContain("names a renew command it never takes");
+      expect(machines.reason).toContain("the machine mac names a renew command it never takes, because no account uses a token command");
     }
   });
   test("refuses a kind none account with a misspelt key instead of reporting the machines as healthy", async () => {
