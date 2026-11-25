@@ -225,6 +225,7 @@ const expectedFiles = [
   "src/widgets/beat/task-events.ts",
   "src/widgets/beat/yolo-merge.ts",
   "src/entities/backlog/task-record-render.ts",
+  "src/entities/backlog/task-record-text.ts",
   "src/entities/backlog/task-record.ts",
   "src/entities/token/token.ts",
   "src/widgets/beat/index.ts",

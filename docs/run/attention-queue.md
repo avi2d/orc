@@ -130,14 +130,19 @@ The beat opens an item for each run event, owned by the user:
 - A dispatch machine that orc has not reached for 10 minutes, counted from the first beat that could not reach it, opens a `machine-unreached` item for each started task on that machine.
   Each item names the machine and the error of the command that reaches it, and the task stays started.
   A beat that reaches the machine again withdraws the item, and so does closing its task.
-- A red GitHub Actions check on a closed ship task's PR makes orc run `gh run rerun <run-id> --failed` once per PR.
+
+### Items for a PR's checks
+
+The beat opens these items for a closed ship task's PR, owned by the user:
+
+- A red GitHub Actions check on the PR makes orc run `gh run rerun <run-id> --failed` once per PR.
   orc records the rerun in the task file and posts a chat event.
   While a run with a red check still has unfinished checks, orc waits and does neither.
   Sending the task back does not reset the rerun allowance for that PR.
   If a check is still red after the rerun, or if no red check has an Actions run link, orc opens a `check-red` item with the available failed check links.
   Checks that turn green on that commit, or a new commit, withdraw it.
   Merging the PR or closing it without merging withdraws it.
-- A closed ship task's PR with every check reporting green opens a `pr-ready` item for its head commit.
+- A PR with every check reporting green opens a `pr-ready` item for its head commit.
   A red check or a new commit withdraws it.
   On a project with `yolo` true, the item text names each change that waits for your merge word.
   Merging the PR closes it with the answer `merged`.
