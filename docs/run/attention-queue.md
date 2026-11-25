@@ -153,7 +153,7 @@ After a successful check, the next failure opens a new item and the answered ite
 The following items name a `subject` and list `options`, each with the `outcome` it leads to.
 The `recommendation` names one option:
 
-- A `run-died` item offers `rerun` or `close`, and recommends `rerun`.
+- A `run-died` item offers `rerun` through `orc backlog retry <task-id>` or `close`, and recommends `rerun`.
 - A `check-red` item offers `send back` or `close`, and recommends `send back`.
 - A `pr-ready` item offers `merge` or `hold`, and recommends `merge`.
 - A `failing-command` item offers `continue` or `stop`, and recommends `continue`.

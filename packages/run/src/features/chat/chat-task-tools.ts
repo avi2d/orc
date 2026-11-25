@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import type { Env } from "./chat-command"
-import { DependInput, DropInput, NoteInput, PriorityInput, SendBackInput, StopInput, ThreadInput } from "./chat-inputs"
+import { DependInput, DropInput, NoteInput, PriorityInput, RetryInput, SendBackInput, StopInput, ThreadInput } from "./chat-inputs"
 import { type ChatTool, runTool } from "./chat-run"
 
 export const priorityTool = (env: Env): ChatTool => ({
@@ -25,9 +25,9 @@ export const taskTools = (env: Env): ReadonlyArray<ChatTool> => [
   {
     name: "orc_backlog_retry",
     label: "Retry an orc task",
-    description: "Returns a failed or stopped task to the backlog. Kept work resumes on its original machine and branch.",
-    parameters: Schema.toJsonSchemaDocument(StopInput).schema,
-    execute: (_toolCallId, params) => runTool(StopInput, "orc_backlog_retry", params, env, (input) => ["backlog", "retry", input.id])
+    description: "Returns a failed or stopped task to the backlog on the machine it ran on, reusing its kept branch when one exists. A failed start keeps its pending answers and any machine pin.",
+    parameters: Schema.toJsonSchemaDocument(RetryInput).schema,
+    execute: (_toolCallId, params) => runTool(RetryInput, "orc_backlog_retry", params, env, (input) => ["backlog", "retry", input.id])
   },
   {
     name: "orc_backlog_drop",

@@ -22,7 +22,7 @@ Each tool runs one `orc` command, the same one you could type.
 | `orc_backlog_priority` | Sets or clears a new task's priority |
 | `orc_machines` | Reads the orc version each dispatch machine runs |
 | `orc_backlog_stop` | Kills a started task's run and closes the task stopped |
-| `orc_backlog_retry` | Runs a failed or stopped task again, using kept work on its original machine |
+| `orc_backlog_retry` | Runs a failed or stopped task again, on the machine it ran on, reusing its kept branch when one exists |
 | `orc_backlog_drop` | Closes a new task as dropped, with a reason |
 | `orc_backlog_send_back` | Sends a closed task's open pull request back with your review |
 | `orc_backlog_note` | Leaves a note on a task |

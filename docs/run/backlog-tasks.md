@@ -76,8 +76,10 @@ The command records your decision without checking the PR on the forge.
 ### Retry a task
 
 Run `orc backlog retry <task-id>` to run a failed or stopped task again.
-When it has kept work, the beat resumes it on the original machine and branch.
-Otherwise, the beat places it normally.
+Failed and stopped tasks stay on the machine they ran on and reuse their kept branch when one exists.
+A failed start keeps its pending answers and any machine pin.
+Without a pin, the beat places a failed start normally.
+Retry keeps the recorded PR and withdraws the task's open attention items.
 
 ### Send a task back
 

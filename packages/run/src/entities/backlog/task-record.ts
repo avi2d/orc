@@ -117,6 +117,7 @@ export interface TaskRecord {
   readonly spec: TaskSpec
   readonly hold: Hold | null
   readonly parked: Parked | null
+  readonly priorPr?: string
   readonly state: TaskState
 }
 
@@ -390,6 +391,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
       },
       hold,
       parked,
+      ...(front.pr === undefined || (state.kind === "closed" && state.closing.outcome !== "start-failed") ? {} : { priorPr: front.pr }),
       state
     }
   })

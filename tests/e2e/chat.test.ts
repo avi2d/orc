@@ -46,7 +46,7 @@ describe("orc chat", () => {
         "--extension",
         chatToolsPath,
         "--tools",
-"orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_priority,orc_machines,orc_backlog_stop,orc_backlog_drop,orc_backlog_send_back,orc_backlog_note,orc_backlog_depend,orc_backlog_thread,orc_backlog_edit,orc_backlog_answer,orc_attention,orc_attention_answer,merge_task,orc_decision_board",
+"orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_priority,orc_machines,orc_backlog_stop,orc_backlog_retry,orc_backlog_drop,orc_backlog_send_back,orc_backlog_note,orc_backlog_depend,orc_backlog_thread,orc_backlog_edit,orc_backlog_answer,orc_attention,orc_attention_answer,merge_task,orc_decision_board",
         "ORC_CHAT_ORC=" + JSON.stringify([process.execPath, binPath]),
         "ORC_CHAT_BOARDS=" + join(fixture.home, "boards")
       ])

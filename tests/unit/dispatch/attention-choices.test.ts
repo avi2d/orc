@@ -56,16 +56,16 @@ describe("the choices on the items the beat opens", () => {
   test("a run-died item names its run and offers rerun or close, recommending rerun", async () => {
     await withRoot(async (root) => {
       await run(openRunDeaths(root, [{ kind: "closed", task: "orc-1", machine: "mac", outcome: "failed", reason: "exit 1", pr: null, report: null }], "2026-11-20T12:00:00.000Z"))
-      const died = await stored(root, "orc-1.run-died")
+      const died = await stored(root, "orc-1.run-died.2026-11-20T12_00_00_000Z")
       expect(choices(died)).toEqual({
         subject: "the run of orc-1 on mac",
         options: [
-          ["rerun", "orc backlog add <project> <task-file> adds the task again under a new id, and the next beat starts it"],
+          ["rerun", "orc backlog retry orc-1 returns the task to the backlog, and the next beat starts it"],
           ["close", "the task stays closed failed, and no run starts"]
         ],
         recommendation: "rerun"
       })
-      parses(died.options?.[0]?.outcome, "backlog", ["add", "<project>", "<task-file>"])
+      parses(died.options?.[0]?.outcome, "backlog", ["retry", "orc-1"])
     })
   })
 
