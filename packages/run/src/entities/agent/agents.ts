@@ -151,8 +151,8 @@ export const agentFileCandidates = (
   orcHome: string,
   agentsDir?: string
 ): ReadonlyArray<AgentFileLocation> => [
-  { kind, path: path.join(orcHome, "agents", kind + ".md"), source: "personal" },
   { kind, path: path.join(projectDir, ".orc", "agents", kind + ".md"), source: "project" },
+  { kind, path: path.join(orcHome, "agents", kind + ".md"), source: "personal" },
   { kind, path: agentsDir === undefined ? bundledAgentFiles[kind] : path.join(agentsDir, kind + ".md"), source: "bundled" }
 ]
 

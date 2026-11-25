@@ -96,7 +96,7 @@ describe("parseAgentFile", () => {
 })
 
 describe("resolveAgentFile", () => {
-  test("the personal file wins over the project file and the bundled file", async () => {
+  test("the project file wins over the personal file and the bundled file", async () => {
     await withDirs(async (root) => {
       const home = join(root, "orc-home")
       const project = join(root, "project")
@@ -109,8 +109,8 @@ describe("resolveAgentFile", () => {
           Effect.provide(BunServices.layer)
         )
       )
-      expect(found.source).toBe("personal")
-      expect(found.model).toBe("acme/personal-model")
+      expect(found.source).toBe("project")
+      expect(found.model).toBe("acme/project-model")
     })
   })
 
@@ -178,7 +178,7 @@ describe("resolveAgentFile", () => {
     })
   })
 
-  test("a personal reviewer file is used instead of the project or bundled reviewer file", async () => {
+  test("a project reviewer file is used instead of the personal or bundled reviewer file", async () => {
     await withDirs(async (root) => {
       const home = join(root, "orc-home")
       const project = join(root, "project")
@@ -187,6 +187,15 @@ describe("resolveAgentFile", () => {
       await writeAgent(join(project, ".orc", "agents"), "reviewer.md", good.replace("coder", "project-model"))
       await writeAgent(bundled, "reviewer.md", good.replace("coder", "bundled-model"))
       const found = await resolved("reviewer", { projectDir: project, orcHome: home, agentsDir: bundled, configModel: noConfigModel })
+      expect(typeof found === "string" ? found : [found.source, found.model]).toEqual(["project", "acme/project-model"])
+    })
+  })
+
+  test("a personal reviewer file wins over the bundled file when the project has none", async () => {
+    await withDirs(async (root) => {
+      const home = join(root, "orc-home")
+      await writeAgent(join(home, "agents"), "reviewer.md", good.replace("coder", "personal-model"))
+      const found = await resolved("reviewer", { projectDir: join(root, "project"), orcHome: home, configModel: noConfigModel })
       expect(typeof found === "string" ? found : [found.source, found.model]).toEqual(["personal", "acme/personal-model"])
     })
   })
@@ -204,7 +213,7 @@ describe("resolveAgentFile", () => {
     })
   })
 
-  test("candidates list personal, project then bundled in that order", async () => {
+  test("candidates list project before personal and bundled", async () => {
     const sources = await Effect.runPromise(
       Effect.gen(function*() {
         const path = yield* Path.Path
@@ -212,8 +221,8 @@ describe("resolveAgentFile", () => {
       }).pipe(Effect.provide(BunServices.layer))
     )
     expect(sources).toEqual([
-      ["personal", "/orc-home/agents/fixer.md"],
       ["project", "/project/.orc/agents/fixer.md"],
+      ["personal", "/orc-home/agents/fixer.md"],
       ["bundled", "/bundled/fixer.md"],
     ])
   })
