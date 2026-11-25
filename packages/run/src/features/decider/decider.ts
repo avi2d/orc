@@ -236,7 +236,8 @@ const decidableOf = (byId: ReadonlyMap<string, TaskRecord>, entry: OpenItem): De
 
 const verdictOf = (ask: AskDecider, policy: Effect.Effect<string>, root: string, { entry, task, question }: Decidable) =>
   Effect.gen(function*() {
-    const guarded = guardReason(entry.item.kind === "review-question" ? question : { text: question.text })
+    const kind = entry.item.kind === "worker-question" ? "worker-question" : question.id.startsWith("question-") ? "review-question" : "review-finding"
+    const guarded = guardReason(question, kind)
     if (guarded !== null) {
       return { kind: "escalated", reason: guarded } satisfies Verdict
     }
