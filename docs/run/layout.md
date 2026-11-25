@@ -267,7 +267,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/entities/pull-request/pr-view.ts` | The `gh pr view` reading of a task's PR and its check verdicts |
 | `packages/run/src/entities/pull-request/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |
-| `packages/run/src/entities/pull-request/changed-files.ts` | The PR's changed files from the GitHub files API and the changes that wait for the captain's merge word |
+| `packages/run/src/entities/pull-request/changed-files.ts` | The PR's changed files from the [GitHub](https://github.com) files API and the changes that wait for the captain's merge word |
 | `packages/run/src/entities/pull-request/direct-pr.ts` | The direct PR opener: the push, the existing check and the create, and the opened or failed record |
 
 ## entities/review-gate

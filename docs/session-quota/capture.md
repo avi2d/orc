@@ -10,7 +10,7 @@ The readers prefer the ledger where it holds a call, and count from the logs whe
 
 [Orc release archives](../run/release-assets.md) include `orc-dash-capture`.
 In a clone, `bun run build` writes `packages/session-quota/dist/orc-dash-capture`.
-Both executables run without Bun installed.
+Both executables run without [Bun](https://bun.com) installed.
 Hooks run `orc-dash-capture` with the kind of record as its one argument and the record's input on stdin.
 If your Claude Code statusline or Pi hook still runs `bun .../dist/capture-bin.js`, replace that invocation with `orc-dash-capture`.
 Keep `claude-statusline` for the Claude Code statusline and `pi-call` for the Pi hook.

@@ -24,11 +24,11 @@ Each account has one folder, `~/.orc/accounts/<account>`, or `$ORC_HOME/accounts
 Two accounts never share a folder, and `orc login` refuses an account folder that is a link.
 The sign-in reads no other account folder from `CLAUDE_CONFIG_DIR`, `CODEX_HOME` or `XDG_DATA_HOME`.
 Orc sets the vendor's variable to the account's own folder over any value the shell exports.
-OpenCode keeps its data in the `opencode` folder inside `XDG_DATA_HOME`, so its key file is `accounts/opencode/opencode/auth.json`.
+[OpenCode](https://opencode.ai) keeps its data in the `opencode` folder inside `XDG_DATA_HOME`, so its key file is `accounts/opencode/opencode/auth.json`.
 
 ## Private window
 
-A browser keeps the claude.ai session of the account that signed in there, so a second Claude sign-in in a normal window authorizes that account again.
+A browser keeps the [claude.ai](https://claude.ai) session of the account that signed in there, so a second Claude sign-in in a normal window authorizes that account again.
 For `claude-second`, orc opens the sign-in link in a private or incognito window of the default browser instead.
 Orc reads the default browser from `xdg-settings get default-web-browser` on Linux and from the `https` handler in the LaunchServices settings on macOS.
 Orc writes a small opener script to a temporary folder and sets `BROWSER` to it, and Claude runs `$BROWSER` with the sign-in link.

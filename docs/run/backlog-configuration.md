@@ -181,7 +181,7 @@ A kind `none` account beside a machine `renew` command is refused too, unless a 
 
 ### Subscription logins on other providers
 
-A Pi login names no token, so an account for a subscription Pi signs in to, such as a ChatGPT plan on Pi's `openai` provider or an OpenCode Go plan, takes kind `none` and its own `provider`.
+A Pi login names no token, so an account for a subscription Pi signs in to, such as a ChatGPT plan on Pi's `openai` provider or an [OpenCode](https://opencode.ai) Go plan, takes kind `none` and its own `provider`.
 Sign Pi in to each provider on every machine that runs tasks, and define each one in `config.json` with `credential` `pi-login`.
 Each account sits beside the Claude account the runs already take, and the beat picks among all of them:
 

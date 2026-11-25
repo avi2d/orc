@@ -12,7 +12,7 @@ A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: 
 `orc runner start` reads a missing `ORC_TASK_DELIVERY` as `no-mistakes` and queues a `direct-PR` ship run as `orc run <task-file> --delivery direct-PR`.
 
 ## Review the branch
-Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one Pi turn with the reviewer agent over that diff and the task file.
+Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one [Pi](https://pi.dev) turn with the reviewer agent over that diff and the task file.
 Orc decodes the findings JSON array from the reviewer's last reply and writes it to `review.json` in the run folder.
 An unreadable reply gets one rerun on the same session, and a second unreadable reply fails the review turn.
 The run's end reason names the finding count or the review failure.

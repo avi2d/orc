@@ -69,11 +69,11 @@ With `through` set, `orc heavy watch` prints a line naming the through command a
 With `through` set, `orc heavy check` and `orc heavy watch-once` fail with a line naming the through command.
 
 ## Test runs in agent sessions
-`orc run` sets `HEAVY_TESTS_CI_ONLY=1` for the steps it starts: `prepare`, the local checks and the Pi agent, under the [nono](https://nono.sh) sandbox and under `--sandbox none`.
+`orc run` sets `HEAVY_TESTS_CI_ONLY=1` for the steps it starts: `prepare`, the local checks and the [Pi](https://pi.dev) agent, under the [nono](https://nono.sh) sandbox and under `--sandbox none`.
 For those steps it also writes stand ins for `node` and `checks-test` into `~/.orc/heavy/ci-only`, even without a `PATH` binary.
 It puts that folder first on `PATH`, ahead of `~/.orc/heavy/bin`.
 A `ci-only` stand in never queues: it refuses a test run, or runs the next `node` or `checks-test` on `PATH`.
-Under that variable a stand in refuses a test run with exit 1 and a line naming the command, and leaves the tests to GitHub CI.
+Under that variable a stand in refuses a test run with exit 1 and a line naming the command, and leaves the tests to [GitHub](https://github.com) CI.
 A test run is one of these calls, watch and UI runs included:
 - `bun test`, `npm t`, `node --test`, `go test`, `cargo test`, and `cargo t`.
 - `python -m pytest`, `python3 -m pytest`, `uv run pytest`, and `uv run python -m pytest`, including flags before the runner.

@@ -16,7 +16,7 @@ Otherwise orc runs `gh pr merge <url> --squash --match-head-commit <sha>` at the
 ## A PR behind its base
 When an open green PR is behind its base, Orc compares the files each side changed since the merge base.
 If the two lists share no path, Orc tries to merge at the head it checked without updating the branch.
-If GitHub refuses because the branch is not up to date, Orc updates the branch and waits for its checks before merging.
+If [GitHub](https://github.com) refuses because the branch is not up to date, Orc updates the branch and waits for its checks before merging.
 Orc counts both paths of a renamed file.
 If GitHub returns its limit of 300 files on either side, Orc updates the branch because the lists may be incomplete.
 When the lists share a path, Orc updates the branch before merging.
