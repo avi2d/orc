@@ -64,6 +64,13 @@ const refusedAttempt = recordAttempt + '; printf "%s\\n" "permission denied" >&2
 const updatesInBeat = async (fixture: Fixture) =>
   beatRecord(await orc(fixture, "beat", "--json")).actions.filter((action) => action.kind === "update")
 const attention = async (fixture: Fixture) => attentionRecord(await orc(fixture, "attention", "--json"))
+const expireCheck = (fixture: Fixture) => writeFile(join(fixture.home, "beat-update-checked"), "2000-01-01T00:00:00.000Z")
+const leaveClaim = (file: string, pid: number, at: number) => writeFile(file, JSON.stringify({ pid, at, token: "left-behind" }))
+const exitedPid = async (): Promise<number> => {
+  const exited = Bun.spawn(["true"])
+  await exited.exited
+  return exited.pid
+}
 
 test("overlapping beats check each dispatch machine once, post only the moved version, and keep the remote installer error", async () => {
   await withDispatch(async (fixture, remoteHome) => {
@@ -99,7 +106,7 @@ test("an hourly retry refreshes one failure without reopening it when an answer 
     if (first === undefined) {
       throw new Error("the first update failed without an attention item")
     }
-    const expire = () => writeFile(join(fixture.home, "beat-update-checked"), "2000-01-01T00:00:00.000Z")
+    const expire = () => expireCheck(fixture)
     await installer(remoteHome, recordAttempt + '; printf "%s\\n" "disk full" >&2; exit 8')
     await expire()
     await updatesInBeat(fixture)
@@ -113,5 +120,60 @@ test("an hourly retry refreshes one failure without reopening it when an answer 
     expect(JSON.parse(await readFile(join(fixture.home, "backlog", "attention", first.id + ".json"), "utf8"))).toMatchObject({
       state: { kind: "closed", answer: { words: "acknowledged" } }
     })
+  })
+}, 60_000)
+
+test("a successful check ends an answered failure, so the same failure afterwards opens a new item instead of staying silent", async () => {
+  await withDispatch(async (fixture, remoteHome) => {
+    await installer(fixture.home, recordAttempt)
+    await installer(remoteHome, refusedAttempt)
+    await updatesInBeat(fixture)
+    const first = (await attention(fixture)).items.at(0)
+    if (first === undefined) {
+      throw new Error("the first update failed without an attention item")
+    }
+    await orc(fixture, "attention", "answer", first.id, "acknowledged")
+    await expireCheck(fixture)
+    expect(await updatesInBeat(fixture)).toMatchObject([{ machine: "a dispatch machine" }, { machine: peer, result: { outcome: "failed" } }])
+    expect((await attention(fixture)).items).toEqual([])
+
+    await installer(remoteHome, recordAttempt)
+    await expireCheck(fixture)
+    expect(await updatesInBeat(fixture)).toMatchObject([{ machine: "a dispatch machine" }, { machine: peer, result: { outcome: "installed" } }])
+    expect((await attention(fixture)).items).toEqual([])
+
+    await installer(remoteHome, refusedAttempt)
+    await expireCheck(fixture)
+    await updatesInBeat(fixture)
+    const { items } = await attention(fixture)
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({ kind: "update-failed", owner: "decider", text: expect.stringContaining("permission denied") })
+    expect(items[0]?.id).not.toBe(first.id)
+    expect(JSON.parse(await readFile(join(fixture.home, "backlog", "attention", first.id + ".json"), "utf8"))).toMatchObject({
+      state: { kind: "closed", answer: { words: "acknowledged" } }
+    })
+  })
+}, 60_000)
+
+test("claim files left by an exited or long-gone owner do not stop the hourly check or the item refresh, while a live claim still does", async () => {
+  await withDispatch(async (fixture, remoteHome) => {
+    await installer(fixture.home, recordAttempt)
+    await installer(remoteHome, refusedAttempt)
+    const hourClaim = join(fixture.home, "beat-update-checked.lock")
+    await leaveClaim(hourClaim, process.pid, Date.now())
+    expect(await updatesInBeat(fixture)).toEqual([])
+
+    await leaveClaim(hourClaim, await exitedPid(), Date.now())
+    expect(await updatesInBeat(fixture)).toHaveLength(2)
+    const first = (await attention(fixture)).items.at(0)
+    if (first === undefined) {
+      throw new Error("the update failed without an attention item")
+    }
+
+    await leaveClaim(join(fixture.home, "backlog", "attention", "." + first.id + ".lock"), process.pid, Date.now() - 2 * 60 * 60 * 1000)
+    await installer(remoteHome, recordAttempt + '; printf "%s\\n" "disk full" >&2; exit 8')
+    await expireCheck(fixture)
+    await updatesInBeat(fixture)
+    expect((await attention(fixture)).items).toMatchObject([{ id: first.id, text: expect.stringContaining("disk full") }])
   })
 }, 60_000)

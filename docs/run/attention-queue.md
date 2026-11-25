@@ -99,6 +99,8 @@ A failed [update check](beat-runs.md#updating-orc-on-dispatch-machines) opens an
 A retry that fails for the same version updates the open item without replacing any answer.
 A successful check withdraws the open item.
 Use `orc attention answer <item-id> <words>` to record an acknowledgement.
+A retry that fails again before a check succeeds leaves the answered item closed.
+After a successful check, the next failure opens a new item and the answered item keeps its answer.
 
 ## Recording a choice
 

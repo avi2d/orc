@@ -95,6 +95,21 @@ test("the beat selects a prepared release instead of changing the checkout it st
   })
 }, 60_000)
 
+test("a release lock left by an install that exited does not stop the next beat from installing", async () => {
+  await withLauncher('console.log("orc 99.0.0")\n', async ({ directory, readVersion, run }) => {
+    const exited = Bun.spawn(["true"])
+    await exited.exited
+    await writeFile(join(directory, ".update.lock"), JSON.stringify({ pid: exited.pid, at: Date.now(), token: "exited-install" }))
+    const beat = await run(["beat", "--json"])
+    expect(beat.exitCode).toBe(0)
+    expect(readBeat(beat.stdout).actions).toMatchObject([
+      { kind: "update", result: { outcome: "installed", running: runPackage.version, found: releaseVersion } }
+    ])
+    expect(await readVersion()).toBe(releaseVersion)
+    expect((await readdir(directory)).sort()).toEqual(["release", "v" + runPackage.version, "v" + releaseVersion])
+  })
+}, 60_000)
+
 test("the beat leaves the old release selected instead of pointing at a checkout that cannot start", async () => {
   await withLauncher('throw new Error("release cannot start")\n', async ({ directory, readVersion, run }) => {
     const beat = await run(["beat", "--json"])

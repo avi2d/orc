@@ -319,7 +319,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/shared/lib/toon.ts` | The reading of the TOON output no-mistakes prints |
 | `packages/run/src/shared/lib/table.ts` | The table formatter the runs and refusals listings share |
 | `packages/run/src/shared/lib/run-id.ts` | The new run id from the timestamp and a random part |
-| `packages/run/src/shared/lib/file-claim.ts` | The exclusive claim for a file write shared by processes |
+| `packages/run/src/shared/lib/file-claim.ts` | The exclusive claim for a file write shared by processes, which a later process breaks once its owner has exited or an hour has passed |
 
 ## shared/process
 

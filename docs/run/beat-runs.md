@@ -57,7 +57,8 @@ It reports starts, closures, parked questions, stalls, upstream changes, attenti
 
 ## Updating Orc on dispatch machines
 
-After dispatching tasks, the beat runs [`orc update --json`](updating-orc.md) on a dispatch machine and through each `orc runner start -- <command>` in `dispatch.json`.
+After dispatching tasks, the beat runs [`orc update --json`](updating-orc.md) on the machine the beat runs on and through each `orc runner start -- <command>` in `dispatch.json`.
+The beat names its own machine after the `dispatch.json` entry whose start runs `orc runner start` with no `--` command, and calls it `a dispatch machine` when no entry does.
 The beat records the check time under `ORC_HOME` and checks again no sooner than an hour later.
 Set `ORC_BEAT_UPDATE=off` on the beat process to skip the update check.
 
@@ -65,8 +66,9 @@ Each check adds an `update` action to `orc.beat.v1` with the machine name and th
 If the update command does not return a result, the action reports `unread` and names the reason.
 When Orc moves to a new version, the chat posts a line such as `orc on a dispatch machine moved from 1.2.3 to 1.2.4`.
 If an update fails, `orc attention` shows one `update-failed` item for that machine with the installer's error.
-The decider owns failures that can be retried.
-The beat retries on the next hourly check and withdraws the item if the check succeeds.
+A failure that can be retried goes to the decider, so it stays out of your Awaiting you list, and no one decides it.
+The beat retries it on the next hourly check, and the next successful check withdraws the item.
+A failure that cannot be retried, such as a release that reports the wrong version, goes to you.
 
 The beat that checked for the update and any runs already underway keep their running version.
 The next scheduled beat uses the new version if its launcher reads the selected release or its path resolves to the updated Bun installation.
