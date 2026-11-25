@@ -220,7 +220,7 @@ describe("the runs list", () => {
     expect(statusMenu(board, filter).choices.map(({ name, count }) => [name, count])).toEqual([
       ["All", 1], ["Awaiting you", 1], ["Running", 0], ["Queued", 0], ["Failed", 0], ["Done", 0]
     ])
-    expect(statusMenu(board, { project: null, status: null, allRuns: false }).choices.slice(1).map(({ name }) => name)).toEqual(cardStatuses)
+    expect(statusMenu(board, { project: null, status: null, allRuns: false }).choices.slice(1).map(({ name }) => name)).toEqual([...cardStatuses])
   })
 
   test("a select does not lose its chosen filter when the run list refreshes", () => {
