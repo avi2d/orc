@@ -57,6 +57,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/backlog-planning/backlog-depend.ts` | The task dependency writes and the refusal when a wait would cycle |
 | `packages/run/src/features/backlog-planning/backlog-hold.ts` | The task hold writes and the refusal when a task is already held |
 | `packages/run/src/features/backlog-planning/backlog-drop.ts` | The `orc backlog drop` close of a new task as `dropped` and its refusals |
+| `packages/run/src/features/backlog-planning/backlog-retry.ts` | The `orc backlog retry` return of a failed, stopped or start-failed task to `new` and its refusals |
 | `packages/run/src/features/backlog-planning/backlog-edit.ts` | The `orc backlog edit` rewrite of a new task's title and body |
 | `packages/run/src/features/backlog-planning/backlog-priority.ts` | The task priority writes and the refusal when a task is taken, started or closed |
 
@@ -358,7 +359,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/agents` | The bundled agent files |
 | `packages/run/agents/decider-policy.md` | The written policy the decider answers under |
-| `packages/run/agents/reviewer.md` | The bundled reviewer prompt, which `$ORC_HOME/agents/reviewer.md` and then the project's `.orc/agents/reviewer.md` override |
+| `packages/run/agents/reviewer.md` | The bundled reviewer prompt, which the project's `.orc/agents/reviewer.md` and then `$ORC_HOME/agents/reviewer.md` override |
 
 ## Tests and workspace
 

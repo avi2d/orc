@@ -199,6 +199,7 @@ Subcommands:
   origin     Record where a parked task's run lives
   close      Close a started task or a parked task whose work landed elsewhere
   stop       Kill a task's run and close the task stopped
+  retry      Run a failed or stopped task again
   drop       Drop a new task with a reason
   posted     Mark a closed task or an event as posted to the chat
   hold       Keep a new task back until you answer it
@@ -299,6 +300,19 @@ stopped. Run it where the backlog lives.
 
 Examples:
   orc backlog stop orc-9
+```
+
+#### orc backlog retry
+
+```text
+Usage: orc backlog retry <task-id>
+
+Returns a failed or stopped task to the backlog on the machine it ran on,
+reusing its kept branch when one exists. A failed start keeps its pending
+answers and any machine pin; without a pin, the beat places it normally.
+
+Examples:
+  orc backlog retry orc-9
 ```
 
 #### orc backlog drop

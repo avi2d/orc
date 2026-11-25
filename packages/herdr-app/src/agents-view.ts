@@ -1,6 +1,7 @@
 import { type Color, type Context, type Element, div } from "gpui-kit"
 import { Input, type InputState, type ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { openOverlay } from "herdr"
+import { type MergeOutcome, approvalShown } from "./approval-stage"
 import { monospace } from "./fonts"
 import { type Card, type Mark, type StepRow, approveRow, namedModels, opensTurns, prNumber, sendBackArgs, stepRows } from "./agents"
 import { type ChecksSummary, logLines } from "./checks"
@@ -18,8 +19,6 @@ import { turnsView } from "./turns-view"
 type Palette = ReturnType<typeof palette>
 
 export type Chosen = { readonly kind: "step"; readonly id: number } | { readonly kind: "approve" }
-
-export type MergeOutcome = { readonly kind: "merging" } | { readonly kind: "failed"; readonly reason: string }
 
 export interface AgentsActions extends RunsActions {
   readonly choose: (cx: Context, chosen: Chosen) => void
@@ -108,9 +107,10 @@ const detailNote = (t: Palette, text: string): Element =>
 const approvePane = (t: Palette, card: Card, approval: InboxApproval, merge: MergeOutcome | null, act: AgentsActions): Element => {
   const pr = prNumber(approval.link)
   const merging = merge?.kind === "merging"
+  const shown = approvalShown(merge, card.merge)
   const button = h_flex().id("approve-merge").h(32).px(14).items_center().rounded(8).text_size(13)
     .bg(merging ? t.raised : t.solid).text_color(merging ? t.dim : t.solid_foreground)
-    .child(merging ? "Merging" : "Approve and merge")
+    .child(shown.button)
   return detailPane(t, [
     h_flex().px(16).h(40).flex_shrink_0().items_center().border_b(1).border_color(t.border)
       .child(div().font_semibold().child(`Approve ${pr}`)),
@@ -119,7 +119,7 @@ const approvePane = (t: Palette, card: Card, approval: InboxApproval, merge: Mer
       .child(div().text_color(t.muted).child(linkedText(`approve-${card.key}`, approval.link)))
       .child(div().text_color(t.muted).child(`${pr} waits for your approval. Merging runs orc ${approval.action.argv.join(" ")}.`))
       .child(merging ? button : button.cursor_pointer().hover((style) => style.opacity(0.88)).on_click(() => act.askMerge(card, approval)))
-      .children(merge?.kind === "failed" ? [div().text_color(t.ansi1).child(merge.reason)] : [])
+      .children(shown.notice === null ? [] : [div().text_color(t.ansi1).child(shown.notice)])
   ])
 }
 

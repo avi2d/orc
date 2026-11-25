@@ -114,6 +114,8 @@ export const renderTaskFile = (record: TaskRecord): string =>
     field("created", record.spec.created),
     ...holdFields(record.hold),
     ...parkedFields(record.parked),
+    ...(record.merge === undefined ? [] : [field("merge", record.merge)]),
+    ...(ranClosing(record) === null && record.priorPr !== undefined ? [field("pr", record.priorPr)] : []),
     ...stateFields(record),
     fence,
     record.spec.body
