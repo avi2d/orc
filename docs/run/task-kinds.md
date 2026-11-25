@@ -21,9 +21,11 @@ It prints `orc: <kind> run <run-id> wrote its report to <path>` and records the 
 A run you stop at its looping question prints `orc: <kind> run <run-id> stopped: <reason>` and records the run stopped.
 Any other run that does not report prints why it failed, records the run failed and exits non-zero.
 The beat closes the task done with the reason `the run wrote its report` and keeps the path as `report` in the task file and in `orc backlog --json`.
-A run that wrote a report and still failed closes the task failed with the run reason and keeps the path as `report`.
+A run that wrote a report and still failed follows the [retry rule](attention-queue.md#items-for-run-events).
+If no retry applies, the beat closes the task failed with the run reason and keeps the path as `report`.
 A run you stop closes the task stopped with the run reason.
-When no report exists, it closes the task failed with `the run wrote no report` and the run's reason, even when pueue says the run succeeded.
+When no report exists and no retry applies, the beat closes the task failed with `the run wrote no report` and the run's reason.
+A run that pueue reports as succeeded without a report closes failed without a retry.
 The beat prints the report path in its `closed` line.
 The chat posts it where a shipped task posts its PR, as in `orc-1 Map the parser closed done: the run wrote its report, report /home/me/.orc/runs/<run-id>/agent-report.md`.
 A scout or task marked for a machine waits for room there as any task does.
@@ -79,7 +81,8 @@ The runner queues it as `orc run <task-file> --branch orc/<task-id>-parent --kin
 It starts fresh there and never resumes the worker's failed run, whose partial work stays on `orc/<task-id>`.
 Pi runs the whole result in the real place it serves, checks each done criterion, and ends `agent-report.md` with the line `verdict: pass` or `verdict: fail`.
 A report whose last line is `verdict: pass` closes the parent done with its report.
-Any other report records the run failed with `the final check did not end its report at <path> with verdict: pass`, and the beat closes the parent failed with that reason and keeps the report path.
+Any other report records the run failed with `the final check did not end its report at <path> with verdict: pass`.
+The beat retries the confirmed failed run once before closing the parent failed with that reason and the report path.
 
 ### Splitting at intake
 
@@ -124,7 +127,9 @@ When the task proposing the split has a parent, the slices join that parent as c
 The proposal's done criteria join that parent under `## Done when` as lines naming the split task, so the final check verifies them with the rest.
 The task then leaves that parent and closes done with the reason `split into <child-ids>: <reason>`, and every task that waited on it waits on all slices instead.
 The beat prints `split <task-id> on <machine> into <child-ids>: <reason>` and records the event `<task-id>.split` that orc chat posts, as in `orc-1 Ship task splitting split at run into orc-2 Record the split, orc-3 Show the plan: <reason>`.
-A run whose proposal orc refused ends as `invalid split proposal: <why>`, and the beat closes that task failed with no children.
+A run whose proposal orc refused ends as `invalid split proposal: <why>` with no children.
+The beat treats it as an ordinary failed run and retries it once before closing the task failed.
+A failure while applying a validated split does not trigger a retry, since the split may already have created children.
 
 ### Changing a plan
 

@@ -340,11 +340,18 @@ export const closeFinished = (
       const action = yield* serveRunning(context, task, claim.machine, through, label, reading.asking)
       return { kind: "running", outputAt: reading.outputAt, action, failing: reading.failing } satisfies Progress
     }
-    const run = reading.kind === "read" && reading.result.status === "failed" ? reading.result.run?.id : undefined
+    const run = reading.kind === "read" && reading.result.status === "failed" && reading.result.reason !== "the run was killed" ? reading.result.run?.id : undefined
     if (stale === null && ending.kind === "close" && ending.outcome === "failed" && task.retry === undefined && run !== undefined) {
       const at = yield* nowIso
-      yield* retryStartedTask(context.root, task.spec.id, claim.machine, run, at)
-      yield* recordEvent(context.root, { key: task.spec.id + ".retry", at, text: task.spec.id + " will retry from run " + run + " on its kept branch" })
+      const retried = yield* retryStartedTask(context.root, task.spec.id, claim.machine, run, at).pipe(
+        Effect.catchTag("BacklogError", () => Effect.succeed(null))
+      )
+      if (retried === null) {
+        return { kind: "untracked" } satisfies Progress
+      }
+      yield* recordEvent(context.root, { key: task.spec.id + ".retry." + run, at, text: task.spec.id + " will retry from run " + run + " on its kept branch" }).pipe(
+        Effect.catchTag("BacklogError", () => Effect.void)
+      )
       return { kind: "ended", action: { kind: "retry", task: task.spec.id, machine: claim.machine, run } } satisfies Progress
     }
     const ended = yield* endTask(context.root, context.home, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined)
