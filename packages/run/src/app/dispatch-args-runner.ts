@@ -12,6 +12,7 @@ export type DispatchArgs =
   | AddTask
   | { readonly kind: "CloseTask"; readonly id: string; readonly outcome: "done" | "failed"; readonly reason: string }
   | { readonly kind: "StopTask"; readonly id: string }
+  | { readonly kind: "RetryTask"; readonly id: string }
   | { readonly kind: "MarkPosted"; readonly id: string }
   | { readonly kind: "MarkEventPosted"; readonly key: string }
   | { readonly kind: "HoldTask"; readonly id: string; readonly reason: string; readonly until: string | null; readonly questions: ReadonlyArray<string> }

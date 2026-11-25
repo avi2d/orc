@@ -173,6 +173,7 @@ describe("the chat's backlog tools", () => {
   }
   const calls = [
     { name: "orc_backlog_stop", params: { id: "orc-9" }, argv: ["backlog", "stop", "orc-9"] },
+    { name: "orc_backlog_retry", params: { id: "orc-9" }, argv: ["backlog", "retry", "orc-9"] },
     { name: "orc_backlog_drop", params: { id: "orc-9", reason: "duplicate of orc-12" }, argv: ["backlog", "drop", "orc-9", "duplicate of orc-12"] },
     { name: "orc_backlog_send_back", params: { id: "orc-9", words: "rename the flag to --dry-run" }, argv: ["backlog", "send-back", "orc-9", "rename the flag to --dry-run"] },
     { name: "orc_backlog_note", params: { id: "orc-9", words: "the login page moved to /auth" }, argv: ["backlog", "note", "orc-9", "the login page moved to /auth"] },
