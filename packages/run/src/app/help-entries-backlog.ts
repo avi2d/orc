@@ -3,6 +3,14 @@ import { mergeBases } from "../entities/pull-request/index"
 import type { BacklogVerb } from "./dispatch-args"
 import type { HelpEntry } from "./help-format"
 
+export const quotaHelp: HelpEntry = {
+  usage: ["orc quota [--json]"],
+  summary: "Show the quota and account pick the beat reads",
+  about: "Runs the quota command from dispatch.json and shows its reading without starting tasks. Run it on the machine that runs the beat.",
+  options: [{ flag: "--json", meaning: "Print the reading as JSON, with the floor, accounts and pick, or the cause and reason the quota is unread." }],
+  examples: ["orc quota", "orc quota --json"]
+}
+
 export const backlogHelp: HelpEntry = {
   usage: ["orc backlog [--json]", "orc backlog <subcommand> [<args>]"],
   summary: "See the backlog, and add, hold, answer or close its tasks",
@@ -41,11 +49,11 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
     examples: ["orc backlog origin orc-9 linux-box run-42"]
   },
   close: {
-    usage: ["orc backlog close <task-id> <done|failed> [<reason>]"],
-    summary: "Close a task by hand as done or failed",
-    about: "Closes a started task as done or failed, with an optional reason, for a machine whose start command orc does not run. On a decision, failed drops it, and done is refused, since only orc backlog answer closes a decision done.",
+    usage: ["orc backlog close <task-id> <done|failed> [<reason>]", "orc backlog close <task-id> --landed-in <pr-url>"],
+    summary: "Close a started task or a parked task whose work landed elsewhere",
+    about: "Closes a started task as done or failed. For a parked task, --landed-in records where the work merged and closes the task done without changing its branch. For a decision, failed drops it, and only orc backlog answer closes it done.",
     options: [],
-    examples: ["orc backlog close orc-9 failed \"the machine was rebuilt\""]
+    examples: ["orc backlog close orc-9 failed \"the runner lost the worktree\"", "orc backlog close orc-9 --landed-in https://github.com/example/project/pull/42"]
   },
   stop: {
     usage: ["orc backlog stop <task-id>"],
@@ -155,15 +163,18 @@ export const attentionAnswerHelp: HelpEntry = {
 export const beatHelp: HelpEntry = {
   usage: ["orc beat [--json]"],
   summary: "Start what can start and close what finished",
-  about: "Reads the room on each machine, starts each task that waits on nothing, closes finished runs and relays answers. Run it from cron or launchd every few minutes.",
+  about: "Reads the room on each machine, starts each task that waits on nothing, closes finished runs and relays answers. Checks for Orc updates on dispatch machines at most once an hour. Run it from cron or launchd every few minutes.",
   options: [{ flag: "--json", meaning: "Print the beat as an orc.beat.v1 JSON document." }],
   examples: ["orc beat"]
 }
 
 export const mergeHelp: HelpEntry = {
-  usage: ["orc merge <task-id> [--basis <" + mergeBases.join("|") + ">]"],
+  usage: ["orc merge <task-id> [--basis <" + mergeBases.join("|") + ">] [--no-wait]"],
   summary: "Merge a closed task's PR once its checks are green",
-  about: "Merges the PR of a closed task with a squash at the head it checked, and refuses a PR that is not open or not green. When the PR is behind its base, runs GitHub's update-branch at the checked head, waits up to 20 minutes for the checks on the new head and merges it once they are green. When update-branch reports a merge conflict or a check on the new head is red, merges nothing and sends the task back for a fix as orc backlog send-back does.",
-  options: [{ flag: "--basis <" + mergeBases.join("|") + ">", meaning: "Why the merge is allowed. Defaults to captain-word, and yolo-green needs a project with yolo set." }],
+  about: "Merges the PR of a closed task with a squash at the head it checked, and refuses a PR that is not open or not green. When the PR is behind its base and the two sides changed no shared file, merges without updating. When they share a changed file, GitHub caps either file list or GitHub refuses the branch as out of date, runs GitHub's update-branch at the checked head. By default, waits up to 20 minutes for the checks on the new head and merges it once they are green. When update-branch reports a merge conflict, or a check is red on a --no-wait retry or turns red while waiting, merges nothing and sends the task back for a fix as orc backlog send-back does.",
+  options: [
+    { flag: "--basis <" + mergeBases.join("|") + ">", meaning: "Why the merge is allowed. Defaults to captain-word, and yolo-green needs a project with yolo set." },
+    { flag: "--no-wait", meaning: "When behind, return after requesting a branch update without waiting for CI or merging. Run merge again with the same basis once the new head checks are green. Without --no-wait, a later call drops the checks saved before the update and waits for the new head's own checks. The chat uses this option." }
+  ],
   examples: ["orc merge orc-9", "orc merge orc-9 --basis yolo-green"]
 }

@@ -2,11 +2,10 @@ import { Effect, Fiber, FileSystem, Option, type Path, Schema, Stream } from "ef
 import type { ChildProcessSpawner } from "effect/process"
 import { agentCommand, type AgentExec, type Argv, textInput } from "../../shared/sandbox/index"
 import type { AgentFile } from "./agents"
-import { OrcRunError } from "../../shared/lib/index"
+import { OrcRunError, workerCiInstructions } from "../../shared/lib/index"
 import { writeWhole } from "../../shared/config/index"
 import { askAfterFailures, type FailingMark, type FailureStreak, nextStreak, pauseAfterFailures } from "./failure-streak"
-import { askDirFlag, askToolName } from "./orc-ask-extension"
-import { askExtensionSource, type AskedQuestion, type AskSetup, type WorkerAsks, openWorkerAsks } from "./worker-ask"
+import { askDirFlag, askExtensionSource, askToolName, type AskedQuestion, type AskSetup, type WorkerAsks, openWorkerAsks } from "./worker-ask"
 
 export interface PiRequest {
   readonly agent: AgentFile
@@ -17,6 +16,7 @@ export interface PiRequest {
   readonly logFile: string
   readonly failingFile: string
   readonly asks: AskSetup
+  readonly withoutAsks?: true | undefined
   readonly onSession: (file: string) => Effect.Effect<void, OrcRunError>
 }
 
@@ -60,15 +60,15 @@ const askPollMillis = 1000
 export const idleSpan = (seconds: number): string =>
   seconds < 120 ? seconds.toString() + (seconds === 1 ? " second" : " seconds") : Math.floor(seconds / 60).toString() + " min"
 
-export const piArgv = (request: Pick<PiRequest, "agent" | "instructions" | "sessionDir" | "resumeSession" | "asks">): Argv => [
+export const piArgv = (request: Pick<PiRequest, "agent" | "instructions" | "sessionDir" | "resumeSession" | "asks" | "withoutAsks">, extension: string | null): Argv => [
   "pi", "-p", "--mode", "json",
   "--model", request.agent.model,
   "--thinking", request.agent.thinking,
   "--session-dir", request.sessionDir,
+  ...(extension === null ? [] : ["-e", extension]),
   ...(request.resumeSession === null ? [] : ["--session", request.resumeSession]),
-  "--extension", request.asks.extensionFile,
-  "--" + askDirFlag, request.asks.askDir,
-  "--tools", [...request.agent.tools, askToolName].join(","),
+  ...(request.withoutAsks === true ? [] : ["--extension", request.asks.extensionFile, "--" + askDirFlag, request.asks.askDir]),
+  "--tools", (request.withoutAsks === true ? request.agent.tools : [...request.agent.tools, askToolName]).join(","),
   ...(request.instructions === null ? [] : ["--append-system-prompt", request.instructions])
 ]
 
@@ -179,7 +179,8 @@ const countFailure = (watch: FailureWatch, sink: FailureSink, tool: { readonly l
 
 const placeAskExtension = (fs: FileSystem.FileSystem, request: PiRequest): Effect.Effect<void, OrcRunError> =>
   fs.makeDirectory(request.asks.askDir, { recursive: true }).pipe(
-    Effect.andThen(fs.readFileString(askExtensionSource)),
+    Effect.andThen(askExtensionSource),
+    Effect.flatMap((file) => fs.readFileString(file)),
     Effect.flatMap((source) => fs.writeFileString(request.asks.extensionFile, source)),
     Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot place the orc_ask extension at " + request.asks.extensionFile + ": " + String(cause) }))
   )
@@ -281,9 +282,12 @@ export const runPi = (
     yield* fs.writeFileString(request.logFile, "", { flag: "a" }).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + request.logFile + ": " + String(cause) }))
     )
-    yield* placeAskExtension(fs, request)
+    if (request.withoutAsks !== true) {
+      yield* placeAskExtension(fs, request)
+    }
     const asks = openWorkerAsks(fs, request.asks)
-    const handle = yield* spawner.spawn(agentCommand(exec, piArgv(request), textInput(request.prompt))).pipe(
+    const prompt = workerCiInstructions + "\n\n" + request.prompt
+    const handle = yield* spawner.spawn(agentCommand(exec, piArgv(request, exec.piExtension), textInput(prompt))).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: pi did not start: " + String(cause) }))
     )
     const running = new Map<string, RunningTool>()

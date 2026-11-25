@@ -7,8 +7,8 @@ kind: how-to
 
 ## Before you begin
 
-Install the [Bun](https://bun.com) version pinned in `.bun-version`.
-The other tools below are optional.
+The release executables run without [Bun](https://bun.com).
+The tools below are optional.
 A panel reports a missing tool without stopping the rest of the screen.
 
 | Optional tool | Used for |
@@ -18,27 +18,27 @@ A panel reports a missing tool without stopping the rest of the screen.
 | [`herdr`](https://herdr.dev) 0.9.5 | Agent sessions named by pane |
 | `pueue` 4.0.4 | Queued and running jobs |
 | [`no-mistakes`](https://github.com/kunchenguid/no-mistakes) | Full review fix stages |
-| `orc` | Orc run stages and the attention queue |
+| `orc` | Orc run stages, the attention queue and the dispatch accounts |
 | `gh` | [GitHub Actions](https://github.com/features/actions) and runner repositories |
 
 Put the tools you use on `PATH`.
 For GPU usage on WSL, the panel also checks `/usr/lib/wsl/lib`.
 Sign in to `gh` with an account that can read the repository.
 
-The tasks report, second machine, and saved quota profiles each require a shell command you configure.
+The tasks report and second machine each require a shell command you configure.
 They are off until configured.
 
 ## Install
 
-To install orc-dash:
+To install `orc-dash` and `orc-dash-capture`:
 
-1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
-1. Run `cd orc` to enter it.
-1. Run `bun install --frozen-lockfile` to install the pinned dependencies.
-1. Run `mkdir -p ~/.local/bin && ln -s "$PWD/packages/cli/src/bin.ts" ~/.local/bin/orc-dash` to put the `orc-dash` command in a folder the `PATH` holds.
-   When `~/.local/bin` is not on the `PATH`, add `export PATH="$HOME/.local/bin:$PATH"` to the shell startup file and restart the shell.
+1. Download the archive for your platform and its checksum from the [Orc releases on GitHub](https://github.com/avi2d/orc/releases).
+1. Check the archive's checksum as [Release assets](run/release-assets.md#checksum-file) describes.
+1. Unpack the archive into a folder outside `PATH`.
+1. Copy only `orc-dash` and `orc-dash-capture` into a folder on `PATH`.
+1. Run `orc-dash --help` and `orc-dash-capture --help` to check that both commands start.
 
-The command runs the clone's code through `bun`, so `bun` must be on the `PATH` as well.
+If you use a versioned launcher, see [Updating orc](run/updating-orc.md#update-a-versioned-checkout) for how to follow its selected release.
 
 ## Open one panel
 
@@ -54,10 +54,11 @@ Each panel reads its settings from its key under `panels` in the [dashboard conf
 
 ## Panel guides
 
-<div id="run-the-quota-tool"><span id="show-saved-profiles"></span><span id="show-each-claude-account"></span></div>
+<div id="run-the-quota-tool"><span id="show-each-claude-account"></span></div>
 
 [Quota](dash-quota.md) shows account limits.
-Configure [saved profiles](dash-quota.md#show-saved-profiles) or [Claude accounts](dash-quota.md#show-each-claude-account).
+It shows the [dispatch accounts](dash-quota.md#show-the-dispatch-accounts) from `orc quota --json`.
+Configure [Claude accounts](dash-quota.md#show-each-claude-account).
 
 <div id="run-the-session-quota-tool"></div>
 
@@ -106,7 +107,10 @@ See [Develop orc-dash](dash-development.md) for checks and source paths.
 
 The quota tool could not start `quota-axi`.
 Install it and check that it runs on the panel machine's `PATH`.
-If `claude saved` is unreachable, run `sh -c "$ORC_DASH_SAVED_PROFILES"` and check its output.
+
+### The quota panel's accounts block shows an error
+
+Run `orc quota --json` and check its output.
 
 ### The other machine's resources panel says it is unreachable
 

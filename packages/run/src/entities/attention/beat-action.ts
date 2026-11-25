@@ -1,4 +1,5 @@
 import type { FailingMark } from "../agent/index"
+import type { UpdateDocument } from "../orc-update/index"
 
 export type Progress =
   | { readonly kind: "ended"; readonly action: BeatAction }
@@ -8,7 +9,14 @@ export type Progress =
 
 export type StalledAction = { readonly kind: "stalled"; readonly task: string; readonly machine: string; readonly since: string }
 
+export interface UpdateAction {
+  readonly kind: "update"
+  readonly machine: string
+  readonly result: UpdateDocument | { readonly outcome: "unread"; readonly detail: string; readonly retryable: boolean }
+}
+
 export type BeatAction =
+  | UpdateAction
   | { readonly kind: "started"; readonly task: string; readonly machine: string; readonly account: string; readonly log: string }
   | { readonly kind: "start-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | { readonly kind: "lost"; readonly task: string }
@@ -35,11 +43,15 @@ export type BeatAction =
     readonly questions: ReadonlyArray<string>
     readonly decider: ReadonlyArray<string>
   }
+  | { readonly kind: "held"; readonly task: string; readonly machine: string; readonly reason: string }
   | { readonly kind: "asking"; readonly task: string; readonly machine: string; readonly until: string; readonly questions: ReadonlyArray<string> }
   | { readonly kind: "answered"; readonly task: string; readonly machine: string; readonly questions: ReadonlyArray<string> }
   | { readonly kind: "answer-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | StalledAction
   | { readonly kind: "pr-unread"; readonly task: string; readonly reason: string }
+  | { readonly kind: "yolo-merged"; readonly task: string; readonly pr: string }
+  | { readonly kind: "yolo-updating"; readonly task: string; readonly pr: string }
+  | { readonly kind: "merge-refused"; readonly task: string; readonly reason: string }
   | { readonly kind: "attention"; readonly item: string; readonly task: string; readonly owner: "decider" | "user"; readonly overdue: boolean; readonly text: string }
   | { readonly kind: "upstream-seen"; readonly project: string; readonly url: string; readonly state: string }
   | { readonly kind: "upstream-changed"; readonly project: string; readonly url: string; readonly changes: ReadonlyArray<string>; readonly task: string }

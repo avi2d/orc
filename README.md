@@ -26,15 +26,15 @@ One chat to run your AI agent work on all your machines and models, with a backl
 
 ## Install
 
+Orc runs on Bun, so install it with Bun.
 To install orc:
 
-1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
-1. Run `cd orc && bun install --frozen-lockfile` to install the pinned dependencies.
-1. Run `cd packages/run && bun link` to put the `orc` command on your PATH.
+1. Run `bun add -g @avi2dg/orc` to put the `orc` command on your PATH.
 1. Run `orc --version` to check it.
 
 Orc prints `orc` and its version.
-A linked checkout like this one updates through `orc update` once `update.command` names its update, as [Updating orc](docs/run/updating-orc.md) shows.
+To upgrade orc, run `bun add -g @avi2dg/orc` again, or run `orc update`, as [Updating orc](docs/run/updating-orc.md) shows.
+To run orc from a checkout of this repository instead, follow [Contribute](docs/contribute.md#run-orc-from-a-checkout).
 
 ## Run your first task
 
@@ -54,9 +54,10 @@ To run one task in a project:
 
 ```yaml
 commands:
-  test: bun test
+  lint: bun run lint
 ```
 
+GitHub CI runs repository tests.
 Orc prints the branch, its commits, the checks, the PR link when its run opened one, and the review on a `no-mistakes` run.
 `--sandbox none` runs the agent on the host as your user.
 With nono from https://nono.sh installed, drop the flag and the run works inside the nono sandbox.

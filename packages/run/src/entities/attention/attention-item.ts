@@ -15,7 +15,7 @@ export const Decision = Schema.Union([
 ])
 
 export const AttentionItem = Schema.Struct({
-  kind: Schema.Literals(["review-question", "worker-question", "run-died", "check-red", "pr-ready", "overdue-wait", "failing-command"]),
+  kind: Schema.Literals(["review-question", "worker-question", "run-died", "check-red", "pr-ready", "overdue-wait", "unasked-question", "failing-command", "machine-unreached", "update-failed"]),
   task: Schema.String,
   text: Schema.String,
   subject: Schema.optionalKey(Schema.String),

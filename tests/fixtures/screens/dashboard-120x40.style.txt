@@ -23,8 +23,8 @@ m C CCCCCC CCCC m mmm W WWWW WWW WW WW WWW                 mm w ffff fff ffffff 
 m   f fffff    ssssassssssssssss  sss  sss sssss    mm mmm mm f fff fffffff fff fffff fff ffff fff ffffffff f ff       m
 m   ffff       wwwwwwuauuuuuuuuu  www  WW WWWW      mm mmm mm w ffff f ffff fff ffff fffffff f ff                      m
 m   fffff ffff sssssssasssssssss ssss  sss sssss    mm mmm mm f ffff f fffff fff ffff fffffff fff fff ffffff fff f fff m
-m C CCCCCC CCCCCC m mmm                                    mm                                                          m
-m   ffff                         wwww www ww www           mm                                                          m
+m C CCCCCCC CCCC s ssss sss                                mm                                                          m
+m   fff ffffff sssssssssssssuuuu  sss  mm mmmm      mmm mm mm                                                          m
 m X XXXXX m mmmm m mmm mmm mmm mm mm mm                    mm                                                          m
 m   f fffff    ssssssssssssssssa ssss  mm mmmm      mm mmm mm                                                          m
 m   ffff       ssssssssssssssuua  sss  WW WWWW      mm mmm mm                                                          m

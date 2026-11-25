@@ -8,8 +8,6 @@ export interface BoardTask {
   readonly kind: "ship" | "scout" | "task" | "decision" | "parent"
   readonly created: string
   readonly status: "new" | "taken" | "started" | "closed"
-  readonly held: boolean
-  readonly parked: boolean
   readonly prState: "open" | "closed" | "merged" | null
 }
 
@@ -25,8 +23,8 @@ export const kindLabel = (kind: BoardTask["kind"]): string => {
 
 export const titleClip: { readonly heightPx: number; readonly lineHeightPx: number } = { heightPx: 36, lineHeightPx: 18 }
 
-export const laneFor = (task: BoardTask, attention: ReadonlySet<string>): Lane => {
-  if (task.held || task.parked || attention.has(task.id) || (task.status === "closed" && task.prState === "open")) return "Awaiting you"
+export const laneFor = (task: BoardTask, awaiting: ReadonlySet<string>): Lane => {
+  if (awaiting.has(task.id)) return "Awaiting you"
   if (task.status === "taken" || task.status === "started") return "Running"
   return task.status === "closed" ? "Done" : "Planned"
 }
@@ -44,8 +42,8 @@ export const queueLine = (queued: ReadonlyArray<QueuedRun>, task: string): strin
   return entry.ahead === null ? place : `${place}, ${entry.ahead} ahead`
 }
 
-export const tasksInLane = (tasks: ReadonlyArray<BoardTask>, lane: Lane, project: string | null, attention: ReadonlySet<string>): ReadonlyArray<BoardTask> =>
-  tasks.filter((task) => (project === null || task.project === project) && laneFor(task, attention) === lane)
+export const tasksInLane = (tasks: ReadonlyArray<BoardTask>, lane: Lane, project: string | null, awaiting: ReadonlySet<string>): ReadonlyArray<BoardTask> =>
+  tasks.filter((task) => (project === null || task.project === project) && laneFor(task, awaiting) === lane)
     .sort((a, b) => a.created.localeCompare(b.created) || a.id.localeCompare(b.id))
 
 export const cardBox: { readonly heightPx: number; readonly queuedHeightPx: number; readonly gapPx: number; readonly padPx: number } =

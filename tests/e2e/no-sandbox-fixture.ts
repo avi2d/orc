@@ -109,7 +109,7 @@ export const withNoSandboxFixture = async (body: (fixture: NoSandboxFixture) => 
     git(repo, ["config", "user.name", "orc test"], env)
     git(repo, ["config", "user.email", "orc@test.invalid"], env)
     await writeFile(join(repo, "task.md"), "Create greeting.txt.\n")
-    await writeFile(join(repo, ".no-mistakes.yaml"), "commands:\n  greeting: test -f greeting.txt\n")
+    await writeFile(join(repo, ".no-mistakes.yaml"), "commands:\n  lint: test -f greeting.txt\n")
     git(repo, ["add", "task.md", ".no-mistakes.yaml"], env)
     git(repo, ["commit", "-qm", "task"], env)
     await writeConfig(env, { providers: [loginProvider, keyedProvider], models: { implementer: "acme-go/coder-1", fixer: "acme-go/coder-1" } })

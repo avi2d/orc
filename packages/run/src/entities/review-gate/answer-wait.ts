@@ -1,7 +1,7 @@
 import { Console, Duration, Effect, FileSystem, Schema } from "effect"
 import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
 import { OrcRunError } from "../../shared/lib/index"
-import type { NoMistakesFinding, QuestionAnswer } from "./no-mistakes-gate"
+import type { NoMistakesFinding, OpenQuestion, QuestionAnswer } from "./no-mistakes-gate"
 
 export const askingFileName = "asking.json"
 export const answersFileName = "answers.json"
@@ -16,8 +16,10 @@ const AskingQuestion = Schema.Struct({
   text: Schema.String,
   options: Schema.optional(Schema.Array(AskOption)),
   recommendation: Schema.optional(Schema.String),
+  asks: Schema.optional(Schema.String),
   blocks: Schema.optional(Schema.Boolean),
-  asked: Schema.optional(Schema.String)
+  asked: Schema.optional(Schema.String),
+  owner: Schema.optional(Schema.Literal("user"))
 })
 
 type AskingQuestion = typeof AskingQuestion.Type
@@ -34,9 +36,15 @@ export const AnswersFile = Schema.Struct({ asking: Schema.String, answers: Relay
 
 export const CorrectionsFile = Schema.Struct({ corrections: RelayedAnswers })
 
+export interface AskedAt {
+  readonly question: string
+  readonly asked: string
+}
+
 export interface WaitResult {
   readonly asked: string | null
   readonly answers: ReadonlyArray<QuestionAnswer>
+  readonly askedAt: ReadonlyArray<AskedAt>
 }
 
 const defaultAnswerWaitSeconds = 30 * 60
@@ -80,13 +88,13 @@ const readRelayed = (file: string, asked: string): Effect.Effect<ReadonlyArray<Q
   )
 
 export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: string) =>
-  (missing: ReadonlyArray<Pick<NoMistakesFinding, "id" | "description">>): Effect.Effect<WaitResult, never, FileSystem.FileSystem> =>
+  (missing: ReadonlyArray<Pick<NoMistakesFinding, "id" | "description" | "asks"> & Pick<OpenQuestion, "owner">>): Effect.Effect<WaitResult, never, FileSystem.FileSystem> =>
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
       const asking = runDir + "/" + askingFileName
       const relayed = runDir + "/" + answersFileName
       if (waitSeconds === 0) {
-        return { asked: null, answers: [] }
+        return { asked: null, answers: [], askedAt: [] }
       }
       const now = new Date().toISOString()
       const previous = yield* readJsonFileIfPresent(asking, Asking).pipe(Effect.orElseSucceed(() => null))
@@ -94,11 +102,11 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
       const asked = previous?.asked ?? now
       const deadline = Date.now() + waitSeconds * 1000
       const until = new Date(deadline).toISOString()
-      const fresh: ReadonlyArray<AskingQuestion> = missing.map((finding) => ({ id: finding.id, text: finding.description, blocks: true, asked: now }))
+      const fresh: ReadonlyArray<AskingQuestion> = missing.map((finding) => ({ id: finding.id, text: finding.description, ...(finding.asks === undefined ? {} : { asks: finding.asks }), blocks: true, asked: now, ...(finding.owner === undefined ? {} : { owner: finding.owner }) }))
       const kept = (previous?.questions ?? []).filter((question) => !missing.some((finding) => finding.id === question.id))
       const merged = [...kept, ...fresh]
       if (!(yield* writeWhole(asking, JSON.stringify({ asked, until, questions: merged })))) {
-        return { asked: null, answers: [] }
+        return { asked: null, answers: [], askedAt: [] }
       }
       yield* Console.log("orc: " + waiter + " waits until " + until + " for the captain's answer to " + missing.map((finding) => finding.id).join(", ") + ", read from " + relayed)
       const answeredOf = (answers: ReadonlyArray<QuestionAnswer>) => answers.filter((entry) => missing.some((finding) => finding.id === entry.question))
@@ -115,5 +123,5 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
         const nextUntil = remaining.some(isBlockingQuestion) ? until : asked
         yield* writeWhole(asking, JSON.stringify({ asked, until: nextUntil, questions: remaining })).pipe(Effect.orElseSucceed(() => false))
       }
-      return { asked, answers: answered }
+      return { asked, answers: answered, askedAt: merged.map((question) => ({ question: question.id, asked: question.asked ?? asked })) }
     })

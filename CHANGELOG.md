@@ -2,6 +2,125 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.24.0
+
+Released 2026-11-25.
+
+### Features
+
+- **run:** attach compiled orc builds to each release [#355](https://github.com/avi2d/orc/pull/355)
+- **run:** pick models per task with dispatch rules [#354](https://github.com/avi2d/orc/pull/354)
+
+### Fixes
+
+- **run:** let a compiled orc update through its launcher [#357](https://github.com/avi2d/orc/pull/357)
+- **run:** settle routine questions and retry runs that died for a retryable reason [#356](https://github.com/avi2d/orc/pull/356)
+
+## 0.23.0
+
+Released 2026-11-25.
+
+### Features
+
+- **run:** run tasks on OpenAI and OpenCode Go subscriptions beside Claude [#352](https://github.com/avi2d/orc/pull/352)
+- **run:** update Orc from the dispatch beat [#349](https://github.com/avi2d/orc/pull/349)
+
+## 0.22.0
+
+Released 2026-11-25.
+
+### Features
+
+- **run:** build the heavy stand-in as a Bun bytecode binary [#345](https://github.com/avi2d/orc/pull/345)
+- **run:** close parked tasks whose work merged elsewhere [#348](https://github.com/avi2d/orc/pull/348)
+- **herdr-app:** show user-owned attention with answers on the card [#347](https://github.com/avi2d/orc/pull/347)
+- **run:** merge a done task's green PR by itself on yolo projects [#338](https://github.com/avi2d/orc/pull/338)
+- **herdr-app:** replace Runs filter chips with Project and Status selects [#341](https://github.com/avi2d/orc/pull/341)
+
+### Fixes
+
+- **run:** read bundled assets from the compiled orc [#340](https://github.com/avi2d/orc/pull/340)
+- **run:** reuse a completed review when a resumed direct-PR run's branch is unchanged [#342](https://github.com/avi2d/orc/pull/342)
+
+## 0.21.0
+
+Released 2026-11-24.
+
+### Features
+
+- **run:** refuse test runners called by node_modules/.bin path [#332](https://github.com/avi2d/orc/pull/332)
+- **schema:** read account names from orc quota --json, drop clauth profiles [#336](https://github.com/avi2d/orc/pull/336)
+- **run:** compile orc to a Bun bytecode file that spawns itself [#331](https://github.com/avi2d/orc/pull/331)
+- **run:** refuse node --test, pytest, make test, deno test and cargo t runners [#334](https://github.com/avi2d/orc/pull/334)
+- **herdr-app:** add Summary view for Checks steps in the Agents tab [#335](https://github.com/avi2d/orc/pull/335)
+- **run:** add agent wrappers that refuse test runners in no-mistakes agents [#327](https://github.com/avi2d/orc/pull/327)
+
+### Fixes
+
+- **run:** count review logs as run output [#337](https://github.com/avi2d/orc/pull/337)
+- **run:** pass the tool-time-cap extension to agents in the nono sandbox [#330](https://github.com/avi2d/orc/pull/330)
+- **quota:** drop clauth saved-profiles source from the dashboard quota panel [#329](https://github.com/avi2d/orc/pull/329)
+- **run:** route review questions to the decider by the owner action they ask for [#328](https://github.com/avi2d/orc/pull/328)
+
+## 0.20.0
+
+Released 2026-11-24.
+
+### Features
+
+- **quota:** show orc quota accounts in the dashboard quota panel [#324](https://github.com/avi2d/orc/pull/324)
+- **run:** merge a behind PR without update if no files shared, alarm on failed main CI [#322](https://github.com/avi2d/orc/pull/322)
+- **run:** print the beat quota with orc quota --json [#319](https://github.com/avi2d/orc/pull/319)
+- **run:** run a recorded review turn in direct-PR delivery [#310](https://github.com/avi2d/orc/pull/310)
+- **run:** refuse test runners in --sandbox none Pi sessions through the heavy stand-in [#308](https://github.com/avi2d/orc/pull/308)
+- **run:** answer review questions by their Recommended: line [#315](https://github.com/avi2d/orc/pull/315)
+- **run:** drop session/agent once a run ends done or failed [#314](https://github.com/avi2d/orc/pull/314)
+- **run:** let the beat pick an account across Claude, OpenAI and OpenCode [#312](https://github.com/avi2d/orc/pull/312)
+- **run:** read beat quota from subquo read --json snapshot [#300](https://github.com/avi2d/orc/pull/300)
+- **run:** refuse local test runners inside the default nono sandbox [#307](https://github.com/avi2d/orc/pull/307)
+- **trials:** show task wait state and pull request link on bb Board page [#305](https://github.com/avi2d/orc/pull/305)
+
+### Fixes
+
+- **run:** refuse test runners in Orc run steps with PATH-first stand-ins [#323](https://github.com/avi2d/orc/pull/323)
+- **run:** leave clean behind branches alone during Orc delivery [#321](https://github.com/avi2d/orc/pull/321)
+- **run:** judge decider never-decide guard by intent not single words [#320](https://github.com/avi2d/orc/pull/320)
+- **run:** hold repeat resumes that park with nothing new [#309](https://github.com/avi2d/orc/pull/309)
+- **trials:** run the bb trial beside the captain's own bb settings [#318](https://github.com/avi2d/orc/pull/318)
+- **herdr-app:** show what Awaiting you cards need [#317](https://github.com/avi2d/orc/pull/317)
+- **herdr-app:** show settled runs and configured projects [#316](https://github.com/avi2d/orc/pull/316)
+- **run:** park an unchanged gate for the owner instead of restarting it [#313](https://github.com/avi2d/orc/pull/313)
+- **trials:** build the orc Board bb plugin inside its own folder [#311](https://github.com/avi2d/orc/pull/311)
+- **run:** leave repository tests to GitHub CI [#304](https://github.com/avi2d/orc/pull/304)
+- **run:** tolerate punctuation differences in decider rule quotes [#303](https://github.com/avi2d/orc/pull/303)
+
+## 0.19.0
+
+Released 2026-11-23.
+
+### Features
+
+- **run:** derive each board task next action from backlog JSON [#296](https://github.com/avi2d/orc/pull/296)
+- **run:** sign opencode in with orc login in its own account folder [#287](https://github.com/avi2d/orc/pull/287)
+- **run:** sign claude-second in through a private browser window [#288](https://github.com/avi2d/orc/pull/288)
+- **run:** add openai sign-in through Codex login [#286](https://github.com/avi2d/orc/pull/286)
+- **run:** add orc login with per-account folders and Claude sign-in [#263](https://github.com/avi2d/orc/pull/263)
+- **docs:** keep map node text under 40 characters, with details in the control [#282](https://github.com/avi2d/orc/pull/282)
+- **docs:** add details control to every map node [#280](https://github.com/avi2d/orc/pull/280)
+- **herdr-app:** open Inbox from Awaiting you counts [#277](https://github.com/avi2d/orc/pull/277)
+- **run:** gate direct PR runs on GitHub CI check verdict [#271](https://github.com/avi2d/orc/pull/271)
+- **run:** require outcomes and recommendation on orc_ask questions [#272](https://github.com/avi2d/orc/pull/272)
+- **run:** report the decider's recommended option and mark it in the Inbox [#268](https://github.com/avi2d/orc/pull/268)
+- **run:** give beat attention items subject, options with outcomes and recommendation [#270](https://github.com/avi2d/orc/pull/270)
+
+### Fixes
+
+- **run:** fall back to project tool when heavy stand-in has no recorded path [#290](https://github.com/avi2d/orc/pull/290)
+- **run:** pin platform-node-shared so packed CLI starts after clean install [#289](https://github.com/avi2d/orc/pull/289)
+- **run:** prove scoped tarball with npm pack and use object repository form [#285](https://github.com/avi2d/orc/pull/285)
+- **run:** report overturned answers as undelivered and narrow decider quotes [#281](https://github.com/avi2d/orc/pull/281)
+- **run:** recover grabs after owner pid reuse [#269](https://github.com/avi2d/orc/pull/269)
+
 ## 0.18.0
 
 Released 2026-11-20.

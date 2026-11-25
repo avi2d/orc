@@ -25,8 +25,8 @@ Orc grows toward the full orchestrator one step at a time.
 | Follow-ups on upstream changes | Ships today |
 
 Today a ship run counts as done once [Pi](https://pi.dev) stops cleanly with `ORC_COMPLETE` and the branch holds a new commit.
-The checks must pass too, and [no-mistakes](https://github.com/kunchenguid/no-mistakes) must open a pull request with green CI.
-A `direct-PR` ship run counts as done once the checks pass and its pull request opens.
+The configured local checks must pass too, and [no-mistakes](https://github.com/kunchenguid/no-mistakes) must open a pull request with green CI.
+A `direct-PR` ship run counts as done once the configured local checks pass, its pull request opens, and the GitHub CI verdict on the pushed head is `passed`.
 A ship task that changes no code closes failed.
 A scout or task run counts as done once its report exists.
 A queued run from the backlog runs without the [nono](https://nono.sh) sandbox.

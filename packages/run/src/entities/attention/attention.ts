@@ -1,56 +1,19 @@
-import { Effect, FileSystem, Schema } from "effect"
-import { readNames, BacklogError, isDeciderAnswer, type ParkedQuestion, platformFailure, publishOnce, readIfPresent, scratchName, type TaskRecord } from "../backlog/index"
+import { Effect, type FileSystem } from "effect"
+import { readNames, type BacklogError, isDeciderAnswer, type ParkedQuestion, taskPr, type TaskRecord } from "../backlog/index"
 import { isWorkerQuestion, loopQuestionId } from "../agent/index"
 
 export const deciderTimeoutMillis = 180 * 1000
 const deciderClaimMillis = deciderTimeoutMillis + 60 * 1000
 
-import { AttentionItem, type Asked, type AttentionOption, type Decision, type ItemAnswer } from "./attention-item"
-import { AskOption } from "../review-gate/index"
+import type { AttentionItem, Asked, Decision, ItemAnswer } from "./attention-item"
+import type { AskOption } from "../review-gate/index"
+import { choice, itemId, unaskedQuestion, type Choice } from "./attention-ask"
+import { attentionFolder, encodeItem, fileSuffix, openItem, readExistingItem, readItem, replaceItem, withItemClaim, writeItem } from "./attention-store"
 
 export type { Asked }
 
-const ItemFile = Schema.fromJsonString(AttentionItem)
-
-const fileSuffix = ".json"
-
-const attentionFolder = (root: string): string => root + "/attention"
-
-const itemFile = (root: string, id: string): string => attentionFolder(root) + "/" + id + fileSuffix
-
-const encodeItem = (id: string, item: AttentionItem): Effect.Effect<string, BacklogError> =>
-  Schema.encodeEffect(ItemFile)(item).pipe(Effect.mapError((error) => new BacklogError({ detail: "cannot write the item " + id + ": " + error.message })))
-
-const replaceItem = (root: string, id: string, before: string, encoded: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    if ((yield* readIfPresent(itemFile(root, id))) !== before) {
-      return false
-    }
-    const fs = yield* FileSystem.FileSystem
-    const scratch = scratchName(attentionFolder(root), id)
-    const file = itemFile(root, id)
-    yield* fs.writeFileString(scratch, encoded).pipe(Effect.mapError(platformFailure("write " + scratch)))
-    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
-    return true
-  })
-
-export const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const scratch = scratchName(attentionFolder(root), id)
-    const file = itemFile(root, id)
-    yield* fs.writeFileString(scratch, yield* encodeItem(id, item)).pipe(Effect.mapError(platformFailure("write " + scratch)))
-    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
-  })
-
-// The same parts always name one file, so routing an item again opens nothing new.
-export const itemId = (...parts: ReadonlyArray<string>): string => parts.map((part) => part.replace(/[^A-Za-z0-9_-]/g, "_")).join(".")
-
-type Choice = Pick<Asked, "subject" | "options" | "recommendation">
-
-// The recommended option comes first, so an item cannot recommend an option it does not list.
-export const choice = (subject: string, recommended: AttentionOption, ...others: ReadonlyArray<AttentionOption>): Choice =>
-  ({ subject, options: [recommended, ...others], recommendation: recommended.text })
+export { openItem, readItem } from "./attention-store"
+export { choice, itemId } from "./attention-ask"
 
 const choiceOf = (asked: Asked): Choice => ({
   ...(asked.subject === undefined ? {} : { subject: asked.subject }),
@@ -60,20 +23,13 @@ const choiceOf = (asked: Asked): Choice => ({
 
 export const reviewQuestionId = (task: string, question: string, asked: string): string => itemId(task, question, asked)
 
-export const openItem = (root: string, id: string, asked: Asked): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const folder = attentionFolder(root)
-    yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.mapError(platformFailure("make " + folder)))
-    return yield* publishOnce(folder, id + fileSuffix, yield* encodeItem(id, { ...asked, state: { kind: "open" } }))
-  })
-
 interface AskedQuestion {
   readonly id: string
   readonly text: string
   readonly asked?: string | undefined
   readonly blocks?: boolean | undefined
   readonly options?: ReadonlyArray<AskOption> | undefined
+  readonly owner?: "user" | undefined
 }
 
 const toStoredOptions = (options: ReadonlyArray<AskOption>): NonNullable<Asked["options"]> =>
@@ -94,7 +50,7 @@ const reviewQuestionItem = (
     text: question.text,
     ...(question.options === undefined ? {} : { options: toStoredOptions(question.options) }),
     asked: question.asked ?? "",
-    owner: question.id === loopQuestionId ? "user" : "decider"
+    owner: question.owner ?? (question.id === loopQuestionId ? "user" : "decider")
   }
   return { id, asked }
 }
@@ -109,19 +65,22 @@ export const openReviewQuestions = (
     return Effect.asVoid(openItem(root, item.id, item.asked))
   }, { discard: true })
 
-const readExistingItem = (root: string, id: string): Effect.Effect<{ readonly before: string; readonly item: AttentionItem } | null, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const file = itemFile(root, id)
-    const before = yield* readIfPresent(file)
-    if (before === null) {
-      return null
-    }
-    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
-    return { before, item }
-  })
+type ItemWrite = (root: string, id: string, asked: Asked) => Effect.Effect<void, BacklogError, FileSystem.FileSystem>
 
-export const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
-  Effect.map(readExistingItem(root, id), (existing) => existing?.item ?? null)
+const whenAlreadyOpened = (onExisting: ItemWrite): ItemWrite => (root, id, asked) =>
+  Effect.flatMap(openItem(root, id, asked), (opened) => opened ? Effect.void : onExisting(root, id, asked))
+
+export const openOrRefreshItem: ItemWrite = whenAlreadyOpened((root, id, asked) =>
+  withItemClaim(root, id, Effect.gen(function*() {
+    const item = yield* readItem(root, id)
+    if (item === null || item.state.kind === "closed" || (item.state.kind === "open" && item.text === asked.text && item.owner === asked.owner)) {
+      return
+    }
+    const next: AttentionItem = item.state.kind === "withdrawn"
+      ? { ...asked, state: { kind: "open" } }
+      : { ...item, text: asked.text, owner: asked.owner, ...choiceOf(asked) }
+    yield* writeItem(root, id, yield* encodeItem(id, next))
+  })))
 
 type CloseOutcome = "closed" | "already closed" | "missing"
 
@@ -129,17 +88,21 @@ type SettledState = Exclude<AttentionItem["state"], { kind: "open" }>
 
 const settleOpenItem = (root: string, id: string, state: SettledState): Effect.Effect<"settled" | "already closed" | "missing", BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const stored = yield* readExistingItem(root, id)
-    if (stored === null) {
+    if ((yield* readItem(root, id)) === null) {
       return "missing" as const
     }
-    const { before, item } = stored
-    if (item.state.kind !== "open") {
-      return "already closed" as const
-    }
-    const { deciding: _claim, ...rest } = item
-    const replaced = yield* replaceItem(root, id, before, yield* encodeItem(id, { ...rest, state }))
-    return replaced ? "settled" : "already closed"
+    return yield* withItemClaim(root, id, Effect.gen(function*() {
+      const item = yield* readItem(root, id)
+      if (item === null) {
+        return "missing" as const
+      }
+      if (item.state.kind !== "open") {
+        return "already closed" as const
+      }
+      const { deciding: _claim, ...rest } = item
+      yield* writeItem(root, id, yield* encodeItem(id, { ...rest, state }))
+      return "settled" as const
+    }))
   })
 
 export const closeItem = (root: string, id: string, answer: ItemAnswer): Effect.Effect<CloseOutcome, BacklogError, FileSystem.FileSystem> =>
@@ -227,9 +190,9 @@ export const readAttention = (root: string, tasks: ReadonlyArray<TaskRecord>): E
     }
   })
 
-type TaskItemKind = Extract<AttentionItem["kind"], "review-question" | "worker-question" | "overdue-wait">
+type TaskItemKind = Extract<AttentionItem["kind"], "review-question" | "worker-question" | "overdue-wait" | "unasked-question">
 
-const taskItemKinds: ReadonlySet<AttentionItem["kind"]> = new Set<TaskItemKind>(["review-question", "worker-question", "overdue-wait"])
+const taskItemKinds: ReadonlySet<AttentionItem["kind"]> = new Set<TaskItemKind>(["review-question", "worker-question", "overdue-wait", "unasked-question"])
 
 // A hold names the day it is answered by, so its wait passes once that whole day has.
 const overdueWait = (task: TaskRecord, at: string): { readonly id: string; readonly asked: Asked | null; readonly answer: ItemAnswer | null } | null => {
@@ -253,16 +216,24 @@ const overdueWait = (task: TaskRecord, at: string): { readonly id: string; reado
   return { id, asked, answer: hold.answer }
 }
 
-// openItem publishes once and cannot rewrite a withdrawn item, so this rewrites it open with the text the task asks now.
-const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+// openItem publishes once and cannot rewrite an item, so this rewrites a withdrawn or open one with the text the task asks now.
+// A lost replace means another writer changed the item, so the item is live exactly when it reads open now.
+const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     if (yield* openItem(root, id, asked)) {
-      return
+      return true
     }
     const existing = yield* readExistingItem(root, id)
-    if (existing !== null && existing.item.state.kind === "withdrawn") {
-      yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, ...choiceOf(asked), state: { kind: "open" } }))
+    if (existing === null || existing.item.state.kind === "closed") {
+      return false
     }
+    if (existing.item.state.kind === "open" && existing.item.text === asked.text) {
+      return true
+    }
+    if (yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, ...choiceOf(asked), state: { kind: "open" } }))) {
+      return true
+    }
+    return (yield* readItem(root, id))?.state.kind === "open"
   })
 
 // The task file holds the answer that stands, so an item closed on the answer it replaced takes the new one and keeps the old one.
@@ -298,7 +269,7 @@ const routeOne = (root: string, id: string, asked: Asked | null, answer: ItemAns
   if (answer !== null) {
     return Effect.as(closeOrCloseReopenedTaskItem(root, id, answer, overturns), false)
   }
-  return asked === null ? Effect.succeed(false) : Effect.as(openOrReopenTaskItem(root, id, asked), true)
+  return asked === null ? Effect.succeed(false) : openOrReopenTaskItem(root, id, asked)
 }
 
 const routeQuestion = (root: string, task: string, question: ParkedQuestion): Effect.Effect<string | null, BacklogError, FileSystem.FileSystem> => {
@@ -328,6 +299,7 @@ const closeAskedBackEarlier = (root: string, task: TaskRecord, asked: string, at
 const routeTask = (root: string, task: TaskRecord, at: string): Effect.Effect<ReadonlyArray<string>, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const live: Array<string> = []
+    const unasked: Array<ParkedQuestion> = []
     for (const question of task.parked?.questions ?? []) {
       const id = yield* routeQuestion(root, task.spec.id, question)
       if (id !== null) {
@@ -335,9 +307,16 @@ const routeTask = (root: string, task: TaskRecord, at: string): Effect.Effect<Re
         continue
       }
       const answer = question.answer
+      if (answer === null && question.blocks && task.state.kind === "new") {
+        unasked.push(question)
+      }
       if (answer !== null && answer.by !== "asked-back" && isWorkerQuestion(question.id)) {
         yield* closeAskedBackEarlier(root, task, question.asked, at)
       }
+    }
+    const silent = unaskedQuestion(task, unasked, at)
+    if (silent !== null && (yield* openOrReopenTaskItem(root, silent.id, silent.asked))) {
+      live.push(silent.id)
     }
     const wait = overdueWait(task, at)
     if (wait !== null && (yield* routeOne(root, wait.id, wait.asked, wait.answer))) {
@@ -345,6 +324,32 @@ const routeTask = (root: string, task: TaskRecord, at: string): Effect.Effect<Re
     }
     return live
   })
+
+export const withdrawTaskItems = (root: string, tasks: ReadonlyArray<string>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const closing = new Set(tasks)
+    for (const entry of yield* openItems(root)) {
+      if (closing.has(entry.item.task)) {
+        yield* withdrawItem(root, entry.id, "task closed", at)
+      }
+    }
+  })
+
+const staleTaskItemReasons: Partial<Record<AttentionItem["kind"], string>> = {
+  "overdue-wait": "hold no longer waits",
+  "unasked-question": "each question it named has an answer or an open item"
+}
+
+const staleItemReason = (item: AttentionItem, task: TaskRecord, live: boolean): string | null => {
+  if (taskItemKinds.has(item.kind) && !live) {
+    return task.state.kind === "closed" ? "task closed" : staleTaskItemReasons[item.kind] ?? "question no longer asked"
+  }
+  if (task.state.kind !== "closed") {
+    return null
+  }
+  const prItem = item.kind === "check-red" || item.kind === "pr-ready"
+  return item.kind === "failing-command" || item.kind === "machine-unreached" || (prItem && taskPr(task) === null) ? "task closed" : null
+}
 
 export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
@@ -355,15 +360,13 @@ export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, a
       }
     }
     const tasksById = new Map(tasks.map((task) => [task.spec.id, task] as const))
-    const stale = (yield* openItems(root)).filter((entry) => taskItemKinds.has(entry.item.kind) && tasksById.has(entry.item.task) && !live.has(entry.id))
-    yield* Effect.forEach(stale, (entry) => {
-      const ended = entry.item.kind === "overdue-wait" ? "hold no longer waits" : "question no longer asked"
-      const reason = tasksById.get(entry.item.task)?.state.kind === "closed" ? "task closed" : ended
-      return Effect.asVoid(withdrawItem(root, entry.id, reason, at))
-    }, { discard: true })
-    const closedTasks = new Set(tasks.filter((task) => task.state.kind === "closed").map((task) => task.spec.id))
-    const staleFailing = (yield* openItems(root)).filter((entry) => entry.item.kind === "failing-command" && closedTasks.has(entry.item.task))
-    yield* Effect.forEach(staleFailing, (entry) => Effect.asVoid(withdrawItem(root, entry.id, "task closed", at)), { discard: true })
+    for (const entry of yield* openItems(root)) {
+      const task = tasksById.get(entry.item.task)
+      const reason = task === undefined ? null : staleItemReason(entry.item, task, live.has(entry.id))
+      if (reason !== null) {
+        yield* withdrawItem(root, entry.id, reason, at)
+      }
+    }
   })
 
 export type AnswerItemOutcome = CloseOutcome | { readonly kind: "answered elsewhere"; readonly task: string }

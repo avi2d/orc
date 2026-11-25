@@ -31,6 +31,7 @@ const failedRunLogs = [
 ].join("\n")
 
 const endedFailed: NoMistakesRunner = {
+  init: Effect.die("the repository is initialized in this test"),
   start: () => Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 }),
   reattach: Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 }),
   respond: () => Effect.die("no gate is parked"),
@@ -92,6 +93,43 @@ describe("driveNoMistakes", () => {
   test("a run that skips the pr step carries the reason no-mistakes gave", async () => {
     const { record } = await driveIn(endedSkippingPr)
     expect(record.result).toBe("no-mistakes ended with outcome passed-with-skips, and it skipped the pr step: provider unknown is not supported yet. No PR opens.")
+  })
+
+  const notInitialized = { stdout: "error: repo not initialized (run 'no-mistakes init' first)\nhelp[1]: Run `no-mistakes init` to set up the gate in this repository", stderr: "", exitCode: 1 }
+
+  const initThenStart = (calls: Array<string>, starts: ReadonlyArray<typeof notInitialized | null>, initExit = 0): NoMistakesRunner => ({
+    ...endedSkippingPr,
+    init: Effect.sync(() => {
+      calls.push("init")
+      return { stdout: "", stderr: initExit === 0 ? "" : "init: not a git repository", exitCode: initExit }
+    }),
+    start: () => Effect.sync(() => {
+      const reply = starts[calls.filter((call) => call === "start").length] ?? null
+      calls.push("start")
+      return reply ?? { stdout: skippedPr, stderr: "", exitCode: 0 }
+    })
+  })
+
+  test("a repository not initialized for no-mistakes is initialized and the run starts again, instead of dying for the owner", async () => {
+    const calls: Array<string> = []
+    const { record, gate } = await driveIn(initThenStart(calls, [notInitialized]))
+    expect(calls).toEqual(["start", "init", "start"])
+    expect(gateSteps(gate)).toEqual(["start", "init"])
+    expect(record.result).toBe("no-mistakes ended with outcome passed-with-skips, and it skipped the pr step: provider unknown is not supported yet. No PR opens.")
+  })
+
+  test("a repository still not initialized after init ends the run once, instead of initializing again and again", async () => {
+    const calls: Array<string> = []
+    const { record } = await driveIn(initThenStart(calls, [notInitialized, notInitialized, notInitialized]))
+    expect(calls).toEqual(["start", "init", "start"])
+    expect(record.result).toBe("no-mistakes refused to start: repo not initialized (run 'no-mistakes init' first). No PR opens.")
+  })
+
+  test("an init that fails ends the run with the init's own reason, instead of starting again without it", async () => {
+    const calls: Array<string> = []
+    const { record } = await driveIn(initThenStart(calls, [notInitialized], 1))
+    expect(calls).toEqual(["start", "init"])
+    expect(record.result).toBe("no-mistakes refused to start: no-mistakes init failed: init: not a git repository. No PR opens.")
   })
 
   test("a run that ends failed carries the error no-mistakes gave for it", async () => {
@@ -164,7 +202,7 @@ describe("driveNoMistakes", () => {
     }
     const wait: Wait = (missing) => {
       waitedOn.push(missing.map((finding) => finding.id))
-      return Effect.succeed({ asked, answers: [{ question: "r2", answer: "Keep the old behavior" }] })
+      return Effect.succeed({ asked, answers: [{ question: "r2", answer: "Keep the old behavior" }], askedAt: [{ question: "r2", asked }] })
     }
     const { record, gate } = await driveIn(answering, [], [], wait)
     expect(waitedOn).toEqual([["r2"]])
@@ -186,12 +224,16 @@ describe("driveNoMistakes", () => {
     let waited = 0
     const wait: Wait = () => {
       waited += 1
-      return Effect.succeed(waited === 1 ? { asked, answers: [{ question: "r2", answer: "Keep the old behavior" }] } : { asked: "2026-11-02T10:40:00.000Z", answers: [] })
+      return Effect.succeed(
+        waited === 1
+          ? { asked, answers: [{ question: "r2", answer: "Keep the old behavior" }], askedAt: [{ question: "r2", asked }] }
+          : { asked: "2026-11-02T10:40:00.000Z", answers: [], askedAt: [{ question: "r2", asked: "2026-11-02T10:40:00.000Z" }] }
+      )
     }
     const { record } = await driveIn(answering, [], [], wait)
     expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"] }])
     expect(sent.length).toBe(1)
-    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked: "2026-11-02T10:40:00.000Z" }])
+    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked: "2026-11-02T10:40:00.000Z", asking: "2026-11-02T10:40:00.000Z" }])
   })
 
   test("a wait that runs out unanswered parks the question instead of sending an empty answer", async () => {
@@ -204,9 +246,9 @@ describe("driveNoMistakes", () => {
         return Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 })
       }
     }
-    const { record } = await driveIn(asking, [], [], () => Effect.succeed({ asked, answers: [] }))
+    const { record } = await driveIn(asking, [], [], () => Effect.succeed({ asked, answers: [], askedAt: [{ question: "r2", asked }] }))
     expect(sent).toEqual([])
-    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked }])
+    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked, asking: asked }])
   })
 
   test("a finding with an action orc does not know parks as an open question instead of failing the run", async () => {
@@ -214,7 +256,7 @@ describe("driveNoMistakes", () => {
     const asking: NoMistakesRunner = { ...endedFailed, start: () => Effect.succeed({ stdout: manual, stderr: "", exitCode: 0 }) }
     const { record } = await driveIn(asking)
     expect(record.status).toBe("refused")
-    expect(record.openQuestions).toEqual([{ id: "r2", text: "needs a human" }])
+    expect(record.openQuestions).toEqual([{ id: "r2", text: "needs a human", owner: "user" }])
     expect(record.result).toContain("--answer r2=")
   })
 
@@ -228,12 +270,13 @@ describe("driveNoMistakes", () => {
     }
   })
 
-  test("reaching the gate cap parks the task with the cap as an open question instead of failing it", async () => {
+  test("reaching the gate cap parks for the decider instead of assigning the cap to the owner", async () => {
     const sent: Array<GateResponse> = []
     const { record } = await driveIn(endlessGates(sent, 100))
     expect(sent.length).toBe(20)
     expect(record.status).toBe("refused")
     expect(record.openQuestions.map((question) => question.id)).toEqual(["gate-cap"])
+    expect(record.openQuestions.map((question) => question.owner ?? "decider")).toEqual(["decider"])
     expect(record.openQuestions[0]?.text).toContain("20 no-mistakes gates")
   })
 
@@ -242,7 +285,7 @@ describe("driveNoMistakes", () => {
     const waitedOn: Array<ReadonlyArray<string>> = []
     const wait: Wait = (missing) => {
       waitedOn.push(missing.map((finding) => finding.id))
-      return Effect.succeed({ asked, answers: [{ question: "gate-cap", answer: "keep going" }] })
+      return Effect.succeed({ asked, answers: [{ question: "gate-cap", answer: "keep going" }], askedAt: [{ question: "gate-cap", asked }] })
     }
     const { record } = await driveIn(endlessGates(sent, 25), [], [], wait)
     expect(waitedOn).toEqual([["gate-cap"]])

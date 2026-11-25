@@ -1,4 +1,6 @@
 export { formatTable } from "./table"
 export { trimmedLines, scalar, splitRow, hasTable, table } from "./toon"
-export { OrcRunError } from "./run-session"
+export { ciOnlyTestsEnv, workerCiInstructions, OrcRunError } from "./run-session"
 export { isRunId, newRunId } from "./run-id"
+export { reportKinds, runKinds, taskIdPattern, TaskId, type RunKind } from "./task-identity"
+export { withFileClaim } from "./file-claim"

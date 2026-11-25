@@ -88,7 +88,7 @@ const attentionTools = (env: Env): ReadonlyArray<ChatTool> => [
     name: "orc_attention",
     label: "Read the orc attention queue",
     description:
-      "Returns orc attention --json: every open item that waits on the captain or the decider, oldest first, with its id, kind, task, text, asked time and owner. Besides review questions it holds the check-red item for a PR whose check is red, the run-died item for a run that died on its machine, and the pr-ready item for a PR whose checks are green. orc_backlog_answer does not answer a check-red, run-died or pr-ready item; orc_attention_answer does.",
+      "Returns orc attention --json: every open item that waits on the captain or the decider, oldest first, with its id, kind, task, text, asked time and owner. Besides review questions it holds the check-red item for a PR whose check is red, the run-died item for a run that died on its machine, the machine-unreached item for a dispatch machine unreachable for 10 minutes, and the pr-ready item for a PR whose checks are green. orc_backlog_answer does not answer a check-red, run-died, machine-unreached, or pr-ready item; orc_attention_answer does.",
     parameters: noParameters,
     execute: () => Effect.runPromise(runOrc(env, ["attention", "--json"], null).pipe(Effect.map(textResult)))
   },
@@ -96,7 +96,7 @@ const attentionTools = (env: Env): ReadonlyArray<ChatTool> => [
     name: "orc_attention_answer",
     label: "Answer an orc attention item",
     description:
-      "Records the captain's words through orc attention answer, word for word, and closes the one item named. Use it for a check-red, run-died or pr-ready item, which orc_backlog_answer does not answer. A review question, a worker question or an overdue wait is answered with orc_backlog_answer instead, and orc attention answer leaves it open.",
+      "Records the captain's words through orc attention answer, word for word, and closes the one item named. Use it for a check-red, run-died, machine-unreached, or pr-ready item, which orc_backlog_answer does not answer. A review question, a worker question or an overdue wait is answered with orc_backlog_answer instead, and orc attention answer leaves it open.",
     parameters: Schema.toJsonSchemaDocument(AttentionAnswerInput).schema,
     execute: (_toolCallId, params) =>
       runTool(AttentionAnswerInput, "orc_attention_answer", params, env, (input) => ["attention", "answer", input.id, input.words])
@@ -195,10 +195,10 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
     name: "merge_task",
     label: "Merge an orc task's PR",
     description:
-      "Squash-merges a closed task's PR through orc merge, which merges nothing and says why when the PR is not open or a check is red or has not reported. When the branch is behind its base, orc merge runs GitHub's update-branch, waits up to 20 minutes for the new head's checks and merges once they are green. When the update conflicts or a check on the new head is red, it merges nothing and sends the task back for a fix. Call it only when asked to merge that PR, with basis captain-word on the captain's explicit word, or with basis yolo-green when asked about a yolo project's PR and the PR is green. orc refuses yolo-green for a project without yolo true.",
+      "Squash-merges a closed task's PR through orc merge, which merges nothing and says why when the PR is not open or a check is red or has not reported. When the branch is behind its base, requests GitHub's update-branch and returns without waiting for CI or merging. Call merge_task again once the new head's checks are green. Do not poll or wait for CI in a tool call. When the update conflicts or a check is red, it merges nothing and sends the task back for a fix. Call it only when asked to merge that PR, with basis captain-word on the captain's explicit word, or with basis yolo-green when asked about a yolo project's PR and the PR is green. orc refuses yolo-green for a project without yolo true.",
     parameters: Schema.toJsonSchemaDocument(MergeInput).schema,
     execute: (_toolCallId, params) =>
-      runTool(MergeInput, "merge_task", params, env, (input) => ["merge", input.id, "--basis", input.basis])
+      runTool(MergeInput, "merge_task", params, env, (input) => ["merge", input.id, "--basis", input.basis, "--no-wait"])
   },
   {
     name: "orc_decision_board",

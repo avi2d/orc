@@ -16,6 +16,19 @@ On a machine without a backlog, `orc backlog` prints `no backlog at <path>` and 
 With `--json`, the command returns an empty backlog.
 Other `orc backlog` commands except `add` refuse, as does `orc merge`.
 
+## Main CI alarms
+
+Each beat identifies repositories from task PR links and the origin remotes of reachable checkouts in `projects.json`.
+Task PR links keep identifying the repository after the task merges, including projects with checkouts only on worker machines.
+For each repository, Orc reads push workflow runs on its default branch, regardless of who merged the PR or whether Orc updated it.
+Orc makes one GraphQL call per GitHub host per beat, with a 30-second timeout.
+The query covers the latest 20 commits and at most 100 check suites per commit.
+A repository the token cannot resolve is skipped, and the other repositories on its host are still read.
+A failed run raises a CI alarm in Orc chat with a link to the run.
+A red run raises an alarm only at the current head of the default branch, or when it finished after Orc first saw the repository.
+The first beat that sees a repository records when it saw it and posts no alarm from this check.
+A later beat can still report a red run at the branch head.
+
 ## Reference
 
 - [Configure the backlog](backlog-configuration.md) describes machines, accounts, quotas, and projects.

@@ -1,6 +1,6 @@
 import { Effect, FileSystem } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import type { WaitResult } from "./answer-wait"
+import type { AskedAt, WaitResult } from "./answer-wait"
 import { collectOutput } from "../../shared/process/index"
 import { hostGitSafetyEnv } from "../../shared/sandbox/index"
 import {
@@ -9,6 +9,7 @@ import {
   answeredAskUser,
   askUserFindings,
   findingsTable,
+  isUnknownAction,
   omittedQuestionIds,
   openQuestionsIn,
   respondArgs,
@@ -18,6 +19,7 @@ import {
   type NoMistakesFinding,
   type ParkedGate,
   type ParsedRun,
+  type PendingFinding,
   type QuestionAnswer
 } from "./no-mistakes-gate"
 import { openDriveLog, type DriveLog, type Ending, type NoMistakesRecord } from "./no-mistakes-drive-log"
@@ -34,6 +36,7 @@ export interface NoMistakesReply {
 
 // A runner that cannot reach no-mistakes resolves with a nonzero exit code, so the driver records why the step stopped.
 export interface NoMistakesRunner {
+  readonly init: Effect.Effect<NoMistakesReply>
   readonly start: (intentFile: string) => Effect.Effect<NoMistakesReply>
   readonly reattach: Effect.Effect<NoMistakesReply>
   readonly respond: (response: GateResponse) => Effect.Effect<NoMistakesReply>
@@ -50,7 +53,7 @@ export interface NoMistakesInput {
   readonly runDir: string
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
-  readonly waitForAnswers?: ((missing: ReadonlyArray<NoMistakesFinding>) => Effect.Effect<WaitResult, never, FileSystem.FileSystem>) | undefined
+  readonly waitForAnswers?: ((missing: ReadonlyArray<PendingFinding>) => Effect.Effect<WaitResult, never, FileSystem.FileSystem>) | undefined
 }
 
 export interface NoMistakesHost {
@@ -111,7 +114,8 @@ const spawnBinary = (options: NoMistakesHost, cwd: string, args: ReadonlyArray<s
 export const subprocessNoMistakesRunner = (options: SubprocessRunnerOptions): NoMistakesRunner => {
   const spawn = (args: ReadonlyArray<string>) => spawnBinary(options, options.worktreeDir, args)
   return {
-    start: (intentFile) => spawn(["axi", "run", "--intent-file", intentFile]),
+    init: spawn(["init", "--skip-user-skill"]),
+    start: (intentFile) => spawn(["axi", "run", "--intent-file", intentFile, "--skip", "test,rebase"]),
     reattach: spawn(["axi", "run"]),
     respond: (response) => spawn(respondArgs(response)),
     answer: (reply) => spawn(answerArgsFor(reply.question, reply.answer)),
@@ -160,7 +164,7 @@ const stopOnRejection = (input: NoMistakesInput, log: DriveLog, sent: Sent, comm
   }))
 }
 
-const gateCapQuestionId = "gate-cap"
+export const gateCapQuestionId = "gate-cap"
 
 const gateCapQuestion = (gate: ParkedGate): NoMistakesFinding => ({
   id: gateCapQuestionId,
@@ -228,13 +232,13 @@ const appendGate = (runDir: string, step: string): Effect.Effect<void, never, Fi
 // supplied gains every answer the wait brings, so the rest of the gate sends them.
 const awaitMissing = (
   input: NoMistakesInput,
-  asked: ReadonlyArray<NoMistakesFinding>,
+  asked: ReadonlyArray<PendingFinding>,
   supplied: Map<string, string>
-): Effect.Effect<{ readonly missing: ReadonlyArray<NoMistakesFinding>; readonly asking: string | null }, never, FileSystem.FileSystem> =>
+): Effect.Effect<{ readonly missing: ReadonlyArray<PendingFinding>; readonly asking: string | null; readonly askedAt: ReadonlyArray<AskedAt> }, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const unanswered = () => asked.filter((finding) => !supplied.has(finding.id))
     if (unanswered().length === 0 || input.waitForAnswers === undefined) {
-      return { missing: unanswered(), asking: null }
+      return { missing: unanswered(), asking: null, askedAt: [] }
     }
     yield* appendGate(input.runDir, "asking")
     const waited = yield* input.waitForAnswers(unanswered())
@@ -242,7 +246,7 @@ const awaitMissing = (
       supplied.set(entry.question, entry.answer)
     }
     yield* appendGate(input.runDir, "answered")
-    return { missing: unanswered(), asking: waited.asked }
+    return { missing: unanswered(), asking: waited.asked, askedAt: waited.askedAt }
   })
 
 type ParkedAdvance =
@@ -262,15 +266,17 @@ const advanceParked = (
     if (log.gatesSinceCap() >= maxGatesAnswered) {
       const cap = yield* awaitMissing(input, [gateCapQuestion(gate)], supplied)
       if (cap.missing.length > 0) {
-        return { kind: "ending", ending: log.awaitAnswers(gate, cap.missing, cap.asking) }
+        return { kind: "ending", ending: log.awaitAnswers(gate, cap.missing, cap.asking, cap.askedAt) }
       }
       supplied.delete(gateCapQuestionId)
       log.liftCap()
     }
     const open = openQuestionsIn(parsed.findings, omittedQuestionIds(stdout))
-    const { missing, asking } = yield* awaitMissing(input, [...open, ...askUserFindings(parsed.findings, input.allow ?? [])], supplied)
+    const questions = [...open, ...askUserFindings(parsed.findings, input.allow ?? [])].map((finding): PendingFinding =>
+      isUnknownAction(finding) ? { ...finding, owner: "user" } : finding)
+    const { missing, asking, askedAt } = yield* awaitMissing(input, questions, supplied)
     if (missing.length > 0) {
-      return { kind: "ending", ending: log.awaitAnswers(gate, missing, asking) }
+      return { kind: "ending", ending: log.awaitAnswers(gate, missing, asking, askedAt) }
     }
     if (open.length > 0) {
       const outcome: OpenOutcome = yield* serveOpenQuestions(input, log, gate, open, supplied)
@@ -296,11 +302,31 @@ const advanceParked = (
     return { kind: "next", current, sent: { kind: "respond", gate } }
   })
 
+const repoNotInitialized = (command: NoMistakesReply): boolean =>
+  command.exitCode !== 0 && /\brepo not initialized\b/.test(errorDetail(command))
+
+const initFailed = (command: NoMistakesReply): NoMistakesReply => ({
+  stdout: "",
+  stderr: "no-mistakes init failed: " + firstLine(command.stderr + "\n" + command.stdout),
+  exitCode: command.exitCode === 0 ? 1 : command.exitCode
+})
+
+const startRun = (input: NoMistakesInput): Effect.Effect<NoMistakesReply, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const first = yield* input.runner.start(input.taskFile)
+    if (!repoNotInitialized(first)) {
+      return first
+    }
+    yield* appendGate(input.runDir, "init")
+    const init = yield* input.runner.init
+    return init.exitCode === 0 ? yield* input.runner.start(input.taskFile) : initFailed(init)
+  })
+
 const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     let sent: Sent = { kind: "start" }
     yield* appendGate(input.runDir, "start")
-    let current = yield* input.runner.start(input.taskFile)
+    let current = yield* startRun(input)
     const supplied = new Map((input.answers ?? []).filter((entry) => entry.question !== gateCapQuestionId).map((entry) => [entry.question, entry.answer] as const))
     for (;;) {
       const step: CurrentStep = yield* stepCurrent(input, log, sent, current)

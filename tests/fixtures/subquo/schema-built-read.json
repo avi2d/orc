@@ -1,0 +1,57 @@
+{
+  "version": "subquo.v1",
+  "writtenAt": "2026-11-22T20:00:30.000Z",
+  "accounts": [
+    {
+      "id": "main",
+      "provider": "claude",
+      "observation": {
+        "status": "fresh",
+        "observedAt": "2026-11-22T20:00:00.000Z",
+        "source": "provider",
+        "validUntil": "2026-11-22T20:02:00.000Z",
+        "windows": [
+          { "id": "five-hour", "scope": "all", "percentLeft": 62, "resetsAt": "2026-11-22T23:00:00.000Z" },
+          { "id": "weekly", "scope": "all", "percentLeft": 41, "resetsAt": "2026-11-27T09:00:00.000Z" },
+          { "id": "opus-weekly", "scope": "opus", "percentLeft": 3, "resetsAt": "2026-11-27T09:00:00.000Z" }
+        ]
+      },
+      "loginEndsInDays": 4
+    },
+    {
+      "id": "second",
+      "provider": "claude",
+      "observation": {
+        "status": "fresh",
+        "observedAt": "2026-11-22T20:00:05.000Z",
+        "source": "provider",
+        "validUntil": "2026-11-22T20:02:05.000Z",
+        "windows": [
+          { "id": "five-hour", "scope": "all", "percentLeft": 88, "resetsAt": "2026-11-23T00:30:00.000Z" },
+          { "id": "weekly", "scope": "all", "percentLeft": 74, "resetsAt": "2026-11-28T12:00:00.000Z" }
+        ]
+      }
+    },
+    {
+      "id": "codex-home",
+      "provider": "codex",
+      "observation": {
+        "status": "unavailable",
+        "code": "rate_limited"
+      }
+    },
+    {
+      "id": "go",
+      "provider": "opencode-go",
+      "observation": {
+        "status": "stale",
+        "observedAt": "2026-11-22T19:51:00.000Z",
+        "source": "provider",
+        "windows": [
+          { "id": "five-hour", "scope": "all", "percentLeft": 96, "resetsAt": "2026-11-22T21:39:47.000Z" }
+        ],
+        "code": "timeout"
+      }
+    }
+  ]
+}

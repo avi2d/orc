@@ -19,6 +19,7 @@ import {
   span,
 } from "@avi2dg/orc-ui";
 import { printQuotaFrame, runQuotaPanel } from "./app";
+import { isFoldedAccount } from "./accounts";
 import { quotaSection, reserveQuotaSection } from "./sections";
 
 export interface QuotaReading {
@@ -27,9 +28,9 @@ export interface QuotaReading {
   readonly refreshing: boolean;
 }
 
-const savedCount = (blocks: ReadonlyArray<QuotaBlock>): number => blocks.filter((block) => block.body.kind === "saved").length;
+const accountCount = (blocks: ReadonlyArray<QuotaBlock>): number => blocks.filter(isFoldedAccount).length;
 
-// The quota folds its saved profiles first, so under pressure it gives way while its live rows stay.
+// The quota folds its orc quota accounts first, so under pressure it gives way while its live rows stay.
 const leastRows = frameRows + 2;
 
 const readingLines: Block = [[span("reading the quota\u2026", "muted")]];
@@ -38,7 +39,7 @@ export const quotaPlaced = (reading: () => QuotaReading): Placed => {
   const blocks = (): ReadonlyArray<QuotaBlock> => shownValue(reading().shown) ?? [];
   const firstReadInFlight = (): boolean => blocks().length === 0 && reading().shown.kind === "pending";
   const boxSections = (inner: number): ReadonlyArray<Block> =>
-    countdownFrom(savedCount(blocks())).map((shown) => reserveQuotaSection(blocks(), inner, reading().now, shown));
+    countdownFrom(accountCount(blocks())).map((shown) => reserveQuotaSection(blocks(), inner, reading().now, shown));
   return {
     box: (size, look) => {
       const title = singleTitle("quota", everyText(readsCadence), size.columns, look.focused);
@@ -47,7 +48,7 @@ export const quotaPlaced = (reading: () => QuotaReading): Placed => {
     },
     natural: (width) => (boxSections(width - panelChrome).at(0)?.length ?? 0) + frameRows,
     least: () => leastRows,
-    glance: (width) => (firstReadInFlight() ? [readingLines] : countdownFrom(savedCount(blocks())).map((shown) => quotaSection(blocks(), width, reading().now, shown))),
+    glance: (width) => (firstReadInFlight() ? [readingLines] : countdownFrom(accountCount(blocks())).map((shown) => quotaSection(blocks(), width, reading().now, shown))),
   };
 };
 

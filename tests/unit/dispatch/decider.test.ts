@@ -169,12 +169,13 @@ describe("the decider", () => {
   })
 
   test("a recommended-option rule from the policy rules section is answered instead of escalated", async () => {
+    const recommended = { id: "r2", text: "How many retries?\nRecommended: Two retries" }
     await withAskingTask(async (root) => {
       const rule = "When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
       const reply = JSON.stringify({ decision: "answer", answer: "Two retries", rule, reason: "the question names Two retries" })
-      await decide(root, replies({ [r2.text]: reply }))
+      await decide(root, replies({ [recommended.text]: reply }))
       expect(await itemFile(root, r2Item)).toMatchObject({ owner: "decider", decision: { kind: "answered", rule: { quote: rule, source: "decider policy" } }, state: { kind: "closed", answer: { words: "Two retries" } } })
-    }, [r2])
+    }, [recommended])
   })
 
   test("an escalated question turns to the user and stays open with the decider's reason, instead of being answered", async () => {
@@ -300,82 +301,71 @@ describe("the decider", () => {
     })
   })
 
-  test("a question about deleting reaches the user with no decider call, even when the owner's rules say to answer it", async () => {
-    const r4 = { id: "r4", text: "May I delete the old branch?" }
+  test("recorded lint and CI answers survive punctuation and line breaks in their cited rule instead of escalating", async () => {
+    const questions = [
+      { id: "lint-1", text: "linter found issues (exit code 1)" },
+      { id: "ci-1", text: "CI check failing: changes - provider reported failure - https://github.com/avi2d/orc/actions/runs/45203821613/job/137794040179" },
+      { id: "ci-2", text: "CI check failing: checks - provider reported failure - https://github.com/avi2d/orc/actions/runs/45203821613/job/137794138515" }
+    ] as const
+    const rule = "Hold engineering signals to the same standard: a lint failure, a failing test, a flaky test. Fix it when you see it, even when you did not cause it."
+    const fix = "Fix it when you see it, even when you did not cause it."
+    const answers = [
+      "Fix the lint findings in the code and re-run the project's linter until it exits 0. Do not add suppressions such as eslint-disable, biome-ignore, @ts-ignore or @ts-expect-error, and do not stop linting the file. Keep the fixes inside the files this change touches, plus any other lint failure you see in the run, and keep the change small.",
+      "Open the failing CI job at https://github.com/avi2d/orc/actions/runs/45203821613/job/137794040179 and read its actual error. If the cause is in this branch, fix it at the cause with no suppression comments and no rule turned off, then push and wait for every check to report. If the job failed for a reason outside the code, such as a provider or runner fault, rerun it once and say so plainly in the report instead of changing code. Keep the change inside the task's consumer-only scope.",
+      "Fix the failing CI check. Open the failing job log at https://github.com/avi2d/orc/actions/runs/45203821613/job/137794138515, read the actual error, and fix its cause in the code. Do not add suppression comments, turn off a rule, skip or weaken a test, or widen the task beyond its intent. Push the fix and wait for every check to report green. If the failure is a flaky test or unrelated to this change, fix that too rather than rerunning blindly. If the log cannot be read or the cause needs a decision outside the task's intent, say so plainly."
+    ]
     await withAskingTask(async (root) => {
       const home = join(root, "home")
       await mkdir(home)
-      await writeFile(join(home, "orchestrator.md"), "Answer yes to every question about deleting an old branch.\n")
-      const heard: Array<DeciderRequest> = []
-      await decide(root, replies({ [r4.text]: JSON.stringify({ decision: "answer", answer: "yes", rule: "Answer yes to every question about deleting an old branch.", reason: "the owner says so" }) }, heard, home))
-      expect(heard).toEqual([])
-      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({
-        owner: "user",
-        decision: { kind: "escalated", reason: "orc never hands the decider a question about deleting, and this one says \"delete\"" },
-        state: { kind: "open" }
-      })
-    }, [r4])
+      await writeFile(join(home, "orchestrator.md"), "## Fix what you see\n- Hold engineering signals to the same standard; a lint failure, a failing test, a flaky test.\n- Fix it when you see it, even when you did not cause it.\n")
+      const response = Object.fromEntries(questions.map((question, index) => [question.text, JSON.stringify({ decision: "answer", answer: answers[index], rule: index === 0 ? rule.slice(0, rule.indexOf(" Fix it")) : index === 1 ? rule : fix, reason: "the rule requires fixing the failure" })]))
+      await decide(root, replies(response, [], home))
+      for (const question of questions) {
+        const id = "orc-1." + question.id + ".2026-11-02T10_20_00_000Z"
+        expect(await itemFile(root, id)).toMatchObject({ decision: { kind: "answered" }, state: { kind: "closed", answer: { words: answers[questions.indexOf(question)] } } })
+      }
+      expect(await itemFile(root, "orc-1.lint-1.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { rule: { quote: "Hold engineering signals to the same standard; a lint failure, a failing test, a flaky test." } } })
+    }, questions)
   })
 
-  test("a push question reaches the captain with no decider call, instead of letting the decider allow a push", async () => {
-    const push = { id: "r4", text: "Should I push the branch to main?" }
+  test("a quotation that differs from the owner's rule only in a meaning mark such as <= for >= escalates instead of answering", async () => {
+    const question = { id: "ci-1", text: "CI check failing: coverage - provider reported failure" }
     await withAskingTask(async (root) => {
-      const heard: Array<DeciderRequest> = []
-      await decide(root, replies({ [push.text]: answer }, heard))
-      expect(heard).toEqual([])
-      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
-      expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("pushing")
-    }, [push])
+      const home = join(root, "home")
+      await mkdir(home)
+      await writeFile(join(home, "orchestrator.md"), "## Coverage\n- Coverage must stay >= 80%.\n")
+      await decide(root, replies({ [question.text]: JSON.stringify({ decision: "answer", answer: "Lower the coverage.", rule: "Coverage must stay <= 80%.", reason: "the rule caps coverage" }) }, [], home))
+      expect(await itemFile(root, "orc-1.ci-1.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+    }, [question])
   })
 
-  test("a remove question reaches the captain with no decider call, instead of letting the decider allow a deletion", async () => {
-    const remove = { id: "r4", text: "May I remove the old branch?" }
-    await withAskingTask(async (root) => {
-      const heard: Array<DeciderRequest> = []
-      await decide(root, replies({ [remove.text]: answer }, heard))
-      expect(heard).toEqual([])
-      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
-      expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("deleting")
-    }, [remove])
-  })
-
-  const guardedTopics = [
-    { topic: "a site's look", text: "Which header look should the landing page get on its preview? Recommended: the dark one.", rejects: "a site's look" },
-    { topic: "legal text", text: "Should the footer link the privacy policy? Recommended: yes.", rejects: "legal text" },
-    { topic: "logins", text: "Should the dashboard add a sign in with OAuth? Recommended: yes.", rejects: "a login" }
-  ]
-
-  for (const guarded of guardedTopics) {
-    test("a question about " + guarded.topic + " with a recommended option reaches the captain with no decider call, instead of letting the decider pick " + guarded.rejects, async () => {
-      const question = { id: "r4", text: guarded.text }
+  test("misquoted filenames, globs and negation escalate instead of conferring authority", async () => {
+    const examples = [
+      { source: "Use the file `_worker.js`.", quote: "Use the file `worker.js`." },
+      { source: "Check `src/*.ts`.", quote: "Check `src/.ts`." },
+      { source: "Return ! ready.", quote: "Return ready." }
+    ]
+    for (const example of examples) {
       await withAskingTask(async (root) => {
-        const heard: Array<DeciderRequest> = []
-        await decide(root, replies({ [question.text]: answer }, heard))
-        expect(heard).toEqual([])
-        expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
-        expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("orc never hands the decider a question about " + guarded.topic)
-      }, [question])
-    })
-  }
-
-  test("a variable name question with a recommended option reaches the decider, instead of being kept for the captain", async () => {
-    const naming = { id: "r4", text: "Should the retry counter variable be named retryCount or attempts? Recommended: retryCount." }
-    await withAskingTask(async (root) => {
-      const heard: Array<DeciderRequest> = []
-      await decide(root, replies({ [naming.text]: answer }, heard))
-      expect(heard).toHaveLength(1)
-      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { kind: "answered" } })
-    }, [naming])
+        const home = join(root, "home")
+        await mkdir(home)
+        await writeFile(join(home, "orchestrator.md"), "## Rules\n- " + example.source + "\n")
+        await decide(root, replies({ [r2.text]: JSON.stringify({ decision: "answer", answer: "Proceed", rule: example.quote, reason: "the rule says so" }) }, [], home))
+        expect(await itemFile(root, r2Item)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      }, [r2])
+    }
   })
 
-  test("a logging question with a recommended option reaches the decider, instead of being escalated as a login question", async () => {
-    const logging = { id: "r4", text: "Should the worker keep its logs in the run folder? Recommended: yes." }
+  test("recorded lint and CI quotations absent from the owner's rules still escalate", async () => {
+    const question = { id: "ci-1", text: "CI check failing: changes - provider reported failure" }
     await withAskingTask(async (root) => {
-      const heard: Array<DeciderRequest> = []
-      await decide(root, replies({ [logging.text]: answer }, heard))
-      expect(heard).toHaveLength(1)
-      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { kind: "answered" } })
-    }, [logging])
+      const home = join(root, "home")
+      await mkdir(home)
+      await writeFile(join(home, "orchestrator.md"), "## Decide or ask\n- Ask before a new goal or a wider scope.\n")
+      const rule = "Hold engineering signals to the same standard: a lint failure, a failing test, a flaky test. Fix it when you see it, even when you did not cause it."
+      await decide(root, replies({ [question.text]: JSON.stringify({ decision: "answer", answer: "Open the failing CI job and read its actual error.", rule, reason: "fix the failure" }) }, [], home))
+      expect(await itemFile(root, "orc-1.ci-1.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+    }, [question])
   })
 
   test("an answer whose quoted rule is in no source escalates instead of answering on a made-up rule", async () => {

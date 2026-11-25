@@ -104,7 +104,7 @@ describe("a handover after a passed implement", () => {
       try {
         const project = join(home, "project")
         await mkdir(project, { recursive: true })
-        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
+        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
         const logFile = join(home, "branch-log.txt")
         await writeFile(logFile, "")
         const git = await branchLogGit(home, logFile)
@@ -163,7 +163,7 @@ describe("a handover written after no-mistakes", () => {
       try {
         const project = join(home, "project")
         await mkdir(project, { recursive: true })
-        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
+        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
         const logFile = join(home, "branch-log.txt")
         await writeFile(logFile, "abc1234\x1fImplement A\n")
         const git = await branchLogGit(home, logFile)
@@ -176,6 +176,7 @@ describe("a handover written after no-mistakes", () => {
         await mkdir(sessionDir, { recursive: true })
         await writeFile(join(sessionDir, "2026-10-01T09-00-00-000Z_long-nm.jsonl"), sessionJsonl)
         const fixedAfterLoop: NoMistakesRunner = {
+          init: Effect.die("no init in this test"),
           start: () => Effect.promise(() =>
             appendFile(logFile, "def5678\x1fFix B\n").then(() => ({
               stdout: "outcome: passed\npr: https://example.com/pr/1\n",
@@ -256,7 +257,7 @@ describe("a long session survives a later failure", () => {
       try {
         const project = join(home, "project")
         await mkdir(project, { recursive: true })
-        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
+        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
         const logFile = join(home, "branch-log.txt")
         await writeFile(logFile, "")
         const git = await branchLogGit(home, logFile)

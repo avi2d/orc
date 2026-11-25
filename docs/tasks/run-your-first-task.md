@@ -17,12 +17,11 @@ Run one task by hand, to see a run from the task file to its pull request before
 
 To put the `orc` command on your PATH:
 
-1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
-1. Run `cd orc && bun install --frozen-lockfile` to install the pinned dependencies.
-1. Run `cd packages/run && bun link` to link the command.
+1. Run `bun add -g @avi2dg/orc` to install the npm package.
 1. Run `orc --version` to check it.
 
 Orc prints `orc` and its version.
+To upgrade orc later, run `bun add -g @avi2dg/orc` again.
 
 ## Name a provider and its models
 
@@ -41,15 +40,17 @@ To tell orc which models it may run:
 
 ## Name the project's checks
 
-To give the run something to pass:
+To name the project's checks:
 
-1. In the project, add a `.no-mistakes.yaml` file with at least one named check under `commands`.
+1. In the project, add a `.no-mistakes.yaml` file with at least one command under `commands`.
 1. Commit that file.
 
 ```yaml
 commands:
-  test: bun test
+  lint: bun run lint
 ```
+
+Follow the local-check and GitHub CI policy in [Local checks and CI](../run/running-a-task.md#local-checks-and-ci).
 
 ## Run the task
 

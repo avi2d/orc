@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { ConfigProvider, Effect, Layer, Schema } from "effect";
@@ -193,20 +193,17 @@ describe("orc-dash-capture claude-statusline, run as the statusline runs it", ()
   });
 });
 
-describe("orc-dash-capture claude-statusline, run from an account folder's settings as the README sets it", () => {
-  const repository = join(import.meta.dir, "..", "..", "..");
-
+describe("orc-dash-capture claude-statusline, run from an account folder's settings", () => {
   const captureAccountReading = async (folders: { readonly main: string; readonly second: string }): Promise<void> => {
     mkdirSync(join(home, "config", "orc-dash"), { recursive: true });
     writeFileSync(join(home, "config", "orc-dash", "config.json"), JSON.stringify({ accounts: folders }));
     const settings = decodeJson(Schema.Struct({ statusLine: Schema.Struct({ command: Schema.String }) }))(fixture("capture/account-settings.json"));
     if (settings.kind !== "ok") throw new Error(settings.issue);
-    // The build is not part of a test run, and dist holds the same writer bundled.
-    const command = settings.value.statusLine.command
-      .replace("/path/to/orc", repository)
-      .replace("dist/capture-bin.js", "src/capture-bin.ts");
-    const child = Bun.spawn(["sh", "-c", command], {
-      env: environment({ CLAUDE_CONFIG_DIR: folders.main }),
+    const bin = join(home, "bin");
+    mkdirSync(bin);
+    symlinkSync(writer, join(bin, "orc-dash-capture"));
+    const child = Bun.spawn(["sh", "-c", settings.value.statusLine.command], {
+      env: environment({ CLAUDE_CONFIG_DIR: folders.main, PATH: bin + ":" + (process.env.PATH ?? "") }),
       stdin: new Blob([fixture("capture/claude-statusline.json")]),
       stdout: "pipe",
       stderr: "pipe",

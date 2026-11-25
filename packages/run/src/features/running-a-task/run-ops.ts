@@ -5,12 +5,14 @@ import type { OrcRunError } from "../../shared/lib/index"
 import type { AllowWord, NoMistakesRecord, OpenQuestion, QuestionAnswer } from "../../entities/review-gate/index"
 import type { DirectPrRecord } from "../../entities/pull-request/index"
 import type { ChecksRoundSummary, OrcRunCommit, RecordedFixAttempt } from "./run-record"
+import type { ReviewAtHeadOutcome } from "./review-outcome"
 
 export interface AgentRun {
   readonly agent: AgentFile
   readonly prompt: string
   readonly logFile: string
   readonly resumeSession: string | null
+  readonly withoutAsks?: true | undefined
   readonly onSession: (file: string) => Effect.Effect<void, OrcRunError>
 }
 
@@ -62,11 +64,11 @@ export interface RunCheckpoints {
   readonly fixDone: (fix: RecordedFixAttempt) => Effect.Effect<void, OrcRunError>
   readonly noMistakesStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly noMistakesDone: (record: NoMistakesRecord) => Effect.Effect<void, OrcRunError>
+  readonly reviewStart: (reviewer: AgentFile, started: string) => Effect.Effect<void, OrcRunError>
+  readonly reviewDone: (reviewer: AgentFile, outcome: ReviewAtHeadOutcome, started: string, ended: string) => Effect.Effect<void, OrcRunError>
   readonly pullRequestStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly pullRequestDone: (record: DirectPrRecord) => Effect.Effect<void, OrcRunError>
   readonly questionAsked: (step: AgentStep, question: OpenQuestion) => Effect.Effect<void, OrcRunError>
 }
 
 export type AgentStep = { readonly name: "implement"; readonly attempt: 1 } | { readonly name: "fix"; readonly attempt: number } | { readonly name: "pr"; readonly attempt: 1 }
-
-export const ciWaitingQuestionId = "ci-waiting"

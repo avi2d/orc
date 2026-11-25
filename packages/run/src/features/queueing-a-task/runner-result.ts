@@ -14,7 +14,7 @@ import { orcGroup, PueueResult, PueueStatus } from "../../shared/process/index"
 import { LabelArg } from "../../entities/token/index"
 import { capture, decodeJson, type Command } from "../../shared/process/index"
 import { readHeld, refuse, resolveProjectDir, type RunnerRequirements } from "./runner"
-import { RunnerError } from "../../shared/process/index"
+import { MachineUnreached, RunnerError } from "../../shared/process/index"
 
 const RUNNER_JSON_SCHEMA = "orc.runner.v1" as const
 
@@ -23,7 +23,7 @@ const RunSummary = Schema.Struct({
   status: RunStatusSchema,
   prLink: Schema.NullOr(Schema.String),
   endReason: Schema.NullOr(Schema.String),
-  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String), blocks: Schema.optional(Schema.Boolean), options: Schema.optional(Schema.Array(AskOption)), recommendation: Schema.optional(Schema.String) })),
+  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String), asking: Schema.optional(Schema.String), blocks: Schema.optional(Schema.Boolean), options: Schema.optional(Schema.Array(AskOption)), recommendation: Schema.optional(Schema.String), asks: Schema.optional(Schema.String), owner: Schema.optional(Schema.Literal("user")) })),
   report: Schema.optional(Schema.String),
   asking: Schema.optional(Asking),
   failing: Schema.optional(FailingMark),
@@ -70,7 +70,7 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
 
 export type RunEnding =
   | { readonly kind: "close"; readonly outcome: "done" | "failed" | "stopped"; readonly reason: string; readonly pr: string | null; readonly report: string | null }
-  | { readonly kind: "park"; readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion> }
+  | { readonly kind: "park"; readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion>; readonly reason: string }
   | { readonly kind: "split"; readonly plan: SplitPlan }
 
 type FinishedResult = Extract<RunnerResult, { readonly status: "succeeded" | "failed" }>
@@ -110,7 +110,7 @@ export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEndin
   }
   const questions = result.run?.openQuestions ?? []
   return Arr.isReadonlyArrayNonEmpty(questions)
-    ? { kind: "park", questions }
+    ? { kind: "park", questions, reason: result.run?.endReason ?? result.reason }
     : { kind: "close", outcome: "failed", reason: result.run?.endReason ?? result.reason, pr: result.run?.prLink ?? null, report: null }
 }
 
@@ -235,7 +235,7 @@ const runLogAt = (home: string, runId: string): Effect.Effect<string | null, nev
     const names = yield* fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
     let latest: string | null = null
     for (const name of names) {
-      if (name !== "agent.log" && name !== gateLogFileName && !/^fix-.*\.log$/.test(name) && !/^checks-.*\.txt$/.test(name)) {
+      if (name !== "agent.log" && name !== gateLogFileName && !/^fix-.*\.log$/.test(name) && !/^review-\d+\.log$/.test(name) && !/^checks-.*\.txt$/.test(name)) {
         continue
       }
       const info = yield* fs.stat(dir + "/" + name).pipe(Effect.orElseSucceed(() => null))
@@ -293,17 +293,33 @@ export const readStdinLabel = (stdin: Effect.Effect<string, RunnerError>): Effec
     )
   )
 
-export const readResultThrough = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> => {
+// ssh exits 255 for its own failure and passes the remote command's code on otherwise, so 255 says the machine was not reached.
+const unreachedExit = 255
+
+// Shorter than the beat's 30-second close read, so a machine that never answers ends as ssh's own 255 and not as a timeout.
+const connectSeconds = 10
+
+const boundedConnect = (command: Command): Command => {
+  const [program, ...rest] = command
+  return program.split("/").at(-1) === "ssh" ? [program, "-o", "ConnectTimeout=" + connectSeconds.toString(), ...rest] : command
+}
+
+export const readResultReaching = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError | MachineUnreached, ChildProcessSpawner.ChildProcessSpawner> => {
   const stdin = label == null ? null : JSON.stringify({ label })
-  return capture([...command, "runner", "result", task, "--json", ...(stdin === null ? [] : ["--stdin-label"])], stdin).pipe(
-    Effect.flatMap((result) =>
-      result.exitCode === 0
-        ? decodeJson(result.stdout, RunnerDocument, command.join(" ") + " runner result")
-        : refuse(command.join(" ") + " runner result exited " + result.exitCode + ": " + result.stderr.trim())
-    ),
+  return capture([...boundedConnect(command), "runner", "result", task, "--json", ...(stdin === null ? [] : ["--stdin-label"])], stdin).pipe(
+    Effect.flatMap((result): Effect.Effect<typeof RunnerDocument.Type, RunnerError | MachineUnreached> => {
+      if (result.exitCode === 0) {
+        return decodeJson(result.stdout, RunnerDocument, command.join(" ") + " runner result")
+      }
+      const detail = command.join(" ") + " runner result exited " + result.exitCode + ": " + result.stderr.trim()
+      return Effect.fail(result.exitCode === unreachedExit ? new MachineUnreached({ detail }) : new RunnerError({ detail }))
+    }),
     Effect.map((document) => document.result)
   )
 }
+
+export const readResultThrough = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  readResultReaching(command, task, label).pipe(Effect.catchTag("MachineUnreached", (error) => refuse(error.detail)))
 
 export const readRunResult = (id: string, home: string, label: string | null | undefined, machine: Machine): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> => {
   const through = throughFor(machine)

@@ -81,7 +81,7 @@ export const noMistakesSignals = (record: NoMistakesRecord): ReadonlyArray<{ rea
   ...(record.gate === null ? [] : [{ name: "gate", value: record.gate }]),
   ...(record.prLink === null ? [] : [{ name: "pr-link", value: record.prLink }]),
   ...(record.reviewer === null ? [] : [{ name: "reviewer", value: record.reviewer }]),
-  ...record.openQuestions.map((question) => ({ name: openQuestionSignal, value: JSON.stringify({ id: question.id, text: question.text, ...(question.asked === undefined ? {} : { asked: question.asked }) }) }))
+  ...record.openQuestions.map((question) => ({ name: openQuestionSignal, value: JSON.stringify({ id: question.id, text: question.text, ...(question.asks === undefined ? {} : { asks: question.asks }), ...(question.asked === undefined ? {} : { asked: question.asked }), ...(question.asking === undefined ? {} : { asking: question.asking }), ...(question.owner === undefined ? {} : { owner: question.owner }) }) }))
 ]
 
 type ChecksLoopStep =
@@ -98,7 +98,7 @@ const stepLines = (report: OrcRunReport): Array<string> => {
   const lines = ["- implement: " + (report.implementPassed ? "passed" : "failed")]
   for (const step of checksLoopSteps(report)) {
     lines.push(step.kind === "checks"
-      ? checksLine(step.round.round, step.round.passed, step.round.failed, step.round.file)
+      ? checksLine(step.round)
       : "- fix " + step.fix.attempt.toString() + ": " + step.fix.status + " " + toFileUrl(step.fix.evidenceIn))
   }
   if (report.noMistakes !== null) {
@@ -107,9 +107,9 @@ const stepLines = (report: OrcRunReport): Array<string> => {
   return lines
 }
 
-const checksLine = (round: number, passed: boolean, failed: ReadonlyArray<string>, file: string): string => {
-  const outcome = passed ? "passed" : "failed (" + failed.join(", ") + ")"
-  return "- checks round " + round.toString() + ": " + outcome + " " + toFileUrl(file)
+const checksLine = (round: ChecksRoundSummary): string => {
+  const outcome = round.checks.length === 0 ? "skipped, no local checks run" : round.passed ? "passed" : "failed (" + round.failed.join(", ") + ")"
+  return "- checks round " + round.round.toString() + ": " + outcome + " " + toFileUrl(round.file)
 }
 
 const noMistakesLine = (status: string, gate: string | null): string =>
@@ -212,7 +212,7 @@ export const runStatus = (report: OrcRunReport): string => {
     return "no commit"
   }
   const finalRound = report.checksRounds?.at(-1)
-  if (finalRound === undefined || !finalRound.passed) {
+  if (finalRound === undefined || (finalRound.checks.length > 0 && !finalRound.passed)) {
     return "checks failed"
   }
   if (report.noMistakes === null && report.prLink !== null) {

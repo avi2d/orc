@@ -1,10 +1,16 @@
 import { Context, DateTime, Effect, Layer, Option } from "effect";
-import { SavedProfilesSource } from "../../entities/session-quota";
-import { readQuota } from "../../entities/session-quota";
-import { type QuotaReadings, type QuotaReadSources, sessionQuotaOf, type SessionSources } from "../../entities/session-quota";
 import type { QueueReadings } from "../../entities/queues";
-import { type QuotaBlock, quotaBlocks } from "../../entities/session-quota";
-import type { SessionQuotaView } from "../../entities/session-quota";
+import {
+  OrcQuotaSource,
+  type QuotaBlock,
+  quotaBlocks,
+  type QuotaReadings,
+  type QuotaReadSources,
+  readQuota,
+  sessionQuotaOf,
+  type SessionQuotaView,
+  type SessionSources,
+} from "../../entities/session-quota";
 import type { TaskLevels, TaskListing } from "../../entities/task-board";
 import { readsCadence } from "../../shared/feeds";
 import { QuotaBlocksCodec, SessionsCodec } from "./codecs";
@@ -60,25 +66,27 @@ export class QueueFeed extends Context.Service<QueueFeed, { readonly read: Effec
 export const quotaFeedLayer: Layer.Layer<QuotaFeed, never, QuotaReadSources | SavedReadings> = Layer.effect(
   QuotaFeed,
   Effect.gen(function* () {
-    const savedProfiles = yield* SavedProfilesSource;
+    const orcQuotaSource = yield* OrcQuotaSource;
     const quota = yield* polled(readQuota, readsCadence);
-    const login = yield* polled(savedProfiles.read, readsCadence);
+    const orcQuota = yield* polled(orcQuotaSource.read, readsCadence);
     const readings: Polled<QuotaReadings> = {
       latest: Effect.map(
-        Effect.all({ quota: quota.latest, savedProfiles: login.latest }, { concurrency: "unbounded" }),
+        Effect.all({ quota: quota.latest, orcQuota: orcQuota.latest }, { concurrency: "unbounded" }),
         (latest) =>
           Option.map(Option.all(latest), (answered) => ({
-            value: { quota: answered.quota.value, savedProfiles: answered.savedProfiles.value },
-            at: Math.min(answered.quota.at, answered.savedProfiles.at),
+            value: { quota: answered.quota.value, orcQuota: answered.orcQuota.value },
+            at: Math.min(answered.quota.at, answered.orcQuota.at),
           })),
       ),
-      settled: Effect.all({ quota: quota.settled, savedProfiles: login.settled }, { concurrency: "unbounded" }),
-      refreshing: refreshingOf([quota, login]),
+      settled: Effect.all({ quota: quota.settled, orcQuota: orcQuota.settled }, { concurrency: "unbounded" }),
+      refreshing: refreshingOf([quota, orcQuota]),
     };
     const standIn = yield* savedStandIn("quota", QuotaBlocksCodec);
     const blocks = Effect.gen(function* () {
       const now = yield* DateTime.now;
-      return yield* standIn(Option.map(yield* readings.latest, ({ value, at }) => ({ value: quotaBlocks(value.quota, value.savedProfiles, now), at })));
+      return yield* standIn(
+        Option.map(yield* readings.latest, ({ value, at }) => ({ value: quotaBlocks(value.quota, value.orcQuota, now), at })),
+      );
     });
     return { readings, blocks, refreshing: readings.refreshing };
   }),

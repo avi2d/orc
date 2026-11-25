@@ -2,21 +2,18 @@ import { Console, Effect, FileSystem, Path, type Scope } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
-import { resolveAgentFile, type AgentFile, type AgentKind, type PiThinkingLevel } from "../../entities/agent/index"
+import type { PiThinkingLevel } from "../../entities/agent/index"
 import { answerWaitFromEnv } from "../../entities/review-gate/index"
 import { hostGitShim } from "../../shared/sandbox/index"
 import type { SandboxKind } from "../../shared/sandbox/index"
-import { defaultToolchainResolver, type HostTools, type ToolchainResolver, withInstallFolders, within } from "../../shared/sandbox/index"
-import { configuredModels, routeOfAgents } from "../../shared/config/index"
-import { readOrcConfig } from "../../shared/config/index"
-import { planSandbox, type SandboxPlan } from "./sandbox-plan"
+import { defaultToolchainResolver, type ToolchainResolver, withInstallFolders, within } from "../../shared/sandbox/index"
 import { type Checkout, openCheckout, parseRefuseMarkers } from "../../entities/task-copy/index"
 import { formatRefresh, refreshCheckout } from "../../entities/task-copy/index"
 import { OrcRunError } from "../../shared/lib/index"
 import { historyFailure, markRunStopped, openDatabase, openQuestionsForRun, orcHomeDir, stoppedEndReason, updateStep } from "../../entities/run-history/index"
 import { stepsForRun } from "../../entities/run-history/index"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "./run-resume"
-import { finishRun, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordOpenAsks, recordOpenQuestion, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish, recordStepSession } from "./history-write"
+import { deliveryCheckpoints, finishRun, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordOpenAsks, recordOpenQuestion, recordImplementStart, recordResumePublish, recordStepSession } from "./history-write"
 import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
 import { longSessionWarning, type LongSessionCounts } from "../../entities/agent/index"
 import { runFull } from "./run-loop"
@@ -26,12 +23,13 @@ import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
 import { runDirFor, type ReportKind } from "../../entities/backlog/index"
 import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "../../entities/review-gate/index"
 import { isRunId, newRunId } from "../../shared/lib/index"
-import { prepareRunFolders, type RunFolders, runInstructions } from "./run-folders"
+import { dropEndedPiAgentDir, runInstructions } from "./run-folders"
+import { prepareAgents } from "./run-prepare"
 import { subprocessDeliverer } from "./run-deliverer"
 import type { RunDelivery } from "../../shared/config/index"
 import { closeTaskCopy, openTaskCopy, writeAgentGitConfig } from "../../entities/task-copy/index"
 import { ensureHeavyQueue, readHeavySettings } from "../../entities/heavy-queue/index"
-import { withHeavyPath } from "../../entities/heavy-queue/index"
+import { ciOnlyBashFile, runStepPath, withHeavyPath } from "../../entities/heavy-queue/index"
 import { agentGitConfig, agentOps, installCopy, openAgentExec } from "./run-exec"
 import { askSetupFor, type PiPacing } from "../../entities/agent/index"
 
@@ -100,52 +98,6 @@ const openHostGit = (fs: FileSystem.FileSystem, path: Path.Path): Effect.Effect<
     )
 }
 
-interface PreparedAgents {
-  readonly folders: RunFolders
-  readonly agent: AgentFile
-  readonly fixer: AgentFile
-  readonly plan: SandboxPlan
-}
-
-const prepareAgents = (
-  fs: FileSystem.FileSystem,
-  path: Path.Path,
-  spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
-  checkout: Checkout,
-  home: string,
-  runDir: string,
-  effectiveTaskFile: string,
-  instructionsFile: string | null,
-  agentsDir: string | undefined,
-  sandboxKind: SandboxKind,
-  pins: { readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly implementerModel: string | undefined; readonly fixerModel: string | undefined; readonly implementerThinking: PiThinkingLevel | undefined; readonly fixerThinking: PiThinkingLevel | undefined }
-): Effect.Effect<PreparedAgents, OrcRunError, FileSystem.FileSystem | Path.Path> =>
-  Effect.gen(function*() {
-    const config = yield* readOrcConfig(home).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read " + cause.file + ": " + cause.detail }))
-    )
-    const folders = yield* prepareRunFolders(fs, path, runDir, effectiveTaskFile, instructionsFile)
-    const configured = configuredModels(config, { implementer: pins.implementerModel, fixer: pins.fixerModel })
-    const resolveRole = (kind: AgentKind, model: string | undefined, thinking: PiThinkingLevel | undefined) =>
-      resolveAgentFile(kind, { projectDir: checkout.projectDir, orcHome: home, agentsDir, configModel: { file: config.file, model }, thinking })
-        .pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
-    const agent: AgentFile = yield* resolveRole("implementer", configured.implementer, pins.implementerThinking)
-    const fixer: AgentFile = yield* resolveRole("fixer", configured.fixer, pins.fixerThinking)
-    const piBinary = Bun.which("pi")
-    const nodeBinary = Bun.which("node")
-    const models = { agent: agent.model, fixer: fixer.model }
-    const provider = yield* Effect.fromResult(routeOfAgents(config, models, pins.provider)).pipe(Effect.mapError((message) => new OrcRunError({ message })))
-    if (piBinary === null) {
-      return yield* refuse("orc: pi is not on the host PATH")
-    }
-    if (nodeBinary === null) {
-      return yield* refuse("orc: node is not on the host PATH")
-    }
-    const host: HostTools = { piBinary, nodeBinary, homeDir: homedir() }
-    const plan = yield* planSandbox(fs, path, spawner, host, { projectDir: checkout.projectDir, runDir: folders.runDir, piAgentDir: folders.piAgentDir }, models, { config, provider, tokenFileFlag: pins.tokenFile }, sandboxKind)
-    return { folders, agent, fixer, plan }
-  })
-
 const requireNoMistakes = (options: NoMistakesHost, cwd: string): Effect.Effect<void, OrcRunError> =>
   noMistakesVersionProblem(options, cwd).pipe(Effect.flatMap((problem) => problem === null ? Effect.void : refuse(problem)))
 
@@ -209,7 +161,7 @@ const openRun = (
 
 const prepareRunAgents = (opened: OpenedRun, request: OrcRunRequest) =>
   prepareAgents(
-    opened.fs, opened.path, opened.spawner, opened.checkout, opened.home, opened.runDir, opened.effectiveTaskFile, opened.instructionsFile, request.agentsDir, opened.sandboxKind,
+    opened.fs, opened.path, opened.spawner, opened.checkout, opened.home, opened.runDir, opened.effectiveTaskFile, opened.instructionsFile, request.agentsDir, opened.sandboxKind, request.delivery,
     { tokenFile: request.tokenFile, provider: request.provider, implementerModel: request.implementerModel, fixerModel: request.fixerModel, implementerThinking: request.implementerThinking, fixerThinking: request.fixerThinking }
   )
 
@@ -231,7 +183,7 @@ export const runReportStep = (
       return yield* refuse("orc: a " + kind + " run starts Pi on the host in its run folder, so it takes --sandbox none and refuses --sandbox " + opened.sandboxKind)
     }
     const { folders, agent, plan } = yield* prepareRunAgents(opened, request).pipe(Effect.onError(() => removeRunDir(opened)))
-    const exec = yield* openAgentExec(plan, folders, folders.runDir, toolchain, { ...Bun.env, PATH: withHeavyPath(opened.home, Bun.env.PATH ?? "") })
+    const exec = yield* openAgentExec(plan, folders, folders.runDir, toolchain, { ...Bun.env, PATH: runStepPath(opened.home, Bun.env.PATH ?? ""), BASH_ENV: ciOnlyBashFile(opened.home) })
     const run: ReportRun = {
       kind, runId: opened.runId, runDir: folders.runDir, projectDir: opened.checkout.projectDir, branch: opened.checkout.branch, machine: opened.machine, sandbox: opened.sandboxKind,
       taskPath: folders.taskPath, instructions: folders.instructionsPath, hostSessionsDir: folders.hostSessionsDir, agent, started: new Date().toISOString(),
@@ -255,7 +207,7 @@ export const runAgentStep = (
     const opened = yield* openRun(request)
     const { fs, path, spawner, home, runId, git, checkout, sandboxKind } = opened
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: withHeavyPath(home, hostPath ?? ""), git: checkout.git }
-    const { folders, agent, fixer, plan } = yield* prepareRunAgents(opened, request).pipe(
+    const { folders, agent, fixer, reviewer, plan } = yield* prepareRunAgents(opened, request).pipe(
       Effect.tap(() => request.delivery === "direct-PR" ? Effect.void : requireNoMistakes(noMistakes, checkout.projectDir)),
       Effect.onError(() => removeRunDir(opened))
     )
@@ -263,7 +215,7 @@ export const runAgentStep = (
     const copy = yield* openTaskCopy(fs, path, spawner, git, checkout, home)
     yield* Effect.addFinalizer(() => closeTaskCopy(spawner, git, checkout.projectDir, copy).pipe(Effect.catch((error) => Console.log(error.message))))
     yield* writeAgentGitConfig(spawner, git, Bun.which("git") ?? "git", checkout.projectDir, copy.dir, agentGitConfig(folders))
-    const exec = yield* openAgentExec(plan, folders, copy.dir, toolchain, { ...Bun.env, PATH: withHeavyPath(home, Bun.env.PATH ?? "") })
+    const exec = yield* openAgentExec(plan, folders, copy.dir, toolchain, { ...Bun.env, PATH: runStepPath(home, Bun.env.PATH ?? ""), BASH_ENV: ciOnlyBashFile(home) })
     yield* installCopy(spawner, fs, path, exec, path.join(folders.runDir, "prepare.log"))
     const priorOpen = request.resumeRun === undefined ? [] : yield* Effect.acquireUseRelease(
       openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
@@ -278,7 +230,7 @@ export const runAgentStep = (
       taskPath: folders.taskPath, instructions: folders.instructionsPath, agent, fixer, branch: checkout.branch, sandbox: sandboxKind, started,
       worktreeDir: copy.dir,
       machine: opened.machine,
-      delivery: subprocessDeliverer(request.delivery ?? "no-mistakes", { ...noMistakes, worktreeDir: copy.dir, branch: checkout.branch }),
+      delivery: subprocessDeliverer({ ...noMistakes, worktreeDir: copy.dir, branch: checkout.branch }, reviewer),
       allow: request.allow ?? [],
       answers: request.answers ?? [],
       resumeRun: request.resumeRun,
@@ -346,10 +298,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       },
       fixSession: (attempt, file) => recordStepSession(db, run.runId, "fix", attempt, file),
       fixDone: (fix) => recordFixDone(db, run.runId, fix),
-      noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
-      noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
-      pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
-      pullRequestDone: (record) => recordPullRequestDone(db, run, record),
+      ...deliveryCheckpoints(db, run),
       questionAsked: (step, question) => recordOpenQuestion(db, run.runId, step, question)
     }
     const endFailed = (reason: string) =>
@@ -390,6 +339,8 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
     yield* finishRun(db, run.runId, report, new Date().toISOString())
     if (ended.stopped !== null) {
       yield* markRunStopped(db, run.runId, new Date().toISOString(), ended.stopped)
+    } else {
+      yield* dropEndedPiAgentDir(db, run, report)
     }
     return report
   })

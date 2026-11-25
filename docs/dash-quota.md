@@ -12,6 +12,9 @@ To run the live quota panel, run `orc-dash panel quota`.
 The panel reads `quota-axi` on the machine it runs on and paints again every 30 seconds.
 Two [Claude](https://claude.com) accounts share the Claude brand clay, and [Codex](https://github.com/openai/codex) and [OpenCode Go](https://opencode.ai) keep their own colours.
 Each account gets its own block, titled with its account key.
+A Claude block uses an Orc account name when exactly one account from `orc quota --json` matches a quota-axi account key for that row.
+If no key matches, the sole Claude row uses the sole Orc account name.
+With multiple Claude rows, an unmatched row keeps its account key.
 A provider `quota-axi` reports as not set up gets no block, so the panel shows only the Claude, Codex and OpenCode Go accounts you use.
 When no provider is set up, the panel shows `no provider is set up in quota-axi`.
 An exhaustion projection made early in a window reads muted and marked `early` instead of as a warning.
@@ -27,19 +30,26 @@ See [Capture usage as it happens](session-quota/capture.md) for Claude statuslin
 
 To print one frame, run `orc-dash panel quota --print`.
 
-### Show saved profiles
+### Show the dispatch accounts
 
-The panel shows a block for each saved Claude profile other than the active one when `ORC_DASH_SAVED_PROFILES` names a shell command that prints them.
-With `ORC_DASH_SAVED_PROFILES` unset or blank, the panel runs nothing for them and shows no saved block.
+The panel runs `orc quota --json` and shows a block for each account the dispatch quota names, titled `account` and the account's name.
+It reads the same accounts, floor and pick the beat reads, as [Reading quota without running the beat](run/backlog-configuration.md#reading-quota-without-running-the-beat) describes.
+The account blocks sit after the Claude blocks and before Codex.
 
-The command prints one JSON object with `schema` 2, the `active_profile` name or `null`, and `profiles`.
-Each profile carries `name`, `active`, `provider`, `harness`, `tier` or `null`, `stale`, `fetched_at` or `null`, and `windows`.
-Each window carries `label`, `utilization_pct` and `resets_at` or `null`.
-Both panels title the Claude account with the active profile's name, such as `claude main` for a profile named `main`.
+An account the quota can read shows one `all models` row with its room left and the time to its reset.
+Its header names its standing:
 
-| Variable | What it sets |
+| Header | Meaning |
 | --- | --- |
-| `ORC_DASH_SAVED_PROFILES` | The shell command that prints the saved profiles |
+| `next run` | The beat picks this account for the next task. With [dispatch rules](run/dispatch-rules.md), no account shows it |
+| `under the 20% floor` | The room is below the quota's `floorPercent`, here 20% |
+| none | The beat picks another account first |
+
+When no room is left, the account's row reads `used up`.
+An account the quota cannot use reads `unusable`, with the reason `orc quota` gives below the header.
+When `orc quota` reports the quota unread, one `accounts` block names the cause, such as `command not installed` or `an account is missing`, with the reason below it.
+When `orc` is not on `PATH` or `dispatch.json` is missing, the `accounts` block shows the error.
+In a short dashboard the account blocks fold first, into a `+2 more accounts` line.
 
 ### Show each Claude account
 
@@ -64,12 +74,14 @@ To feed an account's block, give the `settings.json` in that account's folder a 
 {
   "statusLine": {
     "type": "command",
-    "command": "bun /path/to/orc/packages/session-quota/dist/capture-bin.js claude-statusline",
+    "command": "orc-dash-capture claude-statusline",
     "refreshInterval": 30
   }
 }
 ```
 
-Run `bun run build` in the clone first, as [Build the writer](session-quota/capture.md#build-the-writer) says, and put the clone's path in place of `/path/to/orc`.
+Put `orc-dash-capture` on Claude Code's `PATH` as [Install orc-dash](dash.md#install) describes.
+If the statusline does not inherit that `PATH`, use the absolute path to the command or its launcher.
+To move an existing hook off the old Bun bundle, see [Capture command](session-quota/capture.md#capture-command).
 Claude Code started with `CLAUDE_CONFIG_DIR` set to the folder reads that `settings.json` and runs the statusline with the same variable, so each reading names the folder.
 The writer prints nothing, so to keep another statusline's text, read stdin once and pipe it to both commands.

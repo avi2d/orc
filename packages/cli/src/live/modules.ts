@@ -7,13 +7,13 @@ import { queueFeedLayer, queueSourcesLive } from "@avi2dg/orc-queues";
 import {
   attentionSourceLayer,
   ciRunsLayer,
-  savedProfilesSourceLayer,
   hostSourcesLayer,
   linuxTaskProcessesSourceLayer,
   macTaskProcessesSourceLayer,
   machineSchedulesLayer,
   noMistakesMachinesLayer,
   orcMachinesLayer,
+  orcQuotaSourceLayer,
   quotaFeedLayer,
   quotaSourceLayer,
   remoteTaskHistoryLayer,
@@ -44,8 +44,8 @@ const runnerSources = Layer.mergeAll(ciRunsLayer, machineSchedulesLayer(onMac ? 
 
 const commandSources = Layer.mergeAll(
   quotaSourceLayer,
+  orcQuotaSourceLayer,
   attentionSourceLayer,
-  savedProfilesSourceLayer,
   hostSourcesLayer,
   resourceMachinesLayer,
   onMac ? macTaskProcessesSourceLayer : linuxTaskProcessesSourceLayer,

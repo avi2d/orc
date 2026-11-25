@@ -9,10 +9,12 @@ import { appHomeDir, bundledAppDir, formatAppInstall, herdrAppSourceDir, install
 import { type OrcArgs, parseArgs } from "./app/args"
 import { runChat } from "./features/chat/index"
 import { type AccountName, signIn } from "./features/signing-in/index"
-import { encodeUpdateJson, formatUpdate, runUpdate } from "./features/updating-orc/index"
+import { encodeUpdateJson, formatUpdate, releasesUrl, runUpdate } from "./features/updating-orc/index"
 import { helpText, overview, usageErrorText } from "./app/help"
 import { runDispatch } from "./app/dispatch-cli"
-import { decodeJson, pueue, PueueState, queuedTasks, RunnerError } from "./shared/process/index"
+import { isStandinInvocation, runStandinInvocation } from "./entities/heavy-queue/index"
+import { runQuotaCli } from "./app/quota-cli"
+import { decodeJson, pueue, PueueState, queuedTasks, RunnerError, selfCommand } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
 import { backlogPaths, backlogRoot as backlogRootOf, type ReportKind, runDirFor } from "./entities/backlog/index"
 import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listAllRuns, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
@@ -38,7 +40,7 @@ const dispatch = (args: Extract<OrcArgs, { readonly kind: "Dispatch" }>["args"])
     home: orcHomeDir(Bun.env.ORC_HOME),
     cwd: process.cwd(),
     env: Bun.env,
-    self: [process.execPath, Bun.main],
+    self: selfCommand(process.execPath, Bun.main),
     stdinIsTerminal: isatty(0),
     stdin: Effect.tryPromise({
       try: () => Bun.stdin.text(),
@@ -84,7 +86,7 @@ const scoreStep = (args: Extract<OrcArgs, { readonly kind: "ScoreStep" }>) =>
     yield* Console.log(`orc score recorded ${args.score} for ${args.step} in ${args.runId}`)
   })
 
-const chat = (sessionFile: string | null) => runChat(orcHomeDir(Bun.env.ORC_HOME), [process.execPath, Bun.main], sessionFile).pipe(
+const chat = (sessionFile: string | null) => runChat(orcHomeDir(Bun.env.ORC_HOME), selfCommand(process.execPath, Bun.main), sessionFile).pipe(
   Effect.provide(BunServices.layer),
   Effect.catchTag("ChatError", (error) => Console.error(error.message).pipe(Effect.andThen(Effect.fail("orc chat refused")))),
   Effect.flatMap((exitCode) => exitCode === 0 ? Effect.void : Effect.fail("pi exited " + String(exitCode)))
@@ -199,7 +201,7 @@ const printStepLog = (args: Extract<OrcArgs, { readonly kind: "ShowStepLog" }>) 
 
 const runInstallApp = Effect.gen(function*() {
   const home = yield* Config.String("HOME")
-  const result = yield* readyBundledApp(herdrAppSourceDir(), bundledAppDir()).pipe(
+  const result = yield* readyBundledApp(Bun.isStandaloneExecutable ? null : herdrAppSourceDir(), bundledAppDir()).pipe(
     Effect.andThen((source) => installApp(source, appHomeDir(home))),
     Effect.provide(BunServices.layer),
     Effect.catchTag("AppInstallError", (error) => Console.error("orc app install: " + error.detail).pipe(Effect.andThen(Effect.fail("orc app install refused"))))
@@ -210,12 +212,19 @@ const runInstallApp = Effect.gen(function*() {
 const login = (account: AccountName) => signIn(orcHomeDir(Bun.env.ORC_HOME), account, Bun.env, process.platform).pipe(
   Effect.provide(BunServices.layer),
   Effect.catchTag("SignInError", (error) => Console.error(error.message).pipe(Effect.andThen(Effect.fail("orc login refused")))),
-  Effect.flatMap((signed) => Console.log("orc login " + account + ": signed in with " + signed.folderVar + "=" + signed.folder))
+  Effect.flatMap((signedIn) => Console.log("orc login " + account + ": signed in with " + signedIn.folderVar + "=" + signedIn.folder))
 )
 
 const update = (args: Extract<OrcArgs, { readonly kind: "Update" }>) =>
   Effect.gen(function*() {
-    const result = yield* runUpdate({ home: orcHomeDir(Bun.env.ORC_HOME), env: Bun.env, running: packageJson.version }).pipe(Effect.provide(BunServices.layer))
+    const result = yield* runUpdate({
+      home: orcHomeDir(Bun.env.ORC_HOME),
+      env: Bun.env,
+      running: packageJson.version,
+      main: Bun.main,
+      executable: process.execPath,
+      releases: releasesUrl
+    }).pipe(Effect.provide(BunServices.layer))
     yield* Console.log(args.json ? yield* encodeUpdateJson(result) : formatUpdate(result))
     if (result.outcome === "failed") {
       return yield* Effect.fail("orc update failed")
@@ -236,6 +245,12 @@ const program = Effect.gen(function*() {
     }
     case "ListMachines": {
       return yield* printMachines()
+    }
+    case "Quota": {
+      return yield* runQuotaCli(orcHomeDir(Bun.env.ORC_HOME), args.json).pipe(
+        Effect.provide(BunServices.layer),
+        Effect.catchTag("ConfigError", (error) => Console.error("orc: " + error.file + ": " + error.detail).pipe(Effect.andThen(Effect.fail("dispatch.json unreadable"))))
+      )
     }
     case "PrintHelp": {
       yield* Console.log(helpText(args.words))
@@ -286,5 +301,10 @@ const program = Effect.gen(function*() {
 })
 
 if (import.meta.main) {
-  runMain(program, { disableErrorReporting: true })
+  const words = process.argv.slice(2)
+  if (Bun.isStandaloneExecutable && isStandinInvocation(words[0] ?? "")) {
+    process.exitCode = await runStandinInvocation(words)
+  } else {
+    runMain(program, { disableErrorReporting: true })
+  }
 }

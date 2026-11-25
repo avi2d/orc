@@ -36,29 +36,41 @@ The command writes only names beginning with `orc`, leaving Herdr's own mods and
 | Board | `cmd-1` | The backlog tasks in five lanes, and the task panel for the selected card |
 | Resources | `cmd-2` | Each subscription's quota windows, and each machine's cores, load, memory, disk and running orc runs |
 | Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps, step output and changes |
-| Inbox | `cmd-4` | Every open question, decision, hold and PR that waits for you, across all tasks |
+| Inbox | `cmd-4` | Every open question, decision, hold, event and PR that Orc assigns to you, across all tasks |
 
 The tabs refresh while visible and show a reason when a command fails.
 
 ## Answer in the Inbox
 
-Select **Inbox** or press `cmd-4` to see everything that waits for you in one list, oldest first.
-The Inbox reads `orc backlog --json`, `orc attention --json`, `orc runs --json`, and `orc backlog thread <task> --json` for each task that waits.
-Each item shows its task, who asks, the question, and its options.
+Select **Inbox** or press `cmd-4` to see everything Orc assigns to you in one list, oldest first.
+Each card shows the task ID and title, who asks, the subject, each option with its outcome, and the recommendation.
 An option with a picture shows as a tile, and any other option shows as a button.
-On a decision the decider escalated, the option it recommends is outlined and its recommendation shows below the options.
+The Inbox outlines the recommended option.
+If Orc did not record options, the card shows the original text and says **No options recorded**.
+An overdue card shows how long it has waited.
+The Agents tab shows the same cards under each run in **Awaiting you**.
 
-To answer a question or a hold:
+To answer a question, a decision, a hold or an event:
 
-1. Click an option, or type into the answer box and press Enter or **Send**.
-1. The Inbox runs `orc backlog answer <task> <id>=<answer>` for a question and `orc backlog answer <task> <answer>` for a hold, as the Board task panel does, and drops the item once the answer is recorded.
+1. Click an option, or type your own answer and press Enter or **Send**.
+1. The Inbox runs the command for that item, and the card shows **Answer recorded**:
+   - `orc backlog answer <task> <id>=<answer>` for a question or a decision.
+   - `orc backlog answer <task> <answer>` for a hold.
+   - `orc attention answer <item> <answer>` for an event, such as a run that died.
+     It does not run the option's outcome.
+
+For an overdue hold, type an answer, or click **drop** and give a reason to run `orc backlog drop <task> <reason>`.
 
 To merge a PR that waits:
 
-1. Click **Approve**.
+1. Click **merge**, or **Merge PR** when Orc recorded no options.
 1. Confirm the dialog, and the Inbox runs `orc merge <task> --basis captain-word`.
 
-When a command fails, the item shows the command and the first line of its error.
+Click **hold** to leave the PR open, and the Inbox runs `orc attention answer <item> hold`.
+When a command fails, the card shows it with the first line of its error.
+
+Questions the agent owns, and its answers, stay in the collapsed **Agent attention** section at the end, each with its basis.
+Where you replaced an agent's answer, your answer shows beside it as **Decided by you**.
 
 ## Tab guides
 
@@ -70,11 +82,32 @@ On the Board tab, click the count in the **Awaiting you** lane header to open th
 <div id="follow-a-run-in-the-agents-tab"><span id="approve-a-run-s-pr"></span><span id="read-a-run-s-changes"></span><span id="chat-with-orc"></span></div>
 
 [Runs and chat](herdr-app-agents.md) covers the Agents tab and chat drawer.
-On the Agents tab, click the count on the **Awaiting you** status filter to open the Inbox, as `cmd-4` does.
+On the Agents tab, open the **Status** select and click the count beside **Awaiting you** to open the Inbox, as `cmd-4` does.
+The **Project** select shows runs for configured projects by default.
+Choose **All runs** in it to include runs from other projects.
+Opening a run of another project from the Inbox switches the **Project** select to **All runs**.
+A merged PR shows its run as Done, and a closed PR shows its run as Failed.
 
 <div id="start-a-scratch-app"><span id="recapture-the-board-screenshots"></span><span id="change-the-mods"></span></div>
 
 [Develop the mods](herdr-app-development.md) covers the scratch App and screenshots.
+
+## Read a Checks step
+
+On the **Agents** tab, select a run and then select a **Checks** step.
+By default, **Summary** shows one row per check with its name, result, and time.
+If a log has no recorded check boundaries, **Summary** shows a note instead of check rows.
+
+Passed checks stay folded.
+A failed check opens below its row.
+Select the row to fold or reopen it.
+For a failed `bun test` check, **Summary** shows the failed test names, their errors, and the pass and fail counts.
+For other failed checks, it shows the last 20 lines before the exit.
+If the step ended before a check reported its result, the row says **Interrupted**.
+
+Select **Raw** in the step bar to see the full log.
+The tab keeps **Raw** selected when you move between steps or runs.
+Select **Summary** on a Checks step or **Turns** on an Agent step to switch back.
 
 ## Related topics
 

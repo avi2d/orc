@@ -18,9 +18,9 @@ interface Readings {
 }
 
 const readBlocks: Effect.Effect<Readings, never, QuotaReadSources> = Effect.gen(function* () {
-  const { quota, savedProfiles } = yield* readQuotas;
+  const { quota, orcQuota } = yield* readQuotas;
   const now = yield* DateTime.now;
-  return { blocks: quotaBlocks(quota, savedProfiles, now), now };
+  return { blocks: quotaBlocks(quota, orcQuota, now), now };
 });
 
 const panelLines = (readings: Readings, columns: number, rows: number): Block =>

@@ -1,7 +1,10 @@
-import { Effect, type FileSystem, Schema } from "effect"
+import { homedir } from "node:os"
+import { Effect, type FileSystem, type Path, Result, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
+import { UPDATE_JSON_SCHEMA, UpdateJson, installerError, isNewer, type UpdateDocument } from "../../entities/orc-update/index"
 import { readOrcConfig } from "../../shared/config/index"
-import { capture, type Command } from "../../shared/process/index"
+import { capture, selfCommand, type Command } from "../../shared/process/index"
+import { installLauncherRelease, launcherDirectory, type LauncherBuild } from "./launcher-release"
 
 const packageName = "@avi2dg/orc"
 
@@ -9,24 +12,9 @@ const defaultRegistry = "https://registry.npmjs.org"
 
 const registryTimeoutMs = 15_000
 
-const UPDATE_JSON_SCHEMA = "orc.update.v1" as const
-
-const UpdateJsonSchema = Schema.Struct({
-  schema: Schema.Literal(UPDATE_JSON_SCHEMA),
-  found: Schema.NullOr(Schema.String),
-  running: Schema.String,
-  outcome: Schema.Literals(["installed", "current", "failed"]),
-  detail: Schema.NullOr(Schema.String),
-  output: Schema.NullOr(Schema.String)
-})
-
-export type UpdateDocument = typeof UpdateJsonSchema.Type
-
 const Version = Schema.String.check(Schema.isPattern(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/))
 
 const LatestManifest = Schema.Struct({ version: Version })
-
-export const isNewer = (found: string, running: string): boolean => Bun.semver.order(found, running) === 1
 
 export const installCommand = (configured: Command | undefined, version: string): Command => {
   if (configured === undefined) {
@@ -60,50 +48,78 @@ const readLatest = (registry: string): Effect.Effect<string, string> => {
   )
 }
 
-const document = (running: string, found: string | null, outcome: UpdateDocument["outcome"], detail: string | null, output: string | null): UpdateDocument =>
-  ({ schema: UPDATE_JSON_SCHEMA, found, running, outcome, detail, output })
+const current = (running: string, found: string): UpdateDocument =>
+  ({ schema: UPDATE_JSON_SCHEMA, found, running, outcome: "current", detail: null, output: null })
+
+const installed = (running: string, found: string, output: string | null): UpdateDocument =>
+  ({ schema: UPDATE_JSON_SCHEMA, found, running, outcome: "installed", detail: null, output })
+
+const failed = (running: string, found: string | null, detail: string, output: string | null, retryable?: false): UpdateDocument =>
+  ({ schema: UPDATE_JSON_SCHEMA, found, running, outcome: "failed", detail, output, ...(retryable === false ? { retryable } : {}) })
 
 export interface UpdateInputs {
   readonly home: string
   readonly env: Readonly<Record<string, string | undefined>>
   readonly running: string
+  readonly main: string
+  readonly executable: string
+  readonly releases: string
 }
 
-export const runUpdate = (inputs: UpdateInputs): Effect.Effect<UpdateDocument, never, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+export const runUpdate = (inputs: UpdateInputs): Effect.Effect<UpdateDocument, never, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    const config = yield* readOrcConfig(inputs.home).pipe(Effect.mapError((error) => error.file + ": " + error.detail))
-    const found = yield* readLatest(registryOf(inputs.env))
-    if (!isNewer(found, inputs.running)) {
-      return document(inputs.running, found, "current", null, null)
+    const { running, env, main, executable } = inputs
+    const config = yield* readOrcConfig(inputs.home).pipe(Effect.result)
+    if (Result.isFailure(config)) {
+      const error = config.failure
+      return failed(running, null, error.file + ": " + error.detail, null, false)
     }
-    const command = installCommand(config.update?.command, found)
+    const latest = yield* readLatest(registryOf(env)).pipe(Effect.result)
+    if (Result.isFailure(latest)) {
+      return failed(running, null, latest.failure, null)
+    }
+    const found = latest.success
+    if (!isNewer(found, running)) {
+      return current(running, found)
+    }
+    const configured = config.success.update?.command
+    if (configured === undefined) {
+      const compiled = selfCommand(executable, main).length === 1
+      const directory = yield* launcherDirectory(env.HOME || homedir(), compiled ? executable : main, running, compiled)
+      if (directory !== null) {
+        const build: LauncherBuild = compiled
+          ? { kind: "compiled", releases: inputs.releases, platform: process.platform + "-" + process.arch }
+          : { kind: "source", bun: executable }
+        return yield* installLauncherRelease(directory, found, running, build).pipe(
+          Effect.map((previous) => previous === null ? current(running, found) : installed(previous, found, null)),
+          Effect.catchTag("InstallFailure", (error) => Effect.succeed(failed(running, found, error.detail, error.output, error.retryable)))
+        )
+      }
+    }
+    const command = installCommand(configured, found)
     return yield* capture(command, null).pipe(
       Effect.map((result) => {
         const output = (result.stdout + result.stderr).trim()
         return result.exitCode === 0
-          ? document(inputs.running, found, "installed", null, output)
-          : document(inputs.running, found, "failed", command.join(" ") + " exited " + String(result.exitCode), output)
+          ? installed(running, found, output)
+          : failed(running, found, command.join(" ") + " exited " + String(result.exitCode), output)
       }),
-      Effect.catchTag("RunnerError", (error) => Effect.succeed(document(inputs.running, found, "failed", error.detail, null)))
+      Effect.catchTag("RunnerError", (error) => Effect.succeed(failed(running, found, error.detail, null)))
     )
-  }).pipe(
-    Effect.catch((detail) => Effect.succeed(document(inputs.running, null, "failed", detail, null)))
-  )
+  })
 
-export const encodeUpdateJson = (update: UpdateDocument): Effect.Effect<string, Schema.SchemaError> =>
-  Schema.encodeEffect(UpdateJsonSchema)(update).pipe(Effect.map((encoded) => JSON.stringify(encoded)))
+export const encodeUpdateJson = Schema.encodeEffect(UpdateJson)
 
 export const formatUpdate = (update: UpdateDocument): string => {
   switch (update.outcome) {
     case "installed": {
-      return "orc update installed " + packageName + " " + String(update.found) + " over " + update.running
+      return "orc update installed " + packageName + " " + update.found + " over " + update.running
     }
     case "current": {
-      return "orc " + update.running + " is current, the registry's newest is " + String(update.found)
+      return "orc " + update.running + " is current, the registry's newest is " + update.found
     }
     case "failed": {
-      const reason = "orc update stayed on " + update.running + ": " + String(update.detail)
-      return update.output === null || update.output === "" ? reason : reason + "\n" + update.output
+      return "orc update stayed on " + update.running + ": " + installerError(update)
     }
   }
 }

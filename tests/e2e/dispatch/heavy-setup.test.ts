@@ -176,21 +176,22 @@ describe("the heavy queue setup", () => {
   })
 
   test("a stale stand-in leaves the bin dir on the next write", async () => {
-    const home = await mkdtemp(join(tmpdir(), "orc-heavy-bin-"))
+    const home = await holderHome(null)
     try {
-      const first = await runEffect(
+      await writeFile(join(home, "fake", "tool"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
+      const first = await withLoggingPueue(home, () => runEffect(
         Effect.provide(
           writeHeavyBin(home, { group: "heavy", commands: ["tool"], limit: "auto", through: null }, "linux"),
           BunServices.layer
         )
-      )
+      ))
       expect(first).toContain("tool")
-      const second = await runEffect(
+      const second = await withLoggingPueue(home, () => runEffect(
         Effect.provide(
           writeHeavyBin(home, { group: "heavy", commands: [], limit: "auto", through: null }, "linux"),
           BunServices.layer
         )
-      )
+      ))
       expect(second).not.toContain("tool")
       expect(await Bun.file(join(home, "heavy", "bin", "tool")).exists()).toBe(false)
       expect(await Bun.file(join(home, "heavy", "bin", "bun")).exists()).toBe(true)
@@ -200,20 +201,27 @@ describe("the heavy queue setup", () => {
   })
 
   test("every generated stand-in passes the shell syntax check and runs", async () => {
-    const home = await mkdtemp(join(tmpdir(), "orc-heavy-bin-"))
+    const home = await holderHome(null)
     try {
-      const tools = await runEffect(
+      for (const tool of ["node", "checks-test", "xcodebuild", "tool"]) {
+        await writeFile(join(home, "fake", tool), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
+      }
+      const tools = await withLoggingPueue(home, () => runEffect(
         Effect.provide(
           writeHeavyBin(home, { group: "heavy", commands: ["tool"], limit: "auto", through: null }, "linux"),
           BunServices.layer
         )
-      )
+      ))
       expect(tools).toContain("bun")
       expect(tools).toContain("xcodebuild")
       expect(tools).toContain("tool")
       for (const tool of tools) {
         const check = Bun.spawnSync(["sh", "-n", join(home, "heavy", "bin", tool)])
         expect(check.exitCode).toBe(0)
+      }
+      for (const tool of ["node", "checks-test"]) {
+        const check = Bun.spawnSync(["sh", "-n", join(home, "heavy", "ci-only", tool)])
+        expect({ tool, exitCode: check.exitCode }).toEqual({ tool, exitCode: 0 })
       }
     } finally {
       await rm(home, { recursive: true, force: true })

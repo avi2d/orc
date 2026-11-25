@@ -36,7 +36,7 @@ describe("configured credential injection", () => {
         const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
         const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-        return yield* planSandbox(fs, path, spawner, hostTools, { projectDir, runDir, piAgentDir }, models, { config, provider, tokenFileFlag: undefined }, "nono")
+        return yield* planSandbox(fs, path, spawner, hostTools, { projectDir, runDir, piAgentDir, orcHome }, models, { config, provider, tokenFileFlag: undefined }, "nono")
       }).pipe(Effect.provide(BunServices.layer)))
       if (plan.kind !== "nono") {
         throw new Error("the login provider planned no nono credential")

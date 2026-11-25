@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { respondArgs } from "../../packages/run/src/entities/review-gate/no-mistakes-gate"
+import { holdReleaseId, respondArgs } from "../../packages/run/src/entities/review-gate/no-mistakes-gate"
 import { answerArgsFor, answerForGate, noMistakesBinary, omittedQuestionIds, parseRun, type NoMistakesFinding } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import { formatReport, type OrcRunReport } from "../../packages/run/src/features/running-a-task/run-record"
 import { parked } from "../lib/no-mistakes-fixture"
@@ -300,7 +300,7 @@ describe("answerForGate refuses only what needs your word", () => {
       instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior behind a flag"
     })
     if (answer.kind === "fix") {
-      expect(respondArgs(answer).slice(-2)).toEqual(["--instructions", "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior behind a flag"])
+      expect(respondArgs(answer).slice(-2)).toEqual(["--instructions", "Leave repository tests to GitHub CI. Do not run them locally. You may run build, lint, or typecheck. If a pull request run exists, do not start or rerun CI by hand. Do not wait for CI in a tool call.\n\nThe captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior behind a flag"])
     }
   })
 
@@ -311,6 +311,32 @@ describe("answerForGate refuses only what needs your word", () => {
       ignore: [],
       instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep it"
     })
+  })
+
+  test("a release beside a self-fixable finding reaches the fixer in the instructions instead of vanishing", () => {
+    const answer = answerForGate(approvalGate, [stubFinding("r1", "auto-fix")], [], [{ question: holdReleaseId, answer: "Fix the lint failure first" }])
+    expect(answer).toEqual({
+      kind: "fix",
+      ids: ["r1"],
+      ignore: [],
+      instructions: "The captain released the repeat hold with: Fix the lint failure first\nFollow that guidance as you retry the task."
+    })
+    if (answer.kind === "fix") {
+      expect(respondArgs(answer).slice(-2)).toEqual(["--instructions", "Leave repository tests to GitHub CI. Do not run them locally. You may run build, lint, or typecheck. If a pull request run exists, do not start or rerun CI by hand. Do not wait for CI in a tool call.\n\nThe captain released the repeat hold with: Fix the lint failure first\nFollow that guidance as you retry the task."])
+    }
+  })
+
+  test("a release beside an answered finding joins the finding guidance instead of replacing it", () => {
+    expect(answerForGate(approvalGate, [stubFinding("r2", "ask-user")], [], [{ question: "r2", answer: "Keep it" }, { question: holdReleaseId, answer: "Fix the lint failure first" }])).toEqual({
+      kind: "fix",
+      ids: ["r2"],
+      ignore: [],
+      instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep it\nThe captain released the repeat hold with: Fix the lint failure first\nFollow that guidance as you retry the task."
+    })
+  })
+
+  test("a release without an answered finding still approves a clean fix review", () => {
+    expect(answerForGate(fixReview, [stubFinding("r1", "auto-fix")], [], [{ question: holdReleaseId, answer: "Fix it" }])).toEqual({ kind: "approve" })
   })
 })
 
@@ -339,7 +365,7 @@ const report = (overrides: Partial<OrcRunReport>): OrcRunReport => ({
   ...overrides
 })
 
-const round = (number: number, passed: boolean) => ({ round: number, file: "checks-" + number.toString() + ".txt", started: "", ended: "", passed, failed: passed ? [] : ["lint"], checks: [], refusals: [] })
+const round = (number: number, passed: boolean) => ({ round: number, file: "checks-" + number.toString() + ".txt", started: "", ended: "", passed, failed: passed ? [] : ["lint"], checks: [{ name: "lint", passed }], refusals: [] })
 
 const statusLine = (text: string): string | undefined => text.split("\n").find((line) => line.startsWith("status: "))
 

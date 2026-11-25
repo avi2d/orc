@@ -6,7 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, Path } from "effect"
 import {
   agentFileCandidates,
-  bundledAgentsDir,
+  bundledAgentFiles,
   parseAgentFile,
   resolveAgentFile,
 } from "../../packages/run/src/entities/agent/index"
@@ -154,7 +154,7 @@ describe("resolveAgentFile", () => {
         throw new Error(found)
       }
       expect(found.source).toBe("bundled")
-      expect(found.path).toBe(join(bundledAgentsDir(), kind + ".md"))
+      expect(found.path).toBe(bundledAgentFiles[kind])
       expect(found.thinking).toBe("high")
       expect(found.tools).toEqual(["read", "bash", "edit", "write"])
       expect(found.model).toBe("acme/configured")
@@ -164,7 +164,7 @@ describe("resolveAgentFile", () => {
   test("the bundled files with no configured model are refused instead of running on a built-in model", async () => {
     for (const kind of ["implementer", "fixer"] as const) {
       expect(await resolved(kind, { projectDir: tmpdir(), orcHome: tmpdir(), configModel: noConfigModel })).toBe(
-        "refused: orc: the agent file " + join(bundledAgentsDir(), kind + ".md") + " names no model and /orc-home/config.json names no " + kind + " model, so name one in either"
+        "refused: orc: the agent file " + bundledAgentFiles[kind] + " names no model and /orc-home/config.json names no " + kind + " model, so name one in either"
       )
     }
   })
@@ -198,8 +198,8 @@ describe("resolveAgentFile", () => {
         throw new Error(found)
       }
       expect(found.source).toBe("bundled")
-      expect(found.path).toBe(join(bundledAgentsDir(), "reviewer.md"))
-      expect(found.tools).toEqual(["read", "bash"])
+      expect(found.path).toBe(bundledAgentFiles.reviewer)
+      expect(found.tools).toEqual(["read", "grep", "find", "ls"])
       expect(found.model).toBe("acme/configured")
     })
   })

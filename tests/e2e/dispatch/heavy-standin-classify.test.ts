@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test"
 import { readFile, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { run, setup, type Harness } from "./heavy-standin-harness"
@@ -315,6 +315,76 @@ describe("the heavy stand-in", () => {
     const harness = harnesses[harnesses.push(await setup(["xcrun"])) - 1]
     const result = run(harness, "xcrun", ["simctl", "boot", "uuid"])
     expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+})
+
+describe("the heavy stand-in under HEAVY_TESTS_CI_ONLY=1", () => {
+  const testsCiOnly = { HEAVY_TESTS_CI_ONLY: "1" }
+  let shared: Harness
+
+  beforeAll(async () => {
+    shared = await setup(["bun", "bunx", "npm", "npx", "pnpm", "yarn", "vitest", "jest", "pytest", "go", "cargo"])
+  })
+
+  afterAll(async () => {
+    await rm(shared.root, { recursive: true, force: true })
+  })
+
+  test.each([
+    "bun test",
+    "bun run test",
+    "bun run test:unit",
+    "bunx vitest",
+    "npx vitest",
+    "bunx jest",
+    "npx jest",
+    "npm test",
+    "npm t",
+    "vitest run",
+    "jest",
+    "pytest",
+    "go test ./...",
+    "cargo test",
+    "bun test --watch",
+    "bun run test:watch",
+    "vitest watch",
+    "vitest dev",
+    "vitest -w",
+    "jest --watchAll",
+    "pytest --ui",
+    "npm test -- --watch",
+    "pnpm test:watch",
+    "npx --yes vitest run",
+    "npx -y jest",
+    "npx vitest@latest run",
+    "npx jest@29",
+    "bun run vitest",
+    "npm run jest",
+    "pnpm run vitest",
+    "pnpm dlx vitest",
+    "yarn dlx jest"
+  ])("%s is refused instead of running the suite in the agent session", async (command) => {
+    const [tool = "", ...args] = command.split(" ")
+    const result = run(shared, tool, args, testsCiOnly)
+    expect({ command, code: result.code }).toEqual({ command, code: 1 })
+    expect(result.stderr).toContain("orc heavy: " + command + " starts a test run")
+    expect(await readFile(join(shared.root, "tool.log"), "utf8").catch(() => "")).toBe("")
+    expect(await shared.pueueLog()).toBe("")
+  })
+
+  test.each([
+    ["bun", "run build"],
+    ["bun", "run lint"],
+    ["bun", "run typecheck"],
+    ["npm", "run build"],
+    ["tsc", ""],
+    ["eslint", "."]
+  ])("%s %s still queues instead of running unqueued", async (tool, words) => {
+    const harness = harnesses[harnesses.push(await setup([tool])) - 1]
+    const result = run(harness, tool, words === "" ? [] : words.split(" "), testsCiOnly)
+    expect(result.code).toBe(0)
+    expect(result.stderr).not.toContain("starts a test run")
     expect(await harness.pueueLog()).toContain("add --group heavy")
   })
 })

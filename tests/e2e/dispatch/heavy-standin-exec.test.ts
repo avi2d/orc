@@ -22,9 +22,9 @@ const shellLines = (script: string): ReadonlyArray<string> =>
   script.split("\n").filter((line) => line !== "" && !line.startsWith("#"))
 
 describe("the heavy stand-in launcher", () => {
-  test("a written stand-in holds three shell lines instead of a script that decides in shell", async () => {
+  test("a written stand-in holds four shell lines instead of a script that decides in shell", async () => {
     const harness = track(await setup(["bun"]))
-    expect(shellLines(await readFile(join(harness.bin, "bun"), "utf8"))).toHaveLength(3)
+    expect(shellLines(await readFile(join(harness.bin, "bun"), "utf8"))).toHaveLength(4)
   })
 
   test("a direct call that the tool ends by a signal reaches the caller as that signal instead of an exit code", async () => {

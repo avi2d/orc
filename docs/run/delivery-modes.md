@@ -5,16 +5,30 @@ kind: reference
 A project's `mode` in `projects.json` is `no-mistakes`, `direct-PR` or `no-mistakes-prod-only`, and a project with no `mode` reads as `no-mistakes`.
 Orc refuses any other mode with `the project <name> names the mode <word>, which is not no-mistakes, direct-PR or no-mistakes-prod-only`.
 The mode decides only how a ship task ends, and any other kind ignores it.
+A `direct-PR` run never starts [no-mistakes](https://github.com/kunchenguid/no-mistakes) and does not need it installed.
 
 The beat turns the mode and the task's `internal` mark into the run's delivery and sets `ORC_TASK_DELIVERY` to `no-mistakes` or `direct-PR`.
 A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: true` and `no-mistakes` to the rest.
 `orc runner start` reads a missing `ORC_TASK_DELIVERY` as `no-mistakes` and queues a `direct-PR` ship run as `orc run <task-file> --delivery direct-PR`.
 
+## Review the branch
+Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one Pi turn with the reviewer agent over that diff and the task file.
+Orc decodes the findings JSON array from the reviewer's last reply and writes it to `review.json` in the run folder.
+An unreadable reply gets one rerun on the same session, and a second unreadable reply fails the review turn.
+The run's end reason names the finding count or the review failure.
+The run history records the turn as the `review` step with its start and end time and the reviewer's model.
+A passed `review` step names `review.json` as evidence and gives the finding count as the `review-findings` signal.
+A failed `review` step gives the failure as the `review-failure` signal.
+The review turn fixes nothing and blocks nothing, so the PR opens after it either way.
+A resumed direct-PR run reuses a completed review when the branch head is unchanged and writes its findings to `review.json` in the current run folder.
+If the head changed or no completed review was recorded, orc runs the review turn.
+Failed review turns are not recorded for reuse, so a resume retries them.
+A checkpoint write failure does not block the PR, but the next resume runs the review again.
+
 ## Open the PR
-A `direct-PR` run never starts [no-mistakes](https://github.com/kunchenguid/no-mistakes) and does not need it installed.
-Once the checks pass, it runs `git push --set-upstream origin <branch>` from the run's worktree.
+After the review turn, a direct-PR run runs `git push --set-upstream origin <branch>` from the run's worktree.
 It reuses the open PR for the branch when `gh pr list --head <branch> --state open` finds one, and otherwise runs `gh pr create`.
-The PR's title is the head commit's subject, and its body lists the branch's commits and the checks that passed.
+The PR's title is the head commit's subject, and its body lists the branch's commits and the local checks that passed.
 To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
 Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
 

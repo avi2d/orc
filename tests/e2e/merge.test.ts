@@ -1,93 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises"
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { closeTask, type Fixture, orchestratorConfig, ranClosing, runOrc, sessionFor, withFixture } from "./chat-helpers"
-
-const prUrl = "https://github.com/acme/orc/pull/8"
-const head = "0123456789abcdef0123456789abcdef01234567"
-
-interface Rollup {
-  readonly __typename: "CheckRun" | "StatusContext"
-  readonly [field: string]: string
-}
-
-const passed = (name: string, startedAt = "2026-11-02T10:00:00Z"): Rollup => ({ __typename: "CheckRun", name, status: "COMPLETED", conclusion: "SUCCESS", startedAt })
-
-const newHead = "fedcba9876543210fedcba9876543210fedcba98"
-
-interface HeadView {
-  readonly head: string
-  readonly checks: ReadonlyArray<Rollup>
-}
-
-interface Forge {
-  readonly state?: "OPEN" | "CLOSED" | "MERGED"
-  readonly checks?: ReadonlyArray<Rollup>
-  readonly behind?: number
-  readonly update?: "updates" | "conflicts" | "head moved"
-  readonly afterUpdate?: ReadonlyArray<HeadView>
-  readonly parents?: string
-  readonly flakyViews?: number
-  readonly flakyParents?: number
-}
-
-const ghCalls = (fixture: Fixture): string => join(fixture.dir, "gh-calls")
-
-const viewJson = (state: string, view: HeadView): string =>
-  JSON.stringify({ state, headRefOid: view.head, baseRefName: "main", statusCheckRollup: view.checks })
-
-const updateReply = (update: Forge["update"]): ReadonlyArray<string> => {
-  switch (update) {
-    case "conflicts": {
-      return ["echo '{\"message\":\"merge conflict between base and head\"}'", "echo 'gh: merge conflict between base and head (HTTP 422)' >&2", "exit 1"]
-    }
-    case "head moved": {
-      return ["echo '{\"message\":\"expected head sha did not match current head ref.\"}'", "echo 'gh: expected head sha did not match current head ref. (HTTP 422)' >&2", "exit 1"]
-    }
-    case "updates":
-    case undefined: {
-      return ["touch \"$VIEWS/updated\"", "echo '{\"message\":\"Updating pull request branch.\"}'", "exit 0"]
-    }
-  }
-}
-
-const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
-  const views = join(fixture.dir, "views")
-  const state = forge.state ?? "OPEN"
-  const after = forge.afterUpdate ?? [{ head: newHead, checks: [passed("lint"), passed("test")] }]
-  await mkdir(views, { recursive: true })
-  await writeFile(join(views, "before.json"), viewJson(state, { head, checks: forge.checks ?? [passed("lint"), passed("test")] }))
-  await Promise.all(after.map((view, index) => writeFile(join(views, "after-" + String(index + 1) + ".json"), viewJson(state, view))))
-  await writeFile(join(views, "after-last.json"), viewJson(state, after.at(-1) ?? { head: newHead, checks: [] }))
-  await writeFile(ghCalls(fixture), "")
-  await writeFile(join(fixture.dir, "bin", "gh"), [
-    "#!/bin/sh",
-    "VIEWS='" + views + "'",
-    "echo \"$*\" >> '" + ghCalls(fixture) + "'",
-    "case \"$*\" in *update-branch*)",
-    ...updateReply(forge.update),
-    ";; esac",
-    "if [ \"$1 $2\" = \"pr view\" ]; then",
-    "  if [ ! -f \"$VIEWS/updated\" ]; then cat \"$VIEWS/before.json\"; exit 0; fi",
-    "  f=$(( $(cat \"$VIEWS/flaky\" 2>/dev/null || echo 0) + 1 )); echo $f > \"$VIEWS/flaky\"",
-    "  if [ \"$f\" -le " + String(forge.flakyViews ?? 0) + " ]; then echo 'gh: Internal Server Error (HTTP 500)' >&2; exit 1; fi",
-    "  n=$(( $(cat \"$VIEWS/served\" 2>/dev/null || echo 0) + 1 )); echo $n > \"$VIEWS/served\"",
-    "  if [ -f \"$VIEWS/after-$n.json\" ]; then cat \"$VIEWS/after-$n.json\"; else cat \"$VIEWS/after-last.json\"; fi",
-    "  exit 0",
-    "fi",
-    "case \"$*\" in *compare/main..." + head + "*) echo " + String(forge.behind ?? 0) + "; exit 0;; esac",
-    "case \"$*\" in *commits/*)",
-    "  c=$(( $(cat \"$VIEWS/parents-flaky\" 2>/dev/null || echo 0) + 1 )); echo $c > \"$VIEWS/parents-flaky\"",
-    "  if [ \"$c\" -le " + String(forge.flakyParents ?? 0) + " ]; then echo 'gh: Not Found (HTTP 404)' >&2; exit 1; fi",
-    "  echo " + (forge.parents ?? head) + "; exit 0;; esac",
-    "if [ \"$1\" = api ]; then echo 0; exit 0; fi",
-    "if [ \"$1 $2\" = \"pr merge\" ]; then exit 0; fi",
-    "echo 'unexpected gh call' >&2",
-    "exit 1",
-    ""
-  ].join("\n"))
-  await chmod(join(fixture.dir, "bin", "gh"), 0o755)
-}
+import { closedWithPr, type Forge, ghCalls, head, newHead, passed, prUrl, type Rollup, stubGh, viewJson, writeProject } from "./merge-helpers"
 
 const stubRunner = async (fixture: Fixture): Promise<void> => {
   const runner = join(fixture.dir, "bin", "runner-stub")
@@ -98,14 +13,6 @@ const stubRunner = async (fixture: Fixture): Promise<void> => {
     machines: [{ name: "mac", slots: 1, start: ["true", "runner", "start", "--", runner] }],
     quota: { provider: "acme", command: ["true"], accounts: [{ name: "main", tokenFile: "/x" }], floorPercent: 15 }
   }))
-}
-
-const writeProject = (fixture: Fixture, extra: Record<string, unknown>): Promise<void> =>
-  writeFile(join(fixture.home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: fixture.dir }, ...extra }] }))
-
-const closedWithPr = async (fixture: Fixture): Promise<void> => {
-  expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added orc-1 for orc")
-  await closeTask(fixture, "orc-1", ranClosing("done", "", prUrl))
 }
 
 const taskFile = (fixture: Fixture): Promise<string> => readFile(join(fixture.home, "backlog", "closed", "orc-1.md"), "utf8")
@@ -177,8 +84,71 @@ const forgeSteps = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
 
 const sentBackTask = (fixture: Fixture): Promise<string> => readFile(join(fixture.home, "backlog", "new", "orc-1.md"), "utf8")
 
-describe("orc merge updates a PR that is only behind its base", () => {
-  test("an approved PR behind main is updated instead of refused", async () => {
+describe("orc merge compares the two sides of a PR behind its base", () => {
+  test("updates a disjoint PR rejected as out of date instead of refusing every retry", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, {
+        behind: 3,
+        baseFiles: [{ filename: "base-only.txt" }],
+        mergeRefusal: "Pull request is not mergeable: the head branch is not up to date with the base branch."
+      })
+      const merged = await runOrc(fixture, ["merge", "orc-1"])
+      expect(merged.exitCode).toBe(0)
+      expect(merged.stderr).toBe("")
+      expect(merged.stdout.trim().split("\n")).toEqual(["Updating from main", "Checks running", "merged orc-1 " + prUrl])
+      expect(await forgeSteps(fixture)).toEqual([
+        "view", "pr merge " + prUrl + " --squash --match-head-commit " + head,
+        "update", "view", "pr merge " + prUrl + " --squash --match-head-commit " + newHead
+      ])
+    })
+  }, 60_000)
+
+  test("does not update a disjoint PR when the merge is refused for another policy", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, baseFiles: [{ filename: "base-only.txt" }], mergeRefusal: "At least one approving review is required." })
+      const merged = await runOrc(fixture, ["merge", "orc-1"])
+      expect(merged.exitCode).not.toBe(0)
+      expect(merged.stderr).toContain("At least one approving review is required.")
+      expect(await forgeSteps(fixture)).toEqual(["view", "pr merge " + prUrl + " --squash --match-head-commit " + head])
+    })
+  }, 60_000)
+
+  test("merges at the checked head instead of updating when the changed paths are disjoint", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 3, baseFiles: [{ filename: "base-only.txt" }] })
+      const merged = await runOrc(fixture, ["merge", "orc-1"])
+      expect(merged.stderr).toBe("")
+      expect(merged.stdout.trim()).toBe("merged orc-1 " + prUrl)
+      expect(await forgeSteps(fixture)).toEqual(["view", "pr merge " + prUrl + " --squash --match-head-commit " + head])
+    })
+  }, 60_000)
+
+  test("does not treat a capped comparison as proof the changed paths are disjoint", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, baseFiles: Array.from({ length: 300 }, (_, index) => ({ filename: "base-" + index })) })
+      const merged = await runOrc(fixture, ["merge", "orc-1"])
+      expect(merged.stderr).toBe("")
+      expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+      expect(await readFile(ghCalls(fixture), "utf8")).toContain(updateCall)
+    })
+  }, 60_000)
+
+  test("updates a PR when the base renamed a path the PR changed instead of missing the overlap", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, baseFiles: [{ filename: "renamed.txt", previous_filename: "shared.txt" }] })
+      const merged = await runOrc(fixture, ["merge", "orc-1"])
+      expect(merged.stderr).toBe("")
+      expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+      expect(await readFile(ghCalls(fixture), "utf8")).toContain(updateCall)
+    })
+  }, 60_000)
+
+  test("an approved PR with a shared changed path is updated instead of merged at its old head", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 3 })
@@ -273,6 +243,153 @@ describe("orc merge updates a PR that is only behind its base", () => {
   }, 60_000)
 })
 
+describe("chat merge returns without waiting for CI", () => {
+  for (const basis of ["captain-word", "yolo-green"] as const) {
+    test(basis + " returns after requesting an update instead of polling CI or merging in the same call", async () => {
+      await withFixture(orchestratorConfig, 0, async (fixture) => {
+        await writeProject(fixture, { yolo: true })
+        await closedWithPr(fixture)
+        await stubGh(fixture, {
+          behind: 1,
+          afterUpdate: [
+            { head: newHead, checks: [passed("lint"), running("test")] },
+            { head: newHead, checks: [passed("lint"), passed("test")] }
+          ]
+        })
+        const session = sessionFor(fixture)
+        const result = await session.call("merge_task", { id: "orc-1", basis })
+        expect(result).toContain("requested branch update for orc-1 " + prUrl)
+        expect(result).toContain("not merged")
+        expect(await forgeSteps(fixture)).toEqual(["view", "update"])
+        expect(await readFile(ghCalls(fixture), "utf8")).toContain(updateCall)
+        expect(await mergeCalls(fixture)).toEqual([])
+
+        await writeFile(join(fixture.dir, "views", "after-1.json"), viewJson("OPEN", { head: newHead, checks: [passed("lint"), passed("test")] }))
+        expect(await session.call("merge_task", { id: "orc-1", basis })).toBe("merged orc-1 " + prUrl)
+        expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+      })
+    }, 60_000)
+  }
+
+  const refusalOf = (error: unknown): string => error instanceof Error ? error.message : String(error)
+  const status = (context: string): Rollup => ({ __typename: "StatusContext", context, state: "SUCCESS" })
+
+  test("the retry command names the basis the caller used instead of dropping it", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1 })
+      const requested = await runOrc(fixture, ["merge", "orc-1", "--basis", "captain-word", "--no-wait"])
+      expect(requested.stdout).toContain("Run orc merge orc-1 --basis captain-word --no-wait again")
+    })
+  }, 60_000)
+
+  test("a status context green before the update and not posted on the new head is refused instead of read as green", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, checks: [passed("lint"), status("ci/deploy")], afterUpdate: [{ head: newHead, checks: [passed("lint")] }] })
+      const session = sessionFor(fixture)
+      expect(await session.call("merge_task", { id: "orc-1", basis: "captain-word" })).toContain("requested branch update for orc-1")
+
+      const refused = await session.call("merge_task", { id: "orc-1", basis: "captain-word" }).then(String, refusalOf)
+      expect(refused).toContain("the check ci/deploy was green before the update and has not reported green on its new head " + newHead)
+      expect(await mergeCalls(fixture)).toEqual([])
+
+      await writeFile(join(fixture.dir, "views", "after-last.json"), viewJson("OPEN", { head: newHead, checks: [passed("lint"), status("ci/deploy")] }))
+      expect(await session.call("merge_task", { id: "orc-1", basis: "captain-word" })).toBe("merged orc-1 " + prUrl)
+      expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+    })
+  }, 60_000)
+
+  test("a rejected duplicate update does not let the new head merge without a check that passed before the first request", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, {
+        behind: 1,
+        update: "reject duplicate",
+        checks: [passed("lint"), status("ci/deploy")],
+        afterUpdate: [{ head, checks: [passed("lint")] }, { head: newHead, checks: [passed("lint")] }]
+      })
+      const session = sessionFor(fixture)
+      const merge = () => session.call("merge_task", { id: "orc-1", basis: "captain-word" })
+      expect(await merge()).toContain("requested branch update for orc-1")
+      expect(await merge().then(String, refusalOf)).toContain("duplicate update request")
+      expect(await merge().then(String, refusalOf)).toContain("the check ci/deploy was green before the update and has not reported green")
+      expect(await mergeCalls(fixture)).toEqual([])
+
+      await writeFile(join(fixture.dir, "views", "after-last.json"), viewJson("OPEN", { head: newHead, checks: [passed("lint"), status("ci/deploy")] }))
+      expect(await merge()).toBe("merged orc-1 " + prUrl)
+      expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+    })
+  }, 60_000)
+
+  test("a red check on the new head sends the task back on the next merge call instead of merging", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubRunner(fixture)
+      await stubGh(fixture, { behind: 1, afterUpdate: [{ head: newHead, checks: [passed("lint"), red("test")] }] })
+      const session = sessionFor(fixture)
+      expect(await session.call("merge_task", { id: "orc-1", basis: "captain-word" })).toContain("requested branch update for orc-1")
+
+      const refused = await session.call("merge_task", { id: "orc-1", basis: "captain-word" }).then(String, refusalOf)
+      expect(refused).toContain("the check ci/test is red on its new head " + newHead)
+      expect(refused).toContain("sent orc-1 back")
+      expect(await mergeCalls(fixture)).toEqual([])
+    })
+  }, 60_000)
+
+  test("a head that does not descend from the checked head is refused on the next merge call instead of merged", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, parents: foreignHead })
+      const session = sessionFor(fixture)
+      expect(await session.call("merge_task", { id: "orc-1", basis: "captain-word" })).toContain("requested branch update for orc-1")
+
+      const refused = await session.call("merge_task", { id: "orc-1", basis: "captain-word" }).then(String, refusalOf)
+      expect(refused).toContain("changed after its checks were read")
+      expect(await mergeCalls(fixture)).toEqual([])
+    })
+  }, 60_000)
+
+  test("a conflict send-back drops the saved update, so the fixed head is judged on its own checks instead of refused as changed", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubRunner(fixture)
+      await stubGh(fixture, { behind: 1, update: "conflicts", parents: foreignHead, afterUpdate: [{ head: newHead, checks: [passed("lint"), passed("test")] }] })
+      const closed = await taskFile(fixture)
+      const session = sessionFor(fixture)
+      const sentBack = await session.call("merge_task", { id: "orc-1", basis: "captain-word" }).then(String, refusalOf)
+      expect(sentBack).toContain("has a merge conflict with main")
+      expect(sentBack).toContain("sent orc-1 back")
+
+      await rm(join(fixture.home, "backlog", "new", "orc-1.md"))
+      await writeFile(join(fixture.home, "backlog", "closed", "orc-1.md"), closed)
+      await writeFile(join(fixture.dir, "views", "updated"), "")
+      expect(await session.call("merge_task", { id: "orc-1", basis: "captain-word" })).toBe("merged orc-1 " + prUrl)
+      expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+    })
+  }, 60_000)
+
+  test("a saved check the new head never runs keeps merge_task refusing, and plain orc merge waits for the new head's own checks instead of staying blocked", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      const unitGreen: Rollup = { ...running("unit"), status: "COMPLETED", conclusion: "SUCCESS" }
+      const unitRunning = { head: newHead, checks: [passed("lint"), running("unit")] }
+      await stubGh(fixture, { behind: 1, afterUpdate: [unitRunning, unitRunning, unitRunning, { head: newHead, checks: [passed("lint"), unitGreen] }] })
+      const session = sessionFor(fixture)
+      expect(await session.call("merge_task", { id: "orc-1", basis: "captain-word" })).toContain("requested branch update for orc-1")
+
+      const refused = await session.call("merge_task", { id: "orc-1", basis: "captain-word" }).then(String, refusalOf)
+      expect(refused).toContain("the check test was green before the update and has not reported green on its new head " + newHead)
+      expect(refused).toContain("or run orc merge orc-1 --basis captain-word to wait for the new head's own checks")
+      expect(await mergeCalls(fixture)).toEqual([])
+
+      const merged = await runOrc(fixture, ["merge", "orc-1", "--basis", "captain-word"])
+      expect(merged.stdout.trim()).toEndWith("merged orc-1 " + prUrl)
+      expect(await forgeSteps(fixture)).toEqual(["view", "update", "view", "view", "view", "view", "pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+    })
+  }, 60_000)
+})
+
 describe("orc merge lands a green PR", () => {
   test("squash-merges the open green PR at its checked head instead of leaving it open", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
@@ -282,7 +399,7 @@ describe("orc merge lands a green PR", () => {
       expect(merged.stderr).toBe("")
       expect(merged.stdout.trim()).toBe("merged orc-1 " + prUrl)
       expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + head])
-      expect(await readFile(ghCalls(fixture), "utf8")).toContain("api --hostname github.com repos/acme/orc/compare/main..." + head + " --jq .behind_by")
+      expect(await readFile(ghCalls(fixture), "utf8")).toContain("api --hostname github.com repos/acme/orc/compare/main..." + head + "?per_page=1")
       expect(await taskFile(fixture)).toContain(prUrl)
       expect(await taskFile(fixture)).not.toContain("merged_at")
       const board = await runOrc(fixture, ["backlog"])
@@ -362,6 +479,75 @@ describe("the merge_task chat tool", () => {
       await closedWithPr(fixture)
       await stubGh(fixture, { checks: [{ __typename: "CheckRun", workflowName: "ci", name: "test", status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-11-02T10:00:00Z" }] })
       expect(await rejection(sessionFor(fixture).call("merge_task", { id: "orc-1", basis: "yolo-green" }))).toContain("the check ci/test is red")
+      expect(await mergeCalls(fixture)).toEqual([])
+    })
+  }, 60_000)
+})
+
+describe("owner-word changes cannot change a branch on yolo-green", () => {
+  for (const noWait of [false, true]) {
+    for (const pendingHead of [null, head, foreignHead]) {
+      test("a workflow PR is refused before updating or sending back with noWait=" + String(noWait) + " and pending=" + String(pendingHead), async () => {
+        await withFixture(orchestratorConfig, 0, async (fixture) => {
+          await writeProject(fixture, { yolo: true })
+          await closedWithPr(fixture)
+          await stubGh(fixture, {
+            behind: 1,
+            files: [".github/workflows/ci.yml"],
+            checks: pendingHead === foreignHead ? [red("test")] : [passed("test")],
+            update: "conflicts"
+          })
+          const pendingFile = join(fixture.home, "backlog", "logs", "orc-1.merge")
+          const pending = JSON.stringify({ url: prUrl, head: pendingHead, green: ["ci/test"] })
+          if (pendingHead !== null) {
+            await mkdir(join(fixture.home, "backlog", "logs"), { recursive: true })
+            await writeFile(pendingFile, pending)
+          }
+          const result = await runOrc(fixture, ["merge", "orc-1", "--basis", "yolo-green", ...(noWait ? ["--no-wait"] : [])])
+          expect(result.exitCode).not.toBe(0)
+          expect(result.stdout).toBe("")
+          expect(result.stderr).toContain("changes the workflow file .github/workflows/ci.yml, which waits for the captain's merge word")
+          if (pendingHead === foreignHead) {
+            expect(result.stderr).toContain("the check ci/test is red")
+          }
+          expect(await forgeSteps(fixture)).toEqual(["view"])
+          expect(await taskFile(fixture)).toContain('outcome: "done"')
+          expect(await readFile(pendingFile, "utf8").catch(() => null)).toBe(pendingHead === null ? null : pending)
+        })
+      }, 60_000)
+    }
+  }
+
+  test("chat reports both the red check and owner-word changes instead of only the first refusal", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await writeProject(fixture, { yolo: true })
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, checks: [red("test")], files: ["CHANGELOG.md", ".env.production"] })
+      const result = await rejection(sessionFor(fixture).call("merge_task", { id: "orc-1", basis: "yolo-green" }))
+      expect(result).toContain("the check ci/test is red")
+      expect(result).toContain("is a release, as it changes CHANGELOG.md")
+      expect(result).toContain("changes the secret file .env.production")
+      expect(await forgeSteps(fixture)).toEqual(["view"])
+    })
+  }, 60_000)
+})
+
+describe("beat merge output", () => {
+  test("an overlapping branch update does not corrupt the beat JSON document with progress output", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await writeProject(fixture, { yolo: true })
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1 })
+      const result = await runOrc(fixture, ["beat", "--json"])
+      expect(result.exitCode).toBe(0)
+      const document: unknown = JSON.parse(result.stdout)
+      expect(document).toMatchObject({
+        schema: "orc.beat.v1",
+        actions: expect.arrayContaining([
+          expect.objectContaining({ kind: "yolo-updating", task: "orc-1", pr: prUrl })
+        ])
+      })
+      expect(await forgeSteps(fixture)).toEqual(["view", "view", "update"])
       expect(await mergeCalls(fixture)).toEqual([])
     })
   }, 60_000)

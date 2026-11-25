@@ -68,6 +68,7 @@ Children may wait on each other with `--depends-on`, and the beat starts the chi
 Orc refuses a `--parent` the backlog does not hold, one that is not a parent, or one that is no longer new.
 Orc refuses a parent given a parent and a child that waits on a task already waiting on its parent.
 Until every scout and task child closes done and every ship child with a PR merges, each beat prints `waits <task-id>: waits on its children, <done> of <total> done`, or `waits for its first child` while it has none.
+A child that closed undone is named after that count, as in `, and orc-2 closed failed, which no beat reopens`.
 A failed child keeps its parent waiting.
 `orc backlog` shows the count on the parent's line, as in `orc-1 parent orc 3 of 5 done Ship the whole feature`.
 
@@ -136,6 +137,8 @@ orc-2 started on mac Record the split
 orc-3 new Show the plan
 orc-4 new waits orc-2,orc-3 Plan at intake
 ```
+
+A parked child closed with `orc backlog close --landed-in` shows as `done landed in <pr-url>`.
 
 To drop a child from the plan, run `orc backlog plan <task-id> --drop <child-id>`, which removes its task file and lowers the parent's count.
 Orc refuses a child that is taken, started, closed or parked, and one another open task waits on until `orc backlog depend` changes that wait.

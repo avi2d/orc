@@ -9,9 +9,9 @@ It fits the terminal's rows by showing fewer sessions a window, and it keeps eve
 Below one row a window, it shows the flags first and then whatever notes still fit.
 When two lines a flag do not fit, each flag takes one line with its session, window cycle and account.
 When even one line a flag does not fit, the panel shows the flags that fit.
-Its last line counts the rest and names the repository root's `session-quota-json` script, which lists every flag, or `session-quota-composed-json` when a second machine is composed.
+Its last line counts the rest and names `orc-dash report session-quota`, which lists every flag, or `orc-dash report session-quota-composed` when a second machine is composed.
 A terminal too narrow for that line on one row wraps it onto two.
-Heights under eight rows are not a supported layout, so there that line can be cut, and the script still lists every flag.
+Heights under eight rows are not a supported layout, so there that line can be cut, and the report command still lists every flag.
 The dashboard shows only the flags, each naming the agent's project, the account and the limit.
 Press `q` or Control C to quit.
 To print one frame of plain text instead, run `orc-dash panel session-quota --print`, and add `--width 40` for a narrow frame.
@@ -37,6 +37,8 @@ The session panel also reads the capture ledger that its writer appends to from 
 The bridge appends headless readings to the same ledger.
 It can merge a second machine's report, so an account both machines spend shows one estimate instead of two upper bounds.
 Each account opens with the assumption that joined its calls to it, such as joined by credential key or assumed the only login.
+The Claude headings use the same [account names](../dash-quota.md) as the dashboard quota panel.
+A heading with no such name uses the `quota-axi` account key, or just `claude` for the default login.
 A window is read from a harness log when the log covered its provider within the hour, or read it later than quota-axi did.
 Such a window names that log and the reading's age, such as from codex rollout 38m ago.
 It names the reading's join too when that differs from the account's.
@@ -71,7 +73,7 @@ Otherwise the panel names the processes that share the folder, and the folder's 
 
 ## Print reports and alerts
 
-To print the versioned JSON report, run `bun run session-quota-json`.
-To print the report merged with a second machine's, run `bun run session-quota-composed-json`.
-To stream flag alerts as JSON lines, run `bun run session-quota-alerts`.
+To print the versioned JSON report, run `orc-dash report session-quota`.
+To print the report merged with a second machine's, run `orc-dash report session-quota-composed`.
+To stream flag alerts as JSON lines, run `orc-dash report session-quota-alerts`.
 [Read the JSON report](json-report.md), [Compose two machines](compose-two-machines.md) and [Tail the alert stream](alert-stream.md) document both reports, the alert stream and how to configure the second machine.

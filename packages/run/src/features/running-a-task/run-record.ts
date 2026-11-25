@@ -16,7 +16,7 @@ export type { ChecksRoundSummary, OrcRunCommit, OrcRunReport, RecordedFixAttempt
 
 export type RunDeliverer =
   | { readonly kind: "no-mistakes"; readonly runner: NoMistakesRunner }
-  | { readonly kind: "direct-PR"; readonly opener: PullRequestOpener }
+  | { readonly kind: "direct-PR"; readonly opener: PullRequestOpener; readonly reviewer: AgentFile }
 
 export const prBodyFileName = "pr-body.md"
 
@@ -47,6 +47,34 @@ export interface HistoryRun {
   readonly answerWaitSeconds?: number | undefined
 }
 
+const commitsText = (commits: OrcRunReport["commits"]): string =>
+  commits === null ? "unknown" : commits.length.toString() + commits.map((commit) => " " + commit.sha).join(",")
+
+const inputTokensText = (tokens: OrcRunReport["tokens"]): string =>
+  tokens === null ? "unknown" : tokens.input.toString()
+
+const outputTokensText = (tokens: OrcRunReport["tokens"]): string =>
+  tokens === null ? "unknown" : tokens.output.toString()
+
+const sessionSizeText = (sessionSize: OrcRunReport["sessionSize"]): string =>
+  sessionSize === null ? "unknown" : sessionSize.turns.toString() + " turns, " + sessionSize.compactions.toString() + " compactions"
+
+const longSessionText = (sessionSize: OrcRunReport["sessionSize"]): string =>
+  sessionSize === null ? "unknown" : (longSessionWarning(sessionSize) ?? "no")
+
+const handoverText = (report: OrcRunReport): string =>
+  report.sessionSize !== null && longSessionWarning(report.sessionSize) !== null ? toFileUrl(report.runDir + "/" + handoverFileName) : "none"
+
+const checksText = (checksRounds: OrcRunReport["checksRounds"], fixAttempts: number): string => {
+  if (checksRounds === null) {
+    return "never ran"
+  }
+  if (checksRounds.every((round) => round.checks.length === 0)) {
+    return "no local checks run"
+  }
+  return checksRounds.length.toString() + (checksRounds.length === 1 ? " round" : " rounds") + ", " + fixAttempts.toString() + (fixAttempts === 1 ? " fix attempt" : " fix attempts")
+}
+
 export const formatReport = (report: OrcRunReport): string =>
   [
     "run id: " + report.runId,
@@ -57,15 +85,13 @@ export const formatReport = (report: OrcRunReport): string =>
     "model: " + report.model,
     "pi session: " + (report.sessionId ?? "none"),
     "session file: " + (report.sessionFile === null ? "none" : toFileUrl(report.sessionFile)),
-    "commits: " + (report.commits === null ? "unknown" : report.commits.length.toString() + report.commits.map((commit) => " " + commit.sha).join(",")),
-    "input tokens: " + (report.tokens === null ? "unknown" : report.tokens.input.toString()),
-    "output tokens: " + (report.tokens === null ? "unknown" : report.tokens.output.toString()),
-    "session size: " + (report.sessionSize === null ? "unknown" : report.sessionSize.turns.toString() + " turns, " + report.sessionSize.compactions.toString() + " compactions"),
-    "long session: " + (report.sessionSize === null ? "unknown" : (longSessionWarning(report.sessionSize) ?? "no")),
-    "handover: " + (report.sessionSize !== null && longSessionWarning(report.sessionSize) !== null ? toFileUrl(report.runDir + "/" + handoverFileName) : "none"),
-    "checks: " + (report.checksRounds === null
-      ? "never ran"
-      : report.checksRounds.length.toString() + (report.checksRounds.length === 1 ? " round" : " rounds") + ", " + report.fixAttempts.toString() + (report.fixAttempts === 1 ? " fix attempt" : " fix attempts")),
+    "commits: " + commitsText(report.commits),
+    "input tokens: " + inputTokensText(report.tokens),
+    "output tokens: " + outputTokensText(report.tokens),
+    "session size: " + sessionSizeText(report.sessionSize),
+    "long session: " + longSessionText(report.sessionSize),
+    "handover: " + handoverText(report),
+    "checks: " + checksText(report.checksRounds, report.fixAttempts),
     "pr: " + (report.prLink ?? "none"),
     "no-mistakes: " + (report.noMistakes === null ? "never ran" : noMistakesSummary(report.noMistakes)),
     "status: " + runStatus(report),
@@ -114,25 +140,44 @@ export const failedReport = (run: HistoryRun, reason: string): OrcRunReport => (
   endReason: reason
 })
 
+const sessionEvidenceLine = (sessionId: string | null, sessionFile: string | null): string =>
+  sessionId === null ? "Pi stored no session." : "Pi session " + sessionId + " is stored at " + (sessionFile ?? "an unknown path") + "."
+
+const markerEvidenceLine = (markerVerified: boolean): string =>
+  markerVerified ? "Pi printed " + orcCompletionLine + "." : "orc could not verify that Pi printed " + orcCompletionLine + "."
+
+const commitsEvidenceLine = (commits: OrcRunReport["commits"], branch: string): string => {
+  if (commits === null) {
+    return "orc could not tell which commits Pi made on " + branch + "."
+  }
+  return commits.length === 0 ? "Pi made no commit on " + branch + "." : "Commits on " + branch + "."
+}
+
+const tokensEvidenceLine = (tokens: OrcRunReport["tokens"]): string =>
+  tokens === null
+    ? "Pi's token use is unknown."
+    : "Pi consumed " + tokens.input.toString() + " input tokens and " + tokens.output.toString() + " output tokens."
+
+const checksEvidenceLines = (checksRounds: OrcRunReport["checksRounds"], fixAttempts: number, basename: (file: string) => string): ReadonlyArray<string> => {
+  if (checksRounds === null) {
+    return []
+  }
+  const summary = checksRounds.every((round) => round.checks.length === 0)
+    ? "No local checks ran."
+    : "Checks ran " + checksRounds.length.toString() + (checksRounds.length === 1 ? " round" : " rounds") + " with " + fixAttempts.toString() + (fixAttempts === 1 ? " fix attempt" : " fix attempts") + "."
+  return [summary, "Checks evidence: " + checksRounds.map((round) => basename(round.file)).join(", ") + "."]
+}
+
 export const writeEvidence = (run: HistoryRun, report: OrcRunReport): Effect.Effect<void, OrcRunError> => {
   const lines = [
     "Implement step for task " + run.taskPath + ".",
     "Agent file " + report.agentPath + " (" + report.agentSource + ") names model " + report.model + " with tools " + run.agent.tools.join(", ") + ".",
-    report.sessionId === null ? "Pi stored no session." : "Pi session " + report.sessionId + " is stored at " + (report.sessionFile ?? "an unknown path") + ".",
-    report.markerVerified ? "Pi printed " + orcCompletionLine + "." : "orc could not verify that Pi printed " + orcCompletionLine + ".",
-    report.commits === null
-      ? "orc could not tell which commits Pi made on " + report.branch + "."
-      : report.commits.length === 0 ? "Pi made no commit on " + report.branch + "." : "Commits on " + report.branch + ".",
+    sessionEvidenceLine(report.sessionId, report.sessionFile),
+    markerEvidenceLine(report.markerVerified),
+    commitsEvidenceLine(report.commits, run.branch),
     ...(report.commits ?? []).map((commit) => commit.sha + " " + commit.subject),
-    report.tokens === null
-      ? "Pi's token use is unknown."
-      : "Pi consumed " + report.tokens.input.toString() + " input tokens and " + report.tokens.output.toString() + " output tokens.",
-    ...(report.checksRounds === null
-      ? []
-      : [
-        "Checks ran " + report.checksRounds.length.toString() + (report.checksRounds.length === 1 ? " round" : " rounds") + " with " + report.fixAttempts.toString() + (report.fixAttempts === 1 ? " fix attempt" : " fix attempts") + ".",
-        "Checks evidence: " + report.checksRounds.map((round) => run.path.basename(round.file)).join(", ") + "."
-      ]),
+    tokensEvidenceLine(report.tokens),
+    ...checksEvidenceLines(report.checksRounds, report.fixAttempts, (file) => run.path.basename(file)),
     report.endReason
   ]
   const implement = run.fs.writeFileString(run.path.join(run.runDir, "implement-1.md"), lines.join("\n") + "\n")

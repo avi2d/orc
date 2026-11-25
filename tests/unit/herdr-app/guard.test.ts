@@ -18,8 +18,15 @@ test("leaves a queued task out of the runs instead of refusing it for its null i
   expect(guarded.kind === "ok" ? guarded.value.runs.map((run) => run.id) : guarded).toEqual(["r1"])
 })
 
+const shownRun = { taskFile: "/work/orc/runs/r1/task.md" }
+
+test("refuses a show without its run instead of hiding the Checks summary", () => {
+  const text = JSON.stringify({ schema: "orc.show.v1", steps: [] })
+  expect(guardJson(text, show)).toEqual({ kind: "refused", reason: "run is missing" })
+})
+
 test("refuses a step status it has no mark for instead of marking it passed", () => {
-  const text = JSON.stringify({ schema: "orc.show.v1", steps: [{ id: 1, name: "implement", attempt: 1, status: "paused" }] })
+  const text = JSON.stringify({ schema: "orc.show.v1", run: shownRun, steps: [{ id: 1, name: "implement", attempt: 1, status: "paused" }] })
   expect(guardJson(text, show)).toEqual({ kind: "refused", reason: 'steps[0].status is "paused", not "running" or "passed" or "failed" or "skipped"' })
 })
 
@@ -35,12 +42,24 @@ test("refuses a run from an orc that prints no worktree instead of hiding its ch
 })
 
 test("refuses a step from an orc that prints no model instead of showing a card without one", () => {
-  const text = JSON.stringify({ schema: "orc.show.v1", steps: [{ id: 1, name: "implement", attempt: 1, status: "passed" }] })
+  const text = JSON.stringify({ schema: "orc.show.v1", run: shownRun, steps: [{ id: 1, name: "implement", attempt: 1, status: "passed" }] })
   expect(guardJson(text, show)).toEqual({ kind: "refused", reason: "steps[0].model is missing" })
 })
 
 test("reads a step's model, thinking level and session file rather than dropping them", () => {
-  const text = JSON.stringify({ schema: "orc.show.v1", steps: [{ id: 1, name: "implement", attempt: 1, status: "passed", model: "claude-opus-5-5", thinking: "high", piSessionFile: "/home/sam/.orc/runs/r1/sessions/s.jsonl", from: null }] })
+  const text = JSON.stringify({ schema: "orc.show.v1", run: shownRun, steps: [{ id: 1, name: "implement", attempt: 1, status: "passed", model: "claude-opus-5-5", thinking: "high", piSessionFile: "/home/sam/.orc/runs/r1/sessions/s.jsonl", from: null }] })
   const guarded = guardJson(text, show)
   expect(guarded.kind === "ok" ? guarded.value.steps : guarded).toEqual([{ id: 1, name: "implement", attempt: 1, status: "passed", model: "claude-opus-5-5", thinking: "high", piSessionFile: "/home/sam/.orc/runs/r1/sessions/s.jsonl", from: null }])
+})
+
+test("reads a project's checkout paths rather than dropping them", () => {
+  const text = JSON.stringify({ schema: "orc.backlog.v1", projects: [{ name: "herdr", checkouts: { desk: "/work/herdr-app" } }], tasks: [] })
+  const guarded = guardJson(text, backlog)
+  expect(guarded.kind === "ok" ? guarded.value.projects : guarded).toEqual([{ name: "herdr", paths: ["/work/herdr-app"] }])
+})
+
+test("reads a backlog's project names and a task's PR state rather than dropping them", () => {
+  const text = JSON.stringify({ schema: "orc.backlog.v1", projects: [{ name: "orc", path: "/work/orc" }], tasks: [{ id: "orc-46", title: "t", project: "orc", kind: "ship", status: "closed", hold: null, parked: null, prState: "merged" }] })
+  const guarded = guardJson(text, backlog)
+  expect(guarded.kind === "ok" ? [guarded.value.projects?.map((project) => project.name), guarded.value.tasks[0]?.prState] : guarded).toEqual([["orc"], "merged"])
 })

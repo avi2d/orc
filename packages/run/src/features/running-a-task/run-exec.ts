@@ -1,11 +1,13 @@
-import { Console, Effect, type FileSystem, type Path, type Scope } from "effect"
+import { Console, Effect, FileSystem, Path, type Scope } from "effect"
+import { homedir } from "node:os"
 import type { ChildProcessSpawner } from "effect/process"
-import { type AgentExec, hostExec, shellInAgent, streamShellInAgent } from "../../shared/sandbox/index"
+import { type AgentExec, hostExec, shellInAgent, streamShellInAgent, toolTimeCap } from "../../shared/sandbox/index"
 import { prepareCommandOf, readChecksCommands } from "./checks"
 import { commitsSince, headOf } from "../../shared/process/index"
 import { openNonoExec } from "../../shared/sandbox/index"
 import type { ToolchainResolver } from "../../shared/sandbox/index"
 import { type AskSetup, failingFileName, runPi, type PiPacing } from "../../entities/agent/index"
+import { standinHelper } from "../../entities/heavy-queue/index"
 import type { RunFolders } from "./run-folders"
 import type { SandboxOps } from "./run-ops"
 import { OrcRunError } from "../../shared/lib/index"
@@ -23,10 +25,30 @@ export const openAgentExec = (
   hostEnv: Readonly<Record<string, string | undefined>>
 ): Effect.Effect<AgentExec, OrcRunError, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path | Scope.Scope> =>
   plan.kind === "none"
-    ? Effect.succeed(hostExec(copyDir, hostEnv, {
-      GIT_CONFIG_GLOBAL: agentGitConfig(folders),
-      ...(plan.own === null ? {} : { PI_CODING_AGENT_DIR: plan.own.piAgentDir, ...plan.own.env })
-    }))
+    ? Effect.gen(function*() {
+      const exec = hostExec(copyDir, hostEnv, {
+        GIT_CONFIG_GLOBAL: agentGitConfig(folders),
+        HEAVY_TESTS_CI_ONLY: "1",
+        BASH_ENV: hostEnv["BASH_ENV"] ?? "",
+        // A top-level bash with a socket for stdin reads bashrc instead of BASH_ENV on Debian and Ubuntu; SHLVL 1 makes every bash nested.
+        SHLVL: "1",
+        ...(plan.own === null ? {} : { PI_CODING_AGENT_DIR: plan.own.piAgentDir, ...plan.own.env })
+      })
+      const agentDir = new Map(Object.entries(exec.env)).get("PI_CODING_AGENT_DIR")
+      if (agentDir === undefined) {
+        return exec
+      }
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const home = hostEnv.HOME || homedir()
+      if (path.resolve(copyDir, agentDir) === path.join(home, ".pi", "agent")) {
+        return exec
+      }
+      const piExtension = yield* toolTimeCap(fs, path, home).pipe(
+        Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot resolve the Pi time cap: " + cause.message }))
+      )
+      return { ...exec, piExtension }
+    })
     : openNonoExec({
       worktree: copyDir,
       piSessionDir: folders.piSessionDir,
@@ -35,6 +57,7 @@ export const openAgentExec = (
       modelCredential: plan.credential,
       hostEnv,
       toolchain,
+      standinHelper,
       env: {}
     }).pipe(Effect.mapError((cause) => new OrcRunError({ message: "orc: the sandbox failed to start: " + cause.message })))
 
@@ -88,6 +111,7 @@ export const agentOps = (
         logFile: run.path.join(folders.runDir, agentRun.logFile),
         failingFile: run.path.join(folders.runDir, failingFileName),
         asks,
+        withoutAsks: agentRun.withoutAsks,
         onSession: agentRun.onSession
       }, pacing)
       const commits = yield* commitsSince(run.spawner, run.git, exec.cwd, base)

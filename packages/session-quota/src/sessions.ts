@@ -302,7 +302,7 @@ export const sessionLines = (view: SessionQuotaView, width: number, shown = Numb
 };
 
 const jsonCommandOf = (view: SessionQuotaView): string =>
-  view.composition === undefined ? "bun run session-quota-json" : "bun run session-quota-composed-json";
+  view.composition === undefined ? "orc-dash report session-quota" : "orc-dash report session-quota-composed";
 
 // The command is what a reader acts on, so a pointer too wide for one row wraps rather than cutting it.
 const moreFlags = (hidden: number, view: SessionQuotaView, width: number): Block => {

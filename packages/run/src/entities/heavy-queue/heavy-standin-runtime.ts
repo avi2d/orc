@@ -1,16 +1,32 @@
 import { accessSync, appendFileSync, closeSync, constants, mkdirSync, openSync, readSync, statSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { classifyHeavyCall } from "./heavy-classify"
+import { refusedTest } from "./heavy-standin-refusal"
 import { ancestry, insideSlot, insideThrough, parseProcessTable } from "./heavy-process-tree"
 import { exitCodeOf, queuedAhead, slotTasks, taskState, type TaskState } from "./heavy-pueue-task"
 
 export const standinMarker = "Written by orc heavy path"
 
+export const ciOnlyMarker = standinMarker + " CI-only"
+
+const embeddedRoot = /^(?:\/\$bunfs\/|[A-Za-z]:[\\/]~BUN[\\/])/
+
+// A compiled file hands every argument to its own code and resolves modules inside its embedded file system, so it runs itself with no flags and no source path.
 // Bun would otherwise load the caller's .env and bunfig.toml preloads into the stand-in.
-export const helperCommand: ReadonlyArray<string> = [
-  process.execPath, "--no-env-file", "--config=/dev/null", Bun.fileURLToPath(import.meta.resolve("./heavy-standin-main.ts"))
-]
+export const helperCommandOf = (runtime: string, modulePath: string, main: string): ReadonlyArray<string> =>
+  embeddedRoot.test(modulePath) ? [runtime] : [runtime, "--no-env-file", "--config=/dev/null", main]
+
+export const helperCommand: ReadonlyArray<string> = helperCommandOf(
+  process.execPath, import.meta.path, Bun.fileURLToPath(import.meta.resolve("./heavy-standin-main.ts"))
+)
+
+export const standinHelper = { runtime: helperCommand[0] ?? "", folder: dirname(helperCommand.at(-1) ?? "") }
 
 export const waiterWord = "orc-heavy-wait"
+
+export const ciOnlyWord = "orc-ci-only"
+
+export const ciOnlyPathWord = "orc-ci-only-path"
 
 export interface StandinTiming {
   readonly budgetMinutes: number | null
@@ -78,31 +94,43 @@ const isExecutableFile = (path: string): boolean => {
   }
 }
 
-const isStandin = (path: string): boolean => {
+const isStandin = (path: string, marker = standinMarker): boolean => {
   try {
     const handle = openSync(path, "r")
     const head = Buffer.alloc(4096)
     const read = readSync(handle, head, 0, head.length, 0)
     closeSync(handle)
-    return head.subarray(0, read).toString("utf8").split("\n").slice(0, 2).join(" ").includes(standinMarker)
+    return head.subarray(0, read).toString("utf8").split("\n").slice(0, 2).join(" ").includes(marker)
   } catch {
     return false
   }
 }
 
 // The shell's field split on ":" keeps empty inner fields as "." and drops a trailing empty field.
-export const callerTool = (tool: string, pathValue: string, standin: string): string => {
+export const callerTool = (tool: string, pathValue: string, standin: string, marker = standinMarker): string => {
   const entries = pathValue.split(":")
   if (entries.at(-1) === "") {
     entries.pop()
   }
   for (const entry of entries) {
     const candidate = (entry === "" ? "." : entry) + "/" + tool
-    if (!sameFile(candidate, standin) && isExecutableFile(candidate) && !isStandin(candidate)) {
+    if (!sameFile(candidate, standin) && isExecutableFile(candidate) && !isStandin(candidate, marker)) {
       return candidate
     }
   }
   return ""
+}
+
+export const projectTool = (tool: string, directory: string): string => {
+  for (let folder = directory, parent = dirname(folder); ; folder = parent, parent = dirname(folder)) {
+    const candidate = join(folder, "node_modules", ".bin", tool)
+    if (isExecutableFile(candidate) && !isStandin(candidate)) {
+      return candidate
+    }
+    if (parent === folder) {
+      return ""
+    }
+  }
 }
 
 const unloggable = /[\n\r\t"\\]/g
@@ -167,15 +195,39 @@ const refuse = (message: string): StandinPlan => {
   return { kind: "exit", code: 127 }
 }
 
-export const planCall = (call: StandinCall, standin: string, args: ReadonlyArray<string>): StandinPlan => {
-  const real = callerTool(call.tool, Bun.env.PATH ?? "", standin) || call.real
+const queueUnreachable = (): boolean => Bun.env.HEAVY_QUEUE_UNREACHABLE === "1"
+
+const runsUnqueued = (call: StandinCall, args: ReadonlyArray<string>): boolean =>
+  queueUnreachable() || classifyHeavyCall(call.tool, call.commands, args) === "direct"
+
+export const ciOnlyPlan = (
+  tool: string,
+  standin: string,
+  args: ReadonlyArray<string>
+): { readonly kind: "run"; readonly real: string } | { readonly kind: "exit"; readonly code: number } => {
+  if (refusedTest(tool, args, workingDirectory())) {
+    return { kind: "exit", code: 1 }
+  }
+  const real = callerTool(tool, Bun.env.PATH ?? "", standin, ciOnlyMarker)
   if (real === "") {
-    return refuse("no " + call.tool + " found when the stand-in was written")
+    process.stderr.write("orc heavy: no " + tool + " on PATH after the stand-in at " + standin + "\n")
+    return { kind: "exit", code: 127 }
+  }
+  return { kind: "run", real }
+}
+
+export const planCall = (call: StandinCall, standin: string, args: ReadonlyArray<string>): StandinPlan => {
+  if (refusedTest(call.tool, args, workingDirectory())) {
+    return { kind: "exit", code: 1 }
+  }
+  const real = callerTool(call.tool, Bun.env.PATH ?? "", standin) || call.real || projectTool(call.tool, workingDirectory())
+  if (real === "") {
+    return refuse("no " + call.tool + " on PATH, recorded when the stand-in was written, or in node_modules/.bin above " + workingDirectory())
   }
   if (!isExecutableFile(real) || sameFile(real, standin)) {
     return refuse("no " + call.tool + " at " + real)
   }
-  if (classifyHeavyCall(call.tool, call.commands, args) === "direct") {
+  if (runsUnqueued(call, args)) {
     return { kind: "run", real }
   }
   const bypass = Bun.env.HEAVY_QUEUE_BYPASS ?? ""

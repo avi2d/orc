@@ -93,8 +93,12 @@ const splitWide = (text: string, width: number): Array<string> => {
   if (cur !== "") out.push(cur);
   return out;
 };
-export const failureLines = (failure: Failed, width: number, subject?: string, room: number = failureRoom): Block => {
-  const lines = wrapParts(failureText(failure, subject).split(/\s+/), width, " ").flatMap((line) => splitWide(line, width));
-  const kept = [...lines.slice(0, room - 1), lines.slice(room - 1).join(" ")].filter((text) => text !== "");
-  return kept.map((text) => [span(widthOf(text) <= width ? text : ellipsize(text, width), "error")]);
+// The last of the room's lines holds the rest of the text, cut with an ellipsis.
+export const noteLines = (text: string, width: number, tone: Tone, room: number = failureRoom): Block => {
+  const lines = wrapParts(text.split(/\s+/), width, " ").flatMap((line) => splitWide(line, width));
+  const kept = [...lines.slice(0, room - 1), lines.slice(room - 1).join(" ")].filter((line) => line !== "");
+  return kept.map((line) => [span(widthOf(line) <= width ? line : ellipsize(line, width), tone)]);
 };
+
+export const failureLines = (failure: Failed, width: number, subject?: string, room: number = failureRoom): Block =>
+  noteLines(failureText(failure, subject), width, "error", room);

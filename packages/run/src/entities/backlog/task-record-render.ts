@@ -29,7 +29,8 @@ const questionFronts = (questions: ReadonlyArray<ParkedQuestion>) =>
     ...choicesOf(question),
     ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at, ...answerFronts(question.answer) }),
     ...(question.answer?.relayedTo == null ? {} : { relayed_to: question.answer.relayedTo }),
-    ...(question.answer !== null && !isDeciderAnswer(question.answer) && question.answer.correctionQueued === true ? { correction_queued: true } : {})
+    ...(question.answer !== null && !isDeciderAnswer(question.answer) && question.answer.correctionQueued === true ? { correction_queued: true } : {}),
+    ...(question.owner === undefined ? {} : { owner: question.owner })
   }))
 
 const holdQuestionFronts = (questions: ReadonlyArray<HoldQuestion>) =>
@@ -44,6 +45,7 @@ const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
     ? []
     : [
       field("hold_reason", hold.reason),
+      ...(hold.repeat === true ? [field("hold_repeat", true)] : []),
       ...(hold.history === undefined ? [] : [field("hold_history", hold.history)]),
       ...(hold.until === null ? [] : [field("hold_until", hold.until)]),
       ...(hold.at === null ? [] : [field("held_at", hold.at)]),
@@ -54,7 +56,7 @@ const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
 const parkedFields = (parked: Parked | null): ReadonlyArray<string> =>
   parked === null
     ? []
-    : [field("parked_branch", parked.branch), field("parked_questions", questionFronts(parked.questions)), ...(parked.origin === undefined ? [] : [field("parked_origin", parked.origin)])]
+    : [field("parked_branch", parked.branch), field("parked_questions", questionFronts(parked.questions)), ...(parked.origin === undefined ? [] : [field("parked_origin", parked.origin)]), ...(parked.at === undefined ? [] : [field("parked_at", parked.at)]), ...(parked.sentBackAt === undefined ? [] : [field("parked_sent_back_at", parked.sentBackAt)])]
 
 const ranFields = (record: TaskRecord): { readonly started: ReadonlyArray<string>; readonly pr: ReadonlyArray<string> } => {
   const ran = ranClosing(record)
@@ -87,6 +89,7 @@ const stateFields = (record: TaskRecord): ReadonlyArray<string> => {
         field("outcome", state.closing.outcome),
         field("closed_at", state.closedAt),
         field("reason", state.closing.reason),
+        ...("landedIn" in state.closing ? [field("landed_in", state.closing.landedIn)] : []),
         ...(answer === null ? [] : [field("answer", answer.words), field("answered_at", answer.at)]),
         ...ran.pr,
         ...(state.postedAt === null ? [] : [field("posted_at", state.postedAt)])

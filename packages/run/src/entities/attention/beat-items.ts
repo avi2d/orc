@@ -1,9 +1,32 @@
 import { Effect, type FileSystem } from "effect"
 import type { BacklogError } from "../backlog/index"
 import { checkRefusals, greenChecks, type PullRequestView, redChecks } from "../pull-request/index"
-import type { Asked, AttentionItem } from "./attention-item"
+import type { AttentionItem } from "./attention-item"
 import type { BeatAction } from "./beat-action"
-import { choice, closeItem, itemId, openItem, openItems, readItem, withdrawItem, writeItem } from "./attention"
+import { choice, closeItem, itemId, openItem, openItems, readItem, withdrawItem, openOrRefreshItem } from "./attention"
+
+const unreachedPrefix = (task: string): string => itemId(task, "machine-unreached") + "."
+
+// An item opens once per id, so the id carries the stretch's start for a machine lost again after it answered.
+export const openUnreachedMachine = (root: string, task: string, machine: string, since: string, reason: string, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.asVoid(openItem(root, itemId(task, "machine-unreached", since), {
+    kind: "machine-unreached",
+    task,
+    text: "orc has not reached " + machine + " since " + since + ", so it cannot tell whether the run of " + task + " still works there, and the task stays started: " + reason,
+    ...choice(
+      "the run of " + task + " on " + machine,
+      { text: "wait", outcome: "the task stays started, and each beat reads its run again" },
+      { text: "close", outcome: "orc backlog close " + task + " failed closes the task failed and frees its slot on " + machine }
+    ),
+    asked: at,
+    owner: "user"
+  }))
+
+export const withdrawUnreachedMachine = (root: string, task: string, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const open = yield* openItems(root, (name) => name.startsWith(unreachedPrefix(task)))
+    yield* Effect.forEach(open, (entry) => Effect.asVoid(withdrawItem(root, entry.id, "the machine answered again", at)), { discard: true })
+  })
 
 export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.forEach(actions, (action) =>
@@ -22,20 +45,11 @@ export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, 
       }))
       : Effect.void, { discard: true })
 
-const openOrReopenPrItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const item = yield* readItem(root, id)
-    if (item === null) {
-      yield* Effect.asVoid(openItem(root, id, asked))
-    } else if (item.state.kind === "withdrawn") {
-      yield* writeItem(root, id, { ...asked, state: { kind: "open" } })
-    } else if (item.state.kind === "open" && item.text !== asked.text) {
-      yield* writeItem(root, id, { ...asked, asked: item.asked, state: { kind: "open" } })
-    }
-  })
+export const pullRequestHeld = (root: string, task: string, head: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
+  Effect.map(readItem(root, itemId(task, "pr-ready", head)), (item) => item?.state.kind === "closed" && item.state.answer.words.trim().toLowerCase().startsWith("hold"))
 
 // Each head commit gets its own items, so a fix pushed after a red check opens anew.
-export const routePullRequest = (root: string, task: string, pr: string, view: PullRequestView, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+export const routePullRequest = (root: string, task: string, pr: string, view: PullRequestView, at: string, waits: ReadonlyArray<string> = []): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const ended = view.state === "MERGED" ? "merged" : view.state === "CLOSED" ? "closed without merging" : null
     const refusals = checkRefusals(view)
@@ -53,7 +67,7 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
       return
     }
     if (red.length > 0) {
-      yield* openOrReopenPrItem(root, itemId(task, "check-red", view.headRefOid), {
+      yield* openOrRefreshItem(root, itemId(task, "check-red", view.headRefOid), {
         kind: "check-red",
         task,
         text: pr + ": the check " + red.join(", ") + " is red",
@@ -66,10 +80,10 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
         owner: "user"
       })
     } else if (refusals.length === 0) {
-      yield* openOrReopenPrItem(root, itemId(task, "pr-ready", view.headRefOid), {
+      yield* openOrRefreshItem(root, itemId(task, "pr-ready", view.headRefOid), {
         kind: "pr-ready",
         task,
-        text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", "),
+        text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", ") + waits.map((wait) => "; it " + wait).join(""),
         ...choice(
           "the PR " + pr + " of " + task,
           { text: "merge", outcome: "orc merge " + task + " merges the PR into main, and the item closes with the answer merged" },

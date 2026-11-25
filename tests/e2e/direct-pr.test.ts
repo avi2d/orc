@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runStatus } from "../../packages/run/src/entities/run-history/index"
-import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, runDirectPrResume, runDirectPrStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, recordingKinds, runDirectPrResume, runDirectPrStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const isNamedSignal = (value: unknown): value is { readonly name: string } =>
   typeof value === "object" && value !== null && "name" in value && typeof value.name === "string"
@@ -34,8 +34,11 @@ describe("a direct-PR run opens its own PR after the checks", () => {
       await withHome(async (home) => {
         await withOrigin(dir, async (origin) => {
           const sha = await readyToCheck(dir, home)
-          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha), lintPasses)
+          const kinds: Array<string> = []
+          const outcome = await runDirectPrStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses)
           const bodyFile = join(home, "runs", "step-run-1", "pr-body.md")
+          expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
+          expect(outcome.report.endReason).toContain("The review turn failed, so the review did not pass")
           expect(outcome.nmCalls).toBe("")
           expect(branchOn(origin)).toBe(sha)
           expect(callLines(outcome.ghCalls)).toEqual([
@@ -51,12 +54,43 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(outcome.run?.prLink).toBe(ghPrLink)
           expect(outcome.run?.status).toBe("running")
           expect(outcome.signals).toContainEqual({ name: "open-question", value: expect.stringContaining('"id":"ci-waiting"') })
+          expect(outcome.steps).toContainEqual({ name: "review", status: "failed" })
           expect(outcome.steps).toContainEqual({ name: "pr", status: "passed" })
           expect(outcome.steps).not.toContainEqual(expect.objectContaining({ name: "no-mistakes" }))
           const body = await readFile(bodyFile, "utf8")
           expect(body).toContain("work")
           expect(body).toContain("after lint passed, without no-mistakes")
           expect(body).not.toContain("Do the thing.")
+        })
+      })
+    })
+  })
+
+  test.each(["success", "failure"])("a test-only config records skipped checks instead of passed checks and follows CI %s", async (conclusion) => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        await withOrigin(dir, async () => {
+          const sha = await readyToCheck(dir, home)
+          await writeFile(join(dir, ".no-mistakes.yaml"), "commands:\n  test: forbidden-test-runner\n")
+          const checkRuns = JSON.stringify({ total_count: 1, check_runs: [{ id: 1, name: "test", head_sha: sha, status: "completed", conclusion }] })
+          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha), async () => {
+            throw new Error("a skipped test command must not start")
+          }, checkRuns)
+          expect(outcome.steps).toContainEqual({ name: "checks", status: "skipped" })
+          expect(outcome.report.checksRounds).toHaveLength(1)
+          expect(outcome.report.checksRounds?.[0]).toMatchObject({ passed: false, checks: [], failed: [] })
+          expect(outcome.report.completed).toBe(conclusion === "success")
+          expect(runStatus(outcome.report)).toBe(conclusion === "success" ? "completed" : "CI failed")
+          expect(outcome.report.endReason).toContain("No local checks ran.")
+          expect(outcome.report.endReason).not.toContain("checks passed")
+          expect(await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8")).toContain("without local checks or no-mistakes")
+          const resumed = await runDirectPrResume(dir, home, sandboxResult(sha), async () => {
+            throw new Error("a resumed skipped test command must not start")
+          }, checkRuns, [])
+          expect(resumed.steps).toContainEqual({ name: "checks", status: "skipped" })
+          expect(resumed.report.checksRounds).toHaveLength(1)
+          expect(resumed.report.completed).toBe(conclusion === "success")
+          expect(runStatus(resumed.report)).toBe(conclusion === "success" ? "completed" : "CI failed")
         })
       })
     })

@@ -13,12 +13,13 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/app/login-args.ts` | The `orc login` argument parsing |
 | `packages/run/src/app/dispatch-args.ts` | The flag parsing for `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
 | `packages/run/src/app/dispatch-cli.ts` | The `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
+| `packages/run/src/app/quota-cli.ts` | The `orc quota` command |
 | `packages/run/src/app/dispatch-args-runner.ts` | The `orc runner` verb parsing and the shared `--json` flag and reach split |
 | `packages/run/src/app/dispatch-args-heavy.ts` | The `orc heavy` verb parsing |
 | `packages/run/src/app/help.ts` | The help pages: the overview, the per-command help, the usage error text and the closest-command suggestion |
 | `packages/run/src/app/help-format.ts` | The help layout: wrapping to 80 columns, the usage block and the name and text tables |
 | `packages/run/src/app/help-entries-run.ts` | The help entries for `orc run`, the run history commands, `orc chat`, `orc app`, `orc login` and `orc update` |
-| `packages/run/src/app/help-entries-backlog.ts` | The help entries for `orc backlog` and its subcommands, `orc attention`, `orc beat` and `orc merge` |
+| `packages/run/src/app/help-entries-backlog.ts` | The help entries for `orc backlog` and its subcommands, `orc attention`, `orc beat`, `orc quota` and `orc merge` |
 | `packages/run/src/app/help-entries-runner.ts` | The help entries for `orc runner` and `orc heavy` and their subcommands, and for `orc version` and `orc machines` |
 
 ## widgets/beat
@@ -28,11 +29,14 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/widgets/beat/quota.ts` | The quota reading from the configured command and the pick of an account |
 | `packages/run/src/widgets/beat/beat.ts` | The beat: room, placement, take and start |
 | `packages/run/src/widgets/beat/beat-close.ts` | The closing of finished runs and the running output time |
+| `packages/run/src/widgets/beat/beat-split.ts` | The application of a worker's split proposal when its run ends |
+| `packages/run/src/widgets/beat/beat-update.ts` | The hourly update claim and the check on each dispatch machine |
 | `packages/run/src/widgets/beat/beat-place.ts` | The room reading, the placement of each new task and the wait it names |
 | `packages/run/src/widgets/beat/beat-origin.ts` | The `orc backlog origin` write of a parked task's machine and run, and its refusals |
 | `packages/run/src/widgets/beat/load.ts` | The five minute load reading and the overloaded machines |
 | `packages/run/src/widgets/beat/stall.ts` | The stalled run flag kept in the backlog logs |
 | `packages/run/src/widgets/beat/task-events.ts` | The stall and PR events the beat records for every task |
+| `packages/run/src/widgets/beat/yolo-merge.ts` | The beat's merge of a green done task's PR on a yolo project, through `orc merge` with `yolo-green` |
 | `packages/run/src/widgets/beat/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `packages/run/src/widgets/beat/upstream.ts` | The beat’s read of each project’s upstream contributions and the scout task a change adds |
 | `packages/run/src/widgets/beat/beat-attention.ts` | The beat attention pass: the actions it reports and queues and the questions the decider owns |
@@ -69,6 +73,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/features/chat/chat.ts` | The `orc chat` start of [Pi](https://pi.dev) on the orchestrator model with the chat tools |
 | `packages/run/src/features/chat/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
+| `packages/run/src/features/chat/chat-tools-bundle.ts` | The chat tools as one JavaScript file, which is `null` from source and which the compile step replaces with the embedded bundle |
 | `packages/run/src/features/chat/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
 | `packages/run/src/features/chat/chat-board.ts` | The chat's decision boards: the cards, the answers they record and the listing at each start |
 | `packages/run/src/features/chat/chat-board-page.ts` | The decision board page and the record of its cards |
@@ -86,8 +91,10 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/decider/decider.ts` | The decider: one call per open question it owns with the rules it reads, its reply checked as an answer on a quoted rule, an ask back, a duplicate link or an escalation, and that decision recorded on the item |
-| `packages/run/src/features/decider/decider-guard.ts` | The fixed list of topics orc never hands the decider, and the words an ask back hands the worker |
+| `packages/run/src/features/decider/decider-guard.ts` | The asked actions and the fixed list of topics orc never hands the decider, and the words an ask back hands the worker |
 | `packages/run/src/features/decider/decider-ask.ts` | The decider's call, Pi on `models.decider` with the policy as its system prompt and no tools |
+| `packages/run/src/features/decider/recommended.ts` | The recommended-option override for questions with a `Recommended:` line |
+| `packages/run/src/features/decider/quoted-source.ts` | The check that a quoted rule is a whole clause of a rule the decider read |
 
 ## features/heavy-commands
 
@@ -108,12 +115,14 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/signing-in/sign-in.ts` | The `orc login` account set, the account folder and the vendor sign-in it runs there |
+| `packages/run/src/features/signing-in/private-window.ts` | The default browser's private-window command and the opener script `orc login claude-second` hands to Claude |
 
 ## features/merging-a-pr
 
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/merging-a-pr/merge.ts` | The `orc merge` guard and squash-merge |
+| `packages/run/src/features/merging-a-pr/base-ci.ts` | The per-beat read of each repository's default branch for red push runs |
 
 ## features/queueing-a-task
 
@@ -133,17 +142,19 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/features/running-a-task/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
 | `packages/run/src/features/running-a-task/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
+| `packages/run/src/features/running-a-task/shared-packages.ts` | The shared install of a package provider's pinned git sources under `$ORC_HOME/pi-packages` and the links to it from a run's Pi folder |
 | `packages/run/src/features/running-a-task/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `packages/run/src/features/running-a-task/run-exec.ts` | The sandbox a run opens, the install that prepares the copy and the steps that run in it |
 | `packages/run/src/features/running-a-task/run-loop.ts` | The implement, check and fix steps of one run |
 | `packages/run/src/features/running-a-task/run-finish.ts` | The finish of a run after its checks pass: the direct PR or the [no-mistakes](https://github.com/kunchenguid/no-mistakes) gate |
+| `packages/run/src/features/running-a-task/review-turn.ts` | The direct-PR review turn: the branch diff, the reviewer run and the findings it records |
 | `packages/run/src/features/running-a-task/run-resume.ts` | The prior run's session and passed steps a resume starts from |
 | `packages/run/src/features/running-a-task/checks.ts` | The check commands `.no-mistakes.yaml` names and their run in the copy |
 | `packages/run/src/features/running-a-task/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
 | `packages/run/src/features/running-a-task/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `packages/run/src/features/running-a-task/context-mark.ts` | The 150 thousand token compaction mark orc writes into the run’s Pi folder |
 | `packages/run/src/features/running-a-task/report-run.ts` | The report run: the Pi run that writes a report file instead of opening a PR |
-| `packages/run/src/features/running-a-task/run-deliverer.ts` | The deliverer a run takes: the direct PR opener or the no-mistakes runner |
+| `packages/run/src/features/running-a-task/run-deliverer.ts` | The deliverer a run takes: the direct PR opener and reviewer or the no-mistakes runner |
 | `packages/run/src/features/running-a-task/run-place.ts` | The machine name a run records, read from `ORC_RUN_MACHINE` |
 | `packages/run/src/features/running-a-task/worker-question.ts` | The end reason of a run stopped on an unanswered `orc_ask` and the prompt that resumes it with the answers |
 
@@ -163,7 +174,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/features/updating-orc/update.ts` | The `orc update` registry read, version comparison, install command and its `orc.update.v1` JSON |
+| `packages/run/src/features/updating-orc/update.ts` | The registry read and the choice of installer for `orc update` |
+| `packages/run/src/features/updating-orc/launcher-release.ts` | The preparation and selection of a versioned launcher release, a source checkout or an unpacked compiled archive |
 
 ## entities/agent
 
@@ -181,10 +193,18 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/entities/attention/beat-action.ts` | The beat actions each beat step reports |
-| `packages/run/src/entities/attention/attention.ts` | The attention queue under `attention/`: one file per item, its open and close and withdraw, the items of one task, and the review questions, run events and overdue waits routed into it |
+| `packages/run/src/entities/attention/attention.ts` | The attention queue, item answers and withdrawals, and the review questions, run events, and overdue waits it holds |
+| `packages/run/src/entities/attention/attention-store.ts` | The item files and their exclusive write claims |
 | `packages/run/src/entities/attention/attention-overdue.ts` | The age of an attention item and whether an open item is overdue |
 | `packages/run/src/entities/attention/attention-item.ts` | The item file shape, the decider's decisions it records and their text |
 | `packages/run/src/entities/attention/failing-command.ts` | The `failing-command` items of running runs whose command keeps failing |
+| `packages/run/src/entities/attention/update-result.ts` | The update lines and the `update-failed` items for dispatch machines |
+
+## entities/orc-update
+
+| Path | What it holds |
+| --- | --- |
+| `packages/run/src/entities/orc-update/index.ts` | The `orc.update.v1` result and version comparison |
 
 ## entities/backlog
 
@@ -215,12 +235,15 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/entities/heavy-queue/heavy.ts` | The heavy settings, the stand in folder and the default heavy tool list |
-| `packages/run/src/entities/heavy-queue/heavy-setup.ts` | The reading of the heavy settings and the writing of the stand in folder |
-| `packages/run/src/entities/heavy-queue/heavy-standin.ts` | The three line stand in launchers that start the helper for each heavy tool |
+| `packages/run/src/entities/heavy-queue/heavy-setup.ts` | The reading of the heavy settings and the writing of the stand in folder and of the `ci-only.bash` guard file |
+| `packages/run/src/entities/heavy-queue/heavy-standin.ts` | The three line stand in launchers that start the helper for each heavy tool, and the `BASH_ENV` guard script |
+| `packages/run/src/entities/heavy-queue/heavy-agent-wrapper.ts` | The agent wrappers that start a no-mistakes review or fix agent under `HEAVY_TESTS_CI_ONLY=1` and the stand in folders |
 | `packages/run/src/entities/heavy-queue/heavy-classify.ts` | The per tool decision of which calls queue and which targeted calls take priority |
-| `packages/run/src/entities/heavy-queue/heavy-standin-main.ts` | The helper a stand in launcher starts by the real bun path, and the waiter a queued pueue task starts |
+| `packages/run/src/entities/heavy-queue/heavy-standin-main.ts` | The helper a stand in launcher starts by the real bun path, and the waiter a queued pueue task starts, and `isStandinInvocation` and `runStandinInvocation`, which the compiled orc entry uses to run a stand in call itself. `packages/run/scripts/build-heavy-standin.ts` compiles it with Bun bytecode into `packages/run/dist/heavy-standin` |
 | `packages/run/src/entities/heavy-queue/heavy-standin-exec.ts` | The helper's run of a call: the classify probe, the real tool as a child, the through command and the queued call waiter |
-| `packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts` | The stand in runtime: the helper command, the real tool lookup, the bypass event, the plan of a call and the queue wait |
+| `packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts` | The stand in runtime: the helper command, which a compiled orc or stand in makes its own file, the real tool lookup, the bypass event, the plan of a call and the queue wait |
+| `packages/run/src/entities/heavy-queue/heavy-standin-refusal.ts` | The refusal of a test run, of a test runner called by path, or of a Bun runtime override, under `HEAVY_TESTS_CI_ONLY=1` |
+| `packages/run/src/entities/heavy-queue/heavy-runner-entry.ts` | The reading of the script file a `bun` or `node` call starts, to find a test runner bin, and the check for Bun runtime overrides |
 | `packages/run/src/entities/heavy-queue/heavy-process-tree.ts` | The process tree walk that finds a call inside a held slot or under the through command |
 | `packages/run/src/entities/heavy-queue/heavy-pueue-task.ts` | The reading of pueue status and log JSON for the queue wait and the exit code |
 
@@ -242,6 +265,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/entities/pull-request/pr-view.ts` | The `gh pr view` reading of a task's PR and its check verdicts |
 | `packages/run/src/entities/pull-request/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |
+| `packages/run/src/entities/pull-request/changed-files.ts` | The PR's changed files from the GitHub files API and the changes that wait for the captain's merge word |
 | `packages/run/src/entities/pull-request/direct-pr.ts` | The direct PR opener: the push, the existing check and the create, and the opened or failed record |
 
 ## entities/review-gate
@@ -297,6 +321,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/shared/lib/toon.ts` | The reading of the TOON output no-mistakes prints |
 | `packages/run/src/shared/lib/table.ts` | The table formatter the runs and refusals listings share |
 | `packages/run/src/shared/lib/run-id.ts` | The new run id from the timestamp and a random part |
+| `packages/run/src/shared/lib/file-claim.ts` | The exclusive claim for a file write shared by processes, which a later process breaks once its owner has exited or an hour has passed |
 
 ## shared/process
 
@@ -324,7 +349,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/bin.ts` | The orc entry point |
+| `packages/run/src/bin.ts` | The orc entry point, which a compiled orc also takes as the heavy stand in helper when its first word is a stand in call, `orc-heavy-wait`, `orc-ci-only` or `orc-ci-only-path` |
 
 ## Package files
 

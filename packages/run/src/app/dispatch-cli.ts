@@ -1,15 +1,16 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs } from "./dispatch-args"
-import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted, runLabel, backlogPresent, backlogRoot as backlogRootOf, noBacklog, type TaskFileError } from "../entities/backlog/index"
-import { readAttention, routeTaskItems } from "../entities/attention/index"
+import { backlogPaths, BacklogError, findTask, listTasks, markPosted, runLabel, backlogPresent, backlogRoot as backlogRootOf, noBacklog, type TaskFileError } from "../entities/backlog/index"
+import { readAttention, routeTaskItems, withdrawTaskItems } from "../entities/attention/index"
 import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readBeatWaits, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText, taskPrState } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
-import { dropTask, edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
+import { edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
 import { type ConfigError, readFailure, type DispatchConfig, readDispatchConfig, readProjects } from "../shared/config/index"
 import { holdRun, sendBack, killHeld, queueFromText, renewTask, startTask, stopNow, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson, ensureAlertStream, liveAlertStream } from "../features/queueing-a-task/index"
-import { mergeTask } from "../features/merging-a-pr/index"
+import { closeLandedNow, closeNow, dropNow } from "./dispatch-close"
+import { mergeNow } from "./dispatch-merge"
 import { RunnerError, type Command } from "../shared/process/index"
 import { encodeToken, sessionToken } from "../entities/token/index"
 import { markEventPosted, mergedIds, unpostedEvents } from "../entities/events/index"
@@ -133,36 +134,6 @@ const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult"
     yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
   })
 
-const closeDecision = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, place: DispatchPlace, at: string) =>
-  Effect.gen(function*() {
-    if (args.outcome === "done") {
-      return yield* new BacklogError({ detail: args.id + " is a decision, so it closes done only by its answer: orc backlog answer " + args.id + " <words>" })
-    }
-    const reason = args.reason.trim() === "" ? "the captain dropped the decision" : args.reason
-    const dropped = yield* dropTask(backlogRoot(place), args.id, reason, at)
-    yield* routeTaskItems(backlogRoot(place), [dropped], at)
-    return "dropped " + args.id + ": " + reason
-  })
-
-const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, place: DispatchPlace) =>
-  Effect.gen(function*() {
-    const at = DateTime.formatIso(yield* DateTime.now)
-    if ((yield* findTask(backlogRoot(place), args.id)).spec.kind === "decision") {
-      return yield* closeDecision(args, place, at)
-    }
-    const closed = yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, { pr: null, report: null }, at)
-    yield* routeTaskItems(backlogRoot(place), [closed], at)
-    return "closed " + args.id + " " + args.outcome
-  })
-
-const dropNow = (args: Extract<CommandArgs, { readonly kind: "DropTask" }>, place: DispatchPlace) =>
-  Effect.gen(function*() {
-    const at = DateTime.formatIso(yield* DateTime.now)
-    const dropped = yield* dropTask(backlogRoot(place), args.id, args.reason, at)
-    yield* routeTaskItems(backlogRoot(place), [dropped], at)
-    return "dropped " + args.id + ": " + args.reason
-  })
-
 const killNow = (args: Extract<CommandArgs, { readonly kind: "RunnerKill" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
     let label = runLabel(place.home, args.task, args.label === undefined ? yield* defaultKind(place, args.task) : undefined, args.label)
@@ -194,10 +165,11 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
   Effect.gen(function*() {
     const at = DateTime.formatIso(yield* DateTime.now)
     const answered = yield* answerTask(backlogRoot(place), args.id, args.words, at, args.expect)
-    yield* routeTaskItems(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)], at)
     if (answered.kind === "decision") {
+      yield* withdrawTaskItems(backlogRoot(place), [args.id], at)
       return "answered " + args.id + " and closed it done, so the tasks that wait on it may start"
     }
+    yield* routeTaskItems(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)], at)
     if (answered.kind === "hold") {
       return "answered " + args.id + ", so the beat may start it"
     }
@@ -207,7 +179,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
         : "answered " + answered.question + " on " + args.id + ", and it stays held for " + answered.open.map((question) => question.id).join(", ")
     }
     if (answered.correction) {
-      return "answered " + answered.question + " on " + args.id + ", queued as a correction, but delivery to the run is not confirmed"
+      return "answered " + answered.question + " on " + args.id + ", so the next beat queues it as a correction for the run on " + answered.branch + ", but delivery to the run is not confirmed"
     }
     if (answered.live) {
       return "answered " + answered.question + " on " + args.id + ", so the next beat hands it to the run waiting on " + answered.branch
@@ -217,7 +189,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "SendBack" | "NoteTask" | "ShowThread" | "DependTask" | "PrioritizeTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "CloseLandedTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "SendBack" | "NoteTask" | "ShowThread" | "DependTask" | "PrioritizeTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -231,10 +203,13 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
       return recordOrigin(backlogRoot(place), place.home, args)
     }
     case "CloseTask": {
-      return closeNow(args, place)
+      return closeNow(args, place.home)
+    }
+    case "CloseLandedTask": {
+      return closeLandedNow(args, place.home)
     }
     case "DropTask": {
-      return dropNow(args, place)
+      return dropNow(args, place.home)
     }
     case "MarkPosted": {
       return markPostedNow(args.id, place)
@@ -264,14 +239,13 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
       return prioritizeTask(backlogRoot(place), args.id, args.priority).pipe(Effect.map((outcome) => priorityLine(args.id, args.priority, outcome)))
     }
     case "MergeTask": {
-      return mergeTask(backlogRoot(place), args.id, args.basis, (words) =>
-        DateTime.now.pipe(Effect.flatMap((now) => sendBack(backlogRoot(place), place.home, { kind: "SendBack", id: args.id, words }, DateTime.formatIso(now)))))
+      return mergeNow(args, place.home)
     }
     case "ShowPlan": {
       return planText(backlogRoot(place), args.parent)
     }
     case "DropChild": {
-      return dropChild(backlogRoot(place), args.parent, args.child)
+      return DateTime.now.pipe(Effect.flatMap((now) => dropChild(backlogRoot(place), args.parent, args.child, DateTime.formatIso(now))))
     }
   }
 }
@@ -302,15 +276,21 @@ const runnerVerbLine = (args: RunnerVerb, place: DispatchPlace) => {
 }
 
 // The task is queued by now, so a stream that will not queue is told in the task's log and fails no task.
-const startAlertStream = (home: string) => {
-  const stream = liveAlertStream()
-  return stream === null
-    ? Effect.void
-    : ensureAlertStream(home, stream).pipe(
+const startAlertStream = (home: string, self: Command) =>
+  Effect.gen(function*() {
+    const stream = yield* liveAlertStream(self)
+    if (stream === null) {
+      return
+    }
+    yield* ensureAlertStream(home, stream).pipe(
       Effect.flatMap((line) => line === null ? Effect.void : Console.log(line)),
       Effect.catchTag("RunnerError", (error) => Console.error("orc runner start queued no alert stream: " + error.detail))
     )
-}
+  })
+
+const printBeat = (json: boolean, place: DispatchPlace) =>
+  runBeat(backlogRoot(place), place.home, liveSources(place.home, place.env.ORC_BEAT_UPDATE === "off" ? null : place.self)).pipe(
+    Effect.flatMap((report) => Console.log(json ? JSON.stringify(beatJson(report)) : formatBeat(report))))
 
 const execute = (args: CommandArgs, place: DispatchPlace) =>
   Effect.gen(function*() {
@@ -328,6 +308,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       case "EditTask":
       case "RecordOrigin":
       case "CloseTask":
+      case "CloseLandedTask":
       case "DropTask":
       case "MarkPosted":
       case "MarkEventPosted":
@@ -351,8 +332,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "Beat": {
-        const report = yield* runBeat(backlogRoot(place), place.home, liveSources(place.home))
-        yield* Console.log(args.json ? JSON.stringify(beatJson(report)) : formatBeat(report))
+        yield* printBeat(args.json, place)
         break
       }
       case "RunnerStart": {
@@ -360,7 +340,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         if (line !== null) {
           yield* Console.log(line)
         }
-        yield* startAlertStream(place.home)
+        yield* startAlertStream(place.home, place.self)
         yield* startHeavyWatch(place.home, place.self, "orc runner start")
         break
       }

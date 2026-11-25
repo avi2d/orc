@@ -1,10 +1,11 @@
 import { type BeatAction, type BeatReport, type MachineRoom } from "./beat"
 import type { BeatWaits } from "./beat-waits"
 import { type TaskWait, taskWaiting } from "./beat-place"
-import { type ChildCount, childCount, decisionAnswer, dependencyWaits, fullPrUrl, type TaskKind, type TaskPriority, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, ranClosing, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
+import { type ChildCount, childCount, decisionAnswer, dependencyWaits, fullPrUrl, type TaskKind, type TaskPriority, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, ranClosing, taskLandedIn, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
 import type { Project } from "../../shared/config/index"
 import { describeQuota } from "./quota"
 import type { ChatEvent, PrState } from "../../entities/events/index"
+import { updateLine } from "../../entities/attention/index"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
 const BEAT_JSON_SCHEMA = "orc.beat.v1" as const
@@ -35,6 +36,7 @@ type TaskStatusJson =
     readonly started: Started | null
     readonly outcome: "done" | "failed" | "stopped" | "start-failed" | "dropped"
     readonly reason: string
+    readonly landedIn?: string
     readonly pr: string | null
     readonly report: string | null
     readonly answer: { readonly words: string; readonly at: string } | null
@@ -65,16 +67,18 @@ type TaskJson = {
 interface ParkedJson {
   readonly origin?: Parked["origin"]
   readonly branch: string
-  readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string; readonly answer: { readonly words: string; readonly at: string } | null }>
+  readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string; readonly blocks: boolean; readonly deciderOwns: boolean; readonly answer: { readonly words: string; readonly at: string } | null }>
 }
 
-const parkedJson = (parked: Parked): ParkedJson => ({
+const parkedJson = (task: string, parked: Parked, deciderOwns: DeciderOwns): ParkedJson => ({
   ...(parked.origin === undefined ? {} : { origin: parked.origin }),
   branch: parked.branch,
   questions: parked.questions.map((question) => ({
     id: question.id,
     text: question.text,
     asked: question.asked,
+    blocks: question.blocks,
+    deciderOwns: deciderOwns(task, question),
     answer: question.answer === null ? null : { words: question.answer.words, at: question.answer.at }
   }))
 })
@@ -106,13 +110,15 @@ const claimJson = (record: TaskRecord): TaskStatusJson => {
     }
     case "closed": {
       const ran = ranClosing(record)
+      const landedIn = taskLandedIn(record)
       return {
         status: "closed",
         claim: state.claim,
         started: ran?.started ?? null,
         outcome: state.closing.outcome,
         reason: state.closing.reason,
-        pr: fullPrUrl(ran?.pr) ?? fullPrUrl(record.parked?.origin?.pr),
+        ...(landedIn === null ? {} : { landedIn }),
+        pr: landedIn === null ? fullPrUrl(ran?.pr) ?? fullPrUrl(record.parked?.origin?.pr) : null,
         report: ran?.report ?? null,
         answer: decisionAnswer(record),
         closedAt: state.closedAt,
@@ -149,7 +155,7 @@ const taskJson = (record: TaskRecord, view: BacklogView): TaskJson => {
     body: record.spec.body,
     prState: view.prStates.get(record.spec.id) ?? null,
     hold: record.hold,
-    parked: record.parked === null ? null : parkedJson(record.parked),
+    parked: record.parked === null ? null : parkedJson(record.spec.id, record.parked, view.deciderOwns),
     ...claimJson(record)
   }
 }
@@ -246,6 +252,9 @@ export const formatBoard = (view: BacklogView): string => {
 
 const actionLine = (action: BeatAction): string => {
   switch (action.kind) {
+    case "update": {
+      return updateLine(action)
+    }
     case "started": {
       return "started " + action.task + " on " + action.machine + " with " + action.account + ", output to " + action.log
     }
@@ -278,7 +287,11 @@ const actionLine = (action: BeatAction): string => {
       return "close failed " + action.task + " on " + action.machine + ": " + action.reason
     }
     case "parked": {
-      return "parked " + action.task + " on " + action.branch + " for " + answersAwaited(action.questions, action.decider)
+      const waiting = action.questions.length + action.decider.length > 0
+      return "parked " + action.task + " on " + action.branch + (waiting ? " for " + answersAwaited(action.questions, action.decider) : "")
+    }
+    case "held": {
+      return "held " + action.task + " on " + action.machine + ": " + action.reason
     }
     case "asking": {
       return "asking " + action.task + " on " + action.machine + ": the run waits until " + action.until + " for the captain's answer to " + action.questions.join(", ")
@@ -298,6 +311,15 @@ const actionLine = (action: BeatAction): string => {
     case "pr-unread": {
       return "cannot read the PR of " + action.task + " for the chat: " + action.reason
     }
+    case "yolo-merged": {
+      return "merged " + action.task + " " + action.pr + " on yolo-green"
+    }
+    case "yolo-updating": {
+      return "updating " + action.task + " " + action.pr + " on yolo-green: requested the branch update, and a later beat merges it once the new head's checks are green"
+    }
+    case "merge-refused": {
+      return "did not merge " + action.task + " on yolo-green: " + action.reason
+    }
     case "upstream-seen": {
       return "watching " + action.url + " for " + action.project + ": " + action.state
     }
@@ -316,7 +338,7 @@ const renewal = (action: BeatAction): boolean =>
 export const formatBeat = (report: BeatReport): string =>
   [
     report.beat + " at " + report.at,
-    describeQuota(report.quota),
+    describeQuota(report.quota, report.perTaskRouting),
     "room: " + (report.room.map((entry) => entry.machine + " " + entry.busy + " of " + entry.slots + " busy").join(", ") || "no machine"),
     ...report.actions.map(actionLine),
     ...(report.actions.every(renewal) ? ["no new task"] : [])

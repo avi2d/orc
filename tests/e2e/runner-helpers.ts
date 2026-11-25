@@ -39,7 +39,7 @@ const fakePueue = [
   "      if [ -f \"$PUEUE_STATE/groups.json\" ]; then groups=$(cat \"$PUEUE_STATE/groups.json\");",
   "      else groups='{\"default\":{\"status\":\"Running\",\"parallel_tasks\":1},\"orc\":{\"status\":\"Running\",\"parallel_tasks\":1}}'; fi;",
   "      case \"$groups\" in *\"\\\"$3\\\"\":*) echo \"Group \\\"$3\\\" already exists\" >&2; rmdir \"$PUEUE_STATE/group-lock\"; exit 1 ;; esac;",
-  "      stripped=$(printf '%s' \"$groups\" | sed 's/}$//'); printf '%s,\"%s\":{\"status\":\"Running\",\"parallel_tasks\":1}}' \"$stripped\" \"$3\" > \"$PUEUE_STATE/groups.json\"",
+  "      stripped=$(printf '%s' \"$groups\" | sed 's/}$//'); printf '%s,\"%s\":{\"status\":\"Running\",\"parallel_tasks\":1}}' \"$stripped\" \"$3\" > \"$PUEUE_STATE/groups.json.tmp\"; mv \"$PUEUE_STATE/groups.json.tmp\" \"$PUEUE_STATE/groups.json\";",
   "      rmdir \"$PUEUE_STATE/group-lock\";",
   "      if [ -f \"$PUEUE_STATE/race-add\" ]; then echo \"Group \\\"$3\\\" already exists\" >&2; exit 1; fi;",
   "      echo \"Group $3 created\";",
@@ -120,6 +120,20 @@ export const withFixture = async (body: (fixture: Fixture) => Promise<void>): Pr
     await body({ dir, home, checkout, pueue, env: { ORC_HOME: home, PUEUE_STATE: pueue, PATH: bin + ":" + (process.env.PATH ?? "") } })
   } finally {
     await rm(dir, { recursive: true, force: true })
+  }
+}
+
+export const runnerStartEnv = async (fixture: Fixture, home = fixture.home): Promise<Record<string, string>> => {
+  await mkdir(join(home, "backlog", "taken"), { recursive: true })
+  const taskFile = join(home, "backlog", "taken", "task-9.md")
+  await writeFile(taskFile, ["---", "id: 'task-9'", "title: 'Do the thing'", "project: 'orc'", "machine: null", "depends_on: []", "beat: 'beat-1'", "taken_for: 'linux'", "account: 'main'", "taken_at: '2026-10-27T10:01:00.000Z'", "created: '2026-10-27T10:00:00.000Z'", "---", "# Do the thing", ""].join("\n"))
+  return {
+    ORC_HOME: home,
+    ORC_TASK_ID: "task-9",
+    ORC_TASK_FILE: taskFile,
+    ORC_TASK_CHECKOUT: fixture.checkout,
+    ORC_TASK_PROVIDER: "acme",
+    ORC_TASK_TOKEN_FILE: mainToken
   }
 }
 

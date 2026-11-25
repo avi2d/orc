@@ -14,10 +14,31 @@ To update orc on a machine:
 1. Read the line it prints, which names the version it found and the version that runs.
 
 `orc update` reads the newest version of `@avi2dg/orc` from the registry `npm_config_registry` names, else from `https://registry.npmjs.org`.
-When that version is newer than the running one, it runs `bun add -g @avi2dg/orc@<version>`.
+When that version is newer than the running one, a Bun global install runs `bun add -g @avi2dg/orc@<version>`.
+If the machine uses a launcher that reads `~/.local/share/orc/release`, Orc prepares the new release before changing that file.
+An `update.command` overrides both install methods.
 When the versions are equal, or the running orc is newer, it installs nothing.
 A registry read that fails or takes more than 15 seconds installs nothing, and the command prints why.
 Run `orc update --json` for an `orc.update.v1` document.
+To upgrade by hand instead, run `bun add -g @avi2dg/orc`, the same command that installs orc.
+
+## Update a versioned checkout
+
+If your launcher reads the version from `~/.local/share/orc/release`, run `orc update` through that launcher.
+Orc detects the launcher when its running entry point resolves to `~/.local/share/orc/v<version>/packages/run/src/bin.ts` or its compiled executable resolves to `~/.local/share/orc/v<version>/orc`.
+For example, if `release` holds `1.2.3`, the launcher starts `v1.2.3/packages/run/src/bin.ts` with Bun or runs `v1.2.3/orc`.
+
+If the launcher starts the source entry, Orc clones the new version tag, installs its production dependencies from the lockfile with the Bun that runs orc, and checks that the new checkout prints the expected version.
+If the launcher runs the compiled `orc`, Orc downloads the archive for its platform and the archive's `.sha256` file from the GitHub release, as [Release assets](release-assets.md) lists them.
+Orc checks the archive's SHA-256, then unpacks it with `orc-dash` and `orc-dash-capture` beside `orc` in the same version directory.
+Before selecting the release, Orc checks its version and runs both dashboard commands with `--help` to check that they start.
+Both commands must exit 0, regardless of their help text.
+The compiled update needs no Bun.
+If the version directory already exists, Orc runs the same checks on that directory before selecting it.
+If any step fails, the launcher keeps the old release.
+After an install, run `orc --version` through the launcher to see the new version.
+Runs that already started still use their old checkout.
+If you use launchers for `orc-dash` or `orc-dash-capture`, have them read the same `release` file as the `orc` launcher to follow updates.
 
 ## Update a linked checkout
 
@@ -43,11 +64,14 @@ Orc replaces `{version}` in each word after the first with the version it found.
 | `running` | The version of the orc that ran the command |
 | `outcome` | `installed`, `current` or `failed` |
 | `detail` | Why the update failed, or `null` |
-| `output` | What the install command printed, or `null` when it did not run |
+| `output` | The installer's output, or `null` if not reported |
+| `retryable` | Optional. If present and `false`, the failure needs a change before retrying helps |
 
 The command exits 0 for `installed` and `current`, and non-zero for `failed`.
 
 ## Related topics
 
+- [The beat and task runs](beat-runs.md#updating-orc-on-dispatch-machines)
 - [Configuring providers](configuring-providers.md)
+- [Release assets](release-assets.md)
 - [Where every source file is](layout.md)

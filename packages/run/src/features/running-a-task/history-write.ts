@@ -1,7 +1,7 @@
 import { Effect } from "effect"
 import type { Database } from "bun:sqlite"
 import type { NoMistakesRecord, OpenQuestion } from "../../entities/review-gate/index"
-import type { DirectPrRecord } from "../../entities/pull-request/index"
+import { ciWaitingQuestionId, type DirectPrRecord } from "../../entities/pull-request/index"
 import { noMistakesFile, prBodyFileName, type HistoryRun } from "./run-record"
 import { refusalSignalName, refusalValue } from "../../entities/run-history/index"
 import type { ChecksRoundSummary, OrcRunReport, RecordedFixAttempt } from "../../entities/run-history/index"
@@ -9,10 +9,11 @@ import { OrcRunError } from "../../shared/lib/index"
 import { historyFailure, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, sqlite, stepIdFor, updateRun, updateStep } from "../../entities/run-history/index"
 import type { EvidenceInput, SignalInput, StepInput } from "../../entities/run-history/index"
 import { measuredSignals, noMistakesSignals, openQuestionSignal } from "../../entities/run-history/index"
-import { ciWaitingQuestionId, type AgentStep, type ResumePlan, type RunCheckpoints } from "./run-ops"
+import type { AgentStep, ResumePlan, RunCheckpoints } from "./run-ops"
 import type { AgentFile } from "../../entities/agent/index"
 import { liveAskQuestions, type AskSetup } from "../../entities/agent/index"
 import { taskOfBranch } from "../../entities/backlog/index"
+import type { ReviewAtHeadOutcome } from "./review-outcome"
 
 type StepAgent = Pick<AgentFile, "model" | "thinking">
 
@@ -67,7 +68,7 @@ const planImplementDone = (
 const planChecksDone = (runId: string, round: ChecksRoundSummary): PlannedChecks => ({
   step: {
     runId, name: "checks", attempt: round.round,
-    status: round.passed ? "passed" : "failed",
+    status: round.checks.length === 0 ? "skipped" : round.passed ? "passed" : "failed",
     started: round.started, ended: round.ended, agentFile: null, piSessionFile: null
   },
   checksEvidence: { direction: "out", path: round.file, kind: "checks" },
@@ -251,7 +252,7 @@ export const recordFixStart = (db: Database, runId: string, attempt: number, age
     yield* recordStep(db, { runId, name: "fix", attempt, status: "running", started, agentFile: agent.path, piSessionFile: piSessionFile ?? null, ...stepAgent(agent) }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the fix step in", cause)))
   })
 
-export const recordNoMistakesStart = (db: Database, runId: string, started: string): Effect.Effect<void, OrcRunError> =>
+const recordNoMistakesStart = (db: Database, runId: string, started: string): Effect.Effect<void, OrcRunError> =>
   recordStep(db, { runId, name: "no-mistakes", attempt: 1, status: "running", started, agentFile: null, piSessionFile: null }).pipe(
     Effect.asVoid,
     Effect.mapError((cause) => historyFailure("record the no-mistakes step in", cause))
@@ -310,7 +311,7 @@ export const recordFixDone = (db: Database, runId: string, fix: RecordedFixAttem
     }
   })
 
-export const recordNoMistakesDone = (db: Database, run: HistoryRun, record: NoMistakesRecord): Effect.Effect<void, OrcRunError> =>
+const recordNoMistakesDone = (db: Database, run: HistoryRun, record: NoMistakesRecord): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const failed = (action: string) => (cause: unknown) => historyFailure(action, cause)
     const status = record.status === "passed" ? "passed" : "failed"
@@ -326,13 +327,42 @@ export const recordNoMistakesDone = (db: Database, run: HistoryRun, record: NoMi
     }
   })
 
-export const recordPullRequestStart = (db: Database, runId: string, started: string): Effect.Effect<void, OrcRunError> =>
+export const recordReviewStart = (db: Database, runId: string, reviewer: Pick<AgentFile, "path" | "model" | "thinking">, started: string): Effect.Effect<void, OrcRunError> =>
+  recordStep(db, { runId, name: "review", attempt: 1, status: "running", started, agentFile: reviewer.path, piSessionFile: null, ...stepAgent(reviewer) }).pipe(
+    Effect.asVoid,
+    Effect.mapError((cause) => historyFailure("record the review step in", cause))
+  )
+
+export const recordReviewDone = (db: Database, runId: string, reviewer: Pick<AgentFile, "path" | "model" | "thinking">, outcome: ReviewAtHeadOutcome, started: string, ended: string): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const failed = (action: string) => (cause: unknown) => historyFailure(action, cause)
+    const known = yield* stepIdFor(db, runId, "review", 1).pipe(Effect.mapError(failed("read the review step in")))
+    const agent = outcome.reusedFrom === null
+      ? { agentFile: reviewer.path, model: reviewer.model, thinking: reviewer.thinking }
+      : { agentFile: null, model: null, thinking: null }
+    const stepId = known ?? (yield* recordStep(db, { runId, name: "review", attempt: 1, status: outcome.status, started, ended, piSessionFile: null, ...agent }).pipe(Effect.mapError(failed("record the review step in"))))
+    if (known !== null) {
+      yield* sqlite(() => db.query("UPDATE steps SET status = ?, ended = ?, agent_file = ?, model = ?, thinking = ? WHERE id = ?").run(outcome.status, ended, agent.agentFile, agent.model, agent.thinking, stepId)).pipe(Effect.mapError(failed("record the review step in")))
+    }
+    if (outcome.reusedFrom !== null) {
+      yield* recordSignal(db, { stepId, name: "review-reused-from", value: outcome.reusedFrom }).pipe(Effect.mapError(failed("record the review reuse in")))
+    }
+    if (outcome.status === "passed") {
+      yield* recordEvidence(db, { stepId, direction: "out", path: outcome.file, kind: "review" }).pipe(Effect.mapError(failed("record the review evidence in")))
+    }
+    const signal = outcome.status === "passed"
+      ? { name: "review-findings", value: outcome.findings.length.toString() }
+      : { name: "review-failure", value: outcome.reason }
+    yield* recordSignal(db, { stepId, ...signal }).pipe(Effect.mapError(failed("record the review signals in")))
+  })
+
+const recordPullRequestStart = (db: Database, runId: string, started: string): Effect.Effect<void, OrcRunError> =>
   recordStep(db, { runId, name: "pr", attempt: 1, status: "running", started, agentFile: null, piSessionFile: null }).pipe(
     Effect.asVoid,
     Effect.mapError((cause) => historyFailure("record the pr step in", cause))
   )
 
-export const recordPullRequestDone = (db: Database, run: HistoryRun, record: DirectPrRecord): Effect.Effect<void, OrcRunError> =>
+const recordPullRequestDone = (db: Database, run: HistoryRun, record: DirectPrRecord): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const failed = (action: string) => (cause: unknown) => historyFailure(action, cause)
     const status = record.status === "opened" ? "passed" : "failed"
@@ -346,3 +376,12 @@ export const recordPullRequestDone = (db: Database, run: HistoryRun, record: Dir
       yield* recordSignal(db, { stepId, name: "pr-link", value: record.prLink }).pipe(Effect.mapError(failed("record the pr signals in")))
     }
   })
+
+export const deliveryCheckpoints = (db: Database, run: HistoryRun): Pick<RunCheckpoints, "noMistakesStart" | "noMistakesDone" | "reviewStart" | "reviewDone" | "pullRequestStart" | "pullRequestDone"> => ({
+  noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
+  noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
+  reviewStart: (reviewer, started) => recordReviewStart(db, run.runId, reviewer, started),
+  reviewDone: (reviewer, outcome, started, ended) => recordReviewDone(db, run.runId, reviewer, outcome, started, ended),
+  pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
+  pullRequestDone: (record) => recordPullRequestDone(db, run, record)
+})

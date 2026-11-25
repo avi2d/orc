@@ -2,7 +2,6 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DateTime } from "effect";
 import {
-  decodeSavedProfiles,
   decodeHerdrPanes,
   decodeLinuxHarnessProcesses,
   type Harness,
@@ -16,6 +15,7 @@ import {
 import { fixture } from "./fixtures";
 import { claudeLogFile, readBeforeHarvest, rolloutFile } from "./harvest-fixture";
 import { recordedQuotaRead } from "./quota-read";
+import { orcQuotaOf, recordedOrcQuota } from "./orc-quota";
 
 export const fixtureHome = "/home/tester";
 
@@ -98,7 +98,7 @@ export const sessionViewOfQuota = (quotaJson: string, now: DateTime.Utc, extra: 
   const files = [...fixtureLogFiles(), ...extra];
   return sessionQuotaFrom({
     quota: recordedQuotaRead(quotaJson, now, files),
-    savedProfiles: { ...decodeSavedProfiles(fixture("saved-profiles/status.json")), capturedAt: now },
+    orcQuota: orcQuotaOf(recordedOrcQuota, now),
     panes: decodeHerdrPanes(fixture("session-logs/herdr-agents.json")),
     processes: decodeLinuxHarnessProcesses(fixture("session-logs/harness-processes.txt")),
     logs: { home: fixtureHome, roots: homeLogRoots(fixtureHome), files, captured: nothingCaptured },

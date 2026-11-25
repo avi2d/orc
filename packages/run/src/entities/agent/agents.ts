@@ -1,5 +1,9 @@
 import { Data, Effect, FileSystem, Path } from "effect"
 import type { PlatformError } from "effect/PlatformError"
+import deciderPolicyFile from "../../../agents/decider-policy.md" with { type: "file" }
+import fixerFile from "../../../agents/fixer.md" with { type: "file" }
+import implementerFile from "../../../agents/implementer.md" with { type: "file" }
+import reviewerFile from "../../../agents/reviewer.md" with { type: "file" }
 
 export class AgentFileError extends Data.TaggedError("AgentFileError")<{
   readonly message: string
@@ -132,30 +136,36 @@ const readIfPresent = (
     )
   )
 
-export const bundledAgentsDir = (): string => import.meta.dir + "/../../../agents"
+export const bundledAgentFiles: Readonly<Record<AgentKind, string>> = {
+  implementer: implementerFile,
+  fixer: fixerFile,
+  reviewer: reviewerFile
+}
+
+export const bundledDeciderPolicyFile: string = deciderPolicyFile
 
 export const agentFileCandidates = (
   path: Path.Path,
   kind: AgentKind,
   projectDir: string,
   orcHome: string,
-  agentsDir: string = bundledAgentsDir()
+  agentsDir?: string
 ): ReadonlyArray<AgentFileLocation> => [
   { kind, path: path.join(orcHome, "agents", kind + ".md"), source: "personal" },
   { kind, path: path.join(projectDir, ".orc", "agents", kind + ".md"), source: "project" },
-  { kind, path: path.join(agentsDir, kind + ".md"), source: "bundled" }
+  { kind, path: agentsDir === undefined ? bundledAgentFiles[kind] : path.join(agentsDir, kind + ".md"), source: "bundled" }
 ]
 
-export const resolveAgentFile = (
+interface AgentFileSearch {
+  readonly projectDir: string
+  readonly orcHome: string
+  readonly agentsDir?: string | undefined
+}
+
+export const readAgentFile = (
   kind: AgentKind,
-  options: {
-    readonly projectDir: string
-    readonly orcHome: string
-    readonly agentsDir?: string | undefined
-    readonly configModel: { readonly file: string; readonly model: string | undefined }
-    readonly thinking?: PiThinkingLevel | undefined
-  }
-): Effect.Effect<AgentFile, AgentFileError, FileSystem.FileSystem | Path.Path> =>
+  options: AgentFileSearch
+): Effect.Effect<ParsedAgentFile, AgentFileError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
@@ -163,14 +173,27 @@ export const resolveAgentFile = (
     for (const location of candidates) {
       const text = yield* readIfPresent(fs, location.path)
       if (text !== null) {
-        const parsed = yield* parseAgentFile(text, location)
-        const model = parsed.model ?? options.configModel.model
-        if (model === undefined) {
-          return yield* fail(location.path, "names no model and " + options.configModel.file + " names no " + kind + " model, so name one in either")
-        }
-        return { ...parsed, model, thinking: options.thinking ?? parsed.thinking }
+        return yield* parseAgentFile(text, location)
       }
     }
     return yield* new AgentFileError({ message: "orc: no " + kind + ".md agent file found beside the bundled ones" })
   })
+
+interface AgentDefaults {
+  readonly configModel: { readonly file: string; readonly model: string | undefined }
+  readonly thinking?: PiThinkingLevel | undefined
+}
+
+export const finishAgentFile = (parsed: ParsedAgentFile, defaults: AgentDefaults): Effect.Effect<AgentFile, AgentFileError> => {
+  const model = parsed.model ?? defaults.configModel.model
+  return model === undefined
+    ? fail(parsed.path, "names no model and " + defaults.configModel.file + " names no " + parsed.kind + " model, so name one in either")
+    : Effect.succeed({ ...parsed, model, thinking: defaults.thinking ?? parsed.thinking })
+}
+
+export const resolveAgentFile = (
+  kind: AgentKind,
+  options: AgentFileSearch & AgentDefaults
+): Effect.Effect<AgentFile, AgentFileError, FileSystem.FileSystem | Path.Path> =>
+  readAgentFile(kind, options).pipe(Effect.flatMap((parsed) => finishAgentFile(parsed, options)))
 

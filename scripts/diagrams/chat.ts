@@ -29,7 +29,7 @@ const answer: Part = {
     "`orc_backlog`: reads every project, machine and task",
     "`orc_backlog_answer`: answers a held or parked task, a decision, or a run at its gate",
     "`orc_attention`: reads the attention queue",
-    "`orc_attention_answer`: answers a check-red, run-died or pr-ready item",
+    "`orc_attention_answer`: answers a check-red, run-died, machine-unreached, or pr-ready item",
     "`orc_decision_board`: opens a page with one card per open question"
   ])
 }

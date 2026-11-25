@@ -1,14 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
 import {
-  decodeSavedProfiles,
   decodeQuota,
   quotaBlocks,
   type QuotaReport,
-  type SavedProfiles,
   type Reading,
 } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
+import { orcQuotaOf } from "../../lib/orc-quota";
 import { quotaAxiRead } from "../../lib/quota-read";
 
 // The frame time the pinned screen was recorded at, one second after the report.
@@ -20,14 +19,8 @@ const quotaReading = (text: string): Reading<QuotaReport> => {
   return { ...decoded, capturedAt: now };
 };
 
-const savedProfilesReading = (text: string): Reading<SavedProfiles> => {
-  const decoded = decodeSavedProfiles(text);
-  if (decoded.kind !== "ok") throw new Error("expected ok, got " + JSON.stringify(decoded));
-  return { ...decoded, capturedAt: now };
-};
-
 const quota = (): string => fixture("quota-axi/full.json");
-const savedProfiles = (): string => fixture("saved-profiles/status.json");
+const accounts = () => orcQuotaOf("second-login-expired", now);
 
 const without = (provider: string): string => {
   const parsed: unknown = JSON.parse(quota());
@@ -57,37 +50,36 @@ const notSetUp = (provider: string): string => {
   });
 };
 
-describe("quotaBlocks, against the recorded quota-axi and saved profiles reports", () => {
-  test("names one block per account: live claude, saved claude, codex and opencode-go", () => {
-    const blocks = quotaBlocks(quotaAxiRead(quotaReading(quota())), savedProfilesReading(savedProfiles()), now);
-    expect(blocks.map((block) => block.title)).toEqual(["claude main", "claude second", "codex", "opencode-go"]);
+describe("quotaBlocks, against the recorded quota-axi and orc quota reports", () => {
+  test("names one block per account: live claude, orc quota's account, codex and opencode-go", () => {
+    const blocks = quotaBlocks(quotaAxiRead(quotaReading(quota())), accounts(), now);
+    expect(blocks.map((block) => block.title)).toEqual(["claude second", "account second", "codex", "opencode-go"]);
     expect(blocks.map((block) => block.provider)).toEqual(["claude", "claude", "codex", "opencode-go"]);
   });
 
-  test("the live claude block carries quota-axi's windows and plan, the saved one the profile", () => {
-    const blocks = quotaBlocks(quotaAxiRead(quotaReading(quota())), savedProfilesReading(savedProfiles()), now);
-    const [live, saved] = blocks;
+  test("the live claude block carries quota-axi's windows and plan and the account block orc quota's reason", () => {
+    const blocks = quotaBlocks(quotaAxiRead(quotaReading(quota())), accounts(), now);
+    const [live, account] = blocks;
     if (live.body.kind !== "live") throw new Error("expected a live claude block");
-    if (saved.body.kind !== "saved") throw new Error("expected a saved claude block");
     expect(live.body.plan).toBe("max");
     expect(live.body.windows.length).toBeGreaterThan(0);
-    expect(saved.body.windows.map((window) => window.label)).toEqual(["7d"]);
+    expect(account.body).toEqual({ kind: "unusable", reason: "its login expired" });
   });
 
   test("a provider quota-axi left out of its report reads absent, not live", () => {
-    const blocks = quotaBlocks(quotaAxiRead(quotaReading(without("codex"))), savedProfilesReading(savedProfiles()), now);
+    const blocks = quotaBlocks(quotaAxiRead(quotaReading(without("codex"))), accounts(), now);
     expect(blocks.find((block) => block.title === "codex")?.body).toEqual({ kind: "absent" });
   });
 
   test("a provider quota-axi reports not set up gets no block", () => {
-    const blocks = quotaBlocks(quotaAxiRead(quotaReading(notSetUp("codex"))), savedProfilesReading(savedProfiles()), now);
-    expect(blocks.map((block) => block.title)).toEqual(["claude main", "claude second", "opencode-go"]);
+    const blocks = quotaBlocks(quotaAxiRead(quotaReading(notSetUp("codex"))), accounts(), now);
+    expect(blocks.map((block) => block.title)).toEqual(["claude second", "account second", "opencode-go"]);
   });
 
   test("an unreachable quota-axi reaches every live block with its reason", () => {
     const failed: Reading<QuotaReport> = { kind: "unreachable", reason: "quota-axi did not start", capturedAt: now };
-    const blocks = quotaBlocks(quotaAxiRead(failed), savedProfilesReading(savedProfiles()), now);
-    expect(blocks.filter((block) => block.title !== "claude second").map((block) => block.body)).toEqual([
+    const blocks = quotaBlocks(quotaAxiRead(failed), accounts(), now);
+    expect(blocks.filter((block) => block.title !== "account second").map((block) => block.body)).toEqual([
       { kind: "unreachable", reason: "quota-axi did not start" },
       { kind: "unreachable", reason: "quota-axi did not start" },
       { kind: "unreachable", reason: "quota-axi did not start" },
@@ -97,10 +89,10 @@ describe("quotaBlocks, against the recorded quota-axi and saved profiles reports
   test("a schema-6 report names one live block per account, leaving the default filler out", () => {
     const decoded = decodeQuota(fixture("quota-axi/schema-6.json"));
     if (decoded.kind !== "ok") throw new Error("expected ok, got " + JSON.stringify(decoded));
-    const blocks = quotaBlocks(quotaAxiRead({ ...decoded, capturedAt: now }), savedProfilesReading(savedProfiles()), now);
+    const blocks = quotaBlocks(quotaAxiRead({ ...decoded, capturedAt: now }), accounts(), now);
     expect(blocks.map((block) => block.title)).toEqual([
-      "claude main",
       "claude second",
+      "account second",
       "codex codex-home",
       "codex openai-codex",
       "opencode-go",
@@ -111,7 +103,7 @@ describe("quotaBlocks, against the recorded quota-axi and saved profiles reports
   test("each account block carries its own row's windows", () => {
     const decoded = decodeQuota(fixture("quota-axi/schema-6.json"));
     if (decoded.kind !== "ok") throw new Error("expected ok, got " + JSON.stringify(decoded));
-    const blocks = quotaBlocks(quotaAxiRead({ ...decoded, capturedAt: now }), savedProfilesReading(savedProfiles()), now);
+    const blocks = quotaBlocks(quotaAxiRead({ ...decoded, capturedAt: now }), accounts(), now);
     const fiveHour = (title: string): number => {
       const block = blocks.find((candidate) => candidate.title === title);
       if (block?.body.kind !== "live") throw new Error("expected a live block for " + title);
@@ -142,7 +134,7 @@ describe("quotaBlocks, against the recorded quota-axi and saved profiles reports
     delete second.windows[0]["percentRemaining"];
     const decoded = decodeQuota(JSON.stringify(parsed));
     if (decoded.kind !== "ok") throw new Error("expected ok, got " + JSON.stringify(decoded));
-    const blocks = quotaBlocks(quotaAxiRead({ ...decoded, capturedAt: now }), savedProfilesReading(savedProfiles()), now);
+    const blocks = quotaBlocks(quotaAxiRead({ ...decoded, capturedAt: now }), accounts(), now);
     const broken = blocks.find((block) => block.title === "codex openai-codex");
     const sibling = blocks.find((block) => block.title === "codex codex-home");
     if (broken?.body.kind !== "invalid") throw new Error("expected an invalid openai-codex block");
@@ -150,10 +142,4 @@ describe("quotaBlocks, against the recorded quota-axi and saved profiles reports
     if (sibling?.body.kind !== "live") throw new Error("expected a live codex-home block");
   });
 
-  test("a failed saved profiles read reads as a claude saved failure, keeping the live blocks", () => {
-    const failed: Reading<SavedProfiles> = { kind: "invalid", issue: "the output is not JSON", capturedAt: now };
-    const blocks = quotaBlocks(quotaAxiRead(quotaReading(quota())), failed, now);
-    expect(blocks.map((block) => block.title)).toEqual(["claude", "claude saved", "codex", "opencode-go"]);
-    expect(blocks[1].body).toEqual({ kind: "invalid", issue: "the output is not JSON" });
-  });
 });

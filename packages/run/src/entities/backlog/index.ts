@@ -67,6 +67,9 @@ export {
   choicesOf,
 } from "./task-record-question"
 export {
+  nextHold,
+} from "./hold-history"
+export {
   isHeld,
   isDeciderAnswer,
   openQuestions,
@@ -74,10 +77,8 @@ export {
   fullPrUrl,
   ranClosing,
   decisionAnswer,
-  decisionWait,
-  answersAwaited,
-  answerWait,
-  missingOriginWait,
+  landedClosing,
+  taskLandedIn,
   isCalendarDate,
   taskPriorities,
   isTaskPriority,
@@ -97,8 +98,8 @@ export type {
   Parked,
   TaskRecord,
   TaskPriority,
-  DeciderOwns,
 } from "./task-record"
+export { answersAwaited, answerWait, decisionWait, missingOriginWait, type DeciderOwns } from "./task-wait"
 export {
   answerDecision,
   decisionRefusal,
@@ -128,8 +129,10 @@ export {
 } from "./notes"
 export {
   childCount,
+  closedUndone,
   dependencyWaits,
 } from "./task-dependency"
 export type {
   ChildCount,
 } from "./task-dependency"
+export { closeNewTask } from "./close-new"

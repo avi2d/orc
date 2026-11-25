@@ -19,10 +19,14 @@ Each item names who must answer it, and a model called the decider takes the rou
 | `looping` question | Pi failed one command 6 times in a row | You |
 | `failing-command` | Pi failed one command 3 times in a row, which only tells you | You |
 | `run-died` | A run failed or its start failed | You |
+| `machine-unreached` | Orc has not reached a run's dispatch machine for 10 minutes | You |
 | `check-red` | A check turned red on a closed task's pull request | You |
 | `pr-ready` | Every check is green on a closed task's pull request | You |
 | `overdue-wait` | A hold's date has passed | You |
+| `unasked-question` | A parked task waits on a question that no open item asks | You |
+| `update-failed` | The hourly Orc update on a dispatch machine failed | The decider when a retry can help, else you |
 
+A gate finding whose action is not `auto-fix`, `no-op`, or `ask-user` stays with you, as [The attention queue](../run/attention-queue.md) shows.
 An open item is overdue once more than 5 minutes have passed since it was asked.
 
 ## The decider
@@ -38,6 +42,7 @@ Orc checks each question's words against a fixed list of topics, and a question 
 - Deleting, and anything that cannot be undone.
 - Security, keys or credentials, and logins.
 - Merging, pushing and releasing.
+- Going public.
 - Spending.
 - A site's look, and legal text.
 

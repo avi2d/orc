@@ -20,6 +20,7 @@ import {
   orcMachinesLayer,
   pueueMachinesLayer,
   quotaSourceLayer,
+  orcQuotaSourceLayer,
   remoteTaskHistoryLayer,
   remoteTaskLiveLayer,
   SessionLogSource,
@@ -33,7 +34,7 @@ import { liveTasksScreen, printTasksFrame, runSampler } from "@avi2dg/orc-tasks"
 import { fixture } from "../../lib/fixtures";
 import { queueAnswers } from "../../lib/queues-fixture";
 import { fixtureHomeEnvironment } from "../../lib/session-fixture";
-import { isSavedProfilesCall, recordedSavedProfilesLayer } from "../../lib/saved-profiles";
+import { orcQuotaText, recordedOrcQuota } from "../../lib/orc-quota";
 import { lateQuotaOrTasks, lateRead, startOrderProbe, startedBesideOthers } from "../../lib/late-quota-tasks";
 
 const tasksCommand = "tasks-report --json";
@@ -98,7 +99,7 @@ const appended: Array<TaskSampleRecord> = [];
 
 const recordedRun = (command: Command): Effect.Effect<string> => {
   if (command.argv[0] === "quota-axi") return Effect.succeed(fixture("quota-axi/full.json"));
-  if (isSavedProfilesCall(command)) return Effect.succeed(fixture("saved-profiles/status.json"));
+  if (command.argv.join(" ") === "orc quota --json") return Effect.succeed(orcQuotaText(recordedOrcQuota));
   if (command.argv[2] === remoteTasksCommand) return Effect.sync(southTasksNow);
   if (command.argv.join(" ").startsWith(`sh -c ${tasksCommand}`)) return Effect.sync(eastTasksNow);
   return Effect.succeed(recordedAnswers.find(([asked]) => command.argv.join(" ").startsWith(asked))?.[1] ?? "");
@@ -106,7 +107,7 @@ const recordedRun = (command: Command): Effect.Effect<string> => {
 
 const sourcesAnswering = (run: (command: Command) => Effect.Effect<string>) => Layer.mergeAll(
   quotaSourceLayer,
-  recordedSavedProfilesLayer,
+  orcQuotaSourceLayer,
   macHostSourceLayer,
   macProcessesSourceLayer,
   macDiskSourceLayer,

@@ -1,9 +1,9 @@
-● claude main · max
+● claude second · max
 session ━━━━━━━━━┃━━━━━━━━━━━━━━━━━━━━━━━━━━━━─  98%  behind pace             1h 11m
 week    ━━━━━━━━━━━━────┃──────────────────────  31%  empty in 1d 20h         2d 20h
 fable   ━━━━━━━━━━━━━━━━┃━━━━━━━━━━━━━━━━━━━━━━ 100%  behind pace             2d 20h
-● claude second · pro
-7d      read 10h 9m ago
+● account second · unusable
+  its login expired
 ● codex · plus
 session ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┃ 100%  on pace                 4h 59m
 week    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━────┃──  82%  empty in 2d 7h · early  6d 11h

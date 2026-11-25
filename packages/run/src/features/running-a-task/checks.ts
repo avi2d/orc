@@ -1,4 +1,4 @@
-import { Data, Effect, FileSystem, type Path } from "effect"
+import { Data, Duration, Effect, FileSystem, type Path } from "effect"
 import { refusalsIn, type GateRefusal } from "../../entities/run-history/index"
 import type { AgentFile } from "../../entities/agent/index"
 import { orcCompletionLine } from "../../entities/agent/index"
@@ -70,13 +70,15 @@ export const readChecksCommands = (
 export const prepareCommandOf = (commands: ReadonlyArray<ChecksCommand>): string | null =>
   commands.find((check) => check.name === "prepare")?.command ?? null
 
-const sectionOf = (outcome: CheckOutcome, stdout: string, stderr: string): string => {
-  const output = (stdout + stderr).trim()
-  return [
-    "check " + outcome.name + ": " + outcome.command,
-    output === "" ? "(no output)" : output,
-    "exit " + outcome.exitCode + ": " + (outcome.passed ? "passed" : "failed")
-  ].join("\n")
+const localCheckNames = new Set(["build", "lint", "typecheck"])
+
+export const localChecksOf = (commands: ReadonlyArray<ChecksCommand>): ReadonlyArray<ChecksCommand> =>
+  commands.filter((check) => localCheckNames.has(check.name))
+
+interface CheckBoundary {
+  readonly name: string
+  readonly outputStart: number
+  readonly result: { readonly outputEnd: number; readonly passed: boolean; readonly seconds: number } | null
 }
 
 // The section reads as the check's trimmed output between its header and exit lines, so leading whitespace is dropped and trailing whitespace is held until more output follows it.
@@ -116,22 +118,39 @@ export const runChecksRound = (
     const append = (text: string): Effect.Effect<void, ChecksError> =>
       fs.writeFileString(file, text, { flag: "a" }).pipe(Effect.mapError(writeFailed))
     const outcomes: Array<CheckOutcome> = []
-    const finished: Array<string> = []
-    const rewrite = (): Effect.Effect<void, ChecksError> =>
-      fs.writeFileString(file, finished.join("\n\n")).pipe(Effect.mapError(writeFailed))
+    const boundaries: Array<CheckBoundary> = []
+    const indexFile = file + ".index.json"
+    const replace = (target: string, text: string): Effect.Effect<void, ChecksError> =>
+      fs.writeFileString(target + ".tmp", text).pipe(
+        Effect.andThen(() => fs.rename(target + ".tmp", target)),
+        Effect.mapError(writeFailed)
+      )
+    const writeIndex = (): Effect.Effect<void, ChecksError> =>
+      replace(indexFile, JSON.stringify({ checks: boundaries }))
+    let finished = ""
+    yield* writeIndex()
     for (const check of commands) {
-      yield* append((outcomes.length === 0 ? "" : "\n\n") + "check " + check.name + ": " + check.command)
+      const header = (finished === "" ? "" : "\n\n") + "check " + check.name + ": " + check.command
+      const outputStart = finished.length + header.length + 1
+      const boundary = { name: check.name, outputStart }
+      yield* append(header)
+      boundaries.push({ ...boundary, result: null })
+      yield* writeIndex()
       const section = sectionWriter(append)
-      const result = yield* runCommand(check.command, section.output).pipe(
+      const [elapsed, result] = yield* runCommand(check.command, section.output).pipe(
+        Effect.timed,
         Effect.mapError((cause) => cause instanceof ChecksError ? cause : new ChecksError({ message: "orc: the " + check.name + " check failed to run: " + cause.message }))
       )
       const passed = result.exitCode === 0
       const outcome: CheckOutcome = { name: check.name, command: check.command, exitCode: result.exitCode, passed, refusals: passed ? [] : refusalsIn(result.stdout + "\n" + result.stderr, check.name) }
       outcomes.push(outcome)
-      finished.push(sectionOf(outcome, result.stdout, result.stderr))
-      yield* rewrite()
+      const output = (result.stdout + result.stderr).trim() || "(no output)"
+      finished += header + "\n" + output + "\nexit " + result.exitCode + ": " + (passed ? "passed" : "failed")
+      yield* replace(file, finished)
+      boundaries[boundaries.length - 1] = { ...boundary, result: { outputEnd: outputStart + output.length, passed, seconds: Duration.toSeconds(elapsed) } }
+      yield* writeIndex()
     }
-    yield* append("\n")
+    yield* append(outcomes.length === 0 ? "No local checks ran. GitHub CI decides completion.\n" : "\n")
     return { round, file, outcomes }
   })
 
@@ -140,6 +159,6 @@ export const buildFixPrompt = (agent: AgentFile, evidenceFile: string): string =
     agent.body,
     "",
     "The failed checks output sits in " + evidenceFile + ".",
-    "Read that file and fix what failed, then run each check that failed and confirm that it passes.",
+    "Read that file and fix what failed. Rerun the failed build, lint, or typecheck command to confirm the fix.",
     "When the fix is committed on this branch, print " + orcCompletionLine + " on its own line and stop."
   ].join("\n")

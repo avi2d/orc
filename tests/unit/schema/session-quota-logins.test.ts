@@ -4,7 +4,6 @@ import {
   type AccountView,
   composedSessionQuota,
   type CountedCall,
-  decodeSavedProfiles,
   decodeQuota,
   type Session,
   SessionQuotaReport,
@@ -14,7 +13,7 @@ import {
   sessionQuotaViewOf,
   type WindowView,
 } from "@avi2dg/orc-schema";
-import { fixture } from "../../lib/fixtures";
+import { noOrcAccounts } from "../../lib/orc-quota";
 import { machineView } from "../../lib/machines-fixture";
 import { valueOf } from "../../lib/outcomes";
 import { quotaAxiRead } from "../../lib/quota-read";
@@ -139,7 +138,7 @@ const quotaAxiView = (quotaJson: string, call: Pick<CountedCall, "harness" | "ro
   const tokens = { input: 100, output: 0, cacheRead: 0, cacheWrite: 0 };
   return sessionQuotaView({
     quota: quotaAxiRead({ ...decodeQuota(quotaJson), capturedAt: now }),
-    savedProfiles: { ...decodeSavedProfiles(fixture("saved-profiles/status.json")), capturedAt: now },
+    orcQuota: noOrcAccounts(now),
     panes: undefined,
     processes: undefined,
     ledger: {

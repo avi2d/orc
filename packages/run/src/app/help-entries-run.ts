@@ -13,7 +13,7 @@ export const runHelp: HelpEntry = {
   about: "Runs the task in the clean checkout you are in: Pi writes the change, the checks run, and no-mistakes reviews it and opens the PR. Give --branch with no task file to resume a stopped run on that branch.",
   options: [
     { flag: "--kind " + choice(runKinds), meaning: "What the task ends in. ship ends in a PR, scout and task end in a report, and parent runs a parent's final check. Defaults to ship." },
-    { flag: "--delivery " + choice(runDeliveries), meaning: "How a ship task reaches its PR. Defaults to no-mistakes, and direct-PR opens the PR with no review." },
+    { flag: "--delivery " + choice(runDeliveries), meaning: "How a ship task reaches its PR. Defaults to no-mistakes, and direct-PR opens the PR after a review turn that records findings and blocks nothing." },
     { flag: "--branch <name>", meaning: "The branch to commit to, or to resume. Defaults to orc/<run-id>." },
     { flag: "--sandbox " + choice(sandboxKinds), meaning: "Where the agent runs. Defaults to nono, and none runs it on the host as you." },
     { flag: "--token-file <path>", meaning: "A file holding the provider token the run uses." },
@@ -102,15 +102,15 @@ export const appInstallHelp: HelpEntry = {
 export const loginHelp: HelpEntry = {
   usage: ["orc login <" + accountNames.join("|") + ">"],
   summary: "Sign one account in through its vendor's own sign-in",
-  about: "Makes the account's folder under ~/.orc/accounts if it is missing and runs the vendor's sign-in with its config folder set to it, so orc never reads or copies the credential. claude-main signs in through claude auth login with CLAUDE_CONFIG_DIR set, and openai through codex login with CODEX_HOME set. On a machine with no browser, Claude prints a link and takes back the code the page shows, and orc runs codex login --device-auth, which prints a link and a code.",
+  about: "Makes the account's folder under ~/.orc/accounts if it is missing and runs the vendor's sign-in with its config folder set to it, so orc never reads or copies the credential. claude-main and claude-second sign in through claude auth login with CLAUDE_CONFIG_DIR set, openai through codex login with CODEX_HOME set, and opencode through opencode auth login with XDG_DATA_HOME set, and the API key is pasted into OpenCode's own prompt. For claude-second, Claude opens the sign-in link in a private window of the default browser, so the claude-main browser session is not reused. On a machine with no browser, Claude prints a link and takes back the code the page shows, and orc runs codex login --device-auth, which prints a link and a code.",
   options: [],
-  examples: ["orc login claude-main", "orc login openai"]
+  examples: ["orc login claude-main", "orc login claude-second", "orc login openai", "orc login opencode"]
 }
 
 export const updateHelp: HelpEntry = {
   usage: ["orc update [--json]"],
   summary: "Install the newest published orc when it is newer than this one",
-  about: "Reads the newest version of @avi2dg/orc from the npm registry and installs it only when it is newer than the running orc. The install runs bun add -g @avi2dg/orc@<version>, or the update.command config.json names. A registry read that fails or takes more than 15 seconds leaves orc as it is.",
+  about: "Reads the newest version of @avi2dg/orc from the npm registry and installs it only when it is newer than the running orc. A Bun global install runs bun add -g @avi2dg/orc@<version>. A versioned launcher prepares a release before switching its release file: a checkout when run from source, a release archive when compiled. An update.command in config.json overrides both. A registry read that fails or takes more than 15 seconds leaves orc as it is.",
   options: [{ flag: "--json", meaning: "Print the result as an orc.update.v1 JSON document." }],
   examples: ["orc update", "orc update --json"]
 }

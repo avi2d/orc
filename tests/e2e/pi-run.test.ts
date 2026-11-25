@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { access, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { access, chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -8,6 +8,9 @@ import { ChildProcessSpawner } from "effect/process"
 import { hostExec } from "../../packages/run/src/shared/sandbox/agent-exec"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
 import { askSetupFor, type PiRun, runPi } from "../../packages/run/src/entities/agent/index"
+import { defaultToolchainResolver } from "../../packages/run/src/shared/sandbox/index"
+import { openAgentExec } from "../../packages/run/src/features/running-a-task/run-exec"
+import { prepareRunFolders } from "../../packages/run/src/features/running-a-task/run-folders"
 
 const agent: AgentFile = { kind: "implementer", model: "acme/coder", thinking: "high", tools: ["read", "bash"], body: "", path: "a.md", source: "bundled" }
 
@@ -40,7 +43,7 @@ interface Fixture {
 }
 
 const withFakePi = async (body: (fixture: Fixture) => ReadonlyArray<string>, use: (fixture: Fixture) => Promise<void>): Promise<void> => {
-  const dir = await mkdtemp(join(tmpdir(), "orc-pi-run-"))
+  const dir = await realpath(await mkdtemp(join(tmpdir(), "orc-pi-run-")))
   try {
     const fixture = { dir, sessionDir: join(dir, "sessions", "host"), logFile: join(dir, "agent.log"), marker: join(dir, "session-stored"), failingFile: join(dir, "failing.json") }
     await mkdir(join(dir, "bin"))
@@ -69,7 +72,77 @@ const run = (fixture: Fixture, pacing: { readonly tickMillis: number; readonly i
     }, pacing)
   }).pipe(Effect.provide(BunServices.layer)))
 
+const expectedAgentDir = (agentDir: "run" | "inherited" | "home" | "default", dir: string): string => {
+  if (agentDir === "run") return join(dir, "session", "agent")
+  if (agentDir === "inherited") return join(dir, "operator-agent")
+  return agentDir === "home" ? join(dir, ".pi", "agent") : ""
+}
+
+const expectRoleArgv = (role: "implementer" | "fixer" | "reviewer", argv: ReadonlyArray<string>): void => {
+  if (role === "reviewer") {
+    expect(argv.slice(argv.indexOf("--session"), argv.indexOf("--session") + 2)).toEqual(["--session", "previous-session.jsonl"])
+    expect(argv).not.toContain("--extension")
+  } else {
+    expect(argv).toContain("--extension")
+  }
+}
+
 describe("runPi", () => {
+  for (const agentDir of ["run", "inherited", "home", "default"] as const) {
+    for (const installed of [true, false]) {
+      test("does not lose an isolated cap or duplicate home loading with " + agentDir + " agent dir and " + (installed ? "an installed" : "a missing") + " cap", async () => {
+        await withFakePi((fixture) => [emit(header), 'printf \'%s\' "$PI_CODING_AGENT_DIR" > ' + quoted(join(fixture.dir, "agent-dir"))], async (fixture) => {
+          const cap = join(fixture.dir, ".pi", "agent", "extensions", "tool-time-cap.ts")
+          if (installed) {
+            await mkdir(join(fixture.dir, ".pi", "agent", "extensions"), { recursive: true })
+            await writeFile(cap, "export default () => {}")
+          }
+          const taskFile = join(fixture.dir, "input.md")
+          await writeFile(taskFile, "Do the task.")
+          for (const role of ["implementer", "fixer", "reviewer"] as const) {
+            const result = await Effect.runPromise(Effect.scoped(Effect.gen(function*() {
+              const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+              const fs = yield* FileSystem.FileSystem
+              const path = yield* Path.Path
+              const folders = yield* prepareRunFolders(fs, path, fixture.dir, taskFile, null)
+              const inheritedDir = agentDir === "home" ? join(fixture.dir, ".pi", "agent") : join(fixture.dir, "operator-agent")
+              const exec = yield* openAgentExec(
+                { kind: "none", own: agentDir === "run" ? { piAgentDir: folders.piAgentDir, env: {} } : null },
+                folders,
+                fixture.dir,
+                defaultToolchainResolver(fixture.dir),
+                {
+                  HOME: fixture.dir,
+                  PATH: join(fixture.dir, "bin") + ":/usr/bin:/bin",
+                  ...(agentDir === "inherited" || agentDir === "home" ? { PI_CODING_AGENT_DIR: inheritedDir } : {})
+                }
+              )
+              return yield* runPi(spawner, fs, path, exec, {
+                agent: { ...agent, kind: role },
+                prompt: "Do the task.",
+                instructions: null,
+                sessionDir: fixture.sessionDir,
+                resumeSession: role === "reviewer" ? "previous-session.jsonl" : null,
+                logFile: fixture.logFile,
+                failingFile: fixture.failingFile,
+                asks: askSetupFor(fixture.dir, fixture.sessionDir, 60, []),
+                ...(role === "reviewer" ? { withoutAsks: true } : {}),
+                onSession: () => Effect.void
+              }, { tickMillis: 50, idleMillis: 2_000 })
+            })).pipe(Effect.provide(BunServices.layer)))
+            expect(result.end).toEqual({ kind: "exited", exitCode: 0 })
+            const argv = (await readFile(join(fixture.dir, "argv"), "utf8")).trimEnd().split("\n")
+            const caps = argv.flatMap((arg, index) => arg === "-e" ? [argv[index + 1]] : [])
+            const isolated = agentDir === "run" || agentDir === "inherited"
+            expect(caps).toEqual(installed && isolated ? [cap] : [])
+            expect(await readFile(join(fixture.dir, "agent-dir"), "utf8")).toBe(expectedAgentDir(agentDir, fixture.dir))
+            expectRoleArgv(role, argv)
+          }
+        })
+      })
+    }
+  }
+
   test("keeps pi running through a tool that prints nothing for longer than the idle limit", async () => {
     await withFakePi((fixture) => [
       emit(header),
@@ -92,8 +165,16 @@ describe("runPi", () => {
         "ORC_COMPLETE",
         ""
       ].join("\n"))
-      expect(await readFile(join(fixture.dir, "stdin"), "utf8")).toBe("Do the task.")
       expect((await readFile(join(fixture.dir, "argv"), "utf8")).split("\n")).toContain(fixture.sessionDir)
+    })
+  }, 20_000)
+
+  test("Pi's prompt forbids starting CI by hand when a pull request run exists and forbids waiting in a tool call", async () => {
+    await withFakePi(() => [emit(header)], async (fixture) => {
+      await run(fixture, { tickMillis: 50, idleMillis: 2_000 }, [])
+      expect(await readFile(join(fixture.dir, "stdin"), "utf8")).toBe(
+        "Leave repository tests to GitHub CI. Do not run them locally. You may run build, lint, or typecheck. If a pull request run exists, do not start or rerun CI by hand. Do not wait for CI in a tool call.\n\nDo the task."
+      )
     })
   }, 20_000)
 

@@ -1,13 +1,19 @@
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { AbsolutePath, readDispatchConfig, readFailure } from "../../shared/config/index"
-import { ModelRef, ProviderId } from "../../shared/config/index"
-import { TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type TaskRecord, withDecisions } from "../../entities/backlog/index"
-import { latestPerId } from "../../entities/parked-runs/index"
+import { ModelRef, ProviderId, RoutedModels, RoutedModelsJson } from "../../shared/config/index"
+import { TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type Parked, type TaskRecord, withDecisions } from "../../entities/backlog/index"
+import { isSendBackQuestion, latestPerId } from "../../entities/parked-runs/index"
+import { carriedHoldReleaseId, holdReleaseId } from "../../entities/review-gate/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
 import { isRunDelivery } from "../../shared/config/index"
 import { decodeTokenText, LabelArg, tokenDocumentNote, tokenFields } from "../../entities/token/index"
 import { isThinkingLevel, piThinkingLevels } from "../../entities/agent/index"
+
+const AnswerArg = Schema.Struct({
+  question: Schema.String.check(Schema.isPattern(/^[^\s=]+$/)),
+  answer: Schema.String.check(Schema.isNonEmpty())
+})
 
 const taskFields = {
   task: TaskId,
@@ -15,6 +21,7 @@ const taskFields = {
   provider: ProviderId,
   implementerModel: Schema.optional(ModelRef),
   fixerModel: Schema.optional(ModelRef),
+  routedModels: Schema.optional(RoutedModels),
   implementerThinking: Schema.optional(Schema.Literals(piThinkingLevels)),
   fixerThinking: Schema.optional(Schema.Literals(piThinkingLevels)),
   body: Schema.String,
@@ -24,10 +31,7 @@ const taskFields = {
   resumeRun: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   machine: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   slots: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-  answers: Schema.optional(Schema.Array(Schema.Struct({
-    question: Schema.String.check(Schema.isPattern(/^[^\s=]+$/)),
-    answer: Schema.String.check(Schema.isNonEmpty())
-  }))),
+  answers: Schema.optional(Schema.Array(AnswerArg)),
   instructions: Schema.optional(TaskInstructions)
 }
 
@@ -81,9 +85,41 @@ const decidedBody = (path: Path.Path, file: string, record: TaskRecord): Effect.
 const takenBody = (record: TaskRecord): string => {
   const hold = record.hold
   const decisions = hold === null ? [] : [...hold.history ?? [], hold]
-  return record.spec.body + decisions.flatMap((decision) => decision.answer === null ? [] : [
+  return record.spec.body + decisions.flatMap((decision) => decision.answer === null || decision.repeat === true ? [] : [
     "\n\nHeld for the captain: " + decision.reason + "\nThe captain answered: " + decision.answer.words
   ]).join("")
+}
+
+const timeOf = (at: string): number => {
+  const time = Date.parse(at)
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time
+}
+
+// A task file written before parked_at falls back to an ask or a hold placement, since an answer given while parked is no run.
+const lastRunEndedAt = (decisions: ReadonlyArray<{ readonly at?: string | null | undefined }>, parked: Parked): number =>
+  parked.at !== undefined ? timeOf(parked.at) : Math.max(Number.NEGATIVE_INFINITY,
+    ...parked.questions.map((question) => timeOf(question.asked)),
+    ...decisions.flatMap((decision) => decision.at === undefined || decision.at === null ? [] : [timeOf(decision.at)]))
+
+const sentBackAt = (parked: Parked): number => {
+  if (parked.sentBackAt !== undefined) {
+    return timeOf(parked.sentBackAt)
+  }
+  const sentBack = parked.questions.flatMap((question) => isSendBackQuestion(question.id) ? [timeOf(question.asked)] : [])
+  return sentBack.length === 0 ? Number.NEGATIVE_INFINITY : Math.min(...sentBack)
+}
+
+// A send-back opens a new park, so a release older than it answered a failure the merged work already resolved.
+const releaseAnswerOf = (hold: TaskRecord["hold"], parked: Parked): ReadonlyArray<typeof AnswerArg.Type> => {
+  const decisions = hold === null ? [] : [...hold.history ?? [], hold]
+  const opened = sentBackAt(parked)
+  const releases = decisions.flatMap((decision) =>
+    decision.repeat === true && decision.answer !== null && decision.answer.words.trim() !== "" && timeOf(decision.answer.at) > opened ? [decision.answer] : [])
+  const latest = releases.at(-1)
+  return latest === undefined ? [] : [{
+    question: timeOf(latest.at) > lastRunEndedAt(decisions, parked) ? holdReleaseId : carriedHoldReleaseId,
+    answer: releases.map((release, index) => (index === releases.length - 1 ? "Current guidance: " : "Earlier repeat hold release: ") + release.words).join("\n")
+  }]
 }
 
 const takenResume = (task: string, record: TaskRecord): Effect.Effect<Record<string, unknown>, RunnerError> => {
@@ -95,7 +131,7 @@ const takenResume = (task: string, record: TaskRecord): Effect.Effect<Record<str
     : {
       branch: record.parked.branch,
       resumeRun: record.parked.origin?.run,
-      answers: latestPerId(record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ ...question, answer: question.answer }])).map((question) => ({ question: question.id, answer: question.answer.words }))
+      answers: [...latestPerId(record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ ...question, answer: question.answer }])).map((question) => ({ question: question.id, answer: question.answer.words })), ...releaseAnswerOf(record.hold, record.parked)]
     })
 }
 
@@ -147,8 +183,12 @@ const readRequestFields = (
     const machineName = env["ORC_RUN_MACHINE"] ?? ""
     const machine = machineName === "" ? {} : { machine: machineName }
     const models = handedModels(env)
+    const route = env["ORC_TASK_ROUTED_MODELS"] ?? ""
+    const routedModels = route === "" ? undefined : yield* Schema.decodeEffect(RoutedModelsJson)(route, { onExcessProperty: "error" }).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot read the models routed for " + task + ": " + error.message }))
+    )
     const thinking = yield* handedThinking(env)
-    return yield* Schema.decodeEffect(RequestSchema)({ task, checkout, provider, body, ...models, ...thinking, ...kind, ...delivery, ...instructions, ...machine, ...resume }).pipe(
+    return yield* Schema.decodeEffect(RequestSchema)({ task, checkout, provider, body, ...models, routedModels, ...thinking, ...kind, ...delivery, ...instructions, ...machine, ...resume }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
     )
   })

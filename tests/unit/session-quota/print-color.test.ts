@@ -9,13 +9,14 @@ import {
   herdrSourceLayer,
   linuxHarnessProcessSourceLayer,
   quotaSourceLayer,
+  orcQuotaSourceLayer,
   sessionMachinesLayer,
 } from "@avi2dg/orc-schema";
 import { harvestLogSourceLive, printSessionQuotaFrame, sessionLogSourceLive } from "@avi2dg/orc-session-quota";
 import { fixture } from "../../lib/fixtures";
 import { copyFixtureHome, recordedNow } from "../../lib/session-fixture";
 import { escape, stripSgr } from "../../e2e/lib/print-color";
-import { isSavedProfilesCall, recordedSavedProfilesLayer } from "../../lib/saved-profiles";
+import { orcQuotaText, recordedOrcQuota } from "../../lib/orc-quota";
 
 let home = "";
 
@@ -39,12 +40,12 @@ const printed = (color: boolean): Promise<string> =>
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
-          Layer.mergeAll(quotaSourceLayer, recordedSavedProfilesLayer, herdrSourceLayer, linuxHarnessProcessSourceLayer, sessionMachinesLayer).pipe(
+          Layer.mergeAll(quotaSourceLayer, orcQuotaSourceLayer, herdrSourceLayer, linuxHarnessProcessSourceLayer, sessionMachinesLayer).pipe(
             Layer.provide(
               Layer.succeed(CommandRunner, {
                 run: (command) => {
                   if (command.argv[0] === "quota-axi") return Effect.succeed(fixture("quota-axi/full.json"));
-                  if (isSavedProfilesCall(command)) return Effect.succeed(fixture("saved-profiles/status.json"));
+                  if (command.argv.join(" ") === "orc quota --json") return Effect.succeed(orcQuotaText(recordedOrcQuota));
                   if (command.argv[0] === "herdr") return Effect.succeed(atHome(fixture("session-logs/herdr-agents.json")));
                   return Effect.succeed(atHome(fixture("session-logs/harness-processes.txt")));
                 },

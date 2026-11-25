@@ -1,6 +1,7 @@
+import { Effect, type FileSystem } from "effect"
 import { deliveryFor, type RunDelivery } from "../../shared/config/index"
 import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "../../shared/config/index"
-import { answerWait, decisionWait, type DeciderOwns, type TaskRecord, childCount, dependencyWaits, isHeld, missingOriginWait, taskPriorities } from "../../entities/backlog/index"
+import { answerWait, type BacklogError, closedUndone, decisionWait, type DeciderOwns, listTasks, type TaskFileError, type TaskRecord, childCount, dependencyWaits, isHeld, missingOriginWait, taskPriorities } from "../../entities/backlog/index"
 
 export interface MachineRoom {
   readonly machine: string
@@ -17,6 +18,15 @@ export const readRoom = (machines: ReadonlyArray<Machine>, tasks: ReadonlyArray<
     ).length
   }))
 
+// Each beat writes its claim before it counts, so of two beats racing for a machine's last slot at least one sees both claims.
+export const machineOverfull = (
+  root: string,
+  machine: Machine
+): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  listTasks(root).pipe(
+    Effect.map((tasks) => readRoom([machine], tasks).some((entry) => entry.busy > entry.slots))
+  )
+
 const priorityRank = (task: TaskRecord): number => task.spec.priority ?? taskPriorities.length
 
 export const startOrder = (left: TaskRecord, right: TaskRecord): number =>
@@ -26,12 +36,18 @@ export const startOrder = (left: TaskRecord, right: TaskRecord): number =>
 
 const freeRoom = (room: MachineRoom): number => Math.max(0, room.slots - room.busy)
 
+const undoneNote = (closed: ReadonlyArray<TaskRecord>): string =>
+  closed.length === 0
+    ? ""
+    : ", and " + closed.map((task) => task.spec.id + " closed " + closedUndone(task)).join(", ") + ", which no beat reopens"
+
 const childrenWait = (parent: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string | null => {
   const count = childCount(parent, tasks, merged)
   if (count.total === 0) {
     return "waits for its first child"
   }
-  return count.done < count.total ? "waits on its children, " + count.done + " of " + count.total + " done" : null
+  const undone = tasks.filter((task) => task.spec.parent === parent.spec.id && closedUndone(task) !== null)
+  return count.done < count.total ? "waits on its children, " + count.done + " of " + count.total + " done" + undoneNote(undone) : null
 }
 
 const parkedOriginWait = (task: TaskRecord): string | null =>
@@ -55,7 +71,7 @@ const dependsWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged:
       return "waits on " + id + ", which the backlog does not hold"
     }
     if (dependencyWaits(task, dependency, merged)) {
-      return "waits on " + id
+      return "waits on " + id + undoneNote(closedUndone(dependency) === null ? [] : [dependency])
     }
   }
   return null

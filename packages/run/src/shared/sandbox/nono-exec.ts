@@ -3,9 +3,10 @@ import type { PlatformError } from "effect/PlatformError"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { homedir } from "node:os"
 import { agentEnv, type AgentExec } from "./agent-exec"
-import { standinDirSuffix } from "./standin-dir"
+import { isStandinDir } from "./standin-dir"
+import { toolTimeCap } from "./tool-time-cap"
 import { NonoProviderError, prepareSandboxShims, resolveDeveloperDir, resolveHostBinary, resolvePiAgentDir, resolveRuntime } from "./host"
-import { buildHostGitEnv, checkProfile, refuseCredentialBearingCheckout, resolveRoots, sandboxEnv, sandboxRuntimes } from "./nono"
+import { buildHostGitEnv, checkProfile, refuseCredentialBearingCheckout, resolveRoots, sandboxEnv, sandboxRuntimes, standinDirsOf } from "./nono"
 import { defaultToolchainResolver, selectNonoProfile, type ModelCredential, type ToolchainResolver } from "./nono-profile"
 
 export interface NonoExecOptions {
@@ -16,8 +17,27 @@ export interface NonoExecOptions {
   readonly modelCredential?: ModelCredential | undefined
   readonly hostEnv: Readonly<Record<string, string | undefined>>
   readonly toolchain?: ToolchainResolver | undefined
+  readonly standinHelper: StandinHelper
   readonly env: Readonly<Record<string, string>>
 }
+
+interface StandinHelper {
+  readonly runtime: string
+  readonly folder: string
+}
+
+const existingRealPaths = (fs: FileSystem.FileSystem, paths: ReadonlyArray<string>) =>
+  Effect.forEach(paths, (candidate) => fs.realPath(candidate).pipe(Effect.orElseSucceed(() => null))).pipe(
+    Effect.map((found) => [...new Set(found.filter((real) => real !== null))])
+  )
+
+// A stand-in the sandbox cannot read or a helper it cannot start falls back to the real tool, so the test refusal would not apply.
+const standinReads = (fs: FileSystem.FileSystem, searchPath: string | undefined, helper: StandinHelper) =>
+  Effect.gen(function*() {
+    const standinFolders = yield* existingRealPaths(fs, [...standinDirsOf(searchPath), helper.folder])
+    const standinFiles = yield* existingRealPaths(fs, [helper.runtime])
+    return { standinFolders, standinFiles }
+  })
 
 export const checksCacheReads = (
   path: Path.Path,
@@ -26,7 +46,7 @@ export const checksCacheReads = (
   hostEnv.HOME === undefined || hostEnv.HOME === "" ? [] : [path.join(hostEnv.HOME, ".cache", "avi2dg-checks")]
 
 const runtimeSearchPath = (searchPath: string): string =>
-  searchPath.split(":").filter((entry) => !entry.endsWith(standinDirSuffix)).join(":")
+  searchPath.split(":").filter((entry) => !isStandinDir(entry)).join(":")
 
 export type NonoExec = Extract<AgentExec, { readonly kind: "nono" }>
 
@@ -54,9 +74,12 @@ export const openNonoExec = (
     const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
     const profileDir = yield* fs.makeTempDirectoryScoped({ prefix: "orc-nono-" })
     const profilePath = path.join(profileDir, "profile.json")
-    const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: [...toolchain.folders, ...checksCacheReads(path, hostEnv)], runtimeDirs }, options.modelCredential)
+    const standins = yield* standinReads(fs, hostEnv.PATH, options.standinHelper)
+    const piExtension = yield* toolTimeCap(fs, path, hostEnv.HOME || homedir())
+    const readFiles = [...standins.standinFiles, ...(piExtension === null ? [] : [piExtension])]
+    const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: [...toolchain.folders, ...checksCacheReads(path, hostEnv)], runtimeDirs, ...standins, standinFiles: readFiles }, options.modelCredential)
     yield* fs.writeFileString(profilePath, `${JSON.stringify(profile, null, 2)}\n`)
-    yield* checkProfile(spawner, nono, profilePath, [profileDir, nonoBinary, path.dirname(nonoBinary)])
+    yield* checkProfile(spawner, nono, profilePath, [profileDir, nonoBinary, path.dirname(nonoBinary), ...standins.standinFolders, ...readFiles])
     yield* fs.makeDirectory(sandboxed.TMPDIR, { recursive: true })
-    return { kind: "nono", cwd: roots.worktree, env, nonoBinary, profilePath } as const
+    return { kind: "nono", cwd: roots.worktree, env, nonoBinary, profilePath, piExtension } as const
   })

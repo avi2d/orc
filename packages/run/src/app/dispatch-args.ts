@@ -8,7 +8,7 @@ import type { DropTask, EditTask, TaskSource } from "../features/backlog-plannin
 import type { RecordOrigin } from "../widgets/beat/index"
 import type { SendBack } from "../features/queueing-a-task/index"
 
-export type DispatchArgs = RunnerArgs | EditTask | DropTask | RecordOrigin | SendBack
+export type DispatchArgs = RunnerArgs | EditTask | DropTask | RecordOrigin | SendBack | { readonly kind: "CloseLandedTask"; readonly id: string; readonly pr: string }
 import { isEventKey } from "../entities/events/index"
 import { isMergeBasis, mergeBases } from "../entities/pull-request/index"
 
@@ -136,9 +136,14 @@ const parseStop = (rest: ReadonlyArray<string>): DispatchArgs => {
 
 const parseClose = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (rest.length < 2 || rest.length > 3) {
-    return { kind: "UsageError", detail: "orc backlog close takes a task id, done or failed, and an optional reason" }
+    return { kind: "UsageError", detail: "orc backlog close takes a task id, then done or failed with an optional reason, or --landed-in <pr-url>" }
   }
   const [id = "", outcome = "", reason = ""] = rest
+  if (outcome === "--landed-in") {
+    return isTaskId(id) && reason !== ""
+      ? { kind: "CloseLandedTask", id, pr: reason }
+      : { kind: "UsageError", detail: "orc backlog close takes a task id and --landed-in <pr-url>" }
+  }
   if (outcome !== "done" && outcome !== "failed") {
     return { kind: "UsageError", detail: "orc backlog close takes done or failed, got \"" + outcome + "\"" }
   }
@@ -274,14 +279,19 @@ const parseMerge = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (!isTaskId(id)) {
     return { kind: "UsageError", detail: "orc merge takes a task id, got \"" + id + "\"" }
   }
-  if (flags.length === 0) {
-    return { kind: "MergeTask", id, basis: "captain-word" }
+  const noWait = flags.includes("--no-wait")
+  if (flags.filter((flag) => flag === "--no-wait").length > 1) {
+    return { kind: "UsageError", detail: "orc merge takes --no-wait once" }
   }
-  const [flag, basis = "", ...extra] = flags
+  const remaining = flags.filter((flag) => flag !== "--no-wait")
+  if (remaining.length === 0) {
+    return { kind: "MergeTask", id, basis: "captain-word", noWait }
+  }
+  const [flag, basis = "", ...extra] = remaining
   if (flag !== "--basis" || !isMergeBasis(basis)) {
     return { kind: "UsageError", detail: "orc merge takes --basis once, with " + mergeBases.join(" or ") }
   }
-  return extra.length === 0 ? { kind: "MergeTask", id, basis } : unexpected(extra[0])
+  return extra.length === 0 ? { kind: "MergeTask", id, basis, noWait } : unexpected(extra[0])
 }
 
 const attentionSubcommands = {

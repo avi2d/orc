@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { decodeSavedProfiles, decodeQuota } from "@avi2dg/orc-schema";
+import { decodeQuota } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 
 const full = (): string => fixture("quota-axi/full.json");
@@ -108,18 +108,5 @@ describe("decodeQuota, against a recorded two-Codex-account replay at schemaVers
     const report = reportOf(JSON.stringify(parsed));
     const rows = report.providers.filter((entry) => entry.provider === "codex");
     expect(rows.map((entry) => ("kind" in entry ? entry.kind : "ok"))).toEqual(["ok", "invalid"]);
-  });
-});
-
-describe("decodeSavedProfiles, against a recorded saved profiles report at schema 2", () => {
-  test("reads the active profile and the saved profiles", () => {
-    const decoded = decodeSavedProfiles(fixture("saved-profiles/status.json"));
-    if (decoded.kind !== "ok") throw new Error("expected ok, got " + JSON.stringify(decoded));
-    expect(decoded.value.active_profile).toBe("main");
-    expect(decoded.value.profiles.map((profile) => profile.name)).toEqual(["main", "second"]);
-  });
-
-  test("refuses text that is not JSON", () => {
-    expect(decodeSavedProfiles("{oops")).toEqual({ kind: "invalid", issue: "the output is not JSON" });
   });
 });

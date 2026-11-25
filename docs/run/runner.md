@@ -15,9 +15,12 @@ A token account also supplies `--token-file`.
 
 ### Select models and thinking levels
 
-`ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` select the run's models.
-A model in an agent file takes precedence.
-Without the variables, the run uses its config or agent files.
+`ORC_TASK_ROUTED_MODELS` holds the routed models as JSON, with a required `implementer` and optional `fixer` and `reviewer`.
+The runner preserves these models for `orc run`.
+`ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` select the corresponding role's model before the routed or configured default.
+Each role uses its agent file's model before these variables and defaults.
+When all three model variables are empty, the run uses its config or agent files.
+If your custom start command forwards a task to another machine, forward all three model variables.
 
 `ORC_TASK_IMPLEMENTER_THINKING` and `ORC_TASK_FIXER_THINKING` select the run's thinking levels.
 The runner passes them to `orc run` as `--implementer-thinking` and `--fixer-thinking`.
@@ -27,8 +30,10 @@ The runner refuses any other level before it queues the run.
 The run history records the handed level on the step row.
 Without the variables, the run uses the agent file's `thinking` line.
 
-The beat sets none of these four variables yet.
-They stay unset until the routes task lands.
+Without routing, the beat sets `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` from the picked account's `models` in `dispatch.json`.
+It leaves both empty for an account that names no models.
+When routing is set, the beat leaves both empty and sets `ORC_TASK_ROUTED_MODELS` instead.
+It sets neither thinking variable yet.
 
 ### Queue limits and files
 
@@ -40,7 +45,9 @@ A completed task can be queued again.
 
 ### Alert stream
 
-When `orc-dash` is on `PATH`, the runner queues `orc-dash alerts --json` and appends its output to `~/.orc/backlog/alerts.jsonl`.
+When a compiled `orc runner start` queues the alert stream, it prefers the `orc-dash` beside `orc` to one on `PATH`.
+If no sibling executable is available, or orc runs from source, the runner looks for `orc-dash` on `PATH`.
+When it finds `orc-dash`, the runner queues `orc-dash alerts --json` and appends its output to `~/.orc/backlog/alerts.jsonl`.
 A running stream is not duplicated.
 If pueue refuses the stream, the runner reports the error and still queues the task.
 

@@ -8,7 +8,8 @@ Both files live in `$ORC_HOME/backlog`, or `~/.orc/backlog` when `ORC_HOME` is u
 
 ## Dispatch configuration
 
-`dispatch.json` defines machines, their slot limits and commands, and the provider's quota and accounts.
+`dispatch.json` defines machines, their slot limits and commands, and the quota and accounts.
+Its optional [`routing` section](dispatch-rules.md) picks models and quota accounts per task.
 Each slot limit also sets the [pueue](https://github.com/Nukesor/pueue) `orc` group's parallel limit when `orc runner start` queues a task.
 
 Each account has one credential kind:
@@ -48,7 +49,7 @@ The start command must run `orc runner start`.
 On a machine whose start command runs `orc runner start`, the beat also pauses starts when its heavy queue has at least three calls.
 An unread heavy queue does not hold starts.
 
-The provider must be defined in `config.json` on each machine that runs tasks.
+Each provider must be defined in `config.json` on each machine that runs tasks.
 Token file paths in `dispatch.json` must exist on those machines.
 Token-command accounts store tokens in each machine's runner token folder instead.
 Orc runs the quota command with no input and reads its standard output as this document:
@@ -66,6 +67,28 @@ Orc runs the quota command with no input and reads its standard output as this d
 Each entry gives remaining quota from 0 to 100, or why the account cannot run.
 An account missing from the document cannot run.
 
+### Accounts on other providers
+
+An account may name its own `provider`, and the `models` its runs take from that provider:
+
+```json
+{
+  "name": "openai",
+  "provider": "codex",
+  "models": { "implementer": "codex/gpt-5.5", "fixer": "codex/gpt-5.5" },
+  "tokenFile": "/Users/me/.secrets/openai-token"
+}
+```
+
+Without [dispatch rules](dispatch-rules.md), the beat picks the account with the most remaining quota across every provider.
+Without routing, the run takes that account's provider and models through `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL`.
+With routing, the run takes the selected account's provider and receives the routed models as JSON through `ORC_TASK_ROUTED_MODELS`.
+The beat leaves the other two model variables empty.
+An account without a `provider` takes the quota's `provider`.
+When neither routing nor account `models` is set, the run takes its models from `config.json` or the agent files.
+An account whose provider differs from the quota's must name `models`, and each model must come from the account's provider.
+A model an agent file names still takes precedence, so the agent files of a project that runs on several providers name no model.
+
 ### Quota from quota-axi
 
 The quota command may instead print the document [quota-axi](https://github.com/kunchenguid/quota-axi) prints for `quota-axi --full --json --provider <id>`, such as `["quota-axi", "--full", "--json", "--provider", "codex"]`.
@@ -74,7 +97,28 @@ The account's reset time is the `resetsAt` of the scope's limiting window, the l
 An account without a window or percentage cannot run.
 A document with no windows or duplicate account keys leaves the quota unread.
 
-A command that exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
+### Quota from subquo
+
+The quota command may instead print the `subquo.v1` snapshot `subquo read --json` prints, such as `["subquo", "read", "--json"]`.
+Orc reads the account room as the smallest `percentLeft` among its windows with scope `all`, so a window that covers one model only does not limit the account.
+The reset time is the `resetsAt` of the limiting window, the latest one when several tie.
+An account with a stale or unavailable reading, a fresh reading past its `validUntil`, or an unknown percent or reset cannot run.
+A snapshot that names no quota account, names one account twice, or breaks the `subquo.v1` shape leaves the whole quota unread.
+
+A command that is not installed, exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
+
+### Reading quota without running the beat
+
+Run `orc quota` on the machine that runs the beat to see its quota line without starting tasks.
+For example, set `quota.command` to `["subquo", "read", "--json"]` and run `orc quota --json` to read your configured accounts.
+
+A JSON reading with `kind: "read"` gives `floorPercent`, `accounts` in configuration order, and `pick`, which is the chosen account name or `null`.
+With [dispatch rules](dispatch-rules.md#candidates-and-quota), `pick` is always `null`, because the account is chosen per task.
+Each usable account gives `remainingPercent` and, if the source supplies it, `resetsAt`.
+Each unusable account gives its `reason`.
+A reading with `kind: "unread"` gives `reason` and a machine-readable `cause`: `command-missing`, `exit`, `timeout`, `no-json`, `spawn`, `schema`, or `account-missing`.
+Both kinds of reading exit successfully.
+If Orc cannot read `dispatch.json`, the command reports the configuration error on standard error and exits non-zero.
 
 ### Token command accounts
 
@@ -132,7 +176,30 @@ A Pi package that logs in on its own takes this kind, as in a `claude-bridge` pa
 
 Its `config.json` provider names the package with `credential` `package`, and its `env` points at the login the runs take, such as a `CLAUDE_CONFIG_DIR`.
 With no `CLAUDE_CONFIG_DIR` the runs take your ordinary Claude login under `~/.claude`.
-A quota that names more than one account when any of them is kind `none` is refused, and so is a kind `none` account beside a machine `renew` command.
+A kind `none` account spends the one login its provider holds, so a quota with another account on that provider is refused.
+A kind `none` account beside a machine `renew` command is refused too, unless a token command account takes the renewal.
+
+### Subscription logins on other providers
+
+A Pi login names no token, so an account for a subscription Pi signs in to, such as a ChatGPT plan on Pi's `openai` provider or an OpenCode Go plan, takes kind `none` and its own `provider`.
+Sign Pi in to each provider on every machine that runs tasks, and define each one in `config.json` with `credential` `pi-login`.
+Each account sits beside the Claude account the runs already take, and the beat picks among all of them:
+
+```json
+{
+  "quota": {
+    "provider": "claude-bridge",
+    "command": ["subquo", "read", "--json"],
+    "accounts": [
+      { "name": "main", "kind": "claude-config", "configDirs": { "mac": "/Users/me/claude/main" } },
+      { "name": "codex", "kind": "none", "provider": "openai", "models": { "implementer": "openai/gpt-5.5", "fixer": "openai/gpt-5.5" } },
+      { "name": "opencode-go", "kind": "none", "provider": "opencode-go", "models": { "implementer": "opencode-go/kimi-k3", "fixer": "opencode-go/kimi-k3" } }
+    ]
+  }
+}
+```
+
+With subquo as the quota command, each account name is the id subquo gives that subscription.
 
 ### Claude config accounts
 

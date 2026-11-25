@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Option } from "effect"
 import { defaultHeavyTools } from "./heavy"
-import { helperCommand, standinMarker, type StandinCall, type StandinTiming } from "./heavy-standin-runtime"
+import { ciOnlyMarker, ciOnlyPathWord, ciOnlyWord, helperCommand, standinMarker, type StandinCall, type StandinTiming } from "./heavy-standin-runtime"
 
 export type { StandinTiming } from "./heavy-standin-runtime"
 
@@ -23,10 +23,13 @@ export const detectWrap = (platform: HeavyPlatform, limit: "auto" | "none"): str
   return ""
 }
 
-export const standinTools = (commands: ReadonlyArray<string>): ReadonlyArray<string> => {
-  const extra = commands.map((entry) => entry.trim().split(" ")[0] ?? "").filter((tool) => tool !== "")
-  return [...new Set([...defaultHeavyTools, ...extra])]
-}
+const configuredTools = (commands: ReadonlyArray<string>): ReadonlyArray<string> =>
+  commands.map((entry) => entry.trim().split(" ")[0] ?? "").filter((tool) => tool !== "")
+
+export const standinTools = (commands: ReadonlyArray<string>): ReadonlyArray<string> =>
+  [...new Set([...defaultHeavyTools, ...configuredTools(commands)])]
+
+const toolsRequiringPathAtWrite = new Set(["python", "python3", "uv", "deno", "go", "cargo", "make"])
 
 const isExecutableFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<boolean> =>
   fs.stat(file).pipe(
@@ -70,26 +73,59 @@ const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, ne
     return ""
   })
 
-const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
+export const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 
-const launcher = (call: StandinCall): string => {
-  const [bun = "", ...flags] = helperCommand
-  const main = flags.at(-1) ?? ""
-  const fallback = call.real === "" ? "no " + call.tool + " was found when it was written" : "running " + call.real + " unqueued"
+const launcher = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, real: string, timing?: StandinTiming): string => {
+  const call = { tool, ...settings, commands, real, timing: timing ?? null } satisfies StandinCall
+  const bun = helperCommand[0] ?? ""
+  const main = helperCommand.at(-1) ?? ""
+  const fallback = call.real === "" ? "running the nearest node_modules/.bin/" + call.tool + " unqueued" : "running " + call.real + " unqueued"
   const warning = "orc heavy: no bun at " + bun + " or no stand-in helper at " + main + "; " + fallback + ", rerun orc to rewrite the stand-ins"
-  const direct = call.real === "" ? "exit 127" : "exec " + quoteSingle(call.real) + ' "$@"'
+  const project = quoteSingle("/node_modules/.bin/" + call.tool)
+  const direct = call.real === ""
+    ? 'd=$PWD; while [ -n "$d" ]; do [ -x "$d"' + project + ' ] && exec "$d"' + project + ' "$@"; d=${d%/*}; done; exit 127'
+    : "exec " + quoteSingle(call.real) + ' "$@"'
   return `#!/bin/sh
 # ${standinMarker}. Regenerated on every run of that command.
 [ -x ${quoteSingle(bun)} ] && [ -f ${quoteSingle(main)} ] && exec ${helperCommand.map(quoteSingle).join(" ")} ${quoteSingle(JSON.stringify(call))} "$0" "$@"
+[ "$HEAVY_TESTS_CI_ONLY" != "1" ] || { echo "orc heavy: cannot enforce CI-only tests without the stand-in helper; rerun orc to rewrite the stand-ins" >&2; exit 127; }
 echo ${quoteSingle(warning)} >&2
 [ -z "$HEAVY_CLASSIFY" ] || exit 1; ${direct}
+`
+}
+
+export const ciOnlyTools: ReadonlyArray<string> = ["node", "checks-test"]
+
+export const ciOnlyBashScript = (): string => `if [ "$HEAVY_TESTS_CI_ONLY" = 1 ]; then
+  orc_ci_only_command() {
+    local refusal
+    refusal=$(${helperCommand.map(quoteSingle).join(" ")} ${quoteSingle(ciOnlyPathWord)} "$BASH_COMMAND" 2>&1) || {
+      printf '%s (BASH_ENV command-shape guard)\\n' "$refusal" >&2
+      exit 1
+    }
+  }
+  set -o functrace
+  trap 'case $BASH_COMMAND in *node_modules/.bin/*) orc_ci_only_command ;; esac' DEBUG
+fi
+`
+
+// A missing helper cannot tell a test run from any other call, so the stand-in refuses rather than run the tool unchecked.
+export const ciOnlyScript = (tool: string): string => {
+  const bun = helperCommand[0] ?? ""
+  const main = helperCommand.at(-1) ?? ""
+  const missing = "orc heavy: no bun at " + bun + " or no stand-in helper at " + main + "; rerun orc to rewrite the stand-ins"
+  return `#!/bin/sh
+# ${ciOnlyMarker}. Regenerated on every run of that command.
+[ -x ${quoteSingle(bun)} ] && [ -f ${quoteSingle(main)} ] || { echo ${quoteSingle(missing)} >&2; exit 127; }
+real=$(${helperCommand.map(quoteSingle).join(" ")} ${quoteSingle(ciOnlyWord)} ${quoteSingle(tool)} "$0" "$@") || exit "$?"
+exec "$real" "$@"
 `
 }
 
 export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming): Effect.Effect<string, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const real = yield* findRealTool(tool, Bun.env.PATH ?? "")
-    return launcher({ tool, commands, home: settings.home, group: settings.group, wrap: settings.wrap, real, through: settings.through, timing: timing ?? null })
+    return launcher(tool, settings, commands, real, timing)
   })
 
 export const standinScripts = (
@@ -100,8 +136,12 @@ export const standinScripts = (
 ): Effect.Effect<Record<string, string>, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const entries: Array<[string, string]> = []
+    const configured = new Set(configuredTools(commands))
     for (const tool of tools) {
-      entries.push([tool, yield* standinScript(tool, settings, commands, timing)])
+      const real = yield* findRealTool(tool, Bun.env.PATH ?? "")
+      if (real !== "" || configured.has(tool) || !toolsRequiringPathAtWrite.has(tool)) {
+        entries.push([tool, launcher(tool, settings, commands, real, timing)])
+      }
     }
     return Object.fromEntries(entries)
   })

@@ -3,7 +3,7 @@ import { arrow, card, svg, tall, text, zone, type Drawing, type Part } from "./k
 const title = "The merge: what orc merge checks before it lands a pull request"
 
 const desc =
-  "You, the chat and the app all merge through orc merge. It merges only when the task names a pull request, the pull request is open, and every check has reported green. Otherwise it refuses, names every reason, and merges nothing. A branch behind its base updates first. It squash merges at the exact commit it checked. A merge always traces back to your word, and the decider never answers a question about merging."
+  "You, the chat, the app and the beat all merge through orc merge. It merges only when the task names a pull request, the pull request is open, and every check has reported green. Otherwise it refuses, names every reason, and merges nothing. A branch behind its base updates first only when both sides changed a shared file. It squash merges at the exact commit it checked. A merge traces back to your word or to a project with yolo true, and the decider never answers a question about merging."
 
 const askers: readonly Part[] = [
   { title: "You", text: "`orc merge <task-id>`" },
@@ -17,7 +17,7 @@ const conditions: readonly Part[] = [
   { title: "Green", text: "Every check has reported, and none is red." }
 ]
 
-const merged: Part = { title: "Squash merge", text: "At the checked commit, updating a branch behind its base first.", cls: "card-ok" }
+const merged: Part = { title: "Squash merge", text: "At the checked commit, after an update only when files overlap.", cls: "card-ok" }
 const refused: Part = { title: "Refused: nothing merges", text: "The refusal names every reason." }
 
 const word: readonly Part[] = [

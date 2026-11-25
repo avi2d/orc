@@ -5,6 +5,10 @@ import { pickEnv, sandboxedEnvNames } from "./agent-exec"
 import { hostGitSafetyEnv, NonoProviderError, runHostCommand, type Spawner } from "./host"
 import { credentialBearingKeys, includePathKeys, includeTargets, submoduleCheckouts } from "./git-config"
 import { type NonoSandboxRoots, within } from "./nono-profile"
+import { isStandinDir } from "./standin-dir"
+
+export const standinDirsOf = (searchPath: string | undefined): ReadonlyArray<string> =>
+  (searchPath ?? "").split(":").filter((entry) => entry.startsWith("/") && isStandinDir(entry))
 
 export const sandboxRuntimes: ReadonlyArray<string> = ["bun", "node", "pi"]
 
@@ -16,9 +20,14 @@ export const buildSandboxEnv = (
   runtimeBinDirs: ReadonlyArray<string>
 ): Readonly<Record<string, string>> & { readonly TMPDIR: string } => {
   const env = inheritedEnv(hostEnv)
+  const standins = standinDirsOf(hostEnv.PATH)
+  const rest = (hostEnv.PATH ?? "").split(":").filter((entry) => !standins.includes(entry))
   return {
     ...env,
-    PATH: [...runtimeBinDirs, ...(hostEnv.PATH === undefined ? [] : [hostEnv.PATH])].join(":"),
+    PATH: [...new Set(standins), ...runtimeBinDirs, ...(hostEnv.PATH === undefined || rest.length === 0 ? [] : [rest.join(":")])].join(":"),
+    HEAVY_TESTS_CI_ONLY: "1",
+    // The sandbox grants no pueue socket, so a queued call there could never start.
+    HEAVY_QUEUE_UNREACHABLE: "1",
     TMPDIR: `${piSessionDir}/tmp`,
     // xcrun finds its default cache through confstr, not TMPDIR, and without a writable cache every /usr/bin/git call reruns xcodebuild -find.
     xcrun_db: `${piSessionDir}/tmp/xcrun_db`,

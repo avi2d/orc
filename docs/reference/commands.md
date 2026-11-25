@@ -29,6 +29,7 @@ The backlog and the beat:
   backlog    See the backlog, and add, hold, answer or close its tasks
   attention  See everything that waits on you or the decider
   beat       Start what can start and close what finished
+  quota      Show the quota and account pick the beat reads
   merge      Merge a closed task's PR once its checks are green
 
 The runner:
@@ -73,8 +74,9 @@ Options:
                             final check. Defaults to ship.
   --delivery <no-mistakes|direct-PR>
                             How a ship task reaches its PR. Defaults to
-                            no-mistakes, and direct-PR opens the PR with no
-                            review.
+                            no-mistakes, and direct-PR opens the PR after a
+                            review turn that records findings and blocks
+                            nothing.
   --branch <name>           The branch to commit to, or to resume. Defaults to
                             orc/<run-id>.
   --sandbox <nono|none>     Where the agent runs. Defaults to nono, and none
@@ -195,7 +197,7 @@ Subcommands:
   add        Add a task to the backlog
   edit       Replace the text of a task that has not started
   origin     Record where a parked task's run lives
-  close      Close a task by hand as done or failed
+  close      Close a started task or a parked task whose work landed elsewhere
   stop       Kill a task's run and close the task stopped
   drop       Drop a new task with a reason
   posted     Mark a closed task or an event as posted to the chat
@@ -276,13 +278,15 @@ Examples:
 
 ```text
 Usage: orc backlog close <task-id> <done|failed> [<reason>]
+       orc backlog close <task-id> --landed-in <pr-url>
 
-Closes a started task as done or failed, with an optional reason, for a machine
-whose start command orc does not run. On a decision, failed drops it, and done
-is refused, since only orc backlog answer closes a decision done.
+Closes a started task as done or failed. For a parked task, --landed-in records
+where the work merged and closes the task done without changing its branch. For
+a decision, failed drops it, and only orc backlog answer closes it done.
 
 Examples:
-  orc backlog close orc-9 failed "the machine was rebuilt"
+  orc backlog close orc-9 failed "the runner lost the worktree"
+  orc backlog close orc-9 --landed-in https://github.com/example/project/pull/42
 ```
 
 #### orc backlog stop
@@ -499,7 +503,8 @@ Examples:
 Usage: orc beat [--json]
 
 Reads the room on each machine, starts each task that waits on nothing, closes
-finished runs and relays answers. Run it from cron or launchd every few minutes.
+finished runs and relays answers. Checks for Orc updates on dispatch machines at
+most once an hour. Run it from cron or launchd every few minutes.
 
 Options:
   --json  Print the beat as an orc.beat.v1 JSON document.
@@ -508,22 +513,48 @@ Examples:
   orc beat
 ```
 
+### orc quota
+
+```text
+Usage: orc quota [--json]
+
+Runs the quota command from dispatch.json and shows its reading without starting
+tasks. Run it on the machine that runs the beat.
+
+Options:
+  --json  Print the reading as JSON, with the floor, accounts and pick, or the
+          cause and reason the quota is unread.
+
+Examples:
+  orc quota
+  orc quota --json
+```
+
 ### orc merge
 
 ```text
-Usage: orc merge <task-id> [--basis <captain-word|yolo-green>]
+Usage: orc merge <task-id> [--basis <captain-word|yolo-green>] [--no-wait]
 
 Merges the PR of a closed task with a squash at the head it checked, and refuses
-a PR that is not open or not green. When the PR is behind its base, runs
-GitHub's update-branch at the checked head, waits up to 20 minutes for the
-checks on the new head and merges it once they are green. When update-branch
-reports a merge conflict or a check on the new head is red, merges nothing and
-sends the task back for a fix as orc backlog send-back does.
+a PR that is not open or not green. When the PR is behind its base and the two
+sides changed no shared file, merges without updating. When they share a changed
+file, GitHub caps either file list or GitHub refuses the branch as out of date,
+runs GitHub's update-branch at the checked head. By default, waits up to 20
+minutes for the checks on the new head and merges it once they are green. When
+update-branch reports a merge conflict, or a check is red on a --no-wait retry
+or turns red while waiting, merges nothing and sends the task back for a fix as
+orc backlog send-back does.
 
 Options:
   --basis <captain-word|yolo-green>
                             Why the merge is allowed. Defaults to captain-word,
                             and yolo-green needs a project with yolo set.
+  --no-wait                 When behind, return after requesting a branch update
+                            without waiting for CI or merging. Run merge again
+                            with the same basis once the new head checks are
+                            green. Without --no-wait, a later call drops the
+                            checks saved before the update and waits for the new
+                            head's own checks. The chat uses this option.
 
 Examples:
   orc merge orc-9
@@ -725,7 +756,8 @@ Run orc heavy <subcommand> --help for one subcommand.
 Usage: orc heavy path
 
 Writes a stand-in for each heavy tool into ~/.orc/heavy/bin and prints that
-folder.
+folder. Also writes the agent wrappers into ~/.orc/heavy/agents that no-mistakes
+agent_path_override can point at.
 
 Examples:
   orc heavy path
@@ -862,14 +894,20 @@ Usage: orc login <claude-main|claude-second|openai|opencode>
 
 Makes the account's folder under ~/.orc/accounts if it is missing and runs the
 vendor's sign-in with its config folder set to it, so orc never reads or copies
-the credential. claude-main signs in through claude auth login with
-CLAUDE_CONFIG_DIR set, and openai through codex login with CODEX_HOME set. On a
-machine with no browser, Claude prints a link and takes back the code the page
-shows, and orc runs codex login --device-auth, which prints a link and a code.
+the credential. claude-main and claude-second sign in through claude auth login
+with CLAUDE_CONFIG_DIR set, openai through codex login with CODEX_HOME set, and
+opencode through opencode auth login with XDG_DATA_HOME set, and the API key is
+pasted into OpenCode's own prompt. For claude-second, Claude opens the sign-in
+link in a private window of the default browser, so the claude-main browser
+session is not reused. On a machine with no browser, Claude prints a link and
+takes back the code the page shows, and orc runs codex login --device-auth,
+which prints a link and a code.
 
 Examples:
   orc login claude-main
+  orc login claude-second
   orc login openai
+  orc login opencode
 ```
 
 ## Updating orc
@@ -880,9 +918,11 @@ Examples:
 Usage: orc update [--json]
 
 Reads the newest version of @avi2dg/orc from the npm registry and installs it
-only when it is newer than the running orc. The install runs bun add -g
-@avi2dg/orc@<version>, or the update.command config.json names. A registry read
-that fails or takes more than 15 seconds leaves orc as it is.
+only when it is newer than the running orc. A Bun global install runs bun add -g
+@avi2dg/orc@<version>. A versioned launcher prepares a release before switching
+its release file: a checkout when run from source, a release archive when
+compiled. An update.command in config.json overrides both. A registry read that
+fails or takes more than 15 seconds leaves orc as it is.
 
 Options:
   --json  Print the result as an orc.update.v1 JSON document.

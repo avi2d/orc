@@ -88,8 +88,17 @@ const filesUnder = async (dir: string): Promise<ReadonlyArray<string>> =>
 const filesHolding = async (dir: string, text: string, except: ReadonlyArray<string>): Promise<ReadonlyArray<string>> => {
   const holding: Array<string> = []
   for (const file of await filesUnder(dir)) {
-    if (!except.includes(file) && (await readFile(file, "utf8")).includes(text)) {
-      holding.push(file)
+    if (except.includes(file)) {
+      continue
+    }
+    try {
+      if ((await readFile(file, "utf8")).includes(text)) {
+        holding.push(file)
+      }
+    } catch (error) {
+      if (!(typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT")) {
+        throw error
+      }
     }
   }
   return holding
