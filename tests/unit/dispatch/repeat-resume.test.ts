@@ -261,7 +261,7 @@ describe("a resumed run that parks again", () => {
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:45:00.000Z", log: root + "/logs/orc-1.log" } } }))
       await run(closeStartedTask(root, "orc-1", "done", "", { pr: "https://github.com/acme/orc/pull/8", report: null }, "2026-10-27T11:00:00.000Z"))
-      await run(sendBackClosedTask(root, "orc-1", "rename the flag", "2026-10-27T12:00:00.000Z", { machine: "mac", run: "run-3" }))
+      await run(sendBackClosedTask(root, "orc-1", "rename the flag", "2026-10-27T12:00:00.000Z", { machine: "mac", run: "run-3" }, "cleared"))
       const file = join(root, "new", "orc-1.md")
       const queued = await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: file, ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))
       expect(queued.answers).toEqual([{ question: "send-back", answer: "rename the flag" }])
@@ -274,7 +274,7 @@ describe("a resumed run that parks again", () => {
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:45:00.000Z", log: root + "/logs/orc-1.log" } } }))
       await run(closeStartedTask(root, "orc-1", "done", "", { pr: "https://github.com/acme/orc/pull/8", report: null }, "2026-10-27T11:00:00.000Z"))
-      await run(sendBackClosedTask(root, "orc-1", "rename the flag", "2026-10-27T12:00:00.000Z", { machine: "mac", run: "run-3" }))
+      await run(sendBackClosedTask(root, "orc-1", "rename the flag", "2026-10-27T12:00:00.000Z", { machine: "mac", run: "run-3" }, "cleared"))
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T12:05:00.000Z", log: root + "/logs/orc-1.log" } } }))
       const question = { id: "ask-1", text: "Rename its help too?", asked: "2026-10-27T12:10:00.000Z", blocks: true }

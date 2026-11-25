@@ -330,6 +330,8 @@ export const markCiRerun = (root: string, id: string, rerun: CiRerun): Effect.Ef
       ? { kind: "keep", result: false }
       : { kind: "write", record: { ...record, ciReruns: [...(record.ciReruns ?? []), rerun] }, result: true }))
 
+export const rewriteClosed = rewriteIn("closed")
+
 export const findTask = (root: string, id: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   listTasks(root).pipe(
     Effect.map((tasks) => tasks.find((candidate) => candidate.spec.id === id)),

@@ -201,7 +201,7 @@ describe("a red check on a ship task's PR", () => {
       await closeWithPr(root)
       const asked: Array<ReadonlyArray<string>> = []
       await route(root, asked)
-      await run(sendBackClosedTask(root, "orc-1", "fix it", "2026-10-27T12:10:00.000Z", { machine: "worker", run: "run-1", pr }))
+      await run(sendBackClosedTask(root, "orc-1", "fix it", "2026-10-27T12:10:00.000Z", { machine: "worker", run: "run-1", pr }, "cleared"))
       await run(claimTask(root, "orc-1"))
       const task = await run(findTask(root, "orc-1"))
       await run(writeTaken(root, { ...task, state: { kind: "started", claim, started: { at: "2026-10-27T12:11:00.000Z", log: "/tmp/task.log" } } }))

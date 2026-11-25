@@ -32,6 +32,7 @@ export {
   markCiRerun,
   rewriteNew,
   rewriteTaken,
+  rewriteClosed,
   findTask,
 } from "./backlog"
 export type {
@@ -99,6 +100,7 @@ export type {
   TaskRecord,
   TaskPriority,
 } from "./task-record"
+export type { MergeRecord } from "./task-record-merge"
 export { answersAwaited, answerWait, decisionWait, missingOriginWait, type DeciderOwns } from "./task-wait"
 export {
   answerDecision,
