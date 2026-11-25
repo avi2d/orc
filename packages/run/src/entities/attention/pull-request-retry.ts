@@ -52,7 +52,11 @@ export const routePullRequestWithRetry = (
     if (shipPr && runs.length > 0 && repo !== null && !rerunRecorded) {
       const ids = [...new Set(runs.map((run) => run.run))]
       const recorded = yield* markCiRerun(root, task.spec.id, { pr, runs: ids, at }).pipe(
-        Effect.catchTag("TaskFileError", (error) => Effect.fail(new BacklogError({ detail: error.file + ": " + error.detail })))
+        Effect.catch((error) => recordEvent(root, {
+          key: itemId(task.spec.id, "ci-rerun-record-failed", pr),
+          at,
+          text: task.spec.id + ": could not record the CI rerun for " + pr + ": " + error.detail
+        }).pipe(Effect.as(false)))
       )
       if (recorded && (yield* rerunFailed(root, task, pr, repo[1] + "/" + repo[2] + "/" + repo[3], runs, at))) {
         yield* routePullRequest(root, task.spec.id, pr, view, at, waits, true)
