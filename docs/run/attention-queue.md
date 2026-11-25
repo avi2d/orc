@@ -31,6 +31,7 @@ A question that names `unknown` or no action goes through a topic check instead.
 Orc sends questions about deletion, security, credentials, merging, pushing, releasing, spending, irreversible actions, site appearance, legal text, and logins to you.
 The topic check reads the whole question, context included, so a question that says a step pushes a tag goes to you even when it only asks whether to continue.
 A question that only reports a merge or a release, such as one that names `merge conflicts`, also goes to you.
+Dropping, discarding, resetting or throwing away commits, changes, edits, work or a stash counts as deleting work, and so does `git stash drop`.
 The name `test runs` never counts as deleting work.
 A question with no words at all goes to you.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
@@ -107,9 +108,9 @@ The beat opens an item for each run event, owned by the user:
   Two failures retry instead of opening the item.
   When no-mistakes refuses to start because the repository is not initialized, the run runs `no-mistakes init --skip-user-skill` and starts no-mistakes again.
   When the command that reaches a dispatch machine exits 255, as ssh does when its connection fails, the task stays started and the next beat reads it again.
-- A dispatch machine that orc has not reached for 10 minutes, counted from the first beat that could not reach it, opens a `machine-unreached` item.
-  The item names the machine and the error of the command that reaches it, and the task stays started.
-  A beat that reaches the machine again withdraws it, and so does closing the task.
+- A dispatch machine that orc has not reached for 10 minutes, counted from the first beat that could not reach it, opens a `machine-unreached` item for each started task on that machine.
+  Each item names the machine and the error of the command that reaches it, and the task stays started.
+  A beat that reaches the machine again withdraws the item, and so does closing its task.
 - A red check on a closed ship task's PR opens a `check-red` item for the PR's head commit.
   Checks that turn green on that commit, or a new commit, withdraw it.
   Merging the PR or closing it without merging withdraws it.

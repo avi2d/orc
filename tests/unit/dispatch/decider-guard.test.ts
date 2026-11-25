@@ -157,7 +157,6 @@ describe("the decider guard", () => {
       "Should the parser drop records with no id?",
       "Should the loader drop rows with empty names?",
       "Should the decoder discard data that fails the schema?",
-      "Should the summary drop commits from bots?",
       "Should I remove logs from the test output?",
       "Should the Map key be a string?",
       "The Record key is path; ok?",
@@ -180,6 +179,8 @@ describe("the decider guard", () => {
       "Should I delete orc-12?",
       "Should I run git branch -D old?",
       "Should I run git reset --hard?",
+      "Should I run git stash drop?",
+      "Should the summary drop commits from bots?",
       "Should I rotate the token?",
       "Should I revoke the token?",
       "Should I leak the key?",
@@ -324,7 +325,12 @@ describe("a request only the owner grants, named in the context of a neutral ask
     { text: "How should 0.22.0 ship?\nA) Cut 0.22.0 now\n   Leads to: orc creates the `chore: release` commit and tags it on main.\nRecommended: A) Cut 0.22.0 now", topic: "releasing" },
     { text: "Which way?\nA) Take main's side\n   Leads to: resolving the merge conflicts lands this branch on main.\nRecommended: A) Take main's side", topic: "merging" },
     { text: "The next step creates the `chore: release` commit and cuts 0.22.0. Continue?", topic: "releasing" },
-    { text: "The next step adds the commit subject at release and tags 0.22.0. Continue?", topic: "releasing" }
+    { text: "The next step adds the commit subject at release and tags 0.22.0. Continue?", topic: "releasing" },
+    { text: "Should I drop my last 3 commits and redo the fix?\nRecommended: yes", topic: "deleting" },
+    { text: "Should I discard my local changes and start over from main?\nRecommended: A", topic: "deleting" },
+    { text: "Throw away the current changes in the worktree and restart?\nRecommended: yes", topic: "deleting" },
+    { text: "Should I discard my work so far and restart from main?\nRecommended: yes", topic: "deleting" },
+    { text: "Should I git stash drop the saved work?\nRecommended: yes", topic: "deleting" }
   ]
 
   for (const request of ownerOnly) {
@@ -352,6 +358,7 @@ describe("a merge or release word in a report of something done", () => {
 describe("a request only the owner grants", () => {
   const ownerOnly = [
     { kind: "discarding unlanded work", text: "May I delete the unmerged branch orc-12 and its worktree? Recommended: yes", topic: "deleting" },
+    { kind: "discarding local changes", text: "Should I discard my local changes and start over from main?\nRecommended: A", topic: "deleting" },
     { kind: "a merge with no standing permission", text: "#262 is green. Should I merge it? Recommended: yes.", topic: "merging" },
     { kind: "a login", text: "npm refuses to install the private package from CI. Should I run npm login on a dispatch machine? Recommended: yes.", topic: "logins" },
     { kind: "spending money", text: "The free CI minutes ran out this month. Should I buy 1000 more minutes for $8? Recommended: yes.", topic: "spending" },

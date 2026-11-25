@@ -37,7 +37,7 @@ A result that remains unreadable for 10 minutes also closes failed.
 A result the beat cannot read because the command that reaches the machine exits 255, as ssh does when its connection fails, never closes the task, and the next beat reads it again.
 Such a beat also restarts the 10 minutes of an unreadable result.
 When that command is `ssh`, orc passes it `-o ConnectTimeout=10`, so a machine that never answers ends as exit 255 and not as a timed-out read.
-After 10 minutes without reaching the machine, the beat opens a `machine-unreached` item for you, as [The attention queue](attention-queue.md) describes.
+After 10 minutes without reaching the machine, the beat opens a `machine-unreached` item for you for each started task on that machine, as [The attention queue](attention-queue.md) describes.
 A run still waiting for an answer stays started and the beat relays the answer.
 To stop a task yourself, run `orc backlog stop <task-id>` where the backlog lives, as [Stop a task](backlog-tasks.md#stop-a-task) describes.
 
