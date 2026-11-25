@@ -173,7 +173,7 @@ describe("the asked action of a no-mistakes review question", () => {
 
   test("a routine question no-mistakes left unclassified reaches the decider, instead of the owner", async () => {
     await withStartedTask(async (root) => {
-      await parkThroughGate(root, gateAsking("question-1,warning,,ask-user," + JSON.stringify(openQuestions.changelogNotUpdated.text) + ",unknown"))
+      await parkThroughGate(root, gateAsking("question-1,warning,,ask-user," + JSON.stringify(openQuestions.finishedRunTestUsesFailedPath.text) + ",unknown"))
       expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)?.asks).toBe("unknown")
       const heard: Array<DeciderRequest> = []
       const decided = await decideAll(root, heard)

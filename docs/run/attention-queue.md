@@ -30,9 +30,7 @@ No-mistakes writes `unknown` for an `ask-user` finding its reviewer did not clas
 A question that names `unknown` or no action goes through a topic check instead.
 Orc sends questions about deletion, security, credentials, merging, pushing, releasing, spending, irreversible actions, site appearance, legal text, and logins to you.
 The topic check reads the whole question, context included, so a question that says a step pushes a tag goes to you even when it only asks whether to continue.
-A few names ask for no action: `merge conflicts`, `` `chore: release` commits ``, `written by the release` and `subject at release`.
-They do not send a question to you when they sit in a sentence that reports what happened.
-In a sentence that asks, offers an option, or says what should, would or will happen, they send it to you.
+A question that only reports a merge or a release, such as one that names `merge conflicts`, also goes to you.
 The name `test runs` never counts as deleting work.
 A question with no words at all goes to you.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
@@ -97,6 +95,8 @@ Answering a review question or a worker question with `orc backlog answer <task-
 A question asked again with the same words keeps its item.
 A question asked again with different words opens a new item, and the old item is withdrawn.
 An answered question asked again opens a new item, and the old item keeps its answer.
+
+## Items for run events
 
 The beat opens an item for each run event, owned by the user:
 

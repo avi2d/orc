@@ -268,15 +268,15 @@ describe("the decider guard", () => {
 })
 
 describe("the open questions of a queue that all waited on the owner", () => {
-  const namesPushOrReleaseOutsideAReport: ReadonlySet<string> = new Set(["directPrCard", "changelogNotUpdated", "releasePrVersionFlagMissing", "lintComplexity", "agentEnvironmentDelivery", "prePushChecks", "mutationWorkflowHome"])
+  const namesMergePushOrRelease: ReadonlySet<string> = new Set(["directPrCard", "changelogNotUpdated", "releasePrVersionFlagMissing", "lintComplexity", "changelogEntryAbsent", "agentEnvironmentDelivery", "mergeConflict", "prePushChecks", "mutationWorkflowHome"])
 
   for (const [name, question] of Object.entries(openQuestions)) {
-    if (namesPushOrReleaseOutsideAReport.has(name)) {
-      test(name + " reaches the owner on the push or release it names outside a report of something done, instead of passing to the decider", () => {
-        expect(neverDecidedReason(question.text)).toMatch(/about (?:pushing|releasing)/)
+    if (namesMergePushOrRelease.has(name)) {
+      test(name + " reaches the owner on the merge, push or release word anywhere in its text, instead of passing to the decider", () => {
+        expect(neverDecidedReason(question.text)).toMatch(/about (?:merging|pushing|releasing)/)
       })
     } else {
-      test(name + " passes the guard, instead of reaching the owner on merge conflicts or a release named in a report of something done", () => {
+      test(name + " passes the guard, instead of reaching the owner", () => {
         expect(neverDecidedReason(question.text)).toBeNull()
       })
     }
@@ -285,9 +285,7 @@ describe("the open questions of a queue that all waited on the owner", () => {
   const routine = [
     { kind: "a worker question with a Recommended: line", id: "ask-1", text: openQuestions.startTimeJob.text },
     { kind: "a fix round that landed no diff", id: "fix-round-no-diff", text: openQuestions.fixRoundNoDiff.text },
-    { kind: "a missing CHANGELOG entry", id: "changelog-entry-absent", text: openQuestions.changelogEntryAbsent.text },
-    { kind: "a test-coverage finding", id: "finished-run-test-uses-failed-path", text: openQuestions.finishedRunTestUsesFailedPath.text },
-    { kind: "a merge conflict", id: "ci-1", text: openQuestions.mergeConflict.text }
+    { kind: "a test-coverage finding", id: "finished-run-test-uses-failed-path", text: openQuestions.finishedRunTestUsesFailedPath.text }
   ]
 
   for (const question of routine) {
@@ -321,7 +319,12 @@ describe("a request only the owner grants, named in the context of a neutral ask
     { text: "Should the deploy commit go to production?", topic: "releasing" },
     { text: "Should orc add the release entry and cut 0.22.0 at release?", topic: "releasing" },
     { text: "The tag v1.0 was not pushed yet. Continue?", topic: "pushing" },
-    { text: "Should orc merge base into main?", topic: "merging" }
+    { text: "Should orc merge base into main?", topic: "merging" },
+    { text: "Cut 0.22.0 today? Context: this adds the `chore: release` commit, tags it and sends it to npm.", topic: "releasing" },
+    { text: "How should 0.22.0 ship?\nA) Cut 0.22.0 now\n   Leads to: orc creates the `chore: release` commit and tags it on main.\nRecommended: A) Cut 0.22.0 now", topic: "releasing" },
+    { text: "Which way?\nA) Take main's side\n   Leads to: resolving the merge conflicts lands this branch on main.\nRecommended: A) Take main's side", topic: "merging" },
+    { text: "The next step creates the `chore: release` commit and cuts 0.22.0. Continue?", topic: "releasing" },
+    { text: "The next step adds the commit subject at release and tags 0.22.0. Continue?", topic: "releasing" }
   ]
 
   for (const request of ownerOnly) {
@@ -331,25 +334,17 @@ describe("a request only the owner grants, named in the context of a neutral ask
   }
 })
 
-describe("a name that asks for no action", () => {
-  const names = [
-    { name: "merge conflicts", reported: "The rebase onto main hit merge conflicts in two files. Which file order should the fix take?", asked: "Should orc resolve the merge conflicts?", planned: "The next step would resolve the merge conflicts. Continue?" },
-    { name: "`chore: release` commits", reported: "Only `chore: release` commits changed CHANGELOG.md so far. Which subject should the entry use?", asked: "Should orc add `chore: release` commits?", planned: "The next step would add `chore: release` commits. Continue?" },
-    { name: "written by the release", reported: "The header said the file was written by the release. Is the entry text fine as it is?", asked: "Should the file be written by the release?", planned: "The file will be written by the release. Continue?" },
-    { name: "subject at release", reported: "The entry came from the commit subject at release. Is that entry enough?", asked: "Should the commit subject at release be the entry?", planned: "The next step would add the commit subject at release. Continue?" }
+describe("a merge or release word in a report of something done", () => {
+  const reports = [
+    { text: "The rebase onto main hit merge conflicts in two files. Which file order should the fix take?", topic: "merging" },
+    { text: "Only `chore: release` commits changed CHANGELOG.md so far. Which subject should the entry use?", topic: "releasing" },
+    { text: "The header said the file was written by the release. Is the entry text fine as it is?", topic: "releasing" },
+    { text: "The entry came from the commit subject at release. Is that entry enough?", topic: "releasing" }
   ]
 
-  for (const kept of names) {
-    test(JSON.stringify(kept.name) + " in a report of something done passes the guard, instead of reaching the owner", () => {
-      expect(neverDecidedReason(kept.reported)).toBeNull()
-    })
-
-    test(JSON.stringify(kept.name) + " in the asking sentence reaches the owner, instead of passing to the decider", () => {
-      expect(neverDecidedReason(kept.asked)).not.toBeNull()
-    })
-
-    test(JSON.stringify(kept.name) + " in a sentence that plans a step reaches the owner, instead of passing to the decider", () => {
-      expect(neverDecidedReason(kept.planned)).not.toBeNull()
+  for (const report of reports) {
+    test(JSON.stringify(report.text) + " reaches the owner, instead of passing to the decider because the word only reports what happened", () => {
+      expect(neverDecidedReason(report.text)).toContain("about " + report.topic)
     })
   }
 })

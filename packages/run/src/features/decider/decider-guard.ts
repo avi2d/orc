@@ -44,19 +44,10 @@ const neverDecided: ReadonlyArray<NeverDecided> = [
   { topic: "logins", asks: /\b(log-?ins?|log in|sign[- ]in|auth|authn|authz|authenticat\w*|authoriz\w*|oauth\w*)\b(?!\s+(?:header|fixture|test|mock|stub|helper|type)s?\b)/i }
 ]
 
-const namesReportedDone = /\bmerge conflicts?\b|`chore: release` commits?\b|\bwritten by the release\b|\bsubject at release\b/gi
-
-const clauseBreak = /((?<=[.!?;])\s+|\n+|,\s+(?=(?:and|but|so)\s))/
-
-const asksOrPlans = /\?|^\s*(?:[-*•]|[A-Za-z]\)|\d+[.)])\s|\b(?:should|shall|may|might|can|could|would|will|must|let|please|want|need|needs|proceed|continue|go ahead|recommend\w*|option)\b/i
-
-const withoutReportedNames = (clause: string): string => asksOrPlans.test(clause) ? clause : clause.replace(namesReportedDone, " ")
-
 export const neverDecidedReason = (question: string): string | null => {
-  const checked = question.split(clauseBreak).map(withoutReportedNames).join("")
   for (const entry of neverDecided) {
-    const found = entry.asks.exec(checked)
-    if (found !== null && (entry.about === undefined || entry.about.test(checked))) {
+    const found = entry.asks.exec(question)
+    if (found !== null && (entry.about === undefined || entry.about.test(question))) {
       return "orc never hands the decider a question about " + entry.topic + ", and this one says " + JSON.stringify(found[0])
     }
   }
