@@ -17,7 +17,8 @@ Orc decodes the findings JSON array from the reviewer's last reply and writes it
 An unreadable reply gets one rerun on the same session, and a second unreadable reply fails the review turn.
 The run's end reason names the finding count or the review failure.
 The review turn fixes nothing and blocks nothing, so the PR opens after it either way.
-A resumed direct-PR run runs the review turn again.
+A resumed direct-PR run keeps the recorded review result when the branch head is unchanged.
+If the head changed or no review was recorded, orc runs the review turn.
 
 ## Open the PR
 After the review turn, a direct-PR run runs `git push --set-upstream origin <branch>` from the run's worktree.

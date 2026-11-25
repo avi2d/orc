@@ -1,4 +1,4 @@
-import { Effect, Result, Schema } from "effect"
+import { Effect, Option, Result, Schema } from "effect"
 import { finalReplyText, type AgentFile } from "../../entities/agent/index"
 import { runGit } from "../../shared/process/index"
 import type { HistoryRun } from "./run-record"
@@ -18,9 +18,16 @@ const ReviewFindings = Schema.Array(ReviewFinding)
 
 type ReviewFinding = typeof ReviewFinding.Type
 
-export type ReviewOutcome =
-  | { readonly status: "passed"; readonly findings: ReadonlyArray<ReviewFinding>; readonly file: string }
-  | { readonly status: "failed"; readonly reason: string }
+const ReviewOutcome = Schema.Union([
+  Schema.Struct({ status: Schema.Literal("passed"), findings: ReviewFindings, file: Schema.String }),
+  Schema.Struct({ status: Schema.Literal("failed"), reason: Schema.String })
+])
+
+export type ReviewOutcome = typeof ReviewOutcome.Type
+
+const ReviewCheckpoint = Schema.Struct({ head: Schema.String, outcome: ReviewOutcome })
+const decodeCheckpoint = Schema.decodeUnknownOption(Schema.fromJsonString(ReviewCheckpoint))
+const checkpointFileName = "review-checkpoint.json"
 
 const reviewFileName = "review.json"
 
@@ -101,6 +108,33 @@ export const runReviewTurn = (
       prompt = resumeSession === null ? first + "\n" + rerunPrompt(problem) : rerunPrompt(problem)
     }
     return { status: "failed", reason: "the reviewer gave " + maxReviewAnswers.toString() + " answers orc could not read, the last because " + problem }
+  })
+
+export const reviewAtHead = (
+  run: Pick<HistoryRun, "fs" | "path" | "runDir" | "piSessionDir" | "spawner" | "git" | "projectDir" | "worktreeDir" | "branch">,
+  runAgent: SandboxOps["runAgent"],
+  reviewer: AgentFile,
+  priorDir: string | null
+): Effect.Effect<ReviewOutcome, OrcRunError> =>
+  Effect.gen(function*() {
+    const headOfBranch = () => runGit(run.spawner, run.git, ["rev-parse", "--verify", run.branch], run.worktreeDir).pipe(
+      Effect.map((result) => result.exitCode === 0 ? result.stdout.trim() : ""),
+      Effect.orElseSucceed(() => "")
+    )
+    const head = yield* headOfBranch()
+    const saved = priorDir === null ? null : yield* run.fs.readFileString(run.path.join(priorDir, checkpointFileName)).pipe(Effect.orElseSucceed(() => null))
+    const decoded = saved === null ? Option.none() : decodeCheckpoint(saved)
+    const outcome = head !== "" && Option.isSome(decoded) && decoded.value.head === head
+      ? decoded.value.outcome
+      : yield* runReviewTurn(run, runAgent, reviewer)
+    const after = yield* headOfBranch()
+    if (head !== "" && head === after) {
+      const file = run.path.join(run.runDir, checkpointFileName)
+      yield* run.fs.writeFileString(file, JSON.stringify({ head, outcome }) + "\n").pipe(
+        Effect.mapError((cause) => new OrcRunError({ message: "orc cannot write " + file + ": " + String(cause) }))
+      )
+    }
+    return outcome
   })
 
 export const reviewSentence = (outcome: ReviewOutcome): string =>
