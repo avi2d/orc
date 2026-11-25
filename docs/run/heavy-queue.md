@@ -96,8 +96,9 @@ So a package script, a shell wrapper or a workspace-selected script that reaches
 A call by path, such as `./node_modules/.bin/vitest run`, never reaches a `PATH` stand in.
 Under `--sandbox none`, orc also writes `~/.orc/heavy/ci-only.bash` and sets it as `BASH_ENV` for the Pi session, so each `bash` call of the agent sources it.
 Under `HEAVY_TESTS_CI_ONLY=1` that file installs a `DEBUG` trap that checks each command naming `node_modules/.bin/`.
-The check skips leading `NAME=value` words and an `exec` or `command` prefix, and strips quotes.
-When the first word ends in `node_modules/.bin/<tool>` and the call is a test run by the list above, the call fails with exit 1 and a refusal line that ends in `(BASH_ENV command-shape guard)`.
+The check skips leading `NAME=value` words and the launchers `exec`, `command`, `env`, `nice`, `nohup`, `timeout` with its duration, `sh` and `bash`, each with its options such as `-c`.
+It also strips quotes and backslashes, so `sh -c './node_modules/.bin/vitest run'` and `timeout 600 ./node_modules/.bin/vitest` are checked too.
+When the first word after them ends in `node_modules/.bin/<tool>` and the call is a test run by the list above, the call fails with exit 1 and a refusal line that ends in `(BASH_ENV command-shape guard)`.
 Other calls by path, such as `./node_modules/.bin/tsc`, run normally.
 
 ### Bun runtime overrides
@@ -112,7 +113,7 @@ Every other file call is refused, such as `bun run` on a bare path or `bun` on a
 ### What is not blocked
 - A `node` runner started from a Yarn 1 or Yarn Berry script, which puts a `node` wrapper first on the script's `PATH`, though no run has confirmed that route.
 - A runner started through a runtime's absolute path.
-- A runner called by path from a shell that does not read `BASH_ENV`, such as `sh`, or from a program that starts it without a shell.
+- A runner called by path from a script file that a shell other than Bash runs, such as `sh test.sh`, or from a program other than the launchers in [Runners called by path](#runners-called-by-path) that starts it without a shell.
 - A runner the list does not name.
 - The [no-mistakes](https://github.com/kunchenguid/no-mistakes) review and fix agents, unless the no-mistakes config starts them through orc's agent wrapper, as the next section says.
 
