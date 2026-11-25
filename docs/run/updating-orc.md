@@ -18,6 +18,7 @@ When that version is newer than the running one, it runs `bun add -g @avi2dg/orc
 When the versions are equal, or the running orc is newer, it installs nothing.
 A registry read that fails or takes more than 15 seconds installs nothing, and the command prints why.
 Run `orc update --json` for an `orc.update.v1` document.
+To upgrade by hand instead, run `bun add -g @avi2dg/orc`, the same command that installs orc.
 
 ## Update a linked checkout
 
