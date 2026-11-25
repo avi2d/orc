@@ -143,7 +143,7 @@ describe("models the beat hands to orc run", () => {
         },
         routed ? { implementer: "keyed/worker", fixer: "keyed/repair" } : undefined
       ).pipe(Effect.provide(BunServices.layer)))
-      expect([roles.agent.model, roles.fixer.model, roles.reviewer.kind === "direct-PR" ? roles.reviewer.reviewer.model : null]).toEqual(expected)
+      expect([roles.agent.model, roles.fixer.model, roles.reviewer.kind === "direct-PR" ? roles.reviewer.reviewer.model : null]).toEqual([...expected])
     } finally {
       await rm(root, { recursive: true, force: true })
     }
