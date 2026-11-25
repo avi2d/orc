@@ -144,6 +144,7 @@ const reference = [
   page("Seeing runs", "/run/seeing-runs"),
   page("What the no-mistakes fork adds", "/run/no-mistakes-fork"),
   page("Updating orc", "/run/updating-orc"),
+  page("Release assets", "/run/release-assets"),
   page("Where things are in the run package", "/run/layout")
 ]
 

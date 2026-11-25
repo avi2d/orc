@@ -5,7 +5,7 @@ const tools = await Bun.build({ entrypoints: [chat + "chat-tools.ts"], target: "
 
 await Bun.build({
   entrypoints: [run + "src/bin.ts"],
-  compile: { outfile: run + "dist/orc" },
+  compile: { outfile: process.argv[2] ?? run + "dist/orc" },
   bytecode: true,
   format: "esm",
   files: {

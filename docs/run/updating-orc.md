@@ -51,4 +51,5 @@ The command exits 0 for `installed` and `current`, and non-zero for `failed`.
 ## Related topics
 
 - [Configuring providers](configuring-providers.md)
+- [Release assets](release-assets.md)
 - [Where every source file is](layout.md)
