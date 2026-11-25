@@ -20,6 +20,7 @@ export interface AskOption {
   readonly letter: string
   readonly text: string
   readonly picture: string | null
+  readonly outcome?: string
 }
 
 export interface AskText {

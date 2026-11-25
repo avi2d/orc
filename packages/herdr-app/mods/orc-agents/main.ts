@@ -1,6 +1,9 @@
 import { type AsyncContext, type Context, type Element, View } from "gpui-kit"
 import { InputState, h_flex } from "gpui-base"
 import { layout, run, setShared, shared } from "herdr"
+import { AgentAttentionSection, userOverrides } from "../../src/agent-attention-view"
+import type { InboxItem } from "../../src/inbox"
+import type { AgentAttention } from "../../src/inbox-read"
 import { type Card, type Filter, type RunAgent, cardAnswers, filterCards, goesOn, openedFilter, recordedStatus, runAgent } from "../../src/agents"
 import { readAgents } from "../../src/agents-read"
 import { type AgentsActions, type Chosen, type DetailShown, type Keyed, approvalOf, askMerge, detailView, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
@@ -25,6 +28,11 @@ const showsAtOnce = 4
 const shown = (): boolean => {
   const active = activeChild(layout(), viewsStack)
   return active === null || active === thisView
+}
+
+const cardAttention = (card: Card): ReadonlyArray<InboxItem> => {
+  const approval = approvalOf(card)
+  return approval === null ? cardAnswers(card) : [approval]
 }
 
 const readingOf = <A>(keyed: Keyed<A> | null, of: string | null): Reading<A> =>
@@ -55,7 +63,8 @@ export default class OrcAgents extends View {
   review = InputState.new({ placeholder: "What to change before this PR merges" })
   sent: Keyed<string> | null = null
   answers = new InboxAnswers((cx) => this.refresh(cx))
-  unread: ReadonlyMap<string, string> = new Map()
+  agent: AgentAttention = { pending: [], decided: [] }
+  agentAttention = new AgentAttentionSection()
 
   override init(_props: unknown, cx: AsyncContext): void {
     this.review.on("submit", (_event, submitted) => this.sendBack(submitted))
@@ -95,8 +104,8 @@ export default class OrcAgents extends View {
     return readAgents().then((reading) => {
       this.cards = reading.kind === "ok" ? { kind: "ok", value: reading.value.cards } : reading
       if (reading.kind === "ok") {
-        this.unread = reading.value.unread
-        this.answers.sync(cx, reading.value.cards.flatMap(cardAnswers), this.unread)
+        this.agent = reading.value.agent
+        this.answers.sync(cx, reading.value.cards.flatMap(cardAttention))
       }
       cx.notify()
       if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {
@@ -180,13 +189,20 @@ export default class OrcAgents extends View {
     if (this.merge?.outcome.kind === "merging") {
       return
     }
+    const approval = this.cards.kind === "ok" ? this.cards.value.map(approvalOf).find((item) => item?.task === task) : undefined
+    if (approval === undefined || approval === null || this.answers.busy(approval.key)) return
+    this.answers.sent.set(approval.key, { kind: "sending" })
     this.merge = { task, outcome: { kind: "merging" } }
     cx.notify()
     cx.spawn((spot) =>
       runMerge(task).then((problem) => {
         this.merge = problem === null ? null : { task, outcome: { kind: "failed", reason: problem } }
         if (problem === null) {
+          this.answers.sent.delete(approval.key)
+          this.answers.recorded.add(approval.key)
           mergedNote(task)
+        } else {
+          this.answers.sent.set(approval.key, { kind: "failed", reason: problem })
         }
         this.refresh(spot)
         spot.notify()
@@ -308,12 +324,14 @@ export default class OrcAgents extends View {
       askMerge: (asked, approval) => askMerge(approval, `${thisView}.${mergeCommand}${asked.id}`)
     }
     return h_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)
-      .child(runsColumn(t, { cards: this.cards, filter: this.filter, menu: this.menu, selectedKey: card?.key ?? null, agents: this.agents, folded: this.folded }, act))
+      .child(runsColumn(t, {
+        cards: this.cards, filter: this.filter, menu: this.menu, selectedKey: card?.key ?? null, agents: this.agents, folded: this.folded,
+        attention: (listed) => cardAttention(listed).map((item) => this.answers.item(t, item, (asked) => act.askMerge(listed, asked))),
+        agentAttention: [...userOverrides(t, this.agent), ...this.agentAttention.render(t, this.agent)]
+      }, act))
       .child(stepsColumn(t, card, {
         reading: card === null ? null : this.currentSteps(card),
         target: this.target(),
-        answers: (item) => this.answers.item(t, item),
-        threadProblem: card === null ? null : this.unread.get(card.id) ?? null,
         changesProblem: this.changesProblem
       }, act))
       .child(this.detail(t, card, act))

@@ -73,9 +73,13 @@ On the Board tab, click the count in the **Awaiting you** lane header to open th
 
 [Runs and chat](herdr-app-agents.md) covers the Agents tab and chat drawer.
 On the Agents tab, open the **Status** select and click the count beside **Awaiting you** to open the Inbox, as `cmd-4` does.
-Select an **Awaiting you** card to see what it needs above the step list, even if the run is not on this machine.
-
-![An open Awaiting you card on Mac with its question and answer box above the steps.](images/herdr-agents-awaiting.png)
+**Awaiting you** shows the items Orc assigns to you, even if the run is on another machine.
+The Agents tab and Inbox show each item's subject, options, outcomes, and recommendation on the card.
+Select an option to answer without opening the run.
+If Orc did not record options, the card shows the original text and says **No options recorded**.
+An overdue card shows how long it has waited.
+Open **Agent attention** to see what the agent owns or answered, and the basis for its decisions.
+If you replaced an agent answer, the Inbox shows your answer separately.
 The **Project** select shows runs for configured projects by default.
 Choose **All runs** in it to include runs from other projects.
 Opening a run of another project from the Inbox switches the **Project** select to **All runs**.

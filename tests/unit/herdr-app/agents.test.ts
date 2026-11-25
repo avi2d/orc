@@ -68,18 +68,9 @@ describe("sending a PR back", () => {
     ])
   })
 
-  test("a resumed run with answered questions awaits approval, not a mistaken sent-back", () => {
-    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "started", parked: 0 })]))
-    expect(cards.map((card) => [card.id, card.standing.status, card.where, card.sendBack])).toEqual([
-      ["orc-48", "Awaiting you", "Approve PR #48", null]
-    ])
-  })
-
-  test("a sent-back run that succeeded before its close awaits approval, not a second sent-back", () => {
-    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "started", parked: 0, parkedOrigin: "20261113-070000-cccccc" })]))
-    expect(cards.map((card) => [card.id, card.standing.status, card.where, card.sendBack])).toEqual([
-      ["orc-48", "Awaiting you", "Approve PR #48", null]
-    ])
+  test("a succeeded run with no open attention record does not still ask for approval", () => {
+    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed", prState: "open" })]))
+    expect(cards.map((card) => [card.standing.status, card.where])).toEqual([["Done", "PR #48"]])
   })
 })
 
@@ -141,19 +132,14 @@ describe("the runs list", () => {
     expect(cards.map((card) => [card.runId, card.standing.status, cardAnswers(card)])).toEqual([[running.id, "Awaiting you", [question]]])
   })
 
-  test("a running question whose thread could not be read stays Awaiting you instead of Running", () => {
-    const running = run("20261113-090000-aaaaaa", { branch: "orc/orc-7", questions: 1 })
-    const cards = buildCards(runs([running]), backlog([task("orc-7", { status: "started", parked: 1 })]), [], new Set(["orc-7"]))
-    expect(cards.map((card) => [card.runId, card.standing.status, card.where, cardAnswers(card)])).toEqual([[running.id, "Awaiting you", "Question 1", []]])
+  test("parked question counts alone do not put an agent-owned question in Awaiting you", () => {
+    const cards = buildCards(runs([]), backlog([task("orc-7", { status: "new", parked: 2 })]), [])
+    expect(cards.map((card) => [card.id, card.standing.status])).toEqual([["orc-7", "Queued"]])
   })
 
-  test("a parked task whose thread could not be read stays Awaiting you instead of Queued", () => {
-    const cards = buildCards(runs([]), backlog([task("orc-7", { status: "new", parked: 2 })]), [], new Set(["orc-7"]))
-    expect(cards.map((card) => [card.id, card.standing.status, card.where])).toEqual([["orc-7", "Awaiting you", "Questions 1-2"]])
-  })
-
-  test("a closed task whose PR awaits approval gets no card without a run instead of one that says it never ran", () => {
-    expect(buildCards(runs([]), backlog([task("orc-48", { status: "closed" })]), [approval])).toEqual([])
+  test("a recorded approval without a local run is not missing from the Agents tab", () => {
+    const cards = buildCards(runs([]), backlog([task("orc-48", { status: "closed" })]), [approval])
+    expect(cards.map((card) => [card.id, card.standing.status, card.where])).toEqual([["orc-48", "Awaiting you", "Approve PR #48"]])
   })
 
   test("a run whose PR merged outside orc is Done, not Awaiting you", () => {
