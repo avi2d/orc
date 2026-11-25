@@ -104,6 +104,18 @@ describe("run events in the attention queue", () => {
     })
   })
 
+  test("a pending check is logged instead of marking the PR ready", async () => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      const pending = { ...checked(""), statusCheckRollup: [{ name: "test", status: "IN_PROGRESS", conclusion: "", startedAt: "2026-10-27T11:10:00.000Z" }] }
+      const output = await beat(root, "2026-10-27T12:00:00.000Z", pending)
+      expect(output).toContain("PR checks for task-1: the check test has not reported")
+      expect(await run(openItems(root))).toEqual([])
+      await beat(root, "2026-10-27T12:01:00.000Z", checked("SUCCESS"))
+      expect((await run(openItems(root))).map(({ item }) => [item.kind, item.owner])).toEqual([["pr-ready", "user"]])
+    })
+  })
+
   test("a ready PR reopens its item after a red check clears instead of staying withdrawn", async () => {
     await withBacklog(async (root) => {
       await closeWithPr(root)

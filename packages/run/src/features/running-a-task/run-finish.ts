@@ -1,12 +1,11 @@
 import { Effect, FileSystem } from "effect"
-import { driveNoMistakes, waitForAnswers, type AllowWord, type OpenQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
-import { ciWaitingQuestionId, ciVerdictLine, type CiVerdict, type DirectPrRecord, openDirectPr, type PullRequestOpener, readCiVerdict } from "../../entities/pull-request/index"
+import { driveNoMistakes, waitForAnswers, type AllowWord, type QuestionAnswer } from "../../entities/review-gate/index"
+import { type DirectPrRecord, openDirectPr, type PullRequestOpener } from "../../entities/pull-request/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
 import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 import type { RunCheckpoints, SandboxOps } from "./run-ops"
-import { recordOpenAsks } from "./history-write"
 import { reviewSentence, reviewAtHead } from "./review-turn"
 
 export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], priorDir: string | null): Effect.Effect<OrcRunReport, OrcRunError> =>
@@ -23,11 +22,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       if (pr.status !== "opened") {
         return { ...settled, completed: false, waitingOnCi: false, prLink: pr.prLink, endReason: reviewed + pr.result }
       }
-      const ci = yield* ciVerdictOfHead(run, run.delivery.opener, pr.prLink)
-      if (ci.kind === "pending") {
-        yield* recordOpenAsks(checkpoints.questionAsked, run.asks, { name: "pr", attempt: 1 }, [ciWaitingQuestion(ci, pr.prLink)])
-      }
-      return { ...settled, completed: ci.kind === "passed", waitingOnCi: ci.kind === "pending", prLink: pr.prLink, endReason: reviewed + pr.result + " " + ciVerdictLine(ci) }
+      return { ...settled, completed: true, waitingOnCi: false, prLink: pr.prLink, endReason: reviewed + pr.result }
     }
     yield* checkpoints.noMistakesStart(new Date().toISOString())
     const waitSeconds = run.answerWaitSeconds ?? 0
@@ -37,23 +32,6 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     )
     yield* checkpoints.noMistakesDone(noMistakes)
     return { ...settled, completed: noMistakes.status === "passed", waitingOnCi: false, prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
-  })
-
-const ciWaitingQuestion = (ci: Extract<CiVerdict, { readonly kind: "pending" }>, prLink: string): OpenQuestion => ({
-  id: ciWaitingQuestionId,
-  text: "GitHub CI has not finished on " + ci.headSha + " for " + prLink + ": " + ci.reason + ". The PR stays open while the run waits on CI."
-})
-
-const ciVerdictOfHead = (run: HistoryRun, opener: PullRequestOpener, prLink: string): Effect.Effect<CiVerdict> =>
-  Effect.gen(function*() {
-    const head = yield* runGit(run.spawner, run.git, ["rev-parse", run.branch], run.worktreeDir).pipe(
-      Effect.map((parsed) => parsed.exitCode === 0 ? parsed.stdout.trim() : ""),
-      Effect.orElseSucceed(() => "")
-    )
-    if (head === "") {
-      return { kind: "pending", headSha: run.branch, waiting: [], reason: "orc could not read the head commit of " + run.branch }
-    }
-    return yield* readCiVerdict(opener.checkRuns, prLink, head)
   })
 
 const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>): string => {

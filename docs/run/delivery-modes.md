@@ -32,14 +32,7 @@ The PR's title is the head commit's subject, and its body lists the branch's com
 To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
 Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
 
-## Read the CI verdict
-A `passed` verdict ends the run succeeded with the PR link, so the task closes done with it as `pr` and the chat posts it as it posts any PR.
-A failed local check, a failed push or a failed `gh pr create` ends the run failed with no PR, and the task closes failed.
-Once the PR opens, orc reads the GitHub check runs of the pushed head with `gh api repos/<owner>/<repo>/commits/<sha>/check-runs` and adds a `CI verdict for <sha>:` line to the end reason.
-The verdict is `passed` when every check run on that head is green, `failed` with the names of the red check runs, or `pending` while a check run is unfinished, none has reported on that head, or orc cannot read the full list.
-A check run on another head never counts toward the verdict.
-A `failed` verdict ends the run failed.
-A `pending` verdict ends the run waiting on CI without success.
-Both leave the PR open.
-While the run waits, it records an open `ci-waiting` question and keeps its history row running, so the task parks with that question instead of closing failed or done.
-Answering the question resumes the run, which reads the verdict again for the same head.
+## After the PR opens
+A direct-PR run succeeds as soon as the PR opens.
+A failed local check, push, or PR creation ends the run failed.
+The beat reads the open PR and places it in the attention queue when its checks are green.

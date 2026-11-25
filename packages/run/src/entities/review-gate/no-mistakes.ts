@@ -115,7 +115,7 @@ export const subprocessNoMistakesRunner = (options: SubprocessRunnerOptions): No
   const spawn = (args: ReadonlyArray<string>) => spawnBinary(options, options.worktreeDir, args)
   return {
     init: spawn(["init", "--skip-user-skill"]),
-    start: (intentFile) => spawn(["axi", "run", "--intent-file", intentFile, "--skip", "test,rebase"]),
+    start: (intentFile) => spawn(["axi", "run", "--intent-file", intentFile, "--skip", "test,rebase,ci"]),
     reattach: spawn(["axi", "run"]),
     respond: (response) => spawn(respondArgs(response)),
     answer: (reply) => spawn(answerArgsFor(reply.question, reply.answer)),

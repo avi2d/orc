@@ -311,6 +311,9 @@ const actionLine = (action: BeatAction): string => {
     case "pr-unread": {
       return "cannot read the PR of " + action.task + " for the chat: " + action.reason
     }
+    case "pr-checks": {
+      return "PR checks for " + action.task + ": " + action.reason
+    }
     case "yolo-merged": {
       return "merged " + action.task + " " + action.pr + " on yolo-green"
     }

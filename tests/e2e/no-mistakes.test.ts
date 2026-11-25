@@ -53,7 +53,7 @@ const lintPasses = async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 })
 
 const axiCalls = (calls: string): ReadonlyArray<string> => calls.split("\n").filter((line) => line.startsWith("axi "))
 
-const startCall = (path: string): string => "axi run --intent-file " + path + " --skip test,rebase"
+const startCall = (path: string): string => "axi run --intent-file " + path + " --skip test,rebase,ci"
 
 const fixCall = (ignore = ""): string =>
   "axi respond --action fix --findings R7" + ignore + " --instructions Leave repository tests to GitHub CI. Do not run them locally. You may run build, lint, or typecheck. If a pull request run exists, do not start or rerun CI by hand. Do not wait for CI in a tool call."
@@ -118,7 +118,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(text).toContain("PR: https://github.com/o/r/pull/7")
         expect(text).toContain("findings: 0")
         expect(text).toContain("gates answered: 0")
-        expect(text).toContain("no-mistakes opened https://github.com/o/r/pull/7 and CI is green.")
+        expect(text).toContain("no-mistakes opened https://github.com/o/r/pull/7.")
         expect(outcome.signals).toContainEqual({ name: "finding-count", value: "0" })
         expect(outcome.signals).toContainEqual({ name: "result", value: "passed" })
         expect(outcome.signals).toContainEqual({ name: "gates-answered", value: "0" })

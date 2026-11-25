@@ -128,6 +128,10 @@ export const prEvents = (
     if (Result.isFailure(waits)) {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: waits.failure.detail })
     }
+    const refusals = checkRefusals(view.success)
+    if (view.success.state === "OPEN" && refusals.length > 0) {
+      return Option.some<BeatAction>({ kind: "pr-checks", task: id, reason: refusals.join("; ") })
+    }
     if (waits.success === null || waits.success.length > 0) {
       return Option.none()
     }

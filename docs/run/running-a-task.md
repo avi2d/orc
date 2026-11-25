@@ -40,7 +40,7 @@ In the first checks round, orc prints a warning on stderr naming skipped command
 The `prepare` command runs before Pi starts and is not skipped.
 Without local checks, orc records the round as `skipped`.
 Orc then hands off to no-mistakes or opens the direct PR.
-GitHub CI runs repository tests and decides completion.
+GitHub CI runs repository tests.
 Keep test runners out of those commands and `prepare`.
 In Pi sessions, `prepare` and local checks, stand-ins first on `PATH`, and under `--sandbox none` a `BASH_ENV` guard for runners called by path, refuse a test run when it starts, directly or through a script, as [Test runs in agent sessions](heavy-queue.md#test-runs-in-agent-sessions) lists.
 A `node` runner started from a Yarn script is not confirmed as refused, as [What is not blocked](heavy-queue.md#what-is-not-blocked) says.
@@ -51,11 +51,9 @@ The no-mistakes review and fix agents refuse test runs only when `~/.no-mistakes
 
 Orc starts no-mistakes without its preflight Rebase step.
 An existing task branch keeps its base during the run instead of rebasing just because the base moved.
-The no-mistakes CI monitor can still repair a merge conflict.
-By default, the monitor leaves clean behind branches alone.
-Setting `ci.rebase_behind: true` in `.no-mistakes.yaml` opts into updating them.
+Orc skips the no-mistakes CI step and reads PR checks in the beat.
 When a pull request run exists, Orc tells workers not to start or rerun CI by hand.
-Orc manages the wait for CI instead of asking workers to wait in a tool call.
+The beat reads PR checks after the run ends.
 
 ## Choose the run
 
@@ -117,10 +115,9 @@ It also leaves a reused worktree outside `$ORC_HOME` in place.
 
 ## Results
 
-A no-mistakes ship run succeeds when Pi completes with `ORC_COMPLETE` on its own line, the branch has a new commit, the configured local checks pass, and no-mistakes opens the PR and reports green CI.
-A direct-PR run succeeds when Pi completes, the branch has a new commit, the configured local checks pass, the PR opens, and the GitHub CI verdict on the pushed head is `passed`.
-A `pending` verdict ends the run waiting on CI without success.
-The waiting run records an open `ci-waiting` question and keeps its history row running, so the beat parks the task instead of closing it failed or done.
+A no-mistakes ship run succeeds when Pi completes with `ORC_COMPLETE` on its own line, the branch has a new commit, the configured local checks pass, and no-mistakes opens the PR.
+A direct-PR run succeeds when Pi completes, the branch has a new commit, the configured local checks pass, and the PR opens.
+The beat reads the PR checks and opens an attention item when they are green.
 A stopped or failed run exits with status 1 and records the reason.
 See [Merging a task's PR](merging-a-tasks-pr.md) for what follows.
 

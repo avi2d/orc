@@ -37,7 +37,7 @@ A ship run records success only when all of these hold.
 1. Pi's final reply stopped cleanly with `ORC_COMPLETE` on its own line.
 1. The branch holds at least one new commit.
 1. The configured local checks pass.
-1. The pull request is open, and on a `no-mistakes` run CI is green.
+1. The pull request is open.
 
 A scout or task run makes no branch and no pull request.
 It counts as done once Pi wrote `agent-report.md` into the run folder.

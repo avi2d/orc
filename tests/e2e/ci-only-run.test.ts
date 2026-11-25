@@ -32,7 +32,7 @@ test.each([
       'case "$2" in',
       "  run)",
       "    " + record("review"),
-      '    case " $* " in *" --skip test,rebase "*) ;; *) fixture-test-runner ;; esac',
+      '    case " $* " in *" --skip test,rebase,ci "*) ;; *) fixture-test-runner ;; esac',
       '    printf "%s\\n" "gate: review" "findings[1]{id,severity,file,line,action,description}:" "  R1,warning,greeting.txt,1,auto-fix,revise greeting"',
       "    ;;",
       "  respond)",
