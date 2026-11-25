@@ -112,6 +112,8 @@ const expectedFiles = [
   "src/features/attention-list/attention-view.ts",
   "src/entities/attention/attention.ts",
   "src/entities/attention/attention-overdue.ts",
+  "src/entities/attention/attention-store.ts",
+  "src/entities/attention/update-result.ts",
   "src/features/backlog-planning/backlog-depend.ts",
   "src/features/backlog-planning/backlog-drop.ts",
   "src/features/backlog-planning/backlog-edit.ts",
@@ -131,6 +133,7 @@ const expectedFiles = [
   "src/entities/attention/beat-action.ts",
   "src/entities/attention/beat-items.ts",
   "src/widgets/beat/beat-attention.ts",
+  "src/widgets/beat/beat-update.ts",
   "src/widgets/beat/beat-close.ts",
   "src/widgets/beat/beat-origin.ts",
   "src/widgets/beat/beat-place.ts",
@@ -155,6 +158,7 @@ const expectedFiles = [
   "src/entities/backlog/task-record-answer.ts",
   "src/features/queueing-a-task/runner-answer.ts",
   "src/entities/orc-rules/orc-rules.ts",
+  "src/entities/orc-update/index.ts",
   "src/entities/events/events.ts",
   "src/entities/events/pr-state.ts",
   "src/features/heavy-commands/heavy-cli.ts",
@@ -271,6 +275,7 @@ const expectedFiles = [
   "src/entities/backlog/task-kind.ts",
   "src/entities/backlog/task-record-decision.ts",
   "src/entities/backlog/task-record-question.ts",
+  "src/shared/lib/file-claim.ts",
   "src/shared/lib/index.ts",
   "src/shared/process/index.ts",
   "src/shared/sandbox/index.ts",
@@ -301,6 +306,7 @@ const expectedFiles = [
   "src/features/task-thread/note.ts",
   "src/features/task-thread/thread.ts",
   "src/features/updating-orc/index.ts",
+  "src/features/updating-orc/launcher-release.ts",
   "src/features/updating-orc/update.ts"
 ]
 
