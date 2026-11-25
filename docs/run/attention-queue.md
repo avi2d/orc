@@ -65,7 +65,7 @@ The rule and the override apply to review questions and worker questions alike.
 
 ### Settle routine review findings
 
-The policy's Rules section also settles these review findings, so the decider answers them:
+The policy's Rules section settles these findings only for review questions classified as `none`:
 
 - A fix round that landed no diff gets `fix with instructions`, and orc sends the answers to the review's other findings with the fix.
 - A missing changelog entry, in a repository whose release writes the changelog from commit subjects, gets the commit subject as its entry.
@@ -116,6 +116,8 @@ The beat opens an item for each run event, owned by the user:
   On a project with `yolo` true, the item text names each change that waits for your merge word.
   Merging the PR closes it with the answer `merged`.
   Closing the PR without merging closes it with the answer `closed without merging`.
+
+### Items for update failures
 
 A failed [update check](beat-runs.md#updating-orc-on-dispatch-machines) opens an `update-failed` item for a dispatch machine.
 A retry that fails for the same version updates the open item without replacing any answer.
