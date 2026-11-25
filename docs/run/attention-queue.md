@@ -30,7 +30,10 @@ No-mistakes writes `unknown` for an `ask-user` finding its reviewer did not clas
 A question that names `unknown` or no action goes through a topic check instead.
 Orc sends questions about deletion, security, credentials, merging, pushing, releasing, spending, irreversible actions, site appearance, legal text, and logins to you.
 The topic check reads the whole question, context included, so a question that says a step pushes a tag goes to you even when it only asks whether to continue.
-Names that ask for no action do not send a question to you: `merge conflicts`, `merge base`, `pre-push`, `was not pushed`, `test runs`, a `release` parser, tool, commit or entry, `release-generated`, `at release` and `by the release`.
+A few names ask for no action: `merge conflicts`, `` `chore: release` commits ``, `written by the release` and `subject at release`.
+They do not send a question to you when they sit in a sentence that reports what happened.
+In a sentence that asks, offers an option, or says what should, would or will happen, they send it to you.
+The name `test runs` never counts as deleting work.
 A question with no words at all goes to you.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
 Rules and policy do not widen either check.

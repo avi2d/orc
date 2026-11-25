@@ -268,15 +268,15 @@ describe("the decider guard", () => {
 })
 
 describe("the open questions of a queue that all waited on the owner", () => {
-  const contextNamesPushOrRelease: ReadonlySet<string> = new Set(["directPrCard", "releasePrVersionFlagMissing", "agentEnvironmentDelivery", "mutationWorkflowHome"])
+  const namesPushOrReleaseOutsideAReport: ReadonlySet<string> = new Set(["directPrCard", "changelogNotUpdated", "releasePrVersionFlagMissing", "lintComplexity", "agentEnvironmentDelivery", "prePushChecks", "mutationWorkflowHome"])
 
   for (const [name, question] of Object.entries(openQuestions)) {
-    if (contextNamesPushOrRelease.has(name)) {
-      test(name + " reaches the owner on the push or release its context names, instead of passing on a neutral asking sentence", () => {
+    if (namesPushOrReleaseOutsideAReport.has(name)) {
+      test(name + " reaches the owner on the push or release it names outside a report of something done, instead of passing to the decider", () => {
         expect(neverDecidedReason(question.text)).toMatch(/about (?:pushing|releasing)/)
       })
     } else {
-      test(name + " passes the guard, instead of reaching the owner on a name such as merge conflicts, pre-push or release tool", () => {
+      test(name + " passes the guard, instead of reaching the owner on merge conflicts or a release named in a report of something done", () => {
         expect(neverDecidedReason(question.text)).toBeNull()
       })
     }
@@ -313,12 +313,43 @@ describe("a request only the owner grants, named in the context of a neutral ask
     { text: "Should I run the release workflow now? Recommended: yes.", topic: "releasing" },
     { text: "Should orc trigger the deploy job for production?", topic: "releasing" },
     { text: "Should orc re-deploy the site?", topic: "releasing" },
-    { text: "Why not push the tag now?", topic: "pushing" }
+    { text: "Why not push the tag now?", topic: "pushing" },
+    { text: "Should orc run the release tool now? Recommended: yes", topic: "releasing" },
+    { text: "Should orc run the publish tool for 0.22.0?", topic: "releasing" },
+    { text: "Should orc trigger the deploy tool against production?", topic: "releasing" },
+    { text: "Should orc create the release commit and tag for 0.22.0?", topic: "releasing" },
+    { text: "Should the deploy commit go to production?", topic: "releasing" },
+    { text: "Should orc add the release entry and cut 0.22.0 at release?", topic: "releasing" },
+    { text: "The tag v1.0 was not pushed yet. Continue?", topic: "pushing" },
+    { text: "Should orc merge base into main?", topic: "merging" }
   ]
 
   for (const request of ownerOnly) {
     test(JSON.stringify(request.text) + " reaches the owner, instead of passing to the decider on its asking sentence alone", () => {
       expect(neverDecidedReason(request.text)).toContain("about " + request.topic)
+    })
+  }
+})
+
+describe("a name that asks for no action", () => {
+  const names = [
+    { name: "merge conflicts", reported: "The rebase onto main hit merge conflicts in two files. Which file order should the fix take?", asked: "Should orc resolve the merge conflicts?", planned: "The next step would resolve the merge conflicts. Continue?" },
+    { name: "`chore: release` commits", reported: "Only `chore: release` commits changed CHANGELOG.md so far. Which subject should the entry use?", asked: "Should orc add `chore: release` commits?", planned: "The next step would add `chore: release` commits. Continue?" },
+    { name: "written by the release", reported: "The header said the file was written by the release. Is the entry text fine as it is?", asked: "Should the file be written by the release?", planned: "The file will be written by the release. Continue?" },
+    { name: "subject at release", reported: "The entry came from the commit subject at release. Is that entry enough?", asked: "Should the commit subject at release be the entry?", planned: "The next step would add the commit subject at release. Continue?" }
+  ]
+
+  for (const kept of names) {
+    test(JSON.stringify(kept.name) + " in a report of something done passes the guard, instead of reaching the owner", () => {
+      expect(neverDecidedReason(kept.reported)).toBeNull()
+    })
+
+    test(JSON.stringify(kept.name) + " in the asking sentence reaches the owner, instead of passing to the decider", () => {
+      expect(neverDecidedReason(kept.asked)).not.toBeNull()
+    })
+
+    test(JSON.stringify(kept.name) + " in a sentence that plans a step reaches the owner, instead of passing to the decider", () => {
+      expect(neverDecidedReason(kept.planned)).not.toBeNull()
     })
   }
 })
