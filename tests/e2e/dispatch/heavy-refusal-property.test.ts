@@ -83,19 +83,22 @@ const wrap = (words: Words, wrappers: ReadonlyArray<Words>): string =>
 
 const rootWord = "@ROOT@"
 
-const pathCommand: fc.Arbitrary<string> = fc.tuple(
+const pathCall: fc.Arbitrary<Words> = fc.tuple(
   fc.oneof(runner, launched, scriptCall).filter((call) => projectBins.includes(call[0] ?? "")),
   fc.constantFrom("", "./", rootWord + "/"),
   fc.constantFrom(...projectBinFolders),
   fc.constantFrom("", "\"", "'")
-).map(([call, start, folder, quote]) => [quote + start + folder + "/" + (call[0] ?? "") + quote, ...call.slice(1)].join(" "))
+).map(([call, start, folder, quote]) => [quote + start + folder + "/" + (call[0] ?? "") + quote, ...call.slice(1)])
 
-const commandLine: fc.Arbitrary<string> = fc.oneof(
-  fc.tuple(fc.oneof(runner, launched, scriptCall, otherRunner), fc.array(fc.constantFrom(...programWrappers), { maxLength: 3 }), fc.constantFrom(...shellPrefixes))
-    .map(([call, wrappers, prefix]) => prefix + wrap(call, wrappers)),
-  fc.tuple(pathCommand, fc.constantFrom(...shellPrefixes), fc.boolean())
-    .map(([line, prefix, nested]) => nested ? "bash -c " + quoteSingle(prefix + line) : prefix + line)
-)
+const commandLine: fc.Arbitrary<string> = fc.tuple(
+  fc.oneof(runner, launched, scriptCall, otherRunner, pathCall),
+  fc.array(fc.constantFrom(...programWrappers), { maxLength: 3 }),
+  fc.constantFrom(...shellPrefixes),
+  fc.boolean()
+).map(([call, wrappers, prefix, nested]) => {
+  const line = prefix + wrap(call, wrappers)
+  return nested ? "bash -c " + quoteSingle(line) : line
+})
 
 describe("CI-only refusal of generated test command lines", () => {
   let harness: Harness

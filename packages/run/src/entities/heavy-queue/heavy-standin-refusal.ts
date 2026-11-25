@@ -34,12 +34,28 @@ export const refusedTest = (tool: string, args: ReadonlyArray<string>, cwd: stri
 }
 
 const assignmentWord = /^[A-Za-z_][A-Za-z0-9_]*=/
-const prefixWords: ReadonlySet<string> = new Set(["exec", "command"])
+const optionWord = /^-/
+const launcherOperands: ReadonlyMap<string, number> = new Map([
+  ["exec", 0], ["command", 0], ["env", 0], ["nice", 0], ["nohup", 0], ["timeout", 1], ["sh", 0], ["bash", 0]
+])
 const projectRunner = /(?:^|\/)node_modules\/\.bin\/([^/]+)$/
 
+const commandStart = (words: ReadonlyArray<string>, index: number): number => {
+  const word = words[index] ?? ""
+  if (assignmentWord.test(word)) {
+    return commandStart(words, index + 1)
+  }
+  const operands = launcherOperands.get(word.slice(word.lastIndexOf("/") + 1))
+  if (operands === undefined) {
+    return index
+  }
+  const operand = words.findIndex((next, at) => at > index && !optionWord.test(next))
+  return operand === -1 ? words.length : commandStart(words, operand + operands)
+}
+
 export const refusedPathCall = (command: string, cwd: string): boolean => {
-  const words = command.trim().split(/\s+/).map((word) => word.replaceAll(/["']/g, ""))
-  const start = words.findIndex((word) => !assignmentWord.test(word) && !prefixWords.has(word))
+  const words = command.trim().split(/\s+/).map((word) => word.replaceAll(/["'\\]/g, ""))
+  const start = commandStart(words, 0)
   const tool = projectRunner.exec(words[start] ?? "")?.[1]
   return tool !== undefined && refusedTest(tool, words.slice(start + 1), cwd)
 }
