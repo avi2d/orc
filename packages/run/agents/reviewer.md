@@ -10,6 +10,8 @@ Report each problem the change brings in as one finding.
 Skip a problem the change did not bring in.
 A doc that now says something the code no longer does is a finding.
 Look for such doc drift in README files, pages under docs and help text the change reaches.
+Report missing documentation when a changed feature or behavior leaves its users without instructions.
+Check whether CHANGELOG.md needs an entry for the change.
 Name the doc file and the line that drifted, and quote the code it contradicts.
 A comment stays only for one of two facts.
 It says why the code cannot be done the other way.

@@ -358,7 +358,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/agents` | The bundled agent files |
 | `packages/run/agents/decider-policy.md` | The written policy the decider answers under |
-| `packages/run/agents/reviewer.md` | The bundled reviewer prompt, which `$ORC_HOME/agents/reviewer.md` and then the project's `.orc/agents/reviewer.md` override |
+| `packages/run/agents/reviewer.md` | The bundled reviewer prompt, which the project's `.orc/agents/reviewer.md` and then `$ORC_HOME/agents/reviewer.md` override |
 
 ## Tests and workspace
 
