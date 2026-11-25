@@ -1,1 +1,2 @@
-export { encodeUpdateJson, formatUpdate, installCommand, isNewer, registryOf, runUpdate } from "./update"
+export { isNewer } from "../../entities/orc-update/index"
+export { encodeUpdateJson, formatUpdate, installCommand, registryOf, runUpdate } from "./update"

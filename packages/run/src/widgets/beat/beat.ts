@@ -22,6 +22,8 @@ import { roomWaits, writeBeatWaits } from "./beat-waits"
 import { mergedIds } from "../../entities/events/index"
 import { pollBaseCi, readBaseCi, type ReadBaseCi } from "../../features/merging-a-pr/index"
 import { type ReadUpstream, readUpstream, watchUpstream } from "./upstream"
+import type { Command } from "../../shared/process/index"
+import { runBeatUpdates } from "./beat-update"
 
 export type { BeatAction } from "../../entities/attention/index"
 export type { MachineRoom } from "./beat-place"
@@ -298,6 +300,7 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
   })
 
 export interface BeatSources {
+  readonly update: Command | null
   readonly readLoad: ReadLoad
   readonly readPullRequest: ReadPullRequest
   readonly readUpstream: ReadUpstream
@@ -305,7 +308,8 @@ export interface BeatSources {
   readonly readBaseCi: ReadBaseCi
 }
 
-export const liveSources = (home: string): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream, askDecider: askDeciderWithPi(home), readBaseCi })
+export const liveSources = (home: string, update: Command | null): BeatSources =>
+  ({ update, readLoad: readMachineLoad, readPullRequest, readUpstream, askDecider: askDeciderWithPi(home), readBaseCi })
 
 const decideAndRelay = (
   root: string,
@@ -346,7 +350,6 @@ export const runBeat = (
     const quota = yield* readQuota(config.quota)
     const tasks = yield* listTasks(root)
     const merged = yield* mergedIds(root)
-    const room = readRoom(config.machines, tasks)
     const context: BeatContext = {
       root,
       home,
@@ -356,7 +359,7 @@ export const runBeat = (
       tasks,
       merged,
       account: quota.kind === "read" ? (config.quota.accounts.find((account) => account.name === quota.pick) ?? null) : null,
-      live: room.map((entry) => ({ ...entry })),
+      live: readRoom(config.machines, tasks).map((entry) => ({ ...entry })),
       overloaded: new Map(),
       tokens: new Map()
     }
@@ -380,6 +383,7 @@ export const runBeat = (
     const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at, yoloTask(projects, task), home)).pipe(
       Effect.tap(() => pollBaseCi(root, sources.readBaseCi, projects, latest.map(taskPr).filter((url) => url !== null), at))
     )
+    const updates = sources.update === null ? [] : yield* runBeatUpdates(root, home, beat, config.machines, sources.update)
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
         ...reported,
         ...stalls.flatMap(Option.toArray),
@@ -387,7 +391,8 @@ export const runBeat = (
         ...queue,
         ...renewals.flatMap(Option.toArray),
         ...actions,
-        ...prs.flatMap(Option.toArray)
+        ...prs.flatMap(Option.toArray),
+        ...updates
       ]
     }
   })

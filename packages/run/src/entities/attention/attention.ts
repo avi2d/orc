@@ -1,47 +1,17 @@
-import { Effect, FileSystem, Schema } from "effect"
-import { readNames, BacklogError, isDeciderAnswer, type ParkedQuestion, platformFailure, publishOnce, readIfPresent, scratchName, type TaskRecord } from "../backlog/index"
+import { Effect, type FileSystem } from "effect"
+import { readNames, type BacklogError, isDeciderAnswer, type ParkedQuestion, type TaskRecord } from "../backlog/index"
 import { isWorkerQuestion, loopQuestionId } from "../agent/index"
 
 export const deciderTimeoutMillis = 180 * 1000
 const deciderClaimMillis = deciderTimeoutMillis + 60 * 1000
 
-import { AttentionItem, type Asked, type AttentionOption, type Decision, type ItemAnswer } from "./attention-item"
-import { AskOption } from "../review-gate/index"
+import type { AttentionItem, Asked, AttentionOption, Decision, ItemAnswer } from "./attention-item"
+import type { AskOption } from "../review-gate/index"
+import { attentionFolder, encodeItem, fileSuffix, openItem, readExistingItem, readItem, replaceItem, withItemClaim, writeItem } from "./attention-store"
 
 export type { Asked }
 
-const ItemFile = Schema.fromJsonString(AttentionItem)
-
-const fileSuffix = ".json"
-
-const attentionFolder = (root: string): string => root + "/attention"
-
-const itemFile = (root: string, id: string): string => attentionFolder(root) + "/" + id + fileSuffix
-
-const encodeItem = (id: string, item: AttentionItem): Effect.Effect<string, BacklogError> =>
-  Schema.encodeEffect(ItemFile)(item).pipe(Effect.mapError((error) => new BacklogError({ detail: "cannot write the item " + id + ": " + error.message })))
-
-const replaceItem = (root: string, id: string, before: string, encoded: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    if ((yield* readIfPresent(itemFile(root, id))) !== before) {
-      return false
-    }
-    const fs = yield* FileSystem.FileSystem
-    const scratch = scratchName(attentionFolder(root), id)
-    const file = itemFile(root, id)
-    yield* fs.writeFileString(scratch, encoded).pipe(Effect.mapError(platformFailure("write " + scratch)))
-    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
-    return true
-  })
-
-export const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const scratch = scratchName(attentionFolder(root), id)
-    const file = itemFile(root, id)
-    yield* fs.writeFileString(scratch, yield* encodeItem(id, item)).pipe(Effect.mapError(platformFailure("write " + scratch)))
-    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
-  })
+export { openItem, readItem } from "./attention-store"
 
 // The same parts always name one file, so routing an item again opens nothing new.
 export const itemId = (...parts: ReadonlyArray<string>): string => parts.map((part) => part.replace(/[^A-Za-z0-9_-]/g, "_")).join(".")
@@ -59,14 +29,6 @@ const choiceOf = (asked: Asked): Choice => ({
 })
 
 export const reviewQuestionId = (task: string, question: string, asked: string): string => itemId(task, question, asked)
-
-export const openItem = (root: string, id: string, asked: Asked): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const folder = attentionFolder(root)
-    yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.mapError(platformFailure("make " + folder)))
-    return yield* publishOnce(folder, id + fileSuffix, yield* encodeItem(id, { ...asked, state: { kind: "open" } }))
-  })
 
 interface AskedQuestion {
   readonly id: string
@@ -110,19 +72,22 @@ export const openReviewQuestions = (
     return Effect.asVoid(openItem(root, item.id, item.asked))
   }, { discard: true })
 
-const readExistingItem = (root: string, id: string): Effect.Effect<{ readonly before: string; readonly item: AttentionItem } | null, BacklogError, FileSystem.FileSystem> =>
+export const openOrRefreshItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const file = itemFile(root, id)
-    const before = yield* readIfPresent(file)
-    if (before === null) {
-      return null
+    if (yield* openItem(root, id, asked)) {
+      return
     }
-    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
-    return { before, item }
+    yield* withItemClaim(root, id, Effect.gen(function*() {
+      const item = yield* readItem(root, id)
+      if (item === null || item.state.kind === "closed" || (item.state.kind === "open" && item.text === asked.text && item.owner === asked.owner)) {
+        return
+      }
+      const next: AttentionItem = item.state.kind === "withdrawn"
+        ? { ...asked, state: { kind: "open" } }
+        : { ...item, text: asked.text, owner: asked.owner, ...choiceOf(asked) }
+      yield* writeItem(root, id, yield* encodeItem(id, next))
+    }))
   })
-
-export const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
-  Effect.map(readExistingItem(root, id), (existing) => existing?.item ?? null)
 
 type CloseOutcome = "closed" | "already closed" | "missing"
 
@@ -130,17 +95,21 @@ type SettledState = Exclude<AttentionItem["state"], { kind: "open" }>
 
 const settleOpenItem = (root: string, id: string, state: SettledState): Effect.Effect<"settled" | "already closed" | "missing", BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const stored = yield* readExistingItem(root, id)
-    if (stored === null) {
+    if ((yield* readItem(root, id)) === null) {
       return "missing" as const
     }
-    const { before, item } = stored
-    if (item.state.kind !== "open") {
-      return "already closed" as const
-    }
-    const { deciding: _claim, ...rest } = item
-    const replaced = yield* replaceItem(root, id, before, yield* encodeItem(id, { ...rest, state }))
-    return replaced ? "settled" : "already closed"
+    return yield* withItemClaim(root, id, Effect.gen(function*() {
+      const item = yield* readItem(root, id)
+      if (item === null) {
+        return "missing" as const
+      }
+      if (item.state.kind !== "open") {
+        return "already closed" as const
+      }
+      const { deciding: _claim, ...rest } = item
+      yield* writeItem(root, id, yield* encodeItem(id, { ...rest, state }))
+      return "settled" as const
+    }))
   })
 
 export const closeItem = (root: string, id: string, answer: ItemAnswer): Effect.Effect<CloseOutcome, BacklogError, FileSystem.FileSystem> =>

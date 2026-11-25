@@ -501,7 +501,8 @@ Examples:
 Usage: orc beat [--json]
 
 Reads the room on each machine, starts each task that waits on nothing, closes
-finished runs and relays answers. Run it from cron or launchd every few minutes.
+finished runs and relays answers. Checks for Orc updates on dispatch machines at
+most once an hour. Run it from cron or launchd every few minutes.
 
 Options:
   --json  Print the beat as an orc.beat.v1 JSON document.
@@ -915,9 +916,10 @@ Examples:
 Usage: orc update [--json]
 
 Reads the newest version of @avi2dg/orc from the npm registry and installs it
-only when it is newer than the running orc. The install runs bun add -g
-@avi2dg/orc@<version>, or the update.command config.json names. A registry read
-that fails or takes more than 15 seconds leaves orc as it is.
+only when it is newer than the running orc. A Bun global install runs bun add -g
+@avi2dg/orc@<version>. A versioned launcher prepares a checkout before switching
+its release file. An update.command in config.json overrides both. A registry
+read that fails or takes more than 15 seconds leaves orc as it is.
 
 Options:
   --json  Print the result as an orc.update.v1 JSON document.

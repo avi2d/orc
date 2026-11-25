@@ -29,6 +29,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/widgets/beat/quota.ts` | The quota reading from the configured command and the pick of an account |
 | `packages/run/src/widgets/beat/beat.ts` | The beat: room, placement, take and start |
 | `packages/run/src/widgets/beat/beat-close.ts` | The closing of finished runs and the running output time |
+| `packages/run/src/widgets/beat/beat-update.ts` | The hourly update claim and the check on each dispatch machine |
 | `packages/run/src/widgets/beat/beat-place.ts` | The room reading, the placement of each new task and the wait it names |
 | `packages/run/src/widgets/beat/beat-origin.ts` | The `orc backlog origin` write of a parked task's machine and run, and its refusals |
 | `packages/run/src/widgets/beat/load.ts` | The five minute load reading and the overloaded machines |
@@ -171,7 +172,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/features/updating-orc/update.ts` | The `orc update` registry read, version comparison, install command and its `orc.update.v1` JSON |
+| `packages/run/src/features/updating-orc/update.ts` | The registry read and the choice of installer for `orc update` |
+| `packages/run/src/features/updating-orc/launcher-release.ts` | The preparation and selection of a versioned launcher checkout |
 
 ## entities/agent
 
@@ -189,10 +191,18 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/entities/attention/beat-action.ts` | The beat actions each beat step reports |
-| `packages/run/src/entities/attention/attention.ts` | The attention queue under `attention/`: one file per item, its open and close and withdraw, the items of one task, and the review questions, run events and overdue waits routed into it |
+| `packages/run/src/entities/attention/attention.ts` | The attention queue, item answers and withdrawals, and the review questions, run events, and overdue waits it holds |
+| `packages/run/src/entities/attention/attention-store.ts` | The item files and their exclusive write claims |
 | `packages/run/src/entities/attention/attention-overdue.ts` | The age of an attention item and whether an open item is overdue |
 | `packages/run/src/entities/attention/attention-item.ts` | The item file shape, the decider's decisions it records and their text |
 | `packages/run/src/entities/attention/failing-command.ts` | The `failing-command` items of running runs whose command keeps failing |
+| `packages/run/src/entities/attention/update-result.ts` | The update lines and the `update-failed` items for dispatch machines |
+
+## entities/orc-update
+
+| Path | What it holds |
+| --- | --- |
+| `packages/run/src/entities/orc-update/index.ts` | The `orc.update.v1` result and version comparison |
 
 ## entities/backlog
 
@@ -309,6 +319,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/shared/lib/toon.ts` | The reading of the TOON output no-mistakes prints |
 | `packages/run/src/shared/lib/table.ts` | The table formatter the runs and refusals listings share |
 | `packages/run/src/shared/lib/run-id.ts` | The new run id from the timestamp and a random part |
+| `packages/run/src/shared/lib/file-claim.ts` | The exclusive claim for a file write shared by processes |
 
 ## shared/process
 
