@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { alertsFile } from "../../entities/events/index"
 import { PueueState, taskLabel } from "../../shared/process/index"
@@ -6,10 +6,13 @@ import { pueueDone } from "./runner"
 import { type RunnerError } from "../../shared/process/index"
 import { type Command, ensureGroup, decodeJson, pueue } from "../../shared/process/index"
 
-export const liveAlertStream = (): Command | null => {
-  const dash = Bun.which("orc-dash")
-  return dash === null ? null : [dash, "alerts", "--json"]
-}
+export const liveAlertStream = (self: Command): Effect.Effect<Command | null, never, Path.Path> =>
+  Effect.gen(function*() {
+    const path = yield* Path.Path
+    const sibling = self.length === 1 ? Bun.which(path.join(path.dirname(self[0]), "orc-dash")) : null
+    const dash = sibling ?? Bun.which("orc-dash")
+    return dash === null ? null : [dash, "alerts", "--json"]
+  })
 
 const appendScript = "out=$1; shift; exec \"$@\" >> \"$out\""
 

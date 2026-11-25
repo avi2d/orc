@@ -12,6 +12,7 @@ import { type AccountName, signIn } from "./features/signing-in/index"
 import { encodeUpdateJson, formatUpdate, releasesUrl, runUpdate } from "./features/updating-orc/index"
 import { helpText, overview, usageErrorText } from "./app/help"
 import { runDispatch } from "./app/dispatch-cli"
+import { isStandinInvocation, runStandinInvocation } from "./entities/heavy-queue/index"
 import { runQuotaCli } from "./app/quota-cli"
 import { decodeJson, pueue, PueueState, queuedTasks, RunnerError, selfCommand } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
@@ -85,7 +86,7 @@ const scoreStep = (args: Extract<OrcArgs, { readonly kind: "ScoreStep" }>) =>
     yield* Console.log(`orc score recorded ${args.score} for ${args.step} in ${args.runId}`)
   })
 
-const chat = (sessionFile: string | null) => runChat(orcHomeDir(Bun.env.ORC_HOME), selfCommand(process.execPath, Bun.main), sessionFile).pipe(
+const chat = (sessionFile: string | null) => runChat(orcHomeDir(Bun.env.ORC_HOME), selfCommand(process.execPath, Bun.main), sessionFile, Bun.env.ORC_CHAT_DRAWER_LEASE ?? null).pipe(
   Effect.provide(BunServices.layer),
   Effect.catchTag("ChatError", (error) => Console.error(error.message).pipe(Effect.andThen(Effect.fail("orc chat refused")))),
   Effect.flatMap((exitCode) => exitCode === 0 ? Effect.void : Effect.fail("pi exited " + String(exitCode)))
@@ -300,5 +301,10 @@ const program = Effect.gen(function*() {
 })
 
 if (import.meta.main) {
-  runMain(program, { disableErrorReporting: true })
+  const words = process.argv.slice(2)
+  if (Bun.isStandaloneExecutable && isStandinInvocation(words[0] ?? "")) {
+    process.exitCode = await runStandinInvocation(words)
+  } else {
+    runMain(program, { disableErrorReporting: true })
+  }
 }

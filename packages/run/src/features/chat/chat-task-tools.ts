@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import type { Env } from "./chat-command"
-import { DependInput, DropInput, NoteInput, PriorityInput, SendBackInput, StopInput, ThreadInput } from "./chat-inputs"
+import { DependInput, DropInput, NoteInput, PriorityInput, RetryInput, SendBackInput, StopInput, ThreadInput } from "./chat-inputs"
 import { type ChatTool, runTool } from "./chat-run"
 
 export const priorityTool = (env: Env): ChatTool => ({
@@ -21,6 +21,13 @@ export const taskTools = (env: Env): ReadonlyArray<ChatTool> => [
       "Kills a started task's run through the machine that started it with orc backlog stop, and closes the task stopped. orc refuses a task that is not started, and a task on a machine it cannot reach, which the captain closes by hand. A new task ends with orc_backlog_drop instead.",
     parameters: Schema.toJsonSchemaDocument(StopInput).schema,
     execute: (_toolCallId, params) => runTool(StopInput, "orc_backlog_stop", params, env, (input) => ["backlog", "stop", input.id])
+  },
+  {
+    name: "orc_backlog_retry",
+    label: "Retry an orc task",
+    description: "Returns a failed or stopped task to the backlog on the machine it ran on, reusing its kept branch when one exists. A failed start keeps its pending answers and any machine pin.",
+    parameters: Schema.toJsonSchemaDocument(RetryInput).schema,
+    execute: (_toolCallId, params) => runTool(RetryInput, "orc_backlog_retry", params, env, (input) => ["backlog", "retry", input.id])
   },
   {
     name: "orc_backlog_drop",

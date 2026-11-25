@@ -3,18 +3,21 @@ kind: reference
 ---
 # Release assets
 
-Each orc release on GitHub carries a compiled orc and a compiled heavy tool stand-in for each platform, as Bun bytecode builds that run without Bun installed.
+Each Orc release on GitHub carries an archive with `orc`, `orc-dash`, `orc-dash-capture`, and the heavy tool stand-in.
+The executables are Bun bytecode builds that run without Bun installed.
+The archive also holds the bundled [Herdr App](https://herdr.dev), which Herdr loads as mods.
 The `assets` job of `.github/workflows/main.yml` runs after the `release` job has written the GitHub release.
-It runs `bun run release:assets` on a macOS arm64 runner and on a Linux x64 runner, and attaches the files in `release-assets/` to the release with `gh release upload --clobber`.
+The job runs `bun run release:assets` on macOS arm64 and Linux x64.
+The build runs both dashboard executables with `--help` before the job attaches the archives and checksums to the release.
 The `@avi2dg/checks` kit writes that job, because `checks.config.ts` sets `releaseAssets: true`.
 
 ## Asset names
 
 | File | What it holds |
 | --- | --- |
-| `orc-<version>-darwin-arm64.tar.gz` | The compiled orc and heavy tool stand-in for macOS on Apple silicon, and the [Herdr App](https://herdr.dev) files |
+| `orc-<version>-darwin-arm64.tar.gz` | The release archive for macOS on Apple silicon |
 | `orc-<version>-darwin-arm64.tar.gz.sha256` | The SHA-256 checksum of the macOS archive |
-| `orc-<version>-linux-x64.tar.gz` | The compiled orc and heavy tool stand-in for Linux on x64, and the Herdr App files |
+| `orc-<version>-linux-x64.tar.gz` | The release archive for Linux on x64 |
 | `orc-<version>-linux-x64.tar.gz.sha256` | The SHA-256 checksum of the Linux archive |
 
 `<version>` is the release version without the `v` of its tag, such as `0.21.0` for the tag `v0.21.0`.
@@ -25,6 +28,8 @@ On Windows, orc runs inside WSL and takes the Linux x64 archive.
 | Entry | What it is |
 | --- | --- |
 | `orc` | The executable that `bun run compile` builds |
+| `orc-dash` | The [dashboard command](../dash.md) |
+| `orc-dash-capture` | The [session quota capture command](../session-quota/capture.md) |
 | `heavy-standin` | The heavy tool stand-in that `packages/run/scripts/build-heavy-standin.ts` builds |
 | `herdr-app/` | The built Herdr App mods, layouts and `keys.json`, which `orc app install` copies |
 

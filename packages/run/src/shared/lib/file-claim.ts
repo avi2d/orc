@@ -11,7 +11,7 @@ const decodeClaim = Schema.decodeUnknownOption(ClaimJson)
 
 const encodeClaim = (claim: typeof ClaimJson.Type): string => JSON.stringify(claim)
 
-const isRunning = (pid: number): Effect.Effect<boolean> =>
+export const isRunning = (pid: number): Effect.Effect<boolean> =>
   Effect.try({
     try: () => process.kill(pid, 0),
     catch: (error) => Predicate.hasProperty(error, "code") && error.code === "EPERM"

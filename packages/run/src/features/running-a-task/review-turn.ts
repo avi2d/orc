@@ -4,23 +4,7 @@ import { runGit } from "../../shared/process/index"
 import type { HistoryRun } from "./run-record"
 import { OrcRunError } from "../../shared/lib/index"
 import type { AgentRunResult, SandboxOps } from "./run-ops"
-
-const ReviewFinding = Schema.Struct({
-  id: Schema.String,
-  file: Schema.String,
-  line: Schema.NullOr(Schema.Int),
-  severity: Schema.Literals(["blocker", "major", "minor"]),
-  action: Schema.String,
-  description: Schema.String
-})
-
-const ReviewFindings = Schema.Array(ReviewFinding)
-
-type ReviewFinding = typeof ReviewFinding.Type
-
-const RecordedReview = Schema.Struct({ status: Schema.Literal("passed"), findings: ReviewFindings, file: Schema.String })
-
-export type ReviewOutcome = typeof RecordedReview.Type | { readonly status: "failed"; readonly reason: string }
+import { RecordedReview, ReviewFindings, type ReviewFinding, type ReviewOutcome, type ReviewAtHeadOutcome } from "./review-outcome"
 
 const ReviewCheckpoint = Schema.Struct({ head: Schema.String, outcome: RecordedReview })
 const decodeCheckpoint = Schema.decodeUnknownOption(Schema.fromJsonString(ReviewCheckpoint))
@@ -120,7 +104,7 @@ export const reviewAtHead = (
   runAgent: SandboxOps["runAgent"],
   reviewer: AgentFile,
   priorDir: string | null
-): Effect.Effect<ReviewOutcome> =>
+): Effect.Effect<ReviewAtHeadOutcome> =>
   Effect.gen(function*() {
     const head = yield* runGit(run.spawner, run.git, ["rev-parse", "--verify", run.branch], run.worktreeDir).pipe(
       Effect.map((result) => result.exitCode === 0 ? result.stdout.trim() : ""),
@@ -128,14 +112,16 @@ export const reviewAtHead = (
     )
     const saved = priorDir === null ? null : yield* run.fs.readFileString(run.path.join(priorDir, checkpointFileName)).pipe(Effect.orElseSucceed(() => null))
     const decoded = saved === null ? Option.none() : decodeCheckpoint(saved)
-    const outcome = head !== "" && Option.isSome(decoded) && decoded.value.head === head
-      ? yield* recordReview(run, decoded.value.outcome.findings)
+    const reusable = head !== "" && Option.isSome(decoded) && decoded.value.head === head ? decoded.value : null
+    const reusedFrom = reusable !== null && priorDir !== null ? run.path.basename(priorDir) : null
+    const outcome = reusable !== null
+      ? yield* recordReview(run, reusable.outcome.findings)
       : yield* runReviewTurn(run, runAgent, reviewer)
     if (outcome.status === "passed" && head !== "") {
       const file = run.path.join(run.runDir, checkpointFileName)
       yield* run.fs.writeFileString(file, JSON.stringify({ head, outcome }) + "\n").pipe(Effect.result)
     }
-    return outcome
+    return { ...outcome, reusedFrom }
   })
 
 export const reviewSentence = (outcome: ReviewOutcome): string =>

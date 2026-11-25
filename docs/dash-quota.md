@@ -74,12 +74,14 @@ To feed an account's block, give the `settings.json` in that account's folder a 
 {
   "statusLine": {
     "type": "command",
-    "command": "bun /path/to/orc/packages/session-quota/dist/capture-bin.js claude-statusline",
+    "command": "orc-dash-capture claude-statusline",
     "refreshInterval": 30
   }
 }
 ```
 
-Run `bun run build` in the clone first, as [Build the writer](session-quota/capture.md#build-the-writer) says, and put the clone's path in place of `/path/to/orc`.
+Put `orc-dash-capture` on Claude Code's `PATH` as [Install orc-dash](dash.md#install) describes.
+If the statusline does not inherit that `PATH`, use the absolute path to the command or its launcher.
+To move an existing hook off the old Bun bundle, see [Capture command](session-quota/capture.md#capture-command).
 Claude Code started with `CLAUDE_CONFIG_DIR` set to the folder reads that `settings.json` and runs the statusline with the same variable, so each reading names the folder.
 The writer prints nothing, so to keep another statusline's text, read stdin once and pipe it to both commands.
