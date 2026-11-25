@@ -11,7 +11,6 @@ export {
 } from "./agents"
 export type {
   AgentFile,
-  AgentKind,
   PiThinkingLevel,
 } from "./agents"
 export {

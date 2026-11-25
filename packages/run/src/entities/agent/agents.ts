@@ -191,6 +191,9 @@ export const finishAgentFile = (parsed: ParsedAgentFile, defaults: AgentDefaults
     : Effect.succeed({ ...parsed, model, thinking: defaults.thinking ?? parsed.thinking })
 }
 
-export const resolveAgentFile = (kind: AgentKind, options: AgentFileSearch & AgentDefaults) =>
+export const resolveAgentFile = (
+  kind: AgentKind,
+  options: AgentFileSearch & AgentDefaults
+): Effect.Effect<AgentFile, AgentFileError, FileSystem.FileSystem | Path.Path> =>
   readAgentFile(kind, options).pipe(Effect.flatMap((parsed) => finishAgentFile(parsed, options)))
 

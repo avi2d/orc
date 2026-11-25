@@ -1,4 +1,5 @@
-import { Schema } from "effect"
+import { Effect, Schema } from "effect"
+import { ConfigError } from "./json-file"
 import { runKinds, TaskId, type RunKind } from "../lib/index"
 import { ModelRef } from "./orc-config"
 import { providerOfModel } from "./model-route"
@@ -82,10 +83,48 @@ export const resolveDispatch = (
     const account = quota.accounts
       .filter((entry) => entry.provider === provider && (route.account === undefined || entry.name === route.account)
         && roomAtFloor(entry.remainingPercent, quota.floorPercent))
-      .toSorted((left, right) => right.remainingPercent - left.remainingPercent)[0]
+      .toSorted((left, right) => right.remainingPercent - left.remainingPercent)
+      .at(0)
     if (account !== undefined) {
       return { kind: "routed", account: account.name, models: route.models }
     }
   }
   return { kind: "waits", reason: pin === undefined ? "no account has room for the dispatch route" : "no account has room for the pinned model " + (typeof pin === "string" ? pin : pin.models.implementer) }
 }
+
+const routingProblem = (routing: DispatchRouting, accounts: ReadonlyArray<{ readonly name: string; readonly provider: string }>): string | null => {
+  const candidates = [
+    ...routing.rules.flatMap((rule) => rule.candidates),
+    ...routing.default,
+    ...Object.values(routing.tasks ?? {}).flatMap((task) => task.model === undefined ? [] : [task.model])
+  ]
+  for (const candidate of candidates) {
+    const model = typeof candidate === "string" ? candidate : candidate.models.implementer
+    const provider = providerOfModel(model)
+    if (typeof candidate !== "string" && candidate.account !== undefined) {
+      const account = accounts.find((entry) => entry.name === candidate.account)
+      if (account === undefined) {
+        return "routing names the unknown account " + candidate.account
+      }
+      if (provider !== account.provider) {
+        return "routing names the account " + account.name + " on provider " + account.provider + " with model " + model + " from another provider"
+      }
+    } else if (!accounts.some((account) => account.provider === provider)) {
+      return "routing names the provider " + provider + ", which has no quota account"
+    }
+  }
+  return null
+}
+
+export const readRouting = (
+  file: string,
+  raw: unknown,
+  accounts: ReadonlyArray<{ readonly name: string; readonly provider: string }>
+): Effect.Effect<DispatchRouting, ConfigError> =>
+  Schema.decodeUnknownEffect(DispatchRouting)(raw, { onExcessProperty: "error" }).pipe(
+    Effect.mapError((error) => new ConfigError({ file, detail: "routing: " + error.message })),
+    Effect.flatMap((routing) => {
+      const problem = routingProblem(routing, accounts)
+      return problem === null ? Effect.succeed(routing) : Effect.fail(new ConfigError({ file, detail: problem }))
+    })
+  )

@@ -1,9 +1,10 @@
 import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
-import { type Account, type ConfigError, type DispatchConfig, isYolo, type Machine, type Project, providerOf, readDispatchConfig, readProjects, resolveDispatch, type RoutedModels } from "../../shared/config/index"
-import { type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
+import { type Account, type ConfigError, type DispatchConfig, isYolo, type Machine, type Project, providerOf, readDispatchConfig, readProjects, type RoutedModels } from "../../shared/config/index"
+import { machineOverfull, type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
+import { selectTaskRoute } from "./beat-route"
 import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
 import { checkToken, type TokenCache } from "./beat-token"
 import { closeFinished } from "./beat-close"
@@ -81,15 +82,6 @@ const handOn = (
     Effect.catch((error) => Effect.succeed<StartResult>({ kind: "failed", reason: "the start command did not run: " + error.message }))
   )
 
-// Each beat writes its claim before it counts, so of two beats racing for a machine's last slot at least one sees both claims.
-const machineOverfull = (
-  root: string,
-  machine: Machine
-): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  listTasks(root).pipe(
-    Effect.map((tasks) => readRoom([machine], tasks).some((entry) => entry.busy > entry.slots))
-  )
-
 const startTask = (
   root: string,
   task: TaskRecord,
@@ -158,32 +150,6 @@ interface BeatContext {
   readonly live: Array<{ readonly machine: string; readonly slots: number; busy: number }>
   readonly overloaded: ReadonlyMap<string, string>
   readonly tokens: TokenCache
-}
-
-type TaskRoute =
-  | { readonly kind: "waits"; readonly reason: string }
-  | { readonly kind: "selected"; readonly account: Account; readonly routed?: RoutedModels }
-
-const selectTaskRoute = (config: DispatchConfig, quota: QuotaReading, spec: TaskRecord["spec"]): TaskRoute => {
-  if (quota.kind === "unread") {
-    return { kind: "waits", reason: "no account has room" }
-  }
-  if (config.routing === undefined || spec.kind === "decision") {
-    const account = config.quota.accounts.find((entry) => entry.name === quota.pick)
-    return account === undefined ? { kind: "waits", reason: "no account has room" } : { kind: "selected", account }
-  }
-  const accounts = config.quota.accounts.flatMap((account) => {
-    const reading = quota.accounts.find((entry) => entry.account === account.name)
-    return reading?.kind === "usable" ? [{ name: account.name, provider: providerOf(config.quota, account), remainingPercent: reading.remainingPercent }] : []
-  })
-  const route = resolveDispatch(config.routing, { id: spec.id, kind: spec.kind, project: spec.project }, { floorPercent: quota.floorPercent, accounts })
-  if (route.kind === "waits") {
-    return route
-  }
-  const account = config.quota.accounts.find((entry) => entry.name === route.account)
-  return account === undefined
-    ? { kind: "waits", reason: "no account has room for the dispatch route" }
-    : { kind: "selected", account, routed: route.models }
 }
 
 const credentialFor = (

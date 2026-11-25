@@ -2,7 +2,8 @@ import { Effect, FileSystem, Path, Result, Schema } from "effect"
 import { AbsolutePath, ConfigError, duplicateOf, readJsonFile, readJsonFileIfPresent } from "./json-file"
 import { ModelRef, ProviderId } from "./orc-config"
 import { providerOfModel } from "./model-route"
-import { DispatchRouting } from "./dispatch-routing"
+import { DispatchRouting, readRouting } from "./dispatch-routing"
+import { type Contribution, parsedUpstream } from "./contribution"
 import { type DeliveryMode, isDeliveryMode, unknownMode } from "./delivery"
 import { ownedBySweep } from "./machine-reach"
 
@@ -117,13 +118,6 @@ const RawProject = Schema.Struct({
 })
 type RawProject = typeof RawProject.Type
 
-export interface Contribution {
-  readonly url: string
-  readonly owner: string
-  readonly repo: string
-  readonly number: number
-}
-
 export type Project = Omit<RawProject, "mode" | "yolo" | "instructions" | "floor" | "upstream"> & {
   readonly mode?: DeliveryMode
   readonly yolo?: boolean
@@ -146,32 +140,6 @@ const parsedInstructions = (project: { readonly name: string; readonly instructi
     return "the project " + name + " names instructions " + JSON.stringify(instructions) + ", which is not a file path"
   }
   return instructions === undefined ? { name } : { name, instructions }
-}
-
-// GitHub ignores case in owner and repository names and numbers issues and pull requests from one sequence, and an owner holds no dot.
-export const contributionId = (contribution: Contribution): string =>
-  contribution.owner.toLowerCase() + "." + contribution.repo.toLowerCase() + "." + String(contribution.number)
-
-const contributionPattern = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)\/(?:issues|pull)\/([1-9]\d*)$/
-
-const notUpstream = (name: string, value: unknown): string =>
-  "the project " + name + " names upstream " + JSON.stringify(value) + ", which is not a list of GitHub issue or pull request URLs"
-
-const parsedUpstream = (name: string, upstream: unknown): ReadonlyArray<Contribution> | string => {
-  if (!Array.isArray(upstream)) {
-    return notUpstream(name, upstream)
-  }
-  const contributions: Array<Contribution> = []
-  for (const entry of upstream) {
-    const match = typeof entry === "string" ? contributionPattern.exec(entry) : null
-    if (match === null) {
-      return "the project " + name + " names the upstream entry " + JSON.stringify(entry) + ", which is not a GitHub issue or pull request URL such as https://github.com/owner/repo/pull/12"
-    }
-    contributions.push({ url: match[0], owner: match[1], repo: match[2], number: Number(match[3]) })
-  }
-  const ids = contributions.map(contributionId)
-  const again = contributions.find((contribution, index) => ids.indexOf(contributionId(contribution)) !== index)
-  return again === undefined ? contributions : "the project " + name + " names the upstream URL " + again.url + " twice"
 }
 
 const checkedProject = (project: RawProject): Project | string => {
@@ -328,30 +296,7 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
         if (config.routing === undefined) {
           return { machines, quota }
         }
-        const routing = yield* Schema.decodeUnknownEffect(DispatchRouting)(config.routing, { onExcessProperty: "error" }).pipe(
-          Effect.mapError((error) => new ConfigError({ file, detail: "routing: " + error.message }))
-        )
-        const candidates = [
-          ...routing.rules.flatMap((rule) => rule.candidates),
-          ...routing.default,
-          ...Object.values(routing.tasks ?? {}).flatMap((task) => task.model === undefined ? [] : [task.model])
-        ]
-        for (const candidate of candidates) {
-          const model = typeof candidate === "string" ? candidate : candidate.models.implementer
-          const provider = providerOfModel(model)
-          if (typeof candidate !== "string" && candidate.account !== undefined) {
-            const account = accounts.find((entry) => entry.name === candidate.account)
-            if (account === undefined) {
-              return yield* new ConfigError({ file, detail: "routing names the unknown account " + candidate.account })
-            }
-            const accountProvider = providerOf(quota, account)
-            if (provider !== accountProvider) {
-              return yield* new ConfigError({ file, detail: "routing names the account " + account.name + " on provider " + accountProvider + " with model " + model + " from another provider" })
-            }
-          } else if (!accounts.some((account) => providerOf(quota, account) === provider)) {
-            return yield* new ConfigError({ file, detail: "routing names the provider " + provider + ", which has no quota account" })
-          }
-        }
+        const routing = yield* readRouting(file, config.routing, accounts.map((account) => ({ name: account.name, provider: providerOf(quota, account) })))
         return { machines, quota, routing }
       })
     )
