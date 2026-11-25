@@ -18,14 +18,11 @@ const ReviewFindings = Schema.Array(ReviewFinding)
 
 type ReviewFinding = typeof ReviewFinding.Type
 
-const ReviewOutcome = Schema.Union([
-  Schema.Struct({ status: Schema.Literal("passed"), findings: ReviewFindings, file: Schema.String }),
-  Schema.Struct({ status: Schema.Literal("failed"), reason: Schema.String })
-])
+const RecordedReview = Schema.Struct({ status: Schema.Literal("passed"), findings: ReviewFindings, file: Schema.String })
 
-export type ReviewOutcome = typeof ReviewOutcome.Type
+export type ReviewOutcome = typeof RecordedReview.Type | { readonly status: "failed"; readonly reason: string }
 
-const ReviewCheckpoint = Schema.Struct({ head: Schema.String, outcome: ReviewOutcome })
+const ReviewCheckpoint = Schema.Struct({ head: Schema.String, outcome: RecordedReview })
 const decodeCheckpoint = Schema.decodeUnknownOption(Schema.fromJsonString(ReviewCheckpoint))
 const checkpointFileName = "review-checkpoint.json"
 
@@ -76,6 +73,18 @@ const readReply = (run: Pick<HistoryRun, "fs">, sessionFile: string | null): Eff
     ? Effect.succeed(null)
     : run.fs.readFileString(sessionFile).pipe(Effect.map(finalReplyText), Effect.orElseSucceed(() => null))
 
+const recordReview = (
+  run: Pick<HistoryRun, "fs" | "path" | "runDir">,
+  findings: ReadonlyArray<ReviewFinding>
+): Effect.Effect<ReviewOutcome> =>
+  Effect.gen(function*() {
+    const file = run.path.join(run.runDir, reviewFileName)
+    const written = yield* run.fs.writeFileString(file, JSON.stringify(findings, null, 2) + "\n").pipe(Effect.result)
+    return Result.isSuccess(written)
+      ? { status: "passed", findings, file }
+      : { status: "failed", reason: "orc cannot write " + file + ": " + written.failure.message }
+  })
+
 export const runReviewTurn = (
   run: Pick<HistoryRun, "fs" | "path" | "runDir" | "piSessionDir" | "spawner" | "git" | "projectDir" | "branch">,
   runAgent: SandboxOps["runAgent"],
@@ -97,11 +106,7 @@ export const runReviewTurn = (
       }
       const findings = readFindings(yield* readReply(run, result.success.sessionFile))
       if (Result.isSuccess(findings)) {
-        const file = run.path.join(run.runDir, reviewFileName)
-        const written = yield* run.fs.writeFileString(file, JSON.stringify(findings.success, null, 2) + "\n").pipe(Effect.result)
-        return Result.isSuccess(written)
-          ? { status: "passed", findings: findings.success, file }
-          : { status: "failed", reason: "orc cannot write " + file + ": " + written.failure.message }
+        return yield* recordReview(run, findings.success)
       }
       problem = findings.failure
       resumeSession = result.success.sessionFile ?? resumeSession
@@ -115,7 +120,7 @@ export const reviewAtHead = (
   runAgent: SandboxOps["runAgent"],
   reviewer: AgentFile,
   priorDir: string | null
-): Effect.Effect<ReviewOutcome, OrcRunError> =>
+): Effect.Effect<ReviewOutcome> =>
   Effect.gen(function*() {
     const headOfBranch = () => runGit(run.spawner, run.git, ["rev-parse", "--verify", run.branch], run.worktreeDir).pipe(
       Effect.map((result) => result.exitCode === 0 ? result.stdout.trim() : ""),
@@ -125,13 +130,13 @@ export const reviewAtHead = (
     const saved = priorDir === null ? null : yield* run.fs.readFileString(run.path.join(priorDir, checkpointFileName)).pipe(Effect.orElseSucceed(() => null))
     const decoded = saved === null ? Option.none() : decodeCheckpoint(saved)
     const outcome = head !== "" && Option.isSome(decoded) && decoded.value.head === head
-      ? decoded.value.outcome
+      ? yield* recordReview(run, decoded.value.outcome.findings)
       : yield* runReviewTurn(run, runAgent, reviewer)
     const after = yield* headOfBranch()
-    if (head !== "" && head === after) {
+    if (outcome.status === "passed" && head !== "" && head === after) {
       const file = run.path.join(run.runDir, checkpointFileName)
       yield* run.fs.writeFileString(file, JSON.stringify({ head, outcome }) + "\n").pipe(
-        Effect.mapError((cause) => new OrcRunError({ message: "orc cannot write " + file + ": " + String(cause) }))
+        Effect.ignore
       )
     }
     return outcome
