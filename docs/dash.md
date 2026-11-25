@@ -7,8 +7,8 @@ kind: how-to
 
 ## Before you begin
 
-Install the Bun version pinned in `.bun-version`.
-The other tools below are optional.
+The release executables run without Bun.
+The tools below are optional.
 A panel reports a missing tool without stopping the rest of the screen.
 
 | Optional tool | Used for |
@@ -30,15 +30,14 @@ They are off until configured.
 
 ## Install
 
-To install orc-dash:
+To install `orc-dash` and `orc-dash-capture`:
 
-1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
-1. Run `cd orc` to enter it.
-1. Run `bun install --frozen-lockfile` to install the pinned dependencies.
-1. Run `mkdir -p ~/.local/bin && ln -s "$PWD/packages/cli/src/bin.ts" ~/.local/bin/orc-dash` to put the `orc-dash` command in a folder the `PATH` holds.
-   When `~/.local/bin` is not on the `PATH`, add `export PATH="$HOME/.local/bin:$PATH"` to the shell startup file and restart the shell.
+1. Download the archive for your platform and its checksum from the [Orc releases on GitHub](https://github.com/avi2d/orc/releases).
+1. Check the archive's checksum as [Release assets](run/release-assets.md#checksum-file) describes.
+1. Unpack the archive into a folder and add that folder to `PATH`.
+1. Run `orc-dash --help` and `orc-dash-capture --help` to check that both commands start.
 
-The command runs the clone's code through `bun`, so `bun` must be on the `PATH` as well.
+If you use a versioned launcher, see [Updating orc](run/updating-orc.md#update-a-versioned-checkout) for how to follow its selected release.
 
 ## Open one panel
 

@@ -15,7 +15,7 @@
     "orc-dash": "src/bin.ts"
   },
   "scripts": {
-    "build": "bun build src/bin.ts --outdir dist --target bun --external @opentui/core --external effect --external @effect/platform-bun",
+    "build": "bun ../../scripts/compile-dashboard.ts orc-dash",
     "start": "bun src/bin.ts"
   },
   "dependencies": {

@@ -6,11 +6,12 @@ The writer `orc-dash-capture` appends one record to the capture ledger each time
 The ledger keeps Claude statusline and headless readings, which no log keeps, and Pi calls whose log was rotated or deleted.
 The readers prefer the ledger where it holds a call, and count from the logs where it does not.
 
-## Build the writer
+## Capture command
 
-Run `bun run build` at the repository root.
-The build writes `packages/session-quota/dist/capture-bin.js`, a single file that starts without the repository's modules.
-Hooks run `bun packages/session-quota/dist/capture-bin.js` with the kind of record as its one argument and the record's input on stdin.
+[Orc release archives](../run/release-assets.md) include `orc-dash-capture`.
+In a clone, `bun run build` writes `packages/session-quota/dist/orc-dash-capture`.
+Both executables run without Bun installed.
+Hooks run `orc-dash-capture` with the kind of record as its one argument and the record's input on stdin.
 The writer exits 0 after it handles a record, even when it captures nothing.
 `--help` prints usage and exits 0.
 An unknown flag prints usage and exits 1.

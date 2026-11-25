@@ -11,7 +11,7 @@ To run the checks:
 
 1. Run `bun run lint` to run oxlint and every kit lint gate.
 1. Run `bun run typecheck` to run `tsc` and the Effect language service diagnostics.
-1. Run `bun run build` to bundle every tool and the `orc-dash` command into each package's `dist/` and write the changelog.
+1. Run `bun run build` to compile `orc-dash` and `orc-dash-capture` into their packages' `dist/` folders.
 
 CI runs the tests the change reaches on a pull request.
 The release pull request runs the full unit and e2e suites, and the release commit runs `bun run test --full`.

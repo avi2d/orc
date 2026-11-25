@@ -276,8 +276,8 @@ const runnerVerbLine = (args: RunnerVerb, place: DispatchPlace) => {
 }
 
 // The task is queued by now, so a stream that will not queue is told in the task's log and fails no task.
-const startAlertStream = (home: string) => {
-  const stream = liveAlertStream()
+const startAlertStream = (home: string, self: Command) => {
+  const stream = liveAlertStream(self)
   return stream === null
     ? Effect.void
     : ensureAlertStream(home, stream).pipe(
@@ -338,7 +338,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         if (line !== null) {
           yield* Console.log(line)
         }
-        yield* startAlertStream(place.home)
+        yield* startAlertStream(place.home, place.self)
         yield* startHeavyWatch(place.home, place.self, "orc runner start")
         break
       }
