@@ -13,6 +13,7 @@ A task starts when it has a priority, no unanswered hold or question, and its de
 A ship prerequisite must also have its PR merged.
 No beat reopens a closed task, so a prerequisite that closed failed, stopped, start-failed or dropped holds its dependents until you change their dependencies with `orc backlog depend`.
 Their wait names it, as in `waits on orc-2, and orc-2 closed failed, which no beat reopens`.
+A failed, stopped or start-failed prerequisite also stops holding them once `orc backlog retry` runs it again and it finishes.
 A parent waits for its report children to finish and its ship children's PRs to merge.
 A decision never starts.
 
@@ -34,9 +35,10 @@ See [Parked runs](parked-runs.md) and [A worker split proposal](task-kinds.md#a-
 
 A runner task with no [pueue](https://github.com/Nukesor/pueue) record after 10 minutes closes failed.
 A result that remains unreadable for 10 minutes also closes failed.
-A result the beat cannot read because the command that reaches the machine exits 255, as ssh does when its connection fails, never closes the task, and the next beat reads it again.
+A result the beat cannot read because the command that reaches the machine exits 255, as ssh does when its connection fails, or because that read times out after 30 seconds, never closes the task.
+The task's state stays unknown and the next beat reads it again, so a later read that succeeds restores the real state.
 Such a beat also restarts the 10 minutes of an unreadable result.
-When that command is `ssh`, orc passes it `-o ConnectTimeout=10`, so a machine that never answers ends as exit 255 and not as a timed-out read.
+When that command is `ssh`, orc passes it `-o ConnectTimeout=10`, so a machine that never answers usually ends as exit 255 before the read times out.
 After 10 minutes without reaching the machine, the beat opens a `machine-unreached` item for you for each started task on that machine, as [The attention queue](attention-queue.md) describes.
 A run still waiting for an answer stays started and the beat relays the answer.
 To stop a task yourself, run `orc backlog stop <task-id>` where the backlog lives, as [Stop a task](backlog-tasks.md#stop-a-task) describes.
