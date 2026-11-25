@@ -1,4 +1,5 @@
-import { expect, test } from "bun:test"
+import { expect, mock, test } from "bun:test"
+import type { AsyncContext, Context } from "gpui-kit"
 import { ByteSize, Deferred, Effect, FileSystem, Layer, Option, PlatformError } from "effect"
 import { TestClock } from "effect/testing"
 import { DrawerController } from "../../../packages/herdr-app/src/drawer-controller"
@@ -6,60 +7,92 @@ import { drawerTerminal } from "../../../packages/herdr-app/src/drawer-terminal"
 import { whileSessionExists } from "../../../packages/run/src/features/chat/chat-lifetime"
 
 const absent = Option.none()
-const file: FileSystem.File.Info = {
-  type: "File", mtime: absent, atime: absent, birthtime: absent, dev: 1, ino: Option.some(42),
+const fileInfo = (ino: number): FileSystem.File.Info => ({
+  type: "File", mtime: absent, atime: absent, birthtime: absent, dev: 1, ino: Option.some(ino),
   mode: 0o600, nlink: absent, uid: absent, gid: absent, rdev: absent, size: ByteSize.bytes(0), blksize: absent, blocks: absent
-}
+})
 const ok = { code: 0, stdout: "", stderr: "" }
+const appPid = 4242
+const home = "/home/example"
+const folder = home + "/.orc/chat"
 
-const drawer = () => {
-  const files = new Map<string, FileSystem.File.Info>()
-  let launch: string[] = []
-  let shows = 0
-  const terminal = drawerTerminal({
-    createEmpty: (path) => Promise.resolve(files.set(path, file)),
-    exec: (program, args) => {
-      if (program === "ln") {
-        const source = files.get(args[0])
-        if (source === undefined) throw new Error("Missing link source")
-        files.set(args[1], source)
-      } else if (program === "rm") {
-        files.delete(args[1])
-      } else if (program !== "mkdir") {
-        throw new Error("Unexpected command " + program)
+interface Stored {
+  readonly info: FileSystem.File.Info
+  readonly text: string
+}
+
+const notFound = (method: string) => Effect.fail(PlatformError.systemError({ _tag: "NotFound", module: "FileSystem", method }))
+
+const fakeHerdr = (saved: ReadonlyArray<string> = []) => {
+  const files = new Map<string, Stored>()
+  let inode = 40
+  const store = (path: string, text: string) => {
+    files.set(path, { info: fileInfo(++inode), text })
+  }
+  for (const name of saved) store(folder + "/" + name, "")
+  const launches: Array<ReadonlyArray<string>> = []
+  let appRunning = true
+  return {
+    files,
+    launches,
+    quitApp: () => { appRunning = false },
+    ownerRunning: (pid: number) => Effect.sync(() => appRunning && pid === appPid),
+    write: (path: string, text: string) => Promise.resolve(store(path, text)),
+    exec: (program: string, args: ReadonlyArray<string>) => {
+      if (program === "ls") {
+        const names = [...files.keys()].filter((path) => path.startsWith(folder + "/")).map((path) => path.slice(folder.length + 1))
+        return Promise.resolve({ ...ok, stdout: names.join("\n") + "\n" })
       }
+      if (program === "sh") return Promise.resolve({ ...ok, stdout: String(appPid) + "\n" })
+      if (program === "rm") files.delete(args[1] ?? "")
+      else if (program !== "mkdir") throw new Error("Unexpected command " + program)
       return Promise.resolve(ok)
     },
-    hc: (args) => {
+    hc: (args: ReadonlyArray<string>) => {
       if (args[0] === "get") return Promise.resolve({ ...ok, stdout: '{"state":"live"}' })
-      launch = args.slice(args.indexOf("--") + 1)
-      return Promise.resolve({ ...ok, stdout: '{"address":"terminal-1"}' })
-    }
-  }, "/home/example")
+      launches.push(args)
+      return Promise.resolve({ ...ok, stdout: '{"address":"terminal-' + String(launches.length) + '"}' })
+    },
+    fs: FileSystem.layerNoop({
+      stat: (path) => Effect.suspend(() => {
+        const file = files.get(path)
+        return file === undefined ? notFound("stat") : Effect.succeed(file.info)
+      }),
+      readFileString: (path) => Effect.suspend(() => {
+        const file = files.get(path)
+        return file === undefined ? notFound("readFileString") : Effect.succeed(file.text)
+      })
+    })
+  }
+}
+
+const drawer = (saved: ReadonlyArray<string> = []) => {
+  const herdr = fakeHerdr(saved)
+  let shows = 0
   const controller = new DrawerController({
-    ...terminal,
+    ...drawerTerminal({ exec: (program, args) => herdr.exec(program, args), hc: (args) => herdr.hc(args), write: herdr.write }, home),
     show: () => String(++shows),
     hide: () => undefined
   })
-  const fs = FileSystem.layerNoop({ stat: (path) => Effect.suspend(() => {
-    const info = files.get(path)
-    return info === undefined
-      ? Effect.fail(PlatformError.systemError({ _tag: "NotFound", module: "FileSystem", method: "stat" }))
-      : Effect.succeed(info)
-  }) })
-  return { files, fs, controller, launch: () => launch }
+  return { ...herdr, controller }
 }
 
-type End = "close" | "toggle" | "gone:1" | "unlink" | "replace"
+const launchOf = (args: ReadonlyArray<string> | undefined) => {
+  const all = args ?? []
+  const [env, binding = "", orc, chat, flag, session = ""] = all.slice(all.indexOf("--") + 1)
+  expect([env, orc, chat, flag]).toEqual(["env", "orc", "chat", "--session"])
+  const key = "ORC_CHAT_DRAWER_LEASE="
+  expect(binding.startsWith(key)).toBe(true)
+  return { session, lease: binding.slice(key.length), cwd: all[all.indexOf("--cwd") + 1] }
+}
+
+type End = "close" | "toggle" | "gone:1" | "dispose" | "unlink" | "replace" | "quit app"
 type Supervisor = typeof whileSessionExists
 
 const afterDrawerEnds = async (end: End, supervise: Supervisor) => {
   const host = drawer()
   await host.controller.obey("toggle")
-  const [env, binding, orc, chat, flag, session] = host.launch()
-  expect([env, orc, chat, flag]).toEqual(["env", "orc", "chat", "--session"])
-  const key = "ORC_CHAT_DRAWER_LEASE="
-  expect(binding.startsWith(key)).toBe(true)
+  const { session, lease } = launchOf(host.launches[0])
   return Effect.runPromise(Effect.gen(function*() {
     let piRunning = false
     const started = yield* Deferred.make<void>()
@@ -68,47 +101,163 @@ const afterDrawerEnds = async (end: End, supervise: Supervisor) => {
       yield* Deferred.succeed(started, undefined)
       return yield* Effect.never
     }).pipe(Effect.ensuring(Effect.sync(() => { piRunning = false })))
-    const terminal = yield* supervise(pi, session, binding.slice(key.length)).pipe(Effect.forkScoped)
+    const terminal = yield* supervise(pi, session, lease, host.ownerRunning).pipe(Effect.forkScoped)
     yield* Deferred.await(started)
     if (end === "unlink") host.files.delete(session)
-    else if (end === "replace") host.files.set(session, { ...file, ino: Option.some(43) })
+    else if (end === "replace") host.files.set(session, { info: fileInfo(999), text: "" })
+    else if (end === "quit app") host.quitApp()
+    else if (end === "dispose") yield* Effect.promise(() => host.controller.dispose())
     else yield* Effect.promise(() => host.controller.obey(end))
     yield* TestClock.adjust("2 seconds")
     return { terminalRunning: terminal.pollUnsafe() === undefined, piRunning }
   }).pipe(Effect.scoped, Effect.provide(Layer.merge(host.fs, TestClock.layer()))))
 }
 
-const expectStopped = async (end: End, supervise: Supervisor) =>
-  expect(await afterDrawerEnds(end, supervise)).toEqual({ terminalRunning: false, piRunning: false })
-
-for (const end of ["close", "toggle", "gone:1", "unlink", "replace"] as const) {
-  test(end + " does not leave the chat terminal or Pi running", () => expectStopped(end, whileSessionExists))
+for (const end of ["close", "toggle", "gone:1", "dispose", "unlink", "replace", "quit app"] as const) {
+  test(end + " does not leave the chat terminal or Pi running", async () => {
+    expect(await afterDrawerEnds(end, whileSessionExists)).toEqual({ terminalRunning: false, piRunning: false })
+  })
 }
 
-test.failing("waiting only for Pi leaves the chat terminal running after the session is unlinked", () =>
-  expectStopped("unlink", (pi) => pi))
+test("waiting only for Pi leaves the chat terminal and Pi running after the session is unlinked", async () => {
+  expect(await afterDrawerEnds("unlink", (pi) => pi)).toEqual({ terminalRunning: true, piRunning: true })
+})
 
-test("installing the drawer does not launch Pi while the drawer is closed", () => {
-  expect(drawer().launch()).toEqual([])
+test("a drawer with no saved session starts an empty one in ~/.orc/chat and runs the chat from home", async () => {
+  const host = drawer()
+  await host.controller.obey("toggle")
+  const { session, lease, cwd } = launchOf(host.launches[0])
+  expect(cwd).toBe(home)
+  expect(session).toMatch(/^\/home\/example\/\.orc\/chat\/drawer-\d+\.jsonl$/)
+  expect(host.files.get(session)?.text).toBe("")
+  expect(host.files.get(lease)?.text).toBe(String(appPid))
+})
+
+test("opening the drawer resumes the newest saved session instead of starting an empty one", async () => {
+  const host = drawer(["drawer-100.jsonl", "drawer-300.jsonl", "drawer-200.jsonl", "drawer-400.jsonl.5.1.open", "notes.txt"])
+  await host.controller.obey("toggle")
+  expect(launchOf(host.launches[0]).session).toBe(folder + "/drawer-300.jsonl")
+  expect([...host.files.keys()].filter((path) => path.endsWith(".jsonl"))).toHaveLength(3)
+})
+
+test("reopening the drawer resumes its session under a lease the earlier chat does not mistake for its own", async () => {
+  const host = drawer()
+  await host.controller.obey("toggle")
+  await host.controller.obey("toggle")
+  await host.controller.obey("toggle")
+  const [first, second] = [launchOf(host.launches[0]), launchOf(host.launches[1])]
+  expect(second.session).toBe(first.session)
+  expect(second.lease).not.toBe(first.lease)
+  expect(host.files.has(first.lease)).toBe(false)
 })
 
 test("closing a replaced overlay does not stop the chat shown in its replacement", async () => {
   const host = drawer()
   await host.controller.obey("toggle")
-  const launch = host.launch()
+  const launch = launchOf(host.launches[0])
   await host.controller.obey("show:turns")
   await host.controller.obey("gone:1")
-  expect(host.launch()).toBe(launch)
+  expect(host.launches).toHaveLength(1)
   expect(host.files.size).toBe(2)
   await host.controller.dispose()
-  expect([...host.files.keys()]).toEqual([launch[5]])
+  expect([...host.files.keys()]).toEqual([launch.session])
 })
 
-test("an already closed drawer does not spawn Pi against a missing lease", async () => {
+const startsPi = async (ended: (host: ReturnType<typeof drawer>) => Promise<void> | void) => {
   const host = drawer()
   await host.controller.obey("toggle")
-  const [, binding, , , , session] = host.launch()
-  await host.controller.obey("close")
+  const { session, lease } = launchOf(host.launches[0])
+  await ended(host)
   const pi = Effect.die("spawned Pi")
-  expect(await Effect.runPromise(whileSessionExists(pi, session, binding.split("=")[1]).pipe(Effect.provide(host.fs)))).toBe(0)
+  return Effect.runPromise(whileSessionExists(pi, session, lease, host.ownerRunning).pipe(Effect.provide(host.fs)))
+}
+
+test("an already closed drawer does not spawn Pi against a missing lease", async () => {
+  expect(await startsPi((host) => host.controller.obey("close"))).toBe(0)
+})
+
+test("a lease left by a Herdr App that has quit does not spawn Pi", async () => {
+  expect(await startsPi((host) => host.quitApp())).toBe(0)
+})
+
+let app = fakeHerdr()
+const listeners: Array<(command: string) => void> = []
+let listening: Array<() => void> = []
+const nextListen = () => new Promise<void>((resolve) => { listening.push(resolve) })
+const element = (): object => new Proxy({}, { get: (_target, _name, self: object) => () => self })
+
+void mock.module("gpui-kit", () => ({ View: Object, div: element }))
+void mock.module("gpui-base", () => ({ h_flex: element, v_flex: element, ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) } }))
+void mock.module("herdr", () => ({
+  exec: (program: string, args: ReadonlyArray<string>) => app.exec(program, args),
+  hc: (args: ReadonlyArray<string>) => app.hc(args),
+  writeTextFile: (path: string, text: string) => app.write(path, text).then(() => null),
+  home: () => home,
+  props: () => undefined,
+  nextCommand: () => new Promise<string>((resolve) => {
+    listeners.push(resolve)
+    const waiting = listening
+    listening = []
+    for (const wake of waiting) wake()
+  }),
+  openOverlay: () => "overlay-1",
+  closeOverlay: () => null,
+  readTextFile: () => Promise.resolve(null),
+  run: () => null,
+  settings: () => ({}),
+  theme: () => ({})
+}))
+
+const unused = (): never => { throw new Error("Unexpected App context call") }
+class IdleEntity {
+  set_props = unused
+  release = unused
+}
+const cx: Context = Object.assign(IdleEntity, {
+  notify: () => undefined,
+  spawn: (body: (task: AsyncContext) => unknown) => {
+    void body(cx)
+    return { cancel: () => undefined, is_done: () => false }
+  },
+  focus_handle: () => ({ focus: () => undefined, is_focused: () => false, release: () => true }),
+  stop_propagation: unused, bind_keys: unused, propagate: unused, phase: unused, theme: unused, open_url: unused,
+  read_from_clipboard: unused, write_to_clipboard: unused, sleep: unused,
+  timer: { after: unused, every: unused }
+}) satisfies Context
+
+const installDrawer = async () => {
+  app = fakeHerdr()
+  listeners.length = 0
+  const { default: OrcDrawer } = await import("../../../packages/herdr-app/mods/orc-drawer/main")
+  const view = new OrcDrawer()
+  const installed = nextListen()
+  view.init(undefined, cx)
+  await installed
+  const send = async (command: string) => {
+    const handled = nextListen()
+    listeners.shift()?.(command)
+    await handled
+  }
+  return { view, send }
+}
+
+test("installing the drawer does not launch Pi while the drawer is closed", async () => {
+  await installDrawer()
+  await Bun.sleep(0)
+  expect(app.launches).toEqual([])
+})
+
+test("opening the installed drawer launches one chat rather than none", async () => {
+  const { send } = await installDrawer()
+  await send("toggle")
+  expect(app.launches).toHaveLength(1)
+})
+
+test("closing the drawer's App view removes the lease before close returns, not on a later tick", async () => {
+  const { view, send } = await installDrawer()
+  await send("toggle")
+  const { session, lease } = launchOf(app.launches[0])
+  expect(app.files.has(lease)).toBe(true)
+  view.close(cx)
+  expect([...app.files.keys()]).toEqual([session])
 })

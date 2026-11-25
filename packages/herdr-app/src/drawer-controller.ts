@@ -3,6 +3,7 @@ export type DrawerPane = "raw" | "turns"
 export interface DrawerChat {
   readonly address: string
   readonly session: string
+  readonly lease: string
 }
 
 export interface DrawerTerminal {

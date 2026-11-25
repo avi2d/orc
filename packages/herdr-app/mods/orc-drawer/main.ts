@@ -55,7 +55,7 @@ export default class OrcDrawer extends View {
     this.focusHandle = cx.focus_handle()
     if (this.role.role === "controller") {
       this.controller = new DrawerController({
-        ...drawerTerminal({ exec, hc, createEmpty: (session) => writeTextFile(session, "", null) }, home()),
+        ...drawerTerminal({ exec, hc, write: (path, text) => writeTextFile(path, text, null) }, home()),
         show: (view, chat) => openOverlay({ kind: "window", key: overlayKey, width: drawerWidth, height: drawerHeight, layout: drawerLayout(view, chat) }),
         hide: closeOverlay
       })

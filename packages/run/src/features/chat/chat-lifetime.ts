@@ -1,30 +1,42 @@
 import { Effect, Equal, FileSystem } from "effect"
+import { isRunning } from "../../shared/lib/index"
 
 const sameFile = (a: FileSystem.File.Info, b: FileSystem.File.Info): boolean => a.dev === b.dev && Equal.equals(a.ino, b.ino)
+
+const hangupExitCode = 129
+
+export const untilHangup: Effect.Effect<number> = Effect.callback<number>((resume) => {
+  const hungUp = () => resume(Effect.succeed(hangupExitCode))
+  process.once("SIGHUP", hungUp)
+  return Effect.sync(() => {
+    process.off("SIGHUP", hungUp)
+  })
+})
 
 export const whileSessionExists = Effect.fnUntraced(function*<E, R>(
   pi: Effect.Effect<number, E, R>,
   session: string | null,
-  drawerLease: string | null
+  drawerLease: string | null,
+  ownerRunning: (pid: number) => Effect.Effect<boolean> = isRunning
 ) {
-  if (session === null) return yield* pi
+  if (session === null && drawerLease === null) return yield* pi
   const fs = yield* FileSystem.FileSystem
   const stat = (path: string) => fs.stat(path).pipe(Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)))
-  const current = stat(session)
-  let original = yield* current
-  const lease = drawerLease === null ? null : stat(drawerLease)
-  if (lease !== null) {
-    const owner = yield* lease
-    if (owner === null || original === null || !sameFile(owner, original)) return 0
-  }
-  const untilRemoved = Effect.gen(function*() {
+  const leaseHeld = drawerLease === null ? Effect.succeed(true) : fs.readFileString(drawerLease).pipe(
+    Effect.flatMap((owner) => /^\d+$/.test(owner.trim()) ? ownerRunning(Number(owner.trim())) : Effect.succeed(false)),
+    Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(false))
+  )
+  if (!(yield* leaseHeld)) return 0
+  let original = session === null ? null : yield* stat(session)
+  const untilEnded = Effect.gen(function*() {
     while (true) {
       yield* Effect.sleep("1 second")
-      const present = yield* current
+      if (!(yield* leaseHeld)) return 0
+      if (session === null) continue
+      const present = yield* stat(session)
       if (original !== null && (present === null || !sameFile(original, present))) return 0
-      if (lease !== null && (yield* lease) === null) return 0
       original ??= present
     }
   })
-  return yield* Effect.raceFirst(pi, untilRemoved)
+  return yield* Effect.raceFirst(pi, untilEnded)
 })

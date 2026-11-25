@@ -127,7 +127,7 @@ export const signIn = (
     const [program, ...args] = command
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     // The vendor's sign-in talks to the person on the terminal, and orc never reads what it prints or stores.
-    const exitCode = yield* spawner.spawn(ChildProcess.make(program, args, { env: { ...browserEnv, [vendor.folderVar]: folder }, extendEnv: true, stdin: "inherit", stdout: "inherit", stderr: "inherit" })).pipe(
+    const exitCode = yield* spawner.spawn(ChildProcess.make(program, args, { env: { ...browserEnv, [vendor.folderVar]: folder }, extendEnv: true, detached: false, stdin: "inherit", stdout: "inherit", stderr: "inherit" })).pipe(
       Effect.flatMap((handle) => handle.exitCode),
       Effect.catchTag("PlatformError", (error) => Effect.fail(new SignInError({ message: "orc login " + account + ": cannot start " + command.join(" ") + ": " + error.message })))
     )
