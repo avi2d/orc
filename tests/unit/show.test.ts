@@ -418,7 +418,7 @@ describe("formatShow", () => {
         await fixture(db)
         const reviewer = { path: "bundled/reviewer.md", model: "acme/reviewer", thinking: "high" as const }
         await Effect.runPromise(recordReviewStart(db, "show-1", reviewer, "2026-10-18T10:03:00.000Z"))
-        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, { status: "passed", findings: [], file: "/tmp/show-home/runs/show-1/review.json" }, "2026-10-18T10:03:00.000Z", "2026-10-18T10:05:30.000Z"))
+        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, { status: "passed", findings: [], file: "/tmp/show-home/runs/show-1/review.json", reusedFrom: null }, "2026-10-18T10:03:00.000Z", "2026-10-18T10:05:30.000Z"))
         const document = await Effect.runPromise(readShow(db, "show-1"))
         if (document === null) {
           throw new Error("missing fixture")
@@ -436,6 +436,41 @@ describe("formatShow", () => {
     })
   })
 
+  test.each([
+    { started: true, status: "passed" as const },
+    { started: false, status: "passed" as const },
+    { started: true, status: "failed" as const },
+    { started: false, status: "failed" as const }
+  ])("a reused $status review with start=$started names its earlier run instead of claiming a model ran", async ({ started, status }) => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await fixture(db)
+        const reviewer = { path: "bundled/reviewer.md", model: "acme/reviewer", thinking: "high" as const }
+        if (started) {
+          await Effect.runPromise(recordReviewStart(db, "show-1", reviewer, "2026-10-18T10:03:00.000Z"))
+        }
+        const outcome = status === "passed"
+          ? { status, findings: [], file: "/tmp/show-home/runs/show-1/review.json", reusedFrom: "earlier-run" }
+          : { status, reason: "cannot write review.json", reusedFrom: "earlier-run" }
+        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, outcome, "2026-10-18T10:03:00.000Z", "2026-10-18T10:03:00.000Z"))
+        const document = await Effect.runPromise(readShow(db, "show-1"))
+        if (document === null) {
+          throw new Error("missing fixture")
+        }
+        const review = document.steps.find((step) => step.name === "review")
+        expect(review).toMatchObject({ status, agentFile: null, model: null, thinking: null })
+        expect(review?.signals).toContainEqual({ name: "review-reused-from", value: "earlier-run" })
+        const block = formatShow(document).split("\n\n").find((part) => part.startsWith("step review #1"))
+        expect(block).toContain("  reused from run earlier-run")
+        expect(block).not.toContain("  model:")
+        expect(document.steps.map((step) => [step.name, step.from])).toEqual([["implement", null], ["checks", null], ["review", null]])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
   test("a failed review step records why it failed", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)
@@ -443,7 +478,7 @@ describe("formatShow", () => {
         await fixture(db)
         const reviewer = { path: "bundled/reviewer.md", model: "acme/reviewer", thinking: "high" as const }
         await Effect.runPromise(recordReviewStart(db, "show-1", reviewer, "2026-10-18T10:03:00.000Z"))
-        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, { status: "failed", reason: "the reply did not stop cleanly" }, "2026-10-18T10:03:00.000Z", "2026-10-18T10:04:00.000Z"))
+        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, { status: "failed", reason: "the reply did not stop cleanly", reusedFrom: null }, "2026-10-18T10:03:00.000Z", "2026-10-18T10:04:00.000Z"))
         const document = await Effect.runPromise(readShow(db, "show-1"))
         const review = document?.steps.find((step) => step.name === "review")
         expect(review?.status).toBe("failed")

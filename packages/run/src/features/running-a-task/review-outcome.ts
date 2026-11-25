@@ -16,3 +16,5 @@ export type ReviewFinding = typeof ReviewFinding.Type
 export const RecordedReview = Schema.Struct({ status: Schema.Literal("passed"), findings: ReviewFindings, file: Schema.String })
 
 export type ReviewOutcome = typeof RecordedReview.Type | { readonly status: "failed"; readonly reason: string }
+
+export type ReviewAtHeadOutcome = ReviewOutcome & { readonly reusedFrom: string | null }

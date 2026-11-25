@@ -209,6 +209,10 @@ export const formatShow = (document: ShowJsonDocument): string => {
     if (step.from !== null) {
       lines.push("  from run " + step.from)
     }
+    const reusedFrom = step.signals.find((signal) => signal.name === "review-reused-from")?.value
+    if (reusedFrom !== undefined) {
+      lines.push("  reused from run " + reusedFrom)
+    }
     lines.push(...timingLines(step))
     lines.push("  agent: " + (step.agentFile === null ? "none" : toFileUrl(step.agentFile)))
     lines.push("  session: " + (step.piSessionFile === null ? "none" : toFileUrl(step.piSessionFile)))
