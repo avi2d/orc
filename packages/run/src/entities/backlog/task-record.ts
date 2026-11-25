@@ -394,8 +394,6 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
         created: front.created,
         body: parts.body
       },
-      hold,
-      parked,
-      state
+      hold, parked, state
     }
   })
