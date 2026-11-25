@@ -13,7 +13,7 @@ Both only run the `orc` commands and draw what those commands print, so the scre
 ## The Board tab
 
 The Board shows the backlog as cards in five lanes: Backlog, Planned, Awaiting you, Running and Done.
-Awaiting you gathers held tasks, parked questions, open attention items for you and closed tasks whose pull request is still open.
+Awaiting you gathers the tasks that have an item in the Inbox, so the lane and the Inbox agree.
 
 ![Board showing example garden tasks in five lanes](../images/herdr-board.png)
 
