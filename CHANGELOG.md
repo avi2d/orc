@@ -2,6 +2,15 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.23.0
+
+Released 2026-11-25.
+
+### Features
+
+- **run:** run tasks on OpenAI and OpenCode Go subscriptions beside Claude [#352](https://github.com/avi2d/orc/pull/352)
+- **run:** update Orc from the dispatch beat [#349](https://github.com/avi2d/orc/pull/349)
+
 ## 0.22.0
 
 Released 2026-11-25.
