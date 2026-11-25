@@ -234,6 +234,39 @@ const answerOnceAsked = async (runDir: string, answer: string): Promise<void> =>
   }
 }
 
+describe("a rebase-first run", () => {
+  test("a moved PR head rejects the leased push without calling the implement agent", async () => {
+    await withLoopRun(0, async (db, normal) => {
+      const calls = join(normal.runDir, "git-calls")
+      await writeFile(normal.taskPath, "Do the task.\n")
+      await writeFile(normal.git, [
+        "#!/bin/sh",
+        "printf '%s\\n' \"$*\" >> " + calls,
+        "case \"$1\" in",
+        "  branch) echo orc/test ;;",
+        "  symbolic-ref) echo refs/remotes/origin/main ;;",
+        "  config) exit 1 ;;",
+        "  push) echo 'stale info' >&2; exit 1 ;;",
+        "esac"
+      ].join("\n") + "\n")
+      const reply = { stdout: "", stderr: "", exitCode: 0 }
+      const opener = { fetch: Effect.succeed(reply), push: Effect.succeed(reply), existing: Effect.succeed(reply), create: () => Effect.succeed(reply) }
+      const run = { ...normal, delivery: { kind: "orc" as const, opener }, rebase: { head: "a".repeat(40), pr: "https://github.com/example/orc/pull/7" } }
+      let agents = 0
+      const ops = fakeOps({
+        runAgent: async () => { agents += 1; return { commits: [] } },
+        execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
+      }, run.hostSessionsDir)
+      const exit = await Effect.runPromiseExit(runFull(run, ops, freshPlan, runLoopCheckpoints(db, run)))
+      expect(agents).toBe(0)
+      expect(Exit.isFailure(exit)).toBe(true)
+      const commands = await readFile(calls, "utf8")
+      expect(commands).toContain("push --force-with-lease=refs/heads/orc/test:" + "a".repeat(40))
+      expect(commands.split("\n").filter((line) => line.startsWith("push "))).toHaveLength(1)
+    })
+  })
+})
+
 describe("a run Pi loops in", () => {
   test("asks the captain on the step and ends unfinished when no answer comes, instead of reading the stop as done", async () => {
     await withLoopRun(0, async (db, run) => {
