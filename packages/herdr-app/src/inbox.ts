@@ -77,6 +77,7 @@ const attentionCard = (item: AttentionItem, task: TaskDetail | undefined): Inbox
     return action === null ? null : { ...base, kind: item.decision?.kind === "escalated" ? "decision" : "question", action }
   }
   if (item.kind === "overdue-wait") return { ...base, kind: "hold", action: { kind: "overdue-hold" } }
+  if (item.kind === "unasked-question") return { ...base, kind: "question", action: { kind: "unavailable" } }
   if ((item.kind === "pr-ready" || item.kind === "check-red") && isSettledPr(task)) return null
   if (item.kind === "pr-ready") {
     const link = openPr(task)
