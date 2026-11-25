@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Result, Schema } from "effect"
 
 const ReviewFinding = Schema.Struct({
   id: Schema.String,
@@ -15,7 +15,14 @@ const OrcReviewFinding = Schema.Struct({
 })
 
 const OrcReviewFindings = Schema.Array(OrcReviewFinding)
-export const decodeOrcReviewFindings = Schema.decodeUnknownResult(Schema.fromJsonString(OrcReviewFindings))
+const decodeOrcFindings = Schema.decodeUnknownResult(Schema.fromJsonString(OrcReviewFindings))
+
+export class OrcReviewOutputError extends Schema.TaggedError<OrcReviewOutputError>()("OrcReviewOutputError", {
+  message: Schema.String
+}) {}
+
+export const decodeOrcReviewFindings = (input: string) =>
+  decodeOrcFindings(input).pipe(Result.mapError((error) => new OrcReviewOutputError({ message: error.message })))
 
 export const ReviewFindings = Schema.Array(ReviewFinding)
 
