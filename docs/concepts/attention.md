@@ -41,6 +41,7 @@ Orc checks each question's words against a fixed list of topics, and a question 
 - Deleting, and anything that cannot be undone.
 - Security, keys or credentials, and logins.
 - Merging, pushing and releasing.
+- Going public.
 - Spending.
 - A site's look, and legal text.
 
