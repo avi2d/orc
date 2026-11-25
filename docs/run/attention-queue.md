@@ -31,14 +31,15 @@ When it names `merge`, `delete` for deleting unlanded work, `login`, `push`, `re
 No-mistakes writes `unknown` for an `ask-user` finding its reviewer did not classify.
 A question that names `unknown` or no action goes through a topic check instead.
 Orc sends questions about deletion, security, credentials, merging, pushing, releasing, going public, spending, irreversible actions, site appearance, legal text, and logins to you.
-The topic check reads the whole question, context included, so a question that says a step pushes a tag goes to you even when it only asks whether to continue.
-A question that only reports a merge or a release, such as one that names `merge conflicts`, also goes to you.
+The topic check reads the whole question, including context and reports of completed actions.
+A question that names `merge conflicts` or says a step pushes a tag goes to you, even if it only asks whether to continue.
 Going public means making something public, doing it publicly, or posting, announcing, emailing or sharing to an outside place such as a client, a channel or an issue.
 An upstream repository, issue or project, or a service such as a gist, Discord, Slack or Reddit, counts on its own.
 The word public or share alone, as in `public API`, does not count.
-Dropping, discarding, resetting, reverting, restoring, or throwing away or out commits, changes, edits, modifications, diffs, work, a stash or what you changed counts as deleting work.
-The noun counts within three words after such a verb with no joining word such as `in` or `that` between, or within three words before a past form such as `discarded`.
-For own work such as commits or changes, the past form needs a helper verb, as in `will be discarded`.
+Dropping, discarding, scrapping, resetting, reverting, restoring, or throwing away or out commits, changes, edits, modifications, diffs, work, a stash or what you changed counts as deleting work.
+Singular change or edit counts after my, our, your, this, that, the local, or uncommitted.
+The noun counts within three words after the verb without a joining word such as `in`, or before a past form such as `discarded`.
+Own work needs a helper verb before the past form, as in `will be discarded` or `will be scrapped`.
 A hard reset, `git reset --hard`, `git branch -D`, `git stash drop` or `clear`, `git clean -f`, `git checkout -- .` and `git restore .` also count.
 The name `test runs` never counts as deleting work.
 A question with no words at all goes to you.

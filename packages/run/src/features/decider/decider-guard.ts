@@ -4,11 +4,11 @@ interface NeverDecided {
   readonly about?: RegExp
 }
 
-const deletingVerbs = "delet\\w*|remov\\w*|drop\\w*|discard\\w*|eras(?:e|es|ed|ing)|wip(?:e|es|ed|ing)|purg\\w*|destroy\\w*|prun\\w*|abandon\\w*|overwrit\\w*|reset\\w*|(?:throw|throws|throwing|threw|thrown) away|clean(?:s|ed|ing)? up|start(?:s|ed|ing)? over|(?:throw|throws|throwing|threw|thrown) out|revert\\w*|restor(?:e|es|ed|ing)|rm"
-const deletedVerbs = "deleted|removed|dropped|discarded|erased|wiped|purged|destroyed|pruned|abandoned|overwritten|reset|thrown away|cleaned up"
+const deletingVerbs = "delet\\w*|remov\\w*|drop\\w*|discard\\w*|scrap\\w*|eras(?:e|es|ed|ing)|wip(?:e|es|ed|ing)|purg\\w*|destroy\\w*|prun\\w*|abandon\\w*|overwrit\\w*|reset\\w*|(?:throw|throws|throwing|threw|thrown) away|clean(?:s|ed|ing)? up|start(?:s|ed|ing)? over|(?:throw|throws|throwing|threw|thrown) out|revert\\w*|restor(?:e|es|ed|ing)|rm"
+const deletedVerbs = "deleted|removed|dropped|discarded|scrapped|erased|wiped|purged|destroyed|pruned|abandoned|overwritten|reset|thrown away|cleaned up"
 const work = "branch(?:es)?|worktrees?|tasks?|(?<!\\btest\\s)runs?|pull requests?|releases?|tags?|backups?|databases?|user data|commit history|(?:unlanded|unmerged|unpushed) (?:work|changes|commits)"
 const notAName = "(?!\\s+(?:check|name|field|filter|guard|test|option|flag|column|label|chip|key|type|lookup|variable|param\\w*|prop\\w*|argument|list|support|fallback|handling)s?\\b)"
-const ownWork = "commits?|changes|edits|work|stash(?:es)?|modifications?|diffs?|what (?:i|we|you|it) (?:changed|edited|wrote|made|added|did)"
+const ownWork = "commits?|changes|edits|(?:my|our|your|this|that|the local|uncommitted) (?:change|edit)|work|stash(?:es)?|modifications?|diffs?|what (?:i|we|you|it) (?:changed|edited|wrote|made|added|did)"
 const joiningWords = "on|in|of|for|from|to|at|by|with|that|which|so|and|or|but|if|when|because|then|than|while"
 const between = "(?:\\s+(?!(?:" + joiningWords + ")\\b)[\\w./`'-]+){0,3}?"
 

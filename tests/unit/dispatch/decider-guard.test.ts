@@ -184,7 +184,8 @@ describe("the decider guard", () => {
   test("a report of what a commit or a change removed reaches the decider, instead of being escalated as discarding work", () => {
     const questions = [
       "This commit dropped the null check in run.ts:40. Restore it?",
-      "The changes removed the retry loop. Should it come back?"
+      "The changes removed the retry loop. Should it come back?",
+      "Should I revert the change to the retry count?"
     ]
     for (const question of questions) expect(neverDecidedReason(question)).toBeNull()
   })
@@ -350,6 +351,20 @@ describe("a request only the owner grants, named in the context of a neutral ask
     { text: "Throw away the current changes in the worktree and restart?\nRecommended: yes", topic: "deleting" },
     { text: "Should I discard my work so far and restart from main?\nRecommended: yes", topic: "deleting" },
     { text: "Should I git stash drop the saved work?\nRecommended: yes", topic: "deleting" },
+    { text: "Should I discard my change and start over?\nRecommended: yes", topic: "deleting" },
+    { text: "Should I throw away this change and redo it from main?\nRecommended: yes", topic: "deleting" },
+    { text: "Should I revert my edit to run.ts?\nRecommended: yes", topic: "deleting" },
+    { text: "Should I scrap my changes and start over?\nRecommended: yes", topic: "deleting" },
+    ...["my", "our", "your", "this", "that", "the local", "uncommitted"].flatMap((prefix) =>
+      ["change", "edit"].flatMap((noun) => [
+        { text: "Should I discard " + prefix + " " + noun + "?", topic: "deleting" },
+        { text: prefix + " " + noun + " will be discarded. Continue?", topic: "deleting" }
+      ])),
+    ...["scrap", "scraps", "scrapped", "scrapping"].map((verb) => ({
+      text: "The worker " + verb + " my changes. Continue?", topic: "deleting"
+    })),
+    { text: "My edit will be scrapped. Continue?", topic: "deleting" },
+    { text: "Our changes will be scrapped. Continue?", topic: "deleting" },
     { text: "Should I discard the commits I made today?", topic: "deleting" },
     { text: "Should I throw away the changes I made and restart from main?", topic: "deleting" },
     { text: "Should I discard changes made in the worktree?", topic: "deleting" },
