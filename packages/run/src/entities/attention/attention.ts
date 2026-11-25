@@ -365,7 +365,7 @@ const staleItemReason = (item: AttentionItem, task: TaskRecord, live: boolean): 
     return null
   }
   const prItem = item.kind === "check-red" || item.kind === "pr-ready"
-  return item.kind === "failing-command" || (prItem && taskPr(task) === null) ? "task closed" : null
+  return item.kind === "failing-command" || item.kind === "machine-unreached" || (prItem && taskPr(task) === null) ? "task closed" : null
 }
 
 export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>

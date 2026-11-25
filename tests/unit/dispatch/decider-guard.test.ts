@@ -268,10 +268,18 @@ describe("the decider guard", () => {
 })
 
 describe("the open questions of a queue that all waited on the owner", () => {
+  const contextNamesPushOrRelease: ReadonlySet<string> = new Set(["directPrCard", "releasePrVersionFlagMissing", "agentEnvironmentDelivery", "mutationWorkflowHome"])
+
   for (const [name, question] of Object.entries(openQuestions)) {
-    test(name + " passes the guard, instead of reaching the owner on a word from the context it explains", () => {
-      expect(neverDecidedReason(question.text)).toBeNull()
-    })
+    if (contextNamesPushOrRelease.has(name)) {
+      test(name + " reaches the owner on the push or release its context names, instead of passing on a neutral asking sentence", () => {
+        expect(neverDecidedReason(question.text)).toMatch(/about (?:pushing|releasing)/)
+      })
+    } else {
+      test(name + " passes the guard, instead of reaching the owner on a name such as merge conflicts, pre-push or release tool", () => {
+        expect(neverDecidedReason(question.text)).toBeNull()
+      })
+    }
   }
 
   const routine = [
@@ -294,11 +302,32 @@ describe("the open questions of a queue that all waited on the owner", () => {
   }
 })
 
+describe("a request only the owner grants, named in the context of a neutral asking sentence", () => {
+  const ownerOnly = [
+    { text: "The worktree holds 3 unlanded commits that this cleanup deletes. Should orc go ahead? Recommended: yes", topic: "deleting" },
+    { text: "The fix drops the users database on every start. Should the run continue? Recommended: A", topic: "deleting" },
+    { text: "Running this step force-pushes over main. Proceed? Recommended: yes", topic: "pushing" },
+    { text: "The run would merge PR #12 into main. Go ahead?", topic: "merging" },
+    { text: "This pushes the tag v1.0 to npm. OK to continue?", topic: "pushing" },
+    { text: "The next step publishes 0.22.0 to npm. Continue?", topic: "releasing" },
+    { text: "Should I run the release workflow now? Recommended: yes.", topic: "releasing" },
+    { text: "Should orc trigger the deploy job for production?", topic: "releasing" },
+    { text: "Should orc re-deploy the site?", topic: "releasing" },
+    { text: "Why not push the tag now?", topic: "pushing" }
+  ]
+
+  for (const request of ownerOnly) {
+    test(JSON.stringify(request.text) + " reaches the owner, instead of passing to the decider on its asking sentence alone", () => {
+      expect(neverDecidedReason(request.text)).toContain("about " + request.topic)
+    })
+  }
+})
+
 describe("a request only the owner grants", () => {
   const ownerOnly = [
     { kind: "discarding unlanded work", text: "May I delete the unmerged branch orc-12 and its worktree? Recommended: yes", topic: "deleting" },
     { kind: "a merge with no standing permission", text: "#262 is green. Should I merge it? Recommended: yes.", topic: "merging" },
-    { kind: "a login", text: "npm refuses the first publish of the new package from CI. Should I run npm login on a dispatch machine? Recommended: yes.", topic: "logins" },
+    { kind: "a login", text: "npm refuses to install the private package from CI. Should I run npm login on a dispatch machine? Recommended: yes.", topic: "logins" },
     { kind: "spending money", text: "The free CI minutes ran out this month. Should I buy 1000 more minutes for $8? Recommended: yes.", topic: "spending" },
     { kind: "publishing", text: "The checks are green and the version is bumped. Should I publish 0.22.0 to npm now? Recommended: yes.", topic: "releasing" }
   ]

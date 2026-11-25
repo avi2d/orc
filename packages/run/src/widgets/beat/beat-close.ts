@@ -2,7 +2,7 @@ import { Array as Arr, DateTime, Duration, Effect, FileSystem, Option, type Path
 import type { ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, closeStartedTask, findTask, listTasks, applyRunSplit, splitEventText, runLabel, runDirFor, taskBranch, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { recordEvent } from "../../entities/events/index"
-import { type BeatAction, type Progress, withdrawTaskItems } from "../../entities/attention/index"
+import { type BeatAction, openUnreachedMachine, type Progress, withdrawTaskItems, withdrawUnreachedMachine } from "../../entities/attention/index"
 import type { FailingMark } from "../../entities/agent/index"
 import type { DispatchConfig } from "../../shared/config/index"
 import { ownedBySweep, throughFor } from "../../shared/config/index"
@@ -322,17 +322,17 @@ const readClose = (
     })
   )
 
-const readUnreadSince = (
+const readSince = (
   fs: FileSystem.FileSystem,
-  unreadFile: string,
+  sinceFile: string,
   nowText: string
 ): Effect.Effect<number | null> =>
-  fs.readFileString(unreadFile).pipe(
+  fs.readFileString(sinceFile).pipe(
     Effect.map((text) => Date.parse(text)),
     Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null)),
     Effect.flatMap((parsed) =>
       parsed === null || Number.isNaN(parsed)
-        ? fs.writeFileString(unreadFile, nowText).pipe(
+        ? fs.writeFileString(sinceFile, nowText).pipe(
           Effect.as<number | null>(null),
           Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null))
         )
@@ -340,14 +340,37 @@ const readUnreadSince = (
     )
   )
 
-const clearUnread = (
+const clearSince = (
   fs: FileSystem.FileSystem,
-  unreadFile: string
+  sinceFile: string
 ): Effect.Effect<number | null> =>
-  fs.remove(unreadFile, { force: true }).pipe(
+  fs.remove(sinceFile, { force: true }).pipe(
     Effect.as<number | null>(null),
     Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null))
   )
+
+const trackUnreached = (
+  root: string,
+  task: string,
+  machine: string,
+  reading: CloseReading,
+  fs: FileSystem.FileSystem,
+  nowText: string
+): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const unreachedFile = backlogPaths(root).unreachedFile(task)
+    if (reading.kind === "unreached") {
+      const since = yield* readSince(fs, unreachedFile, nowText)
+      if (since !== null && Date.parse(nowText) - since > missingRunnerGraceMillis) {
+        yield* openUnreachedMachine(root, task, machine, new Date(since).toISOString(), reading.reason, nowText)
+      }
+      return
+    }
+    if (yield* fs.exists(unreachedFile).pipe(Effect.orElseSucceed(() => false))) {
+      yield* clearSince(fs, unreachedFile)
+      yield* withdrawUnreachedMachine(root, task, nowText)
+    }
+  })
 
 // A finished run ends its task here, because no other beat step reads a started task after its run ends.
 export const closeFinished = (
@@ -379,8 +402,9 @@ export const closeFinished = (
     const unreadFile = backlogPaths(context.root).unreadFile(task.spec.id)
     const nowText = yield* nowIso
     const unreadSince = reading.kind === "unread"
-      ? yield* readUnreadSince(fs, unreadFile, nowText)
-      : reading.kind === "read" ? yield* clearUnread(fs, unreadFile) : null
+      ? yield* readSince(fs, unreadFile, nowText)
+      : yield* clearSince(fs, unreadFile)
+    yield* trackUnreached(context.root, task.spec.id, claim.machine, reading, fs, nowText)
     const stale = staleEndingOf(started.at, Date.parse(nowText), reading, unreadSince)
     const ending = reading.kind === "read" ? (stale ?? reading.ending) : stale
     if (ending === null) {

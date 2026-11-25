@@ -296,9 +296,17 @@ export const readStdinLabel = (stdin: Effect.Effect<string, RunnerError>): Effec
 // ssh exits 255 for its own failure and passes the remote command's code on otherwise, so 255 says the machine was not reached.
 const unreachedExit = 255
 
+// Shorter than the beat's 30-second close read, so a machine that never answers ends as ssh's own 255 and not as a timeout.
+const connectSeconds = 10
+
+const boundedConnect = (command: Command): Command => {
+  const [program, ...rest] = command
+  return program.split("/").at(-1) === "ssh" ? [program, "-o", "ConnectTimeout=" + connectSeconds.toString(), ...rest] : command
+}
+
 export const readResultReaching = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError | MachineUnreached, ChildProcessSpawner.ChildProcessSpawner> => {
   const stdin = label == null ? null : JSON.stringify({ label })
-  return capture([...command, "runner", "result", task, "--json", ...(stdin === null ? [] : ["--stdin-label"])], stdin).pipe(
+  return capture([...boundedConnect(command), "runner", "result", task, "--json", ...(stdin === null ? [] : ["--stdin-label"])], stdin).pipe(
     Effect.flatMap((result): Effect.Effect<typeof RunnerDocument.Type, RunnerError | MachineUnreached> => {
       if (result.exitCode === 0) {
         return decodeJson(result.stdout, RunnerDocument, command.join(" ") + " runner result")

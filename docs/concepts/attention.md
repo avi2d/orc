@@ -19,6 +19,7 @@ Each item names who must answer it, and a model called the decider takes the rou
 | `looping` question | Pi failed one command 6 times in a row | You |
 | `failing-command` | Pi failed one command 3 times in a row, which only tells you | You |
 | `run-died` | A run failed or its start failed | You |
+| `machine-unreached` | Orc has not reached a run's dispatch machine for 10 minutes | You |
 | `check-red` | A check turned red on a closed task's pull request | You |
 | `pr-ready` | Every check is green on a closed task's pull request | You |
 | `overdue-wait` | A hold's date has passed | You |

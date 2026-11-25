@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -17,11 +17,14 @@ const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promis
 
 const closedConnection = "Connection closed by UNKNOWN port 65535"
 
+const reachExiting = (reach: string, exitCode: number): Promise<void> =>
+  writeFile(reach, "#!/bin/sh\necho '" + closedConnection + "' >&2\nexit " + exitCode.toString() + "\n")
+
 const withReach = async (exitCode: number, body: (root: string, reach: string) => Promise<void>): Promise<void> => {
   const root = await mkdtemp(join(tmpdir(), "orc-unreached-"))
   try {
     const reach = join(root, "reach.sh")
-    await writeFile(reach, "#!/bin/sh\necho '" + closedConnection + "' >&2\nexit " + exitCode.toString() + "\n")
+    await reachExiting(reach, exitCode)
     await body(root, reach)
   } finally {
     await rm(root, { recursive: true, force: true })
@@ -57,6 +60,8 @@ const startOnReach = async (root: string, reach: string): Promise<void> => {
   await writeFile(backlogPaths(root).unreadFile("orc-1"), longStarted)
 }
 
+const openKinds = async (root: string) => (await run(openItems(root))).map((entry) => [entry.item.kind, entry.item.owner])
+
 const beat = (root: string) => Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, localStub))))
 
 describe("a dispatch machine orc cannot reach", () => {
@@ -75,7 +80,22 @@ describe("a dispatch machine orc cannot reach", () => {
     })
   })
 
-  test("a closed ssh connection past the grace keeps the task started with no item for the owner, instead of closing it as a died run", async () => {
+  test("a result read through ssh bounds its connect below the 30-second close read, instead of letting a machine that never answers end as a timed-out read", async () => {
+    await withReach(255, async (root) => {
+      const ssh = join(root, "ssh")
+      const argv = join(root, "argv")
+      await writeFile(ssh, "#!/bin/sh\nprintf '%s\\n' \"$@\" > '" + argv + "'\nexit 255\n")
+      await chmod(ssh, 0o755)
+      await Effect.runPromise(Effect.flip(readResultReaching([ssh, "box", "orc"], "orc-1")).pipe(Effect.provide(BunServices.layer)))
+      const words = (await readFile(argv, "utf8")).trim().split("\n")
+      const option = words.find((word) => word.startsWith("ConnectTimeout="))
+      expect(words.slice(0, 2)).toEqual(["-o", option])
+      expect(Number(option?.slice("ConnectTimeout=".length))).toBeLessThan(30)
+      expect(words.slice(2, 4)).toEqual(["box", "orc"])
+    })
+  })
+
+  test("a first unreached beat keeps the task started with no item for the owner, instead of closing it as a died run", async () => {
     await withReach(255, async (root, reach) => {
       await startOnReach(root, reach)
       const report = await beat(root)
@@ -85,12 +105,49 @@ describe("a dispatch machine orc cannot reach", () => {
     })
   })
 
+  test("a machine unreached past the 10-minute grace opens one item for the owner and keeps the task started, instead of staying silent forever", async () => {
+    await withReach(255, async (root, reach) => {
+      await startOnReach(root, reach)
+      await writeFile(backlogPaths(root).unreachedFile("orc-1"), longStarted)
+      await beat(root)
+      await beat(root)
+      expect((await run(findTask(root, "orc-1"))).state.kind).toBe("started")
+      const items = await run(openItems(root))
+      expect(items.map((entry) => [entry.item.kind, entry.item.owner])).toEqual([["machine-unreached", "user"]])
+      expect(items[0]?.item.text).toContain("win")
+      expect(items[0]?.item.text).toContain(closedConnection)
+    })
+  })
+
+  test("a machine that answers again withdraws its unreached item, instead of leaving the owner a stale alarm", async () => {
+    await withReach(255, async (root, reach) => {
+      await startOnReach(root, reach)
+      await writeFile(backlogPaths(root).unreachedFile("orc-1"), longStarted)
+      await beat(root)
+      expect(await openKinds(root)).toEqual([["machine-unreached", "user"]])
+      await reachExiting(reach, 3)
+      await beat(root)
+      expect(await openKinds(root)).toEqual([])
+    })
+  })
+
+  test("an unreached beat restarts the unread grace, instead of closing a run unread before the outage as soon as the machine answers", async () => {
+    await withReach(255, async (root, reach) => {
+      await startOnReach(root, reach)
+      await beat(root)
+      await reachExiting(reach, 3)
+      await beat(root)
+      expect((await run(findTask(root, "orc-1"))).state.kind).toBe("started")
+      expect(await openKinds(root)).toEqual([])
+    })
+  })
+
   test("a reached machine whose runner refuses past the grace still closes the task as a died run for the owner", async () => {
     await withReach(3, async (root, reach) => {
       await startOnReach(root, reach)
       await beat(root)
       expect((await run(findTask(root, "orc-1"))).state.kind).toBe("closed")
-      expect((await run(openItems(root))).map((entry) => [entry.item.kind, entry.item.owner])).toEqual([["run-died", "user"]])
+      expect(await openKinds(root)).toEqual([["run-died", "user"]])
     })
   })
 })

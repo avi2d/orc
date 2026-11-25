@@ -29,9 +29,8 @@ When it names `merge`, `delete` for deleting unlanded work, `login`, `push`, `re
 No-mistakes writes `unknown` for an `ask-user` finding its reviewer did not classify.
 A question that names `unknown` or no action goes through a topic check instead.
 Orc sends questions about deletion, security, credentials, merging, pushing, releasing, spending, irreversible actions, site appearance, legal text, and logins to you.
-The topic check reads only the sentences that ask something: a sentence that ends with a question mark, an option line such as `A)` or `Recommended:`, and a sentence that speaks to the reader, such as one with `you`, `please` or `the owner needs`.
-A topic word in the rest, such as "the card says orc pushes the branch and opens the PR", does not send the question to you.
-A question with no asking sentence is checked whole, and names such as `merge conflicts`, `pre-push` and `release parser` there do not send it to you.
+The topic check reads the whole question, context included, so a question that says a step pushes a tag goes to you even when it only asks whether to continue.
+Names that ask for no action do not send a question to you: `merge conflicts`, `merge base`, `pre-push`, `was not pushed`, `test runs`, a `release` parser, tool, commit or entry, `release-generated`, `at release` and `by the release`.
 A question with no words at all goes to you.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
 Rules and policy do not widen either check.
@@ -103,6 +102,9 @@ The beat opens an item for each run event, owned by the user:
   Two failures retry instead of opening the item.
   When no-mistakes refuses to start because the repository is not initialized, the run runs `no-mistakes init --skip-user-skill` and starts no-mistakes again.
   When the command that reaches a dispatch machine exits 255, as ssh does when its connection fails, the task stays started and the next beat reads it again.
+- A dispatch machine that orc has not reached for 10 minutes, counted from the first beat that could not reach it, opens a `machine-unreached` item.
+  The item names the machine and the error of the command that reaches it, and the task stays started.
+  A beat that reaches the machine again withdraws it, and so does closing the task.
 - A red check on a closed ship task's PR opens a `check-red` item for the PR's head commit.
   Checks that turn green on that commit, or a new commit, withdraw it.
   Merging the PR or closing it without merging withdraws it.
@@ -120,9 +122,10 @@ Each item the beat opens names its `subject` and lists its `options`, each with 
 - A `check-red` item offers `send back` or `close`, and recommends `send back`.
 - A `pr-ready` item offers `merge` or `hold`, and recommends `merge`.
 - A `failing-command` item offers `continue` or `stop`, and recommends `continue`.
+- A `machine-unreached` item offers `wait` or `close`, and recommends `wait`.
 - An `overdue-wait` item offers `answer` or `drop`, and recommends `answer`.
 
-To record a choice on a `run-died`, `check-red`, `pr-ready` or `failing-command` item, run `orc attention answer <item-id> <words>`.
+To record a choice on a `run-died`, `check-red`, `pr-ready`, `failing-command` or `machine-unreached` item, run `orc attention answer <item-id> <words>`.
 Run the command the outcome names to carry out the option.
 `orc attention answer` only records the choice and closes the item.
 It refuses a review question, a worker question or an overdue wait and names the task to answer with `orc backlog answer` instead.
