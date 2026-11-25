@@ -95,7 +95,7 @@ describe("a dispatch machine orc cannot reach", () => {
       await writeFile(reach, "#!/bin/sh\nprintf '%s\\n' '" + response + "'\n")
       const restored = await run(closeFinished({ root, home: root, config }, await run(findTask(root, "orc-1"))))
       expect(restored.kind).toBe("running")
-      await expect(readFile(backlogPaths(root).unreachedFile("orc-1"), "utf8")).rejects.toThrow()
+      expect(await readFile(backlogPaths(root).unreachedFile("orc-1"), "utf8").then(() => "present", () => "absent")).toBe("absent")
       expect((await run(findTask(root, "orc-1"))).state.kind).toBe("started")
     })
   })
