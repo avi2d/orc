@@ -1,6 +1,6 @@
 import { type AsyncContext } from "gpui-kit"
 import { exec, nextCommand, notify } from "herdr"
-import { type MergeOutcome } from "./agents-view"
+import { type MergeOutcome } from "./approval-stage"
 import { mergeArgv } from "./task"
 
 export interface Merge {

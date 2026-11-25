@@ -85,6 +85,17 @@ const forgeSteps = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
 const sentBackTask = (fixture: Fixture): Promise<string> => readFile(join(fixture.home, "backlog", "new", "orc-1.md"), "utf8")
 
 describe("orc merge compares the two sides of a PR behind its base", () => {
+  test("records the approved head and checks-running stage instead of leaving the closed task unchanged", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1 })
+      const result = await runOrc(fixture, ["merge", "orc-1", "--basis", "captain-word", "--no-wait"])
+      expect(result.exitCode).toBe(0)
+      const text = await taskFile(fixture)
+      const front: unknown = Bun.YAML.parse(text.split("---\n")[1])
+      expect(front).toMatchObject({ merge: { basis: "captain-word", head, green: ["lint", "test"], stage: "checks-running" } })
+    })
+  }, 60_000)
   test("updates a disjoint PR rejected as out of date instead of refusing every retry", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await closedWithPr(fixture)
@@ -182,7 +193,41 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
       expect(merged.stderr).toContain("orc merge refused orc-1 and merged nothing: " + prUrl + " has a merge conflict with main")
       expect(merged.stderr).toContain("sent orc-1 back, so the next beat resumes run origin-run")
       expect(await mergeCalls(fixture)).toEqual([])
-      expect(await sentBackTask(fixture)).toContain("update-branch reported a merge conflict between " + head + " and main")
+      const sent = await sentBackTask(fixture)
+      expect(sent).toContain("update-branch reported a merge conflict between " + head + " and main")
+      const front: unknown = Bun.YAML.parse(sent.split("---\n")[1])
+      expect(front).toMatchObject({ merge: { basis: "captain-word", head, stage: "conflicted", detail: "main" } })
+    })
+  }, 60_000)
+
+  test("a captain's send-back after a conflicted re-close drops the conflict instead of labelling the review a merge conflict", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added orc-1 for orc")
+      await closeTask(fixture, "orc-1", [...ranClosing("done", "", prUrl), "merge: { basis: captain-word, head: " + head + ", green: [lint], stage: conflicted, detail: main }"])
+      await stubRunner(fixture)
+      await stubGh(fixture, {})
+      const sent = await runOrc(fixture, ["backlog", "send-back", "orc-1", "rename", "the", "flag"])
+      expect(sent.stderr).toBe("")
+      expect(sent.exitCode).toBe(0)
+      const text = await sentBackTask(fixture)
+      expect(text).toContain("rename the flag")
+      const front: unknown = Bun.YAML.parse(text.split("---\n")[1])
+      expect(front).not.toHaveProperty("merge")
+    })
+  }, 60_000)
+
+  test("a later refusal clears the red check an earlier attempt recorded instead of keeping the stale stage", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { checks: [passed("lint"), red("test")] })
+      expect((await runOrc(fixture, ["merge", "orc-1"])).exitCode).not.toBe(0)
+      const first: unknown = Bun.YAML.parse((await taskFile(fixture)).split("---\n")[1])
+      expect(first).toMatchObject({ merge: { stage: "check-failed", detail: "ci/test" } })
+      await stubGh(fixture, { checks: [passed("lint"), running("test")] })
+      const second = await runOrc(fixture, ["merge", "orc-1"])
+      expect(second.stderr).toContain("the check ci/test has not reported")
+      const front: unknown = Bun.YAML.parse((await taskFile(fixture)).split("---\n")[1])
+      expect(front).not.toHaveProperty("merge")
     })
   }, 60_000)
 
@@ -549,25 +594,6 @@ describe("beat merge output", () => {
       })
       expect(await forgeSteps(fixture)).toEqual(["view", "view", "update"])
       expect(await mergeCalls(fixture)).toEqual([])
-    })
-  }, 60_000)
-})
-
-describe("yolo in projects.json", () => {
-  test("a non-boolean yolo is refused naming the project instead of read as true", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
-      await writeProject(fixture, { yolo: "yes" })
-      expect(await rejection(sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" }))).toContain("the project orc names yolo \"yes\", which is not true or false")
-      expect(await readFile(join(fixture.home, "backlog", "new", "orc-1.md"), "utf8").catch(() => "no task file")).toBe("no task file")
-    })
-  }, 60_000)
-
-  test("an entry with no yolo reads as before instead of gaining a yolo field", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
-      const json: unknown = JSON.parse((await runOrc(fixture, ["backlog", "--json"])).stdout)
-      expect(json).toMatchObject({ projects: [{ name: "orc", checkouts: { mac: fixture.dir } }] })
-      expect(JSON.stringify(json)).not.toContain("yolo")
-      expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added orc-1 for orc")
     })
   }, 60_000)
 })

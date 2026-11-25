@@ -1,3 +1,5 @@
+import { mergeStages, type RecordedMerge } from "./approval-stage"
+
 export type Guarded<A> =
   | { readonly kind: "ok"; readonly value: A }
   | { readonly kind: "refused"; readonly reason: string }
@@ -138,6 +140,7 @@ export interface Task {
   readonly parkedOrigin: string | null
   readonly reason: string | null
   readonly prState: typeof prStates[number] | null
+  readonly merge?: RecordedMerge
 }
 
 const parkedOrigin = (record: Fields, at: string): Guarded<string | null> => {
@@ -167,7 +170,15 @@ const task: Guard<Task> = (value, at) => {
   if (reason.kind === "refused") return reason
   const prState = record.value["prState"] === null || record.value["prState"] === undefined ? ok(null) : oneOf(record.value, "prState", at, prStates)
   if (prState.kind === "refused") return prState
-  return ok({ ...head.value, hold: hold.value, parked: parked.value, parkedOrigin: origin.value, reason: reason.value, prState: prState.value })
+  const rawMerge = record.value["merge"]
+  if (rawMerge === undefined || rawMerge === null) return ok({ ...head.value, hold: hold.value, parked: parked.value, parkedOrigin: origin.value, reason: reason.value, prState: prState.value })
+  const merge = fields(rawMerge, child(at, "merge"))
+  if (merge.kind === "refused") return merge
+  const stage = oneOf(merge.value, "stage", child(at, "merge"), mergeStages)
+  if (stage.kind === "refused") return stage
+  const detail = absentOrString(merge.value, "detail", child(at, "merge"))
+  if (detail.kind === "refused") return detail
+  return ok({ ...head.value, hold: hold.value, parked: parked.value, parkedOrigin: origin.value, reason: reason.value, prState: prState.value, merge: { stage: stage.value, detail: detail.value } })
 }
 
 interface ProjectCheckouts {

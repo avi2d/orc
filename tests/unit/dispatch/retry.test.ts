@@ -114,7 +114,7 @@ describe("backlog retry", () => {
           await run(writeTaken(root, { ...taken, state: { kind: "started", claim, started: { at, log: "log" } } }))
           await run(closeStartedTask(root, id, outcome, "no push", { pr: null, report: null }, "2026-01-02T00:00:00Z"))
           expect(taskPr(await run(findTask(root, id)))).toBe(pr)
-          await run(sendBackClosedTask(root, id, "Keep the API", "2026-01-03T00:00:00Z", { machine: "node-a", run: "retried" }))
+          await run(sendBackClosedTask(root, id, "Keep the API", "2026-01-03T00:00:00Z", { machine: "node-a", run: "retried" }, "cleared"))
           expect((await run(findTask(root, id))).parked?.origin?.pr).toBe(pr)
         }, pr)
       })
