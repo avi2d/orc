@@ -87,7 +87,7 @@ describe("a failed run", () => {
       expect(await sweep()).toMatchObject({ kind: "ended", action: { kind: "retry", run: "run-1" } })
       await restart()
       await run(closeStartedTask(root, "orc-1", "done", "the PR opened", { pr: "https://github.com/acme/orc/pull/8", report: null }, "2026-10-27T10:06:00.000Z"))
-      await run(sendBackClosedTask(root, "orc-1", "rename the flag", "2026-10-27T10:07:00.000Z", { machine: "mac", run: "run-1" }))
+      await run(sendBackClosedTask(root, "orc-1", "rename the flag", "2026-10-27T10:07:00.000Z", { machine: "mac", run: "run-1" }, "cleared"))
       expect((await run(listTasks(root))).at(0)?.retry).toBeUndefined()
       await restart()
       await failedRun(root, "run-2")

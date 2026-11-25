@@ -62,6 +62,7 @@ type TaskJson = {
   readonly prState: PrState | null
   readonly hold: Hold | null
   readonly parked: ParkedJson | null
+  readonly merge?: TaskRecord["merge"]
 } & TaskStatusJson
 
 interface ParkedJson {
@@ -156,6 +157,7 @@ const taskJson = (record: TaskRecord, view: BacklogView): TaskJson => {
     prState: view.prStates.get(record.spec.id) ?? null,
     hold: record.hold,
     parked: record.parked === null ? null : parkedJson(record.spec.id, record.parked, view.deciderOwns),
+    ...(record.merge === undefined ? {} : { merge: record.merge }),
     ...claimJson(record)
   }
 }

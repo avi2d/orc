@@ -115,6 +115,7 @@ export const renderTaskFile = (record: TaskRecord): string =>
     ...holdFields(record.hold),
     ...(record.retry === undefined ? [] : [field("retry", record.retry)]),
     ...parkedFields(record.parked),
+    ...(record.merge === undefined ? [] : [field("merge", record.merge)]),
     ...(ranClosing(record) === null && record.priorPr !== undefined ? [field("pr", record.priorPr)] : []),
     ...stateFields(record),
     fence,

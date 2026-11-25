@@ -33,7 +33,8 @@ export const sendBackClosedTask = (
   id: string,
   words: string,
   at: string,
-  origin: NonNullable<Parked["origin"]>
+  origin: NonNullable<Parked["origin"]>,
+  mergeRecord: "kept" | "cleared"
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const { fs, paths, file, grabbed, putBack, read } = yield* grabIn(root, "closed", id, Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" })))
@@ -45,7 +46,8 @@ export const sendBackClosedTask = (
       }
       const parked: Parked = { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at)], origin: ran.pr === null ? origin : { ...origin, pr: ran.pr }, at, sentBackAt: at }
       const { retry: _retry, ...retryable } = record
-      const sent: TaskRecord = { ...retryable, parked, state: { kind: "new" } }
+      const { merge: _merge, ...unmerged } = retryable
+      const sent: TaskRecord = { ...(mergeRecord === "kept" ? retryable : unmerged), parked, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(sent)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })
       }

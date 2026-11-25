@@ -308,7 +308,7 @@ export const markPosted = (
 export type Rewrite<A> = { readonly kind: "write"; readonly record: TaskRecord; readonly result: A } | { readonly kind: "keep"; readonly result: A }
 
 // rename(2) takes the one task file at most once, so a hold, an answer, a beat's claim and a park never hold the same file together.
-const rewriteIn = (folder: "new" | "taken") => <A>(
+const rewriteIn = (folder: "new" | "taken" | "closed") => <A>(
   root: string,
   id: string,
   decide: (fresh: TaskRecord) => Effect.Effect<Rewrite<A>, BacklogError, FileSystem.FileSystem>
@@ -344,6 +344,8 @@ const rewriteIn = (folder: "new" | "taken") => <A>(
 export const rewriteNew = rewriteIn("new")
 
 export const rewriteTaken = rewriteIn("taken")
+
+export const rewriteClosed = rewriteIn("closed")
 
 export const findTask = (root: string, id: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   listTasks(root).pipe(
