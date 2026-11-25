@@ -8,3 +8,9 @@ test("orc review accepts all specified severities rather than the direct-PR seve
   expect(Result.isSuccess(decoded)).toBe(true)
   if (Result.isSuccess(decoded)) expect(decoded.success).toEqual(findings)
 })
+
+test("orc review names malformed findings rather than accepting an empty review", () => {
+  const decoded = decodeOrcReviewFindings('[{"id":"bad"}]')
+  expect(Result.isFailure(decoded)).toBe(true)
+  if (Result.isFailure(decoded)) expect(decoded.failure.name).toBe("OrcReviewOutputError")
+})
