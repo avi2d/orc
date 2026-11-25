@@ -161,13 +161,15 @@ describe("the asked action of a no-mistakes review question", () => {
     })
   })
 
-  test("an unguarded action goes to the decider rather than escalating as unknown", async () => {
+  test("an unrecognized question action reaches the owner instead of the decider", async () => {
     await withStartedTask(async (root) => {
       await parkThroughGate(root, gateAsking("question-1,warning,,ask-user,Is this branch ready?,inspect"))
       const heard: Array<DeciderRequest> = []
       const decided = await decideAll(root, heard)
-      expect(heard.length).toBe(1)
-      expect(decided.map((entry) => entry.verdict.kind)).toEqual(["answered"])
+      expect(heard).toHaveLength(0)
+      const verdict = decided.at(0)?.verdict
+      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("which orc does not know")
+      expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
     })
   })
 
@@ -182,13 +184,28 @@ describe("the asked action of a no-mistakes review question", () => {
     })
   })
 
-  test("an unknown action is checked instead of guarded words in the question", async () => {
+  test("an unclassified merge question reaches the owner instead of bypassing the text check", async () => {
     await withStartedTask(async (root) => {
       await parkThroughGate(root, gateAsking("question-1,warning,,ask-user,Merge this branch now?,unknown"))
       const heard: Array<DeciderRequest> = []
       const decided = await decideAll(root, heard)
-      expect(heard.length).toBe(1)
-      expect(decided.map((entry) => entry.verdict.kind)).toEqual(["answered"])
+      expect(heard).toHaveLength(0)
+      const verdict = decided.at(0)?.verdict
+      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("about merging")
+      expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
+    })
+  })
+
+  test("an omitted review question reaches the owner instead of receiving an answer without text", async () => {
+    await withStartedTask(async (root) => {
+      await parkThroughGate(root, "run:\n  id: 01RUN\n  status: awaiting_approval\nreview-questions-omitted: question-5\ngate: review")
+      expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)).toMatchObject({ id: "question-5", text: "", asks: "unknown" })
+      const heard: Array<DeciderRequest> = []
+      const decided = await decideAll(root, heard)
+      expect(heard).toHaveLength(0)
+      const verdict = decided.at(0)?.verdict
+      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("carries no words")
+      expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
     })
   })
 
@@ -220,27 +237,30 @@ describe("the asked action of a no-mistakes review question", () => {
   })
 
   test.each([
-    ["merge the PR", "merging"],
-    ["delete the branch", "deleting"],
-    ["delete files outside the task", "deleting"],
-    ["log in", "logins"],
-    ["publish the release", "releasing"],
-    ["push the branch", "pushing"],
-    ["make the repository public", "going public"],
-    ["spend money", "spending"],
-    ["change the privacy policy", "legal text"],
-    ["change the screenshot", "a site's look"],
-    ["rotate the access token", "credentials"],
-    ["change security", "security"],
-    ["make it irreversible", "anything that cannot be undone"]
-  ])("a finding asking to %s reaches the owner instead of the decider", async (action, topic) => {
+    "inspect",
+    "go-public",
+    "share",
+    "merge the PR",
+    "delete the branch",
+    "delete files outside the task",
+    "log in",
+    "publish the release",
+    "push the branch",
+    "make the repository public",
+    "spend money",
+    "change the privacy policy",
+    "change the screenshot",
+    "rotate the access token",
+    "change security",
+    "make it irreversible"
+  ])("a finding with unrecognized action %s reaches the owner instead of the decider", async (action) => {
     await withStartedTask(async (root) => {
       await parkThroughGate(root, gateAsking("3,warning,,ask-user,Choose the next step.," + action))
       const heard: Array<DeciderRequest> = []
       const decided = await decideAll(root, heard)
       expect(heard).toHaveLength(0)
       const verdict = decided.at(0)?.verdict
-      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("about " + topic)
+      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("which orc does not know")
       expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
     })
   })

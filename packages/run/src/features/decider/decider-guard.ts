@@ -20,7 +20,6 @@ const deletingWork = new RegExp(
     + "|\\b(?:" + ownWork + ")\\b(?:\\s+\\w+){0,3}?\\s+(?:will|would|should|could|may|might|must|is|are|was|were|has|have|had|gets?|got)\\s+(?:been\\s+|be\\s+|get\\s+)?(?:" + deletedVerbs + ")\\b"
     + "|\\b(?:" + deletingVerbs + ")" + between + "\\s+[a-z][a-z0-9]*-\\d+\\b" + notAName
     + "|\\b(?:" + deletingVerbs + ")" + between + "\\s+(?:" + ownWork + ")\\b"
-    + "|\\b(?:" + deletingVerbs + ")" + between + "\\s+files?\\s+outside\\s+(?:the\\s+|this\\s+)?task\\b"
     + "|\\breset\\s+--hard|\\bhard[- ]reset|\\bbranch\\s+-D\\b|\\bstash\\s+(?:drop|clear)\\b|\\bclean\\s+-\\w*f|\\bcheckout\\s+--\\s+\\.|\\brestore\\s+\\.",
   "i"
 )
@@ -70,17 +69,17 @@ const askedActionReason = (asks: string): string | null => {
   }
   const named = actionWords.get(asks)
   return named === undefined
-    ? neverDecidedReason(asks)
+    ? "the review question asks the owner for the action " + JSON.stringify(asks) + ", which orc does not know, so orc hands it to the owner"
     : "the review question asks the owner to " + named + ", and orc hands every asked action to the owner"
 }
 
-const textReason = (text: string): string | null =>
-  text.trim() === "" ? "the question carries no words orc can check, so orc hands it to the owner" : neverDecidedReason(text)
-
 export const guardReason = (question: { readonly text: string; readonly asks?: string | undefined }, kind: "worker-question" | "review-question" | "review-finding"): string | null => {
-  if (kind === "worker-question") return textReason(question.text)
-  if (question.asks !== undefined) return askedActionReason(question.asks)
-  return kind === "review-finding" ? null : textReason(question.text)
+  if (question.text.trim() === "") return "the question carries no words orc can check, so orc hands it to the owner"
+  if (kind === "worker-question") return neverDecidedReason(question.text)
+  if (question.asks === undefined || question.asks === "unknown") {
+    return kind === "review-finding" ? null : neverDecidedReason(question.text)
+  }
+  return askedActionReason(question.asks)
 }
 
 export const askBackWords = (question: string): string =>

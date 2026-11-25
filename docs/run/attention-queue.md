@@ -24,18 +24,18 @@ Its policy is in `packages/run/agents/decider-policy.md`.
 No-mistakes names the action it asks of you in the `question_action` column of each `ask-user` finding and each `question-<id>` finding.
 Orc carries that value through `asking.json`, the run history and the parked question in the task file.
 When a review finding has no `question_action`, orc sends it to the decider without checking its description.
-When a review finding or question has a `question_action`, orc checks that action instead of the description.
+For a review finding, `question_action` values `none` and `unknown` also bypass the description check.
+For a review question, a missing or `unknown` action falls back to the topic check on its text.
+The action `none` bypasses the topic check.
 The actions `merge`, `delete`, `login`, `push`, and `release` go to you.
-Other actions go through the topic check, and an action that matches no topic goes to the decider.
+Any other action value goes to you because orc does not know it.
 
 ### The topic check
 
 No-mistakes writes `unknown` for an `ask-user` finding its reviewer did not classify.
-The topic check sends actions about deletion, security, credentials, merging, pushing, releasing, going public, spending, irreversible actions, site appearance, legal text, and logins to you.
-For a worker question, or a review question with no `question_action`, it reads the whole question, including context and reports of completed actions.
+The topic check sends questions about deletion, security, credentials, merging, pushing, releasing, going public, spending, irreversible actions, site appearance, legal text, and logins to you.
+For a worker question, or a review question with a missing or `unknown` action, it reads the whole question, including context and reports of completed actions.
 Those questions go to you if they name `merge conflicts` or say a step pushes a tag, even if they only ask whether to continue.
-For a review finding or question with a `question_action`, the check reads only the action.
-An `unknown` action matches no topic and goes to the decider.
 Going public means making something public, doing it publicly, or posting, announcing, emailing or sharing to an outside place such as a client, a channel or an issue.
 An upstream repository, issue or project, or a service such as a gist, Discord, Slack or Reddit, counts on its own.
 The word public or share alone, as in `public API`, does not count.
@@ -44,9 +44,8 @@ Singular change or edit counts after my, our, your, this, that, the local, or un
 The noun counts within three words after the verb without a joining word such as `in`, or before a past form such as `discarded`.
 Own work needs a helper verb before the past form, as in `will be discarded` or `will be scrapped`.
 A hard reset, `git reset --hard`, `git branch -D`, `git stash drop` or `clear`, `git clean -f`, `git checkout -- .` and `git restore .` also count.
-Deleting files outside the task also counts.
 The name `test runs` never counts as deleting work.
-A worker question or a review question without an action goes to you if it has no words at all.
+Any question or finding with no words goes to you, regardless of its action.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
 Rules and policy do not widen either check.
 
