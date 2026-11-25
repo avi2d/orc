@@ -40,7 +40,7 @@ const runVerdict = (run: CheckRun): CheckVerdict => {
 
 // GitHub keeps a cancelled run beside its re-run under one run and name, so only the newest run of each run and name speaks for the check.
 const actionsRunId = (run: CheckRun): string | undefined => run.detailsUrl?.match(/\/actions\/runs\/(\d+)(?:\/|$)/)?.[1]
-const runScope = (run: CheckRun): string => actionsRunId(run) ?? run.workflowName ?? ""
+const runScope = (run: CheckRun): string => run.workflowName ?? ""
 const newestRuns = (runs: ReadonlyArray<CheckRun>): ReadonlyArray<CheckRun> => {
   const newest = new Map<string, CheckRun>()
   for (const run of runs) {
