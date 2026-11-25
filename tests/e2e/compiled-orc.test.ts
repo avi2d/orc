@@ -136,8 +136,7 @@ describe("compiled orc", () => {
       expect(help.stdout).toContain("Usage: orc <command>")
 
       const beat = await orc(["beat", "--json"])
-      expect(beat.stderr).toBe("")
-      expect(beat.exitCode).toBe(0)
+      expect(beat).toMatchObject({ exitCode: 0, stderr: "" })
       expect(JSON.parse(beat.stdout)).toMatchObject({ schema: "orc.beat.v1", quota: { kind: "read", pick: "main" }, room: [], actions: [] })
 
       await seedRun(env.ORC_HOME)
@@ -186,7 +185,7 @@ describe("compiled orc", () => {
       expect(help.compiled).toEqual(help.source)
 
       const beat = await both(["beat", "--json"])
-      expect(beat.source.exitCode).toBe(0)
+      expect(beat.source).toMatchObject({ exitCode: 0, stderr: "" })
       expect(unstamped(beat.compiled)).toEqual(unstamped(beat.source))
 
       const show = await both(["show", "compiled-1", "--json"])

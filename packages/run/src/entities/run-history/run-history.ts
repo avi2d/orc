@@ -112,9 +112,9 @@ export const formatHistoryError = (error: unknown): string => {
   return String(error)
 }
 
-// Effect scope refuses node:path here, so a file URL resolves the override.
+// Effect scope refuses node:path here, so a file URL resolves the override; a URL reference would read a drive letter as a scheme.
 export const orcHomeDir = (override?: string): string =>
-  override === undefined || override === "" ? `${homedir()}/.orc` : fileURLToPath(new URL(override, pathToFileURL(process.cwd() + "/")))
+  override === undefined || override === "" ? `${homedir()}/.orc` : fileURLToPath(pathToFileURL(override))
 
 const runFactColumns: ReadonlyArray<string> = ["task TEXT", "machine TEXT", "worktree TEXT"]
 const stepAgentColumns: ReadonlyArray<string> = ["model TEXT", "thinking TEXT"]
