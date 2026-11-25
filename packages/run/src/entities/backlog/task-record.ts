@@ -3,6 +3,7 @@ import { Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 import { deciderAnswerKinds, OverturnedFront, parkedAnswerOf } from "./task-record-answer"
 import { ChoicesFront, choicesOf, type ParkedQuestion } from "./task-record-question"
+import { MergeRecord } from "./task-record-merge"
 
 export { isDeciderAnswer } from "./task-record-answer"
 export type { CaptainAnswer, DeciderAnswer, ParkedAnswer } from "./task-record-answer"
@@ -112,15 +113,6 @@ type TaskState =
   | { readonly kind: "taken"; readonly claim: Claim | null }
   | { readonly kind: "started"; readonly claim: Claim; readonly started: Started }
   | ClosedState
-
-export const MergeRecord = Schema.Struct({
-  basis: Schema.Literals(["captain-word", "yolo-green"]),
-  head: Schema.String,
-  green: Schema.Array(Schema.String),
-  stage: Schema.Literals(["updating", "checks-running", "conflicted", "check-failed", "merged"]),
-  detail: Schema.optional(Schema.String)
-})
-export type MergeRecord = typeof MergeRecord.Type
 
 export interface TaskRecord {
   readonly merge?: MergeRecord

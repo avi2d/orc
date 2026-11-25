@@ -87,7 +87,7 @@ The **Project** select shows runs for configured projects by default.
 Choose **All runs** in it to include runs from other projects.
 Opening a run of another project from the Inbox switches the **Project** select to **All runs**.
 A merged PR shows its run as Done, and a closed PR shows its run as Failed.
-The Approve step names each stage of a merge, as [Approve a run's PR](herdr-app-agents.md#approve-a-run-s-pr) says.
+The Approve step names each stage of a merge, as [Approve a run's PR](herdr-app-agents.md#approve-a-runs-pr) says.
 
 <div id="start-a-scratch-app"><span id="recapture-the-board-screenshots"></span><span id="change-the-mods"></span></div>
 

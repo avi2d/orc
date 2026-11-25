@@ -98,9 +98,9 @@ export type {
   Hold,
   Parked,
   TaskRecord,
-  MergeRecord,
   TaskPriority,
 } from "./task-record"
+export type { MergeRecord } from "./task-record-merge"
 export { answersAwaited, answerWait, decisionWait, missingOriginWait, type DeciderOwns } from "./task-wait"
 export {
   answerDecision,

@@ -52,7 +52,7 @@ When the PR is behind main, the button reads **Updating from main** and then **C
 If the command fails, the error appears under the button.
 If the update conflicts, **Merge conflict with main** appears there instead of the error.
 If a check is red, **Check failed** and the name of the check appear there instead.
-When the merge sends the task back, its card reads **Sent back** with the PR and the stage, such as **Sent back PR #48: Merge conflict**.
+When the merge sends the task back, its card reads **Sent back** with the PR and stage, such as **Sent back PR #48: Merge conflict**.
 When you send the task back yourself, Orc drops the recorded stage and the card reads **Sent back** with the PR alone.
 
 ### Read a run's changes

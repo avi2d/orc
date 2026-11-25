@@ -1,11 +1,12 @@
-import { Console, Duration, Effect, Ref, Schema, type FileSystem, type Path } from "effect"
+import { Console, Duration, Effect, Ref, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { BacklogError, backlogPaths, decisionRefusal, findTask, rewriteClosed, taskPr, type MergeRecord, type TaskFileError } from "../../entities/backlog/index"
+import { BacklogError, backlogPaths, decisionRefusal, findTask, taskPr, type TaskFileError } from "../../entities/backlog/index"
 import { isYolo, readDispatchConfig, readProjects } from "../../shared/config/index"
 import type { ConfigError } from "../../shared/config/index"
 import type { RunnerError } from "../../shared/process/index"
 import type { MergeBasis } from "../../entities/pull-request/index"
 import { checkRefusals, gh, greenChecks, ownerWordChanges, readChangedFiles, prPattern, type PullRequestView, readPullRequest, redChecks } from "../../entities/pull-request/index"
+import { approvedAt, type Approved, type Landing, recordStage, type SendBackForFix, writeMergeRecord, type MergeRequirements } from "./landing"
 import { branchUpdate, compare, refusal, refuse } from "./branch-update"
 import { clearPendingUpdate, readPendingUpdate, savePendingUpdate, type PendingUpdate } from "./pending-update"
 
@@ -22,45 +23,9 @@ const behindBy = (id: string, url: string, view: PullRequestView) =>
     return behind
   })
 
-type MergeRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 type MergeError = BacklogError | ConfigError | TaskFileError | RunnerError
 
 export type MergeOutcome = { readonly kind: "merged" | "updating"; readonly message: string }
-
-export type SendBackForFix = (words: string) => Effect.Effect<string, BacklogError | ConfigError | TaskFileError, MergeRequirements>
-
-interface Landing {
-  readonly root: string
-  readonly id: string
-  readonly url: string
-  readonly basis: MergeBasis
-  readonly sendBack: SendBackForFix
-  readonly progress: (message: string) => Effect.Effect<void>
-}
-
-interface Approved {
-  readonly head: string
-  readonly green: ReadonlyArray<string>
-}
-
-const approvedAt = (view: PullRequestView): Approved => ({ head: view.headRefOid, green: greenChecks(view) })
-
-const writeMergeRecord = (landing: Landing, merge: MergeRecord | null) =>
-  rewriteClosed<void>(landing.root, landing.id, (record) => {
-    if (taskPr(record) !== landing.url) {
-      return Effect.fail(new BacklogError({ detail: landing.id + " changed while orc merge was running" }))
-    }
-    if (merge === null && record.merge === undefined) {
-      return Effect.succeed({ kind: "keep", result: undefined })
-    }
-    const { merge: _earlier, ...rest } = record
-    return Effect.succeed({ kind: "write", record: merge === null ? rest : { ...rest, merge }, result: undefined })
-  }).pipe(
-    Effect.catch((error) => landing.progress("orc merge could not record its stage in " + landing.id + ": " + ("file" in error ? error.file + ": " : "") + error.detail))
-  )
-
-const recordStage = (landing: Landing, approved: Approved, stage: MergeRecord["stage"], detail?: string) =>
-  writeMergeRecord(landing, { basis: landing.basis, ...approved, stage, ...(detail === undefined ? {} : { detail }) })
 
 const checksMinutes = 20
 const checksTimeout = Duration.minutes(checksMinutes)
