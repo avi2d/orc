@@ -33,6 +33,7 @@ export interface Forge {
   readonly state?: "OPEN" | "CLOSED" | "MERGED"
   readonly checks?: ReadonlyArray<Rollup>
   readonly behind?: number
+  readonly files?: ReadonlyArray<string>
   readonly baseFiles?: ReadonlyArray<ChangedFile>
   readonly mergeRefusal?: string
   readonly update?: "updates" | "conflicts" | "head moved" | "reject duplicate"
@@ -99,6 +100,10 @@ export const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
     "  if [ -f \"$VIEWS/after-$n.json\" ]; then cat \"$VIEWS/after-$n.json\"; else cat \"$VIEWS/after-last.json\"; fi",
     "  exit 0",
     "fi",
+    "case \"$*\" in *'/files '*) cat <<'J'",
+    ...(forge.files ?? ["shared.txt"]).map((path) => JSON.stringify({ status: "modified", path, patch: "+example" })),
+    "J",
+    "exit 0;; esac",
     "case \"$*\" in *compare/main..." + newHead + "*)",
     "  case \"$*\" in *.behind_by) echo 0;; *) echo '{\"behind_by\":0,\"base_commit\":{\"sha\":\"" + baseHead + "\"},\"merge_base_commit\":{\"sha\":\"" + baseHead + "\"},\"files\":[]}';; esac",
     "  exit 0;; esac",
