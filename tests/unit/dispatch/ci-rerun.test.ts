@@ -109,6 +109,24 @@ describe("a red check on a ship task's PR", () => {
     })
   })
 
+  test("does not report an old failure while its queued rerun has no start time", async () => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      const asked: Array<ReadonlyArray<string>> = []
+      await route(root, asked)
+      const queued: PullRequestView = {
+        ...red,
+        statusCheckRollup: [
+          ...red.statusCheckRollup,
+          { workflowName: "ci", detailsUrl: details, name: "test", status: "QUEUED", conclusion: "", startedAt: "0001-01-01T00:00:00Z" }
+        ]
+      }
+      await route(root, asked, queued)
+      expect(asked).toHaveLength(1)
+      expect(await run(openItems(root))).toEqual([])
+    })
+  })
+
   test.each(["WAITING", "PENDING"])("opens a red item instead of holding indefinitely when a sibling job is %s", async (status) => {
     await withBacklog(async (root) => {
       await closeWithPr(root)
