@@ -334,7 +334,7 @@ const renewal = (action: BeatAction): boolean =>
 export const formatBeat = (report: BeatReport): string =>
   [
     report.beat + " at " + report.at,
-    describeQuota(report.quota),
+    describeQuota(report.quota, report.perTaskRouting),
     "room: " + (report.room.map((entry) => entry.machine + " " + entry.busy + " of " + entry.slots + " busy").join(", ") || "no machine"),
     ...report.actions.map(actionLine),
     ...(report.actions.every(renewal) ? ["no new task"] : [])

@@ -2,7 +2,7 @@ import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } fro
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
 import type { ConfigError } from "../../shared/config/index"
-import { type Account, type DispatchConfig, isYolo, type Machine, type Project, providerOf, readDispatchConfig, readProjects } from "../../shared/config/index"
+import { type Account, type DispatchConfig, isYolo, type Machine, type Project, providerOf, readDispatchConfig, readProjects, resolveDispatch, type RoutedModels } from "../../shared/config/index"
 import { type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
@@ -31,6 +31,7 @@ export interface BeatReport {
   readonly beat: string
   readonly at: string
   readonly quota: QuotaReading
+  readonly perTaskRouting?: true
   readonly room: ReadonlyArray<MachineRoom>
   readonly actions: ReadonlyArray<BeatAction>
 }
@@ -95,7 +96,7 @@ const startTask = (
   claim: Claim,
   place: Placed,
   credential: Credential,
-  models: Account["models"]
+  models: { readonly legacy: Account["models"]; readonly routed?: RoutedModels }
 ): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     const machine = place.machine
@@ -119,8 +120,9 @@ const startTask = (
       ORC_RUN_MACHINE: machine.name,
       ORC_TASK_PROVIDER: credential.provider,
       ORC_TASK_ACCOUNT: claim.account,
-      ORC_TASK_IMPLEMENTER_MODEL: models?.implementer ?? "",
-      ORC_TASK_FIXER_MODEL: models?.fixer ?? "",
+      ORC_TASK_IMPLEMENTER_MODEL: models.legacy?.implementer ?? "",
+      ORC_TASK_FIXER_MODEL: models.legacy?.fixer ?? "",
+      ORC_TASK_ROUTED_MODELS: models.routed === undefined ? "" : JSON.stringify(models.routed),
       ORC_TASK_TOKEN_FILE: credential.kind === "file" ? credential.tokenFile : "",
       ORC_TASK_CLAUDE_CONFIG_DIR: credential.kind === "claude-config" ? credential.configDirs[machine.name] ?? "" : ""
     }
@@ -152,10 +154,36 @@ interface BeatContext {
   readonly projects: ReadonlyArray<Project>
   readonly tasks: ReadonlyArray<TaskRecord>
   readonly merged: ReadonlySet<string>
-  readonly account: Account | null
+  readonly quota: QuotaReading
   readonly live: Array<{ readonly machine: string; readonly slots: number; busy: number }>
   readonly overloaded: ReadonlyMap<string, string>
   readonly tokens: TokenCache
+}
+
+type TaskRoute =
+  | { readonly kind: "waits"; readonly reason: string }
+  | { readonly kind: "selected"; readonly account: Account; readonly routed?: RoutedModels }
+
+const selectTaskRoute = (config: DispatchConfig, quota: QuotaReading, spec: TaskRecord["spec"]): TaskRoute => {
+  if (quota.kind === "unread") {
+    return { kind: "waits", reason: "no account has room" }
+  }
+  if (config.routing === undefined || spec.kind === "decision") {
+    const account = config.quota.accounts.find((entry) => entry.name === quota.pick)
+    return account === undefined ? { kind: "waits", reason: "no account has room" } : { kind: "selected", account }
+  }
+  const accounts = config.quota.accounts.flatMap((account) => {
+    const reading = quota.accounts.find((entry) => entry.account === account.name)
+    return reading?.kind === "usable" ? [{ name: account.name, provider: providerOf(config.quota, account), remainingPercent: reading.remainingPercent }] : []
+  })
+  const route = resolveDispatch(config.routing, { id: spec.id, kind: spec.kind, project: spec.project }, { floorPercent: quota.floorPercent, accounts })
+  if (route.kind === "waits") {
+    return route
+  }
+  const account = config.quota.accounts.find((entry) => entry.name === route.account)
+  return account === undefined
+    ? { kind: "waits", reason: "no account has room for the dispatch route" }
+    : { kind: "selected", account, routed: route.models }
 }
 
 const credentialFor = (
@@ -196,10 +224,11 @@ const considerTask = (
     if (placement.kind === "waits") {
       return waits(placement.reason)
     }
-    if (context.account === null) {
-      return waits("no account has room")
+    const route = selectTaskRoute(context.config, context.quota, task.spec)
+    if (route.kind === "waits") {
+      return waits(route.reason)
     }
-    const credential = yield* credentialFor(context, context.account)
+    const credential = yield* credentialFor(context, route.account)
     if (credential.kind === "waits") {
       return waits(credential.reason)
     }
@@ -215,8 +244,9 @@ const considerTask = (
     if (slot !== undefined) {
       slot.busy += 1
     }
-    const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: context.account.name, takenAt: yield* nowIso }
-    const action = yield* startTask(context.root, claimed.record, claim, placement, credential, context.account.models)
+    const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: route.account.name, takenAt: yield* nowIso }
+    const models = route.routed === undefined ? { legacy: route.account.models } : { legacy: undefined, routed: route.routed }
+    const action = yield* startTask(context.root, claimed.record, claim, placement, credential, models)
     if (slot !== undefined) {
       if (action.kind === "given-back") {
         slot.busy = slot.slots
@@ -359,7 +389,7 @@ export const runBeat = (
       projects,
       tasks,
       merged,
-      account: quota.kind === "read" ? (config.quota.accounts.find((account) => account.name === quota.pick) ?? null) : null,
+      quota,
       live: room.map((entry) => ({ ...entry })),
       overloaded: new Map(),
       tokens: new Map()
@@ -384,7 +414,7 @@ export const runBeat = (
     const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at, yoloTask(projects, task), home)).pipe(
       Effect.tap(() => pollBaseCi(root, sources.readBaseCi, projects, latest.map(taskPr).filter((url) => url !== null), at))
     )
-    return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
+    return { beat, at, quota, ...(config.routing === undefined ? {} : { perTaskRouting: true }), room: readRoom(config.machines, latest), actions: [
         ...reported,
         ...stalls.flatMap(Option.toArray),
         ...upstream,

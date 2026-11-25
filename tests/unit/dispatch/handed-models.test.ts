@@ -10,6 +10,8 @@ import { resolveAgentFile } from "../../../packages/run/src/entities/agent/index
 import { addTask, claimTask } from "../../../packages/run/src/entities/backlog/index"
 import { openDatabase, recordRun } from "../../../packages/run/src/entities/run-history/index"
 import { startTask } from "../../../packages/run/src/features/queueing-a-task/index"
+import { prepareRoles } from "../../../packages/run/src/features/running-a-task/run-prepare"
+import { RoutedModelsJson } from "../../../packages/run/src/shared/config/index"
 import { recordFixStart } from "../../../packages/run/src/features/running-a-task/history-write"
 import { configuredModels, routeOfAgents } from "../../../packages/run/src/shared/config/model-route"
 import type { OrcConfig } from "../../../packages/run/src/shared/config/orc-config"
@@ -64,6 +66,21 @@ describe("models the beat hands to orc run", () => {
     const run = await queuedRun({ ORC_TASK_IMPLEMENTER_MODEL: "keyed/coder-large", ORC_TASK_FIXER_MODEL: "keyed/coder-small" })
     const provider = run.indexOf("--provider")
     expect(run.slice(provider, provider + 6)).toEqual(["--provider", "keyed", "--implementer-model", "keyed/coder-large", "--fixer-model", "keyed/coder-small"])
+  })
+
+  test("routed role models survive queueing instead of falling back to the run settings", async () => {
+    const models = { implementer: "keyed/worker", fixer: "keyed/repair", reviewer: "keyed/check" }
+    const run = await queuedRun({ ORC_TASK_ROUTED_MODELS: JSON.stringify(models) })
+    const prefix = "ORC_DISPATCH_ROUTED_MODELS="
+    const route = Schema.decodeSync(RoutedModelsJson)(run.find((word) => word.startsWith(prefix))?.slice(prefix.length) ?? "")
+    const roles = await Effect.runPromise(prepareRoles(
+      { projectDir: "/unused/project", orcHome: "/unused/home", agentsDir: undefined },
+      { file: "config.json", models: { implementer: "legacy/worker", fixer: "legacy/repair" } },
+      "direct-PR", { implementerModel: undefined, fixerModel: undefined, implementerThinking: undefined, fixerThinking: undefined }, route
+    ).pipe(Effect.provide(BunServices.layer)))
+    expect({ implementer: roles.agent.model, fixer: roles.fixer.model, reviewer: roles.reviewer.kind === "direct-PR" ? roles.reviewer.reviewer.model : null }).toEqual(models)
+    expect(run).not.toContain("--implementer-model")
+    expect(run).not.toContain("--fixer-model")
   })
 
   test("with no models set the queued orc run carries no model flags", async () => {

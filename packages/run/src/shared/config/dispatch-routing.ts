@@ -16,6 +16,7 @@ export const RoutedModels = Schema.Struct({
     : "the implementer, fixer, and reviewer must use one provider"
 ))
 export type RoutedModels = typeof RoutedModels.Type
+export const RoutedModelsJson = Schema.fromJsonString(RoutedModels)
 
 const Candidate = Schema.Union([ModelRef, Schema.Struct({ models: RoutedModels, account: Schema.optionalKey(Name) })])
 const Candidates = Schema.NonEmptyArray(Candidate)

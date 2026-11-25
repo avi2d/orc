@@ -1,6 +1,6 @@
 import { Clock, DateTime, Effect, Result, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { duplicateOf } from "../../shared/config/index"
+import { duplicateOf, roomAtFloor } from "../../shared/config/index"
 import { type AccountReading, type CommandFailureCause, runQuotaCommand } from "./quota-command"
 import { decodeSubquo, isSubquoDocument, type SubquoFailureCause } from "./subquo"
 
@@ -126,7 +126,7 @@ const readAccounts = (document: unknown, settings: QuotaSettings): UnreadQuota |
 const choose = (accounts: ReadonlyArray<AccountReading>, settings: QuotaSettings): QuotaReading => {
   let pick: { readonly account: string; readonly remainingPercent: number } | null = null
   for (const reading of accounts) {
-    if (reading.kind === "usable" && reading.remainingPercent > 0 && reading.remainingPercent >= settings.floorPercent && reading.remainingPercent > (pick?.remainingPercent ?? -1)) {
+    if (reading.kind === "usable" && roomAtFloor(reading.remainingPercent, settings.floorPercent) && reading.remainingPercent > (pick?.remainingPercent ?? -1)) {
       pick = reading
     }
   }
@@ -156,7 +156,7 @@ export const readQuota = (
       : assessQuota(run.document, settings)
   })
 
-export const describeQuota = (reading: QuotaReading): string => {
+export const describeQuota = (reading: QuotaReading, perTaskRouting = false): string => {
   if (reading.kind === "unread") {
     return "quota unread: " + reading.reason
   }
@@ -165,6 +165,7 @@ export const describeQuota = (reading: QuotaReading): string => {
       ? account.account + " " + account.remainingPercent + "% left" + (account.resetsAt === undefined ? "" : " until " + account.resetsAt)
       : account.account + " unusable, " + account.reason
   )
-  const verdict = reading.pick === null ? "no account has room at or above the floor" : "runs use " + reading.pick
+  const verdict = reading.pick === null ? "no account has room at or above the floor"
+    : perTaskRouting ? "dispatch rules pick an account for each task" : "runs use " + reading.pick
   return "quota: " + accounts.join(", ") + ", floor " + reading.floorPercent + "%: " + verdict
 }
