@@ -163,7 +163,7 @@ export const attentionAnswerHelp: HelpEntry = {
 export const beatHelp: HelpEntry = {
   usage: ["orc beat [--json]"],
   summary: "Start what can start and close what finished",
-  about: "Reads the room on each machine, starts each task that waits on nothing, closes finished runs and relays answers. Run it from cron or launchd every few minutes.",
+  about: "Reads the room on each machine, starts each task that waits on nothing, closes finished runs and relays answers. Checks for Orc updates on dispatch machines at most once an hour. Run it from cron or launchd every few minutes.",
   options: [{ flag: "--json", meaning: "Print the beat as an orc.beat.v1 JSON document." }],
   examples: ["orc beat"]
 }
