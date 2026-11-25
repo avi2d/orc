@@ -14,7 +14,6 @@ export interface PullRequestOpener {
   readonly push: Effect.Effect<CommandReply>
   readonly existing: Effect.Effect<CommandReply>
   readonly create: (title: string, bodyFile: string) => Effect.Effect<CommandReply>
-  readonly checkRuns: (hostname: string, apiPath: string) => Effect.Effect<CommandReply>
 }
 
 export type DirectPrRecord =
@@ -46,8 +45,7 @@ export const subprocessPullRequestOpener = (host: PullRequestHost): PullRequestO
   fetch: spawnIn(host, host.git, ["fetch", "origin"]),
   push: spawnIn(host, host.git, ["push", "--set-upstream", "origin", host.branch]),
   existing: spawnIn(host, host.gh, ["pr", "list", "--head", host.branch, "--state", "open", "--json", "url", "--jq", ".[0].url // empty"]),
-  create: (title, bodyFile) => spawnIn(host, host.gh, ["pr", "create", "--head", host.branch, "--title", title, "--body-file", bodyFile]),
-  checkRuns: (hostname, apiPath) => spawnIn(host, host.gh, ["api", "--hostname", hostname, apiPath])
+  create: (title, bodyFile) => spawnIn(host, host.gh, ["pr", "create", "--head", host.branch, "--title", title, "--body-file", bodyFile])
 })
 
 const prUrlIn = (text: string): string | null => /https:\/\/\S+\/pull\/\d+/.exec(text)?.[0] ?? null

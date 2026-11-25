@@ -1,5 +1,5 @@
-import { Effect, type FileSystem } from "effect"
-import type { BacklogError } from "../backlog/index"
+import { Effect, FileSystem } from "effect"
+import { backlogPaths, type BacklogError } from "../backlog/index"
 import { checkRefusals, greenChecks, type PullRequestView, redChecks } from "../pull-request/index"
 import type { AttentionItem } from "./attention-item"
 import type { BeatAction } from "./beat-action"
@@ -31,18 +31,23 @@ export const withdrawUnreachedMachine = (root: string, task: string, at: string)
 export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.forEach(actions, (action) =>
     (action.kind === "closed" && action.outcome === "failed") || action.kind === "start-failed"
-      ? Effect.asVoid(openItem(root, itemId(action.task, "run-died", at), {
-        kind: "run-died",
-        task: action.task,
-        text: "the run on " + action.machine + " died: " + action.reason,
-        ...choice(
-          "the run of " + action.task + " on " + action.machine,
-          { text: "rerun", outcome: "orc backlog retry " + action.task + " returns the task to the backlog, and the next beat starts it" },
-          { text: "close", outcome: "the task stays closed failed, and no run starts" }
-        ),
-        asked: at,
-        owner: "user"
-      }))
+      ? Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const log = yield* fs.readFileString(backlogPaths(root).logFile(action.task)).pipe(Effect.orElseSucceed(() => ""))
+        const tail = log.slice(-4096).trim()
+        yield* openItem(root, itemId(action.task, "run-died", at), {
+          kind: "run-died",
+          task: action.task,
+          text: "the run on " + action.machine + " died: " + action.reason + (tail === "" ? "" : "\n\n" + tail),
+          ...choice(
+            "the run of " + action.task + " on " + action.machine,
+            { text: "rerun", outcome: "orc backlog retry " + action.task + " returns the task to the backlog, and the next beat starts it" },
+            { text: "close", outcome: "the task stays closed failed, and no run starts" }
+          ),
+          asked: at,
+          owner: "user"
+        })
+      })
       : Effect.void, { discard: true })
 
 export const pullRequestHeld = (root: string, task: string, head: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>

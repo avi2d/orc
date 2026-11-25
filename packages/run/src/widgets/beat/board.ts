@@ -282,6 +282,9 @@ const actionLine = (action: BeatAction): string => {
       return "closed " + action.task + " " + action.outcome + " on " + action.machine + ": " + action.reason + (action.pr === null ? "" : ", PR " + action.pr) +
         (action.report === null ? "" : ", report " + action.report)
     }
+    case "retry": {
+      return "retry " + action.task + " on " + action.machine + " from run " + action.run
+    }
     case "split": {
       return "split " + action.task + " on " + action.machine + " into " + action.children.join(", ") + ": " + action.reason
     }
@@ -312,6 +315,9 @@ const actionLine = (action: BeatAction): string => {
     }
     case "pr-unread": {
       return "cannot read the PR of " + action.task + " for the chat: " + action.reason
+    }
+    case "pr-checks": {
+      return "PR checks for " + action.task + ": " + action.reason
     }
     case "yolo-merged": {
       return "merged " + action.task + " " + action.pr + " on yolo-green"

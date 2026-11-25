@@ -164,12 +164,12 @@ describe("the beat applying a worker's split proposal", () => {
     })
   })
 
-  test("an invalid proposal closes the task failed instead of creating children", async () => {
+  test("an invalid proposal retries the task once instead of creating children", async () => {
     const reason = "invalid split proposal: printed no orc.split.v1 document"
     await beatAfterRun(reason, async (root, lines) => {
       const tasks = await run(listTasks(root))
-      expect(tasks.map((task) => [task.spec.id, task.spec.kind, task.state.kind])).toEqual([["orc-1", "ship", "closed"]])
-      expect(lines).toContain("closed orc-1 failed on mac: " + reason)
+      expect(tasks.map((task) => [task.spec.id, task.spec.kind, task.state.kind])).toEqual([["orc-1", "ship", "new"]])
+      expect(lines).toContain("retry orc-1 on mac from run run-1")
     })
   })
 

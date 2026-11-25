@@ -2,7 +2,7 @@ import { Array as Arr, Effect, type FileSystem } from "effect"
 import { type AttentionItem, readItem, reviewQuestionId } from "../attention/index"
 import { type BacklogError, type ParkedAnswer, type ParkedQuestion, type Rewrite, rewriteNew, type TaskRecord } from "../backlog/index"
 
-type Questions = Arr.NonEmptyReadonlyArray<ParkedQuestion>
+type Questions = ReadonlyArray<ParkedQuestion>
 
 const questionKinds: ReadonlySet<AttentionItem["kind"]> = new Set<AttentionItem["kind"]>(["review-question", "worker-question"])
 

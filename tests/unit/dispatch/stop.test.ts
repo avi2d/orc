@@ -429,7 +429,7 @@ describe("the beat's stale start", () => {
         .toBe("stopped:the run was stopped")
       expect(closed === undefined ? null : taskPr(closed)).toBe("https://github.com/example/orc/pull/7")
       expect(closed === undefined ? "" : renderTaskFile(closed)).toContain("pr: \"https://github.com/example/orc/pull/7\"")
-      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1"])
+      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1", "pr-checks:orc-1"])
     })
   })
   test("a fresh start with a failing close read waits for the next beat instead of closing failed", async () => {

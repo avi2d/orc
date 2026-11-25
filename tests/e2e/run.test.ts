@@ -291,7 +291,7 @@ describe("runWithHistory decides the implement step", () => {
         expect(outcome.report.fixAttempts).toBe(0)
         expect(outcome.report.checksRounds?.map((round) => round.passed)).toEqual([true])
         expect(outcome.run?.status).toBe("succeeded")
-        expect(outcome.run?.endReason).toBe("Pi made 1 commit on orc/test, and the checks passed. no-mistakes opened https://github.com/o/r/pull/7 and CI is green.")
+        expect(outcome.run?.endReason).toBe("Pi made 1 commit on orc/test, and the checks passed. no-mistakes opened https://github.com/o/r/pull/7.")
         expect(outcome.run?.prLink).toBe("https://github.com/o/r/pull/7")
         expect(outcome.steps).toEqual([{ name: "implement", status: "passed" }, { name: "checks", status: "passed" }, { name: "no-mistakes", status: "passed" }])
       })
@@ -391,7 +391,7 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
         expect(agentCalls.length).toBe(2)
         expect(agentCalls[1]).toContain("checks-1.txt")
         expect(agentCalls[1]).toContain("fix-1.log")
-        expect(outcome.run?.endReason).toBe("Pi made 2 commits on orc/test, and the checks passed. no-mistakes opened https://github.com/o/r/pull/7 and CI is green.")
+        expect(outcome.run?.endReason).toBe("Pi made 2 commits on orc/test, and the checks passed. no-mistakes opened https://github.com/o/r/pull/7.")
         expect(outcome.steps).toEqual([
           { name: "implement", status: "passed" },
           { name: "checks", status: "failed" },
