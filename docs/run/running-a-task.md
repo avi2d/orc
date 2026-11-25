@@ -47,13 +47,12 @@ A `node` runner started from a Yarn script is not confirmed as refused, as [What
 The no-mistakes review runs under the daemon's own `PATH`, so Orc starts no-mistakes with its local Test step skipped.
 The no-mistakes review and fix agents refuse test runs only when `~/.no-mistakes/config.yaml` holds `agent_path_override.<agent>` pointing at `~/.orc/heavy/agents/<agent>` for the agent no-mistakes runs, as [The no-mistakes review and fix agents](heavy-queue.md#the-no-mistakes-review-and-fix-agents) says.
 
-## Base updates and CI waits
+## Base updates and PR checks
 
 Orc starts no-mistakes without its preflight Rebase step.
 An existing task branch keeps its base during the run instead of rebasing just because the base moved.
 Orc skips the no-mistakes CI step and reads PR checks in the beat.
 When a pull request run exists, Orc tells workers not to start or rerun CI by hand.
-The beat reads PR checks after the run ends.
 
 ## Choose the run
 

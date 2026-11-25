@@ -7,6 +7,7 @@ import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 import type { RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead } from "./review-turn"
+import { beatReadsChecks } from "./checks"
 
 export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], priorDir: string | null): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
@@ -19,10 +20,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       yield* checkpoints.reviewDone(run.delivery.reviewer, review, reviewStarted, new Date().toISOString())
       const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
       const reviewed = checked + reviewSentence(review)
-      if (pr.status !== "opened") {
-        return { ...settled, completed: false, waitingOnCi: false, prLink: pr.prLink, endReason: reviewed + pr.result }
-      }
-      return { ...settled, completed: true, waitingOnCi: false, prLink: pr.prLink, endReason: reviewed + pr.result }
+      return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
     yield* checkpoints.noMistakesStart(new Date().toISOString())
     const waitSeconds = run.answerWaitSeconds ?? 0
@@ -31,13 +29,13 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       Effect.provideService(FileSystem.FileSystem, run.fs)
     )
     yield* checkpoints.noMistakesDone(noMistakes)
-    return { ...settled, completed: noMistakes.status === "passed", waitingOnCi: false, prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
+    return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
 const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>): string => {
   const passed = rounds.at(-1)?.checks.map((check) => check.name) ?? []
   const closing = passed.length === 0
-    ? "orc opened this PR without local checks or no-mistakes. GitHub CI decides completion.\n"
+    ? "orc opened this PR without local checks or no-mistakes. " + beatReadsChecks + "\n"
     : "orc opened this PR after " + passed.join(", ") + " passed, without no-mistakes.\n"
   return subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing
 }

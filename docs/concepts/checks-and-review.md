@@ -24,7 +24,8 @@ Follow the local check and GitHub CI policy in [Local checks and CI](../run/runn
 ## The review
 
 On a `no-mistakes` run, orc hands the checked branch to [no-mistakes](https://github.com/kunchenguid/no-mistakes) with the task as its intent.
-No-mistakes reviews the branch, pushes it, opens the pull request and reports when CI is green.
+No-mistakes reviews the branch, pushes it and opens the pull request.
+The beat reads the pull request's checks after the run ends.
 At each of its gates orc answers for you where it safely can.
 
 | Finding marked | What orc does |
@@ -47,7 +48,7 @@ A project's `mode` in `projects.json` decides how its ship tasks end.
 
 | Mode | How a ship task ends |
 | --- | --- |
-| `no-mistakes`, the default | Checks, then the no-mistakes review, then a pull request with green CI |
+| `no-mistakes`, the default | Checks, then the no-mistakes review, then a pull request |
 | `direct-PR` | Checks, then a [review turn that records findings without blocking](../run/delivery-modes.md), then orc pushes the branch and opens the pull request itself |
 | `no-mistakes-prod-only` | `direct-PR` for a task marked internal, `no-mistakes` for the rest |
 

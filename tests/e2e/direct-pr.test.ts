@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, recordingKinds, runDirectPrStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+import { runStatus } from "../../packages/run/src/entities/run-history/index"
+import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, recordingKinds, runDirectPrResume, runDirectPrStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const withOrigin = async (dir: string, use: (origin: string) => Promise<void>): Promise<void> => {
   const origin = await mkdtemp(join(tmpdir(), "orc-origin-"))
@@ -42,7 +43,6 @@ describe("a direct-PR run opens its own PR after the checks", () => {
             "pr create --head orc/test --title work --body-file " + bodyFile
           ])
           expect(outcome.report.completed).toBe(true)
-          expect(outcome.report.waitingOnCi).toBe(false)
           expect(outcome.report.noMistakes).toBeNull()
           expect(outcome.report.prLink).toBe(ghPrLink)
           expect(outcome.run?.prLink).toBe(ghPrLink)
@@ -60,20 +60,30 @@ describe("a direct-PR run opens its own PR after the checks", () => {
     })
   })
 
-  test.each(["success", "failure"])("a direct PR does not wait for a %s CI result", async (conclusion) => {
+  test("a test-only config records skipped checks instead of passed checks, also on resume", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         await withOrigin(dir, async () => {
           const sha = await readyToCheck(dir, home)
           await writeFile(join(dir, ".no-mistakes.yaml"), "commands:\n  test: forbidden-test-runner\n")
-          const checks = JSON.stringify({ total_count: 1, check_runs: [{ id: 1, name: "test", head_sha: sha, status: "completed", conclusion }] })
           const outcome = await runDirectPrStep(dir, home, sandboxResult(sha), async () => {
             throw new Error("a skipped test command must not start")
-          }, checks)
+          })
           expect(outcome.steps).toContainEqual({ name: "checks", status: "skipped" })
+          expect(outcome.report.checksRounds).toHaveLength(1)
+          expect(outcome.report.checksRounds?.[0]).toMatchObject({ passed: false, checks: [], failed: [] })
           expect(outcome.report.completed).toBe(true)
-          expect(outcome.report.waitingOnCi).toBe(false)
-          expect(callLines(outcome.ghCalls).some((line) => line.startsWith("api "))).toBe(false)
+          expect(runStatus(outcome.report)).toBe("completed")
+          expect(outcome.report.endReason).toContain("No local checks ran.")
+          expect(outcome.report.endReason).not.toContain("checks passed")
+          expect(await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8")).toContain("without local checks or no-mistakes")
+          const resumed = await runDirectPrResume(dir, home, sandboxResult(sha), async () => {
+            throw new Error("a resumed skipped test command must not start")
+          }, [])
+          expect(resumed.steps).toContainEqual({ name: "checks", status: "skipped" })
+          expect(resumed.report.checksRounds).toHaveLength(1)
+          expect(resumed.report.completed).toBe(true)
+          expect(runStatus(resumed.report)).toBe("completed")
         })
       })
     })
@@ -89,7 +99,6 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(callLines(outcome.ghCalls).some((line) => line.startsWith("pr create --head orc/test"))).toBe(true)
           expect(outcome.report.prLink).toBe(ghPrLink)
           expect(outcome.report.completed).toBe(true)
-          expect(outcome.report.waitingOnCi).toBe(false)
           expect(outcome.run?.status).toBe("succeeded")
         })
       })
