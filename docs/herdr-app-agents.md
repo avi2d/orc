@@ -9,10 +9,11 @@ Press `cmd-k` to open or close the chat drawer.
 ## Follow a run in the Agents tab
 
 The list shows runs and queued tasks, grouped by status.
-The Project row shows runs for configured projects by default.
-Choose All runs to include runs from other projects.
-Opening a run of another project from the Inbox switches the Project row to All runs.
-Pick a project or status to filter the list.
+The **Project** select shows runs for configured projects by default.
+Choose **All runs** in it to include runs from other projects.
+Opening a run of another project from the Inbox switches the **Project** select to **All runs**.
+Open the **Project** or **Status** select to filter the list.
+Each select shows its current choice and count, and its open list shows a count for every choice.
 A merged PR shows its run as Done.
 A closed PR shows its run as Failed.
 Select « to collapse the list and » to open it.
@@ -25,7 +26,8 @@ Select a step to read its output.
 
 Pi steps open in Turns, with a card for each reply.
 Select Raw to follow the log, or Turns to return to the cards.
-Steps without a Pi session show their log.
+Checks steps open in Summary, as [Read a Checks step](herdr-app.md#read-a-checks-step) describes.
+Other steps without a Pi session show their log.
 
 ![Agents tab with a running run's Agent step in the Turns view and its Changes column](images/herdr-agents-turns.png)
 

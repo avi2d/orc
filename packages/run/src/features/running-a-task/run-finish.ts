@@ -7,14 +7,14 @@ import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 import { ciWaitingQuestionId, type RunCheckpoints, type SandboxOps } from "./run-ops"
 import { recordOpenAsks } from "./history-write"
-import { reviewSentence, runReviewTurn } from "./review-turn"
+import { reviewSentence, reviewAtHead } from "./review-turn"
 
-export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]): Effect.Effect<OrcRunReport, OrcRunError> =>
+export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], priorDir: string | null): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + (rounds.at(-1)?.passed === true ? ", and the checks passed. " : ". No local checks ran. ")
     const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
     if (run.delivery.kind === "direct-PR") {
-      const review = yield* runReviewTurn(run, runAgent, run.delivery.reviewer)
+      const review = yield* reviewAtHead(run, runAgent, run.delivery.reviewer, priorDir)
       const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
       const reviewed = checked + reviewSentence(review)
       if (pr.status !== "opened") {

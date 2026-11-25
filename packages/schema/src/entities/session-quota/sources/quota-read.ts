@@ -1,6 +1,7 @@
 import { DateTime, Effect } from "effect";
 import { failureOf, type Reading } from "../../../shared/lib";
 import type { AccountCaptured } from "./capture";
+import { type OrcQuota, OrcQuotaSource } from "./orc-quota";
 import { type HarvestedReading, harvestedReadings } from "./harvest";
 import { type AccountJoin, nativeKeys } from "./account-join";
 import {
@@ -28,6 +29,13 @@ export interface QuotaRead {
   readonly accounts: ReadonlyArray<AccountRead>;
 }
 
+export type QuotaReadSources = QuotaSource | HarvestLogSource | OrcQuotaSource;
+
+export interface QuotaReadings {
+  readonly quota: QuotaRead;
+  readonly orcQuota: Reading<OrcQuota>;
+}
+
 type LoggedProvider = HarvestedReading["provider"];
 
 const loggedProviders = ["claude", "codex"] as const satisfies ReadonlyArray<LoggedProvider>;
@@ -47,10 +55,6 @@ const accountWindows = {
 // quota-axi reuses a reading only while it is younger than its --max-age, at most an hour, so a log reading that old asks quota-axi again.
 export const logFreshMillis = 3_600_000;
 
-export type SavedAge =
-  | { readonly kind: "dated"; readonly fetchedAt: DateTime.Utc; readonly ageSeconds: number }
-  | { readonly kind: "undated" };
-
 export const staleSourceAgeSeconds = (source: WindowSource, now: DateTime.Utc): number | undefined => {
   const readAt = source.kind === "quota-axi" ? source.readAt : source.observedAt;
   const ageMillis = DateTime.toEpochMillis(now) - DateTime.toEpochMillis(readAt);
@@ -59,14 +63,6 @@ export const staleSourceAgeSeconds = (source: WindowSource, now: DateTime.Utc): 
 
 export const savedAgeSeconds = (fetchedAt: DateTime.Utc, now: DateTime.Utc): number =>
   Math.max(0, Math.floor((DateTime.toEpochMillis(now) - DateTime.toEpochMillis(fetchedAt)) / 1000));
-
-// Saved profiles reuse quota-axi's bound on reuse: a profile read more than an hour ago reads stale.
-export const staleSavedAgeSeconds = (age: SavedAge, stale: boolean, now: DateTime.Utc): number | undefined => {
-  if (age.kind !== "dated") return undefined;
-  return stale || DateTime.toEpochMillis(now) - DateTime.toEpochMillis(age.fetchedAt) >= logFreshMillis
-    ? savedAgeSeconds(age.fetchedAt, now)
-    : undefined;
-};
 
 interface Covered {
   readonly shape: WindowShape;
@@ -161,6 +157,10 @@ export const readQuota: Effect.Effect<QuotaRead, never, QuotaSource | HarvestLog
   const accounts = read.captured.accounts.map((account) => accountRead(account, now));
   return { quotaAxi, logAccounts: choice.logAccounts, logReadings, accounts };
 });
+
+export const readQuotas: Effect.Effect<QuotaReadings, never, QuotaReadSources> = Effect.flatMap(OrcQuotaSource, (source) =>
+  Effect.all({ quota: readQuota, orcQuota: source.read }, { concurrency: "unbounded" }),
+);
 
 const providerRank = (entry: SourcedEntry): number => shownQuotaProviders.indexOf(entry.provider);
 

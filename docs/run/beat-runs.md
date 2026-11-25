@@ -53,4 +53,17 @@ A runner task with no new output for 30 minutes reports a stall.
 ### Beat JSON
 
 Run `orc beat --json` for the `orc.beat.v1` action document.
-It reports starts, closures, parked questions, stalls, upstream changes, and attention items.
+It reports starts, closures, parked questions, stalls, upstream changes, attention items, and the PRs the beat merged, is updating or did not merge, as `yolo-merged`, `yolo-updating` and `merge-refused`.
+
+## Merging a task's PR
+
+On a project with `"yolo": true`, the beat merges, through `orc merge` with `yolo-green`, the green PR of a ship task that closed done.
+The beat leaves a stopped or failed task's PR open.
+A PR with a red check or a check that has not reported stays open.
+The beat also leaves a PR open when you answered `hold` to its `pr-ready` item for the current head commit.
+The hold also covers Orc's pending branch update, but new work on the PR can lift it.
+Releases, deletions, workflow file changes, and secret changes wait for your merge word, and the PR's `pr-ready` item in `orc attention` names the change, as [Merging a task's PR](merging-a-tasks-pr.md#choose-a-merge-basis) describes.
+
+When the PR is behind its base and needs a branch update, `orc beat` prints a line that the update was requested.
+A later beat merges the PR once the new head's checks are green, so you run nothing.
+A merge the beat attempts and `orc merge` refuses shows in `orc beat` as a line naming the task and the reason.

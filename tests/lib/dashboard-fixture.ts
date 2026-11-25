@@ -1,6 +1,5 @@
 import { DateTime } from "effect";
 import {
-  decodeSavedProfiles,
   decodeComputeApps,
   decodeCpuUsage,
   decodeDf,
@@ -20,18 +19,16 @@ import {
 } from "@avi2dg/orc-schema";
 import { fixture } from "./fixtures";
 import { valueOf } from "./outcomes";
-import { orcQuotaReading, orcQuotaText } from "./orc-quota";
+import { orcQuotaReading, orcQuotaText, recordedOrcQuota } from "./orc-quota";
 import { quotaAxiRead } from "./quota-read";
 
 export const dashboardNow = DateTime.makeUnsafe("2026-10-13T20:18:16Z");
 
-export const quotaBlocksOf = (quotaText: string, orcQuota: string = orcQuotaText("second-login-expired")): ReadonlyArray<QuotaBlock> => {
+export const quotaBlocksOf = (quotaText: string, orcQuota: string = orcQuotaText(recordedOrcQuota)): ReadonlyArray<QuotaBlock> => {
   const quota = decodeQuota(quotaText);
-  const savedProfiles = decodeSavedProfiles(fixture("saved-profiles/status.json"));
-  if (quota.kind !== "ok" || savedProfiles.kind !== "ok") throw new Error("the fixtures do not decode");
+  if (quota.kind !== "ok") throw new Error("the fixtures do not decode");
   return quotaBlocks(
     quotaAxiRead({ ...quota, capturedAt: dashboardNow }),
-    { ...savedProfiles, capturedAt: dashboardNow },
     orcQuotaReading(orcQuota, dashboardNow),
     dashboardNow,
   );

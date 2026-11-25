@@ -23,7 +23,7 @@ const RunSummary = Schema.Struct({
   status: RunStatusSchema,
   prLink: Schema.NullOr(Schema.String),
   endReason: Schema.NullOr(Schema.String),
-  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String), asking: Schema.optional(Schema.String), blocks: Schema.optional(Schema.Boolean), options: Schema.optional(Schema.Array(AskOption)), recommendation: Schema.optional(Schema.String), owner: Schema.optional(Schema.Literal("user")) })),
+  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String), asking: Schema.optional(Schema.String), blocks: Schema.optional(Schema.Boolean), options: Schema.optional(Schema.Array(AskOption)), recommendation: Schema.optional(Schema.String), asks: Schema.optional(Schema.String), owner: Schema.optional(Schema.Literal("user")) })),
   report: Schema.optional(Schema.String),
   asking: Schema.optional(Asking),
   failing: Schema.optional(FailingMark),
@@ -235,7 +235,7 @@ const runLogAt = (home: string, runId: string): Effect.Effect<string | null, nev
     const names = yield* fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
     let latest: string | null = null
     for (const name of names) {
-      if (name !== "agent.log" && name !== gateLogFileName && !/^fix-.*\.log$/.test(name) && !/^checks-.*\.txt$/.test(name)) {
+      if (name !== "agent.log" && name !== gateLogFileName && !/^fix-.*\.log$/.test(name) && !/^review-\d+\.log$/.test(name) && !/^checks-.*\.txt$/.test(name)) {
         continue
       }
       const info = yield* fs.stat(dir + "/" + name).pipe(Effect.orElseSucceed(() => null))

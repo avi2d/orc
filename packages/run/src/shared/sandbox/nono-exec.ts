@@ -4,6 +4,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { homedir } from "node:os"
 import { agentEnv, type AgentExec } from "./agent-exec"
 import { isStandinDir } from "./standin-dir"
+import { toolTimeCap } from "./tool-time-cap"
 import { NonoProviderError, prepareSandboxShims, resolveDeveloperDir, resolveHostBinary, resolvePiAgentDir, resolveRuntime } from "./host"
 import { buildHostGitEnv, checkProfile, refuseCredentialBearingCheckout, resolveRoots, sandboxEnv, sandboxRuntimes, standinDirsOf } from "./nono"
 import { defaultToolchainResolver, selectNonoProfile, type ModelCredential, type ToolchainResolver } from "./nono-profile"
@@ -74,9 +75,11 @@ export const openNonoExec = (
     const profileDir = yield* fs.makeTempDirectoryScoped({ prefix: "orc-nono-" })
     const profilePath = path.join(profileDir, "profile.json")
     const standins = yield* standinReads(fs, hostEnv.PATH, options.standinHelper)
-    const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: [...toolchain.folders, ...checksCacheReads(path, hostEnv)], runtimeDirs, ...standins }, options.modelCredential)
+    const piExtension = yield* toolTimeCap(fs, path, hostEnv.HOME || homedir())
+    const readFiles = [...standins.standinFiles, ...(piExtension === null ? [] : [piExtension])]
+    const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: [...toolchain.folders, ...checksCacheReads(path, hostEnv)], runtimeDirs, ...standins, standinFiles: readFiles }, options.modelCredential)
     yield* fs.writeFileString(profilePath, `${JSON.stringify(profile, null, 2)}\n`)
-    yield* checkProfile(spawner, nono, profilePath, [profileDir, nonoBinary, path.dirname(nonoBinary), ...standins.standinFolders, ...standins.standinFiles])
+    yield* checkProfile(spawner, nono, profilePath, [profileDir, nonoBinary, path.dirname(nonoBinary), ...standins.standinFolders, ...readFiles])
     yield* fs.makeDirectory(sandboxed.TMPDIR, { recursive: true })
-    return { kind: "nono", cwd: roots.worktree, env, nonoBinary, profilePath } as const
+    return { kind: "nono", cwd: roots.worktree, env, nonoBinary, profilePath, piExtension } as const
   })

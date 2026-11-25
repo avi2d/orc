@@ -2,7 +2,7 @@ import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } fro
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
 import type { ConfigError } from "../../shared/config/index"
-import { type Account, type DispatchConfig, type Machine, type Project, providerOf, readDispatchConfig, readProjects } from "../../shared/config/index"
+import { type Account, type DispatchConfig, isYolo, type Machine, type Project, providerOf, readDispatchConfig, readProjects } from "../../shared/config/index"
 import { type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
@@ -328,6 +328,9 @@ const decideAndRelay = (
     return { latest, relayed }
   })
 
+const yoloTask = (projects: ReadonlyArray<Project>, task: TaskRecord): boolean =>
+  projects.some((project) => project.name === task.spec.project && isYolo(project))
+
 export const runBeat = (
   root: string,
   home: string,
@@ -374,7 +377,7 @@ export const runBeat = (
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task))
     yield* openRunDeaths(root, actions, at).pipe(Effect.andThen(writeBeatWaits(root, at, roomWaits(queued, actions, fresh.tasks, fresh.merged, deciderOwns))))
-    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at)).pipe(
+    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at, yoloTask(projects, task), home)).pipe(
       Effect.tap(() => pollBaseCi(root, sources.readBaseCi, projects, latest.map(taskPr).filter((url) => url !== null), at))
     )
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [

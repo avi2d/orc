@@ -1,16 +1,10 @@
 import type { DateTime } from "effect";
 import { type Failed, failureOf, type Reading } from "../../../shared/lib";
+import { keysOf } from "../sources/account-join";
 import type { OrcQuota, OrcQuotaAccount, OrcQuotaUnreadCause } from "../sources/orc-quota";
-import type { SavedProfiles } from "../sources/saved-profiles";
 import type { QuotaAvailability, QuotaProvider, QuotaProviderId } from "../sources/quota";
-import { type AccountRead, type QuotaRead, type SavedAge, sourcedEntries } from "../sources/quota-read";
+import { type AccountRead, type QuotaRead, sourcedEntries } from "../sources/quota-read";
 import type { SourcedEntry, SourcedProvider, SourcedWindow } from "../sources/window-sources";
-
-export interface SavedWindow {
-  readonly label: string;
-  readonly percentLeft: number;
-  readonly resetsAt: DateTime.Utc | null;
-}
 
 export const accountStandings = ["next", "spare", "under-floor", "used-up"] as const;
 
@@ -25,13 +19,6 @@ export type QuotaBlockBody =
       readonly state: QuotaProvider["state"];
       readonly windows: ReadonlyArray<SourcedWindow>;
       readonly exhaustion: ReadonlyArray<QuotaAvailability>;
-    }
-  | {
-      readonly kind: "saved";
-      readonly plan: string | null;
-      readonly stale: boolean;
-      readonly age: SavedAge;
-      readonly windows: ReadonlyArray<SavedWindow>;
     }
   | {
       readonly kind: "account";
@@ -61,15 +48,23 @@ const liveBody = (entry: SourcedProvider): QuotaBlockBody => ({
   exhaustion: entry.quotaSemantics?.effectiveAvailability ?? [],
 });
 
-// quota-axi fills "default" for single-account providers once any provider expands.
-const accountSuffix = (entry: SourcedEntry): string =>
-  entry.accountKey === undefined || entry.accountKey === "default" ? "" : ` ${entry.accountKey}`;
+const namedKey = (key: string | undefined): string | undefined => key === "default" ? undefined : key;
 
-const providerTitle = (provider: QuotaProviderId, activeClaude: string | null): string =>
-  provider === "claude" && activeClaude !== null ? `claude ${activeClaude}` : provider;
+const dispatchAccountName = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>, entries: ReadonlyArray<SourcedEntry>): string | undefined => {
+  if (entry.provider !== "claude" || orcQuota.kind !== "ok" || orcQuota.value.kind !== "read") return undefined;
+  const { accounts } = orcQuota.value;
+  const keys = keysOf(entry);
+  const matches = accounts.filter(({ account }) => keys.includes(account));
+  if (matches.length === 1) return matches[0]?.account;
+  return accounts.length === 1 && entries.filter((candidate) => candidate.provider === "claude").length === 1
+    ? accounts[0]?.account
+    : undefined;
+};
 
-export const accountTitle = (entry: SourcedEntry, activeClaude: string | null): string =>
-  `${providerTitle(entry.provider, activeClaude)}${accountSuffix(entry)}`;
+export const accountTitle = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>, entries: ReadonlyArray<SourcedEntry>): string => {
+  const name = dispatchAccountName(entry, orcQuota, entries) ?? namedKey(entry.accountKey);
+  return name === undefined ? entry.provider : `${entry.provider} ${name}`;
+};
 
 // orc quota names no provider for an account, so every account block takes the Claude tint.
 const orcAccountProvider: QuotaProviderId = "claude";
@@ -132,18 +127,17 @@ const accountBlock = (account: AccountRead): QuotaBlock => ({
 
 export const quotaBlocks = (
   read: QuotaRead,
-  savedProfiles: Reading<SavedProfiles>,
   orcQuota: Reading<OrcQuota>,
   now: DateTime.Utc,
 ): ReadonlyArray<QuotaBlock> => {
-  const active = savedProfiles.kind === "ok" ? savedProfiles.value.active_profile : null;
+  const entries = sourcedEntries(read, now);
   const context: LiveContext = {
-    entries: sourcedEntries(read, now),
+    entries,
     notSetUp: read.quotaAxi.kind === "ok" ? read.quotaAxi.value.notSetUp : [],
-    title: (entry) => accountTitle(entry, active),
+    title: (entry) => accountTitle(entry, orcQuota, entries),
   };
   return [
-    ...liveBlocks("claude", providerTitle("claude", active), context),
+    ...liveBlocks("claude", "claude", context),
     ...read.accounts.map(accountBlock),
     ...orcQuotaBlocks(orcQuota),
     ...liveBlocks("codex", "codex", context),

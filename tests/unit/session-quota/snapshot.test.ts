@@ -381,10 +381,10 @@ describe("the live session quota panel inside the terminal's rows where flags de
       const lines = sessionPanelWithin(Option.some(fiveHourAheadSessionView()), width, rows, Number.POSITIVE_INFINITY).map(plain);
       const flags = lines.filter((row) => row.startsWith("⚑"));
       expect(flags).toEqual([
-        expect.stringMatching(/w1A:p2 5h claude main/u),
-        expect.stringMatching(/w1A:p2 7d claude main/u),
-        expect.stringMatching(/w2B:p2 7d claude main/u),
-        expect.stringMatching(/pid 4242 7d claude main/u),
+        expect.stringMatching(/w1A:p2 5h claude/u),
+        expect.stringMatching(/w1A:p2 7d claude/u),
+        expect.stringMatching(/w2B:p2 7d claude/u),
+        expect.stringMatching(/pid 4242 7d claude/u),
         expect.stringMatching(/w2B:p2 31d opencode-go/u),
       ]);
     });
@@ -395,7 +395,7 @@ describe("the live session quota panel inside the terminal's rows where flags de
     return {
       ...view,
       accounts: view.accounts.flatMap((account) => {
-        if (account.title !== "claude main" || account.body.kind !== "windows") return [];
+        if (account.provider !== "claude" || account.body.kind !== "windows") return [];
         const found = account.body.windows.find((window) => window.id === "seven_day");
         if (found === undefined) return [];
         const week = { ...found, sessions: found.sessions.map((row) => ({ ...row, flagged: row.session.id === "pane:w1A:p2" })) };

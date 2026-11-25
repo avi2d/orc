@@ -13,13 +13,6 @@ export {
 export { runDecoded, sourceOf, stamped, type Source } from "./shared/lib";
 export * from "./entities/resources";
 export {
-  type SavedProfile,
-  SavedProfilesSource,
-  type SavedProfiles,
-  savedProfilesSourceLayer,
-  decodeSavedProfiles,
-} from "./entities/session-quota";
-export {
   decodeOrcQuota,
   type OrcQuota,
   type OrcQuotaAccount,
@@ -41,7 +34,7 @@ export {
   quotaSourceLayer,
   shownQuotaProviders,
 } from "./entities/session-quota";
-export { logFreshMillis, type QuotaRead, readQuota, savedAgeSeconds, staleSavedAgeSeconds, staleSourceAgeSeconds } from "./entities/session-quota";
+export { logFreshMillis, type QuotaRead, readQuota, savedAgeSeconds, staleSourceAgeSeconds } from "./entities/session-quota";
 
 export {
   type MachineSize,
@@ -145,7 +138,7 @@ export { type TaskHistoryMachine, RemoteTaskHistory, remoteTaskHistoryLayer } fr
 export { type TaskLiveMachine, RemoteTaskLive, remoteTaskLiveLayer } from "./entities/task-board";
 export { readBeside } from "./shared/config";
 
-export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaPanelSources, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./entities/session-quota";
+export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./entities/session-quota";
 export { sessionQuotaOf, type SessionQuotaSources, sessionQuotaSourcesLayer, type SessionSources, sessionSourcesLayer } from "./entities/session-quota";
 export { ComposedSessionQuotaReport } from "./entities/session-quota";
 export { composedSessionQuotaReport } from "./entities/session-quota";
@@ -279,5 +272,5 @@ export { type AttentionItem, type AttentionQueue, AttentionSource, attentionSour
 
 export { type NoMistakesMachine, NoMistakesMachines, noMistakesMachinesLayer, type OrcMachine, OrcMachines, orcMachinesLayer } from "./entities/task-pipeline";
 
-export { type AccountStanding, accountStandings, quotaBlocks, type QuotaBlock, type QuotaBlockBody, type SavedAge, type SavedWindow } from "./entities/session-quota";
+export { type AccountStanding, accountStandings, quotaBlocks, type QuotaBlock, type QuotaBlockBody } from "./entities/session-quota";
 export * from "./features/panel-feeds";

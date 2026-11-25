@@ -17,12 +17,11 @@ Run one task by hand, to see a run from the task file to its pull request before
 
 To put the `orc` command on your PATH:
 
-1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
-1. Run `cd orc && bun install --frozen-lockfile` to install the pinned dependencies.
-1. Run `cd packages/run && bun link` to link the command.
+1. Run `bun add -g @avi2dg/orc` to install the npm package.
 1. Run `orc --version` to check it.
 
 Orc prints `orc` and its version.
+To upgrade orc later, run `bun add -g @avi2dg/orc` again.
 
 ## Name a provider and its models
 

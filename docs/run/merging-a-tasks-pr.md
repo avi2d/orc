@@ -76,3 +76,13 @@ The chat merges with `captain-word` only when you said to merge that PR.
 It merges with `yolo-green` when you ask it to merge a yolo project's PR and the PR is green.
 Orc refuses `yolo-green` for a project without `yolo` true.
 Either basis meets every refusal above.
+
+`yolo-green` also reads the PR's changed files from the GitHub pull request files API and refuses a change that waits for your merge word:
+
+- A release, which changes `CHANGELOG.md`, or changes a `version` line in a `package.json`, `Cargo.toml`, `pyproject.toml`, `setup.cfg` or `*.gemspec`.
+- A deletion, which removes a file.
+- A workflow file change under `.github/workflows/`.
+- A secret change, to a file named `.env`, `.env.<name>`, `*.env`, `.envrc`, `id_rsa`, `id_ed25519`, `.npmrc`, `.netrc`, `credentials.json`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, or a name with `secret` in it.
+
+Each such refusal ends `which waits for the captain's merge word`.
+The beat also merges a yolo project's green PR by itself, as [Merging a task's PR](beat-runs.md#merging-a-tasks-pr) in the beat reference describes.

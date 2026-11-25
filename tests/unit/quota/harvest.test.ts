@@ -11,7 +11,6 @@ import { fixture } from "../../lib/fixtures";
 import { claudeLogRelative, readBeforeHarvest, rolloutRelative } from "../../lib/harvest-fixture";
 import { quotaAxiJsonFor } from "../../lib/quota-read";
 import { recordedOrcQuotaLayer } from "../../lib/orc-quota";
-import { recordedSavedProfilesLayer } from "../../lib/saved-profiles";
 
 let home = "";
 
@@ -47,11 +46,10 @@ const printed = async (quotaJson: string, env: Readonly<Record<string, string>> 
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
-          Layer.merge(quotaSourceLayer, recordedSavedProfilesLayer).pipe(
+          quotaSourceLayer.pipe(
             Layer.provide(
               Layer.succeed(CommandRunner, {
                 run: (command) => {
-                  if (command.argv[0] !== "quota-axi") return Effect.succeed(fixture("saved-profiles/status.json"));
                   quotaAxiAsked.push(command.argv);
                   return Effect.succeed(quotaAxiJsonFor(command.argv, quotaJson));
                 },
@@ -59,7 +57,7 @@ const printed = async (quotaJson: string, env: Readonly<Record<string, string>> 
             ),
           ),
           harvestLogSourceLive.pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ...env })))),
-          recordedOrcQuotaLayer(),
+          recordedOrcQuotaLayer("second-login-expired"),
           TestConsole.layer,
           TestClock.layer(),
         ),
@@ -83,7 +81,7 @@ describe("the printed quota frame over harness logs on disk", () => {
     expect(quotaAxiAsked).toEqual([["quota-axi", "--full", "--json", "--provider", "claude,opencode-go", "--max-age", "5m"]]);
     const rows = rowsOf(frame);
     expect(rows.slice(0, 6)).toEqual([
-      "● claude main · max",
+      "● claude second · max",
       "  week from claude code log 18m ago · assumed the only login",
       "  session, fable from quota-axi 1h 18m ago",
       expect.stringMatching(/^session read 1h 18m ago$/u),
@@ -131,7 +129,7 @@ describe("the printed quota frame over harness logs on disk", () => {
   test("takes no Claude reading from the logs while an OAuth token selects the Claude account", async () => {
     const { frame } = await printed(readBeforeHarvest(fixture("quota-axi/full.json")), { CLAUDE_CODE_OAUTH_TOKEN: "token" });
     const rows = rowsOf(frame);
-    expect(rows.slice(0, 2)).toEqual(["● claude main · max", expect.stringMatching(/^session read 1h 18m ago$/u)]);
+    expect(rows.slice(0, 2)).toEqual(["● claude second · max", expect.stringMatching(/^session read 1h 18m ago$/u)]);
     expect(rows).toContainEqual(expect.stringMatching(/^week +read 1h 18m ago$/u));
   });
 

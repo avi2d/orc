@@ -34,6 +34,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/widgets/beat/load.ts` | The five minute load reading and the overloaded machines |
 | `packages/run/src/widgets/beat/stall.ts` | The stalled run flag kept in the backlog logs |
 | `packages/run/src/widgets/beat/task-events.ts` | The stall and PR events the beat records for every task |
+| `packages/run/src/widgets/beat/yolo-merge.ts` | The beat's merge of a green done task's PR on a yolo project, through `orc merge` with `yolo-green` |
 | `packages/run/src/widgets/beat/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `packages/run/src/widgets/beat/upstream.ts` | The beat’s read of each project’s upstream contributions and the scout task a change adds |
 | `packages/run/src/widgets/beat/beat-attention.ts` | The beat attention pass: the actions it reports and queues and the questions the decider owns |
@@ -70,6 +71,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/features/chat/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
 | `packages/run/src/features/chat/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
+| `packages/run/src/features/chat/chat-tools-bundle.ts` | The chat tools as one JavaScript file, which is `null` from source and which the compile step replaces with the embedded bundle |
 | `packages/run/src/features/chat/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
 | `packages/run/src/features/chat/chat-board.ts` | The chat's decision boards: the cards, the answers they record and the listing at each start |
 | `packages/run/src/features/chat/chat-board-page.ts` | The decision board page and the record of its cards |
@@ -87,7 +89,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/decider/decider.ts` | The decider: one call per open question it owns with the rules it reads, its reply checked as an answer on a quoted rule, an ask back, a duplicate link or an escalation, and that decision recorded on the item |
-| `packages/run/src/features/decider/decider-guard.ts` | The fixed list of topics orc never hands the decider, and the words an ask back hands the worker |
+| `packages/run/src/features/decider/decider-guard.ts` | The asked actions and the fixed list of topics orc never hands the decider, and the words an ask back hands the worker |
 | `packages/run/src/features/decider/decider-ask.ts` | The decider's call, Pi on `models.decider` with the policy as its system prompt and no tools |
 | `packages/run/src/features/decider/recommended.ts` | The recommended-option override for review questions with a `Recommended:` line |
 | `packages/run/src/features/decider/quoted-source.ts` | The check that a quoted rule is a whole clause of a rule the decider read |
@@ -221,13 +223,14 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/entities/heavy-queue/heavy.ts` | The heavy settings, the stand in folder and the default heavy tool list |
-| `packages/run/src/entities/heavy-queue/heavy-setup.ts` | The reading of the heavy settings and the writing of the stand in folder |
-| `packages/run/src/entities/heavy-queue/heavy-standin.ts` | The three line stand in launchers that start the helper for each heavy tool |
+| `packages/run/src/entities/heavy-queue/heavy-setup.ts` | The reading of the heavy settings and the writing of the stand in folder and of the `ci-only.bash` guard file |
+| `packages/run/src/entities/heavy-queue/heavy-standin.ts` | The three line stand in launchers that start the helper for each heavy tool, and the `BASH_ENV` guard script |
+| `packages/run/src/entities/heavy-queue/heavy-agent-wrapper.ts` | The agent wrappers that start a no-mistakes review or fix agent under `HEAVY_TESTS_CI_ONLY=1` and the stand in folders |
 | `packages/run/src/entities/heavy-queue/heavy-classify.ts` | The per tool decision of which calls queue and which targeted calls take priority |
 | `packages/run/src/entities/heavy-queue/heavy-standin-main.ts` | The helper a stand in launcher starts by the real bun path, and the waiter a queued pueue task starts. `packages/run/scripts/build-heavy-standin.ts` compiles it with Bun bytecode into `packages/run/dist/heavy-standin` |
 | `packages/run/src/entities/heavy-queue/heavy-standin-exec.ts` | The helper's run of a call: the classify probe, the real tool as a child, the through command and the queued call waiter |
 | `packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts` | The stand in runtime: the helper command, which a compiled stand in makes its own file, the real tool lookup, the bypass event, the plan of a call and the queue wait |
-| `packages/run/src/entities/heavy-queue/heavy-standin-refusal.ts` | The refusal of a test run, or of a Bun runtime override, under `HEAVY_TESTS_CI_ONLY=1` |
+| `packages/run/src/entities/heavy-queue/heavy-standin-refusal.ts` | The refusal of a test run, of a test runner called by path, or of a Bun runtime override, under `HEAVY_TESTS_CI_ONLY=1` |
 | `packages/run/src/entities/heavy-queue/heavy-runner-entry.ts` | The reading of the script file a `bun` or `node` call starts, to find a test runner bin, and the check for Bun runtime overrides |
 | `packages/run/src/entities/heavy-queue/heavy-process-tree.ts` | The process tree walk that finds a call inside a held slot or under the through command |
 | `packages/run/src/entities/heavy-queue/heavy-pueue-task.ts` | The reading of pueue status and log JSON for the queue wait and the exit code |
@@ -250,6 +253,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/entities/pull-request/pr-view.ts` | The `gh pr view` reading of a task's PR and its check verdicts |
 | `packages/run/src/entities/pull-request/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |
+| `packages/run/src/entities/pull-request/changed-files.ts` | The PR's changed files from the GitHub files API and the changes that wait for the captain's merge word |
 | `packages/run/src/entities/pull-request/direct-pr.ts` | The direct PR opener: the push, the existing check and the create, and the opened or failed record |
 
 ## entities/review-gate

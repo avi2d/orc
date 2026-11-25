@@ -32,3 +32,14 @@ export const refusedTest = (tool: string, args: ReadonlyArray<string>, cwd: stri
   process.stderr.write(testRefusal(command, runner) + "\n")
   return true
 }
+
+const assignmentWord = /^[A-Za-z_][A-Za-z0-9_]*=/
+const prefixWords: ReadonlySet<string> = new Set(["exec", "command"])
+const projectRunner = /(?:^|\/)node_modules\/\.bin\/([^/]+)$/
+
+export const refusedPathCall = (command: string, cwd: string): boolean => {
+  const words = command.trim().split(/\s+/).map((word) => word.replaceAll(/["']/g, ""))
+  const start = words.findIndex((word) => !assignmentWord.test(word) && !prefixWords.has(word))
+  const tool = projectRunner.exec(words[start] ?? "")?.[1]
+  return tool !== undefined && refusedTest(tool, words.slice(start + 1), cwd)
+}

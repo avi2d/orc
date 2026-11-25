@@ -1,26 +1,63 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { decodeOrcQuota, decodeQuota, decodeSavedProfiles, type OrcQuota, type QuotaBlock, quotaBlocks, type Reading } from "@avi2dg/orc-schema";
+import { decodeOrcQuota, decodeQuota, type OrcQuota, type QuotaBlock, quotaBlocks, type Reading, sessionQuotaView } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { type OrcQuotaFixture, orcQuotaOf, orcQuotaReading } from "../../lib/orc-quota";
 import { quotaAxiRead } from "../../lib/quota-read";
+import { ledgerOf } from "../../lib/quota-view-fixture";
 
 const now = DateTime.makeUnsafe("2026-11-24T18:46:36Z");
 
 const blocksWith = (orcQuota: Reading<OrcQuota>): ReadonlyArray<QuotaBlock> => {
   const quota = decodeQuota(fixture("quota-axi/full.json"));
-  const savedProfiles = decodeSavedProfiles(fixture("saved-profiles/status.json"));
-  if (quota.kind !== "ok" || savedProfiles.kind !== "ok") throw new Error("the fixtures do not decode");
-  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: now }), { ...savedProfiles, capturedAt: now }, orcQuota, now);
+  if (quota.kind !== "ok") throw new Error("the fixtures do not decode");
+  return quotaBlocks(quotaAxiRead({ ...quota, capturedAt: now }), orcQuota, now);
 };
 
 const accountBlocks = (name: OrcQuotaFixture): ReadonlyArray<QuotaBlock> =>
   blocksWith(orcQuotaOf(name, now)).filter((block) => block.title.startsWith("account"));
 
 describe("quotaBlocks over the accounts orc quota --json prints", () => {
-  test("puts one account block per account between live claude and codex, in place of the saved claude second profile", () => {
+  test("does not show bare claude when Subquo names only main and quota-axi keys it default", () => {
+    expect(blocksWith(orcQuotaOf("main", now))[0]?.title).toBe("claude main");
+  });
+
+  test.each(["main", "second-login-expired"] as const)("does not give two Claude rows the sole Orc account's name with %s", (name) => {
+    const quota = decodeQuota(JSON.stringify({
+      schemaVersion: 5,
+      generatedAt: DateTime.formatIso(now),
+      providers: ["default", "second"].map((accountKey) => ({
+        provider: "claude",
+        accountKey,
+        accountKeys: [accountKey],
+        windows: [],
+        state: { status: "fresh", stale: false },
+      })),
+    }));
+    if (quota.kind !== "ok") throw new Error("the two-account report does not decode");
+    const read = quotaAxiRead({ ...quota, capturedAt: now });
+    const orcQuota = orcQuotaOf(name, now);
+    expect(quotaBlocks(read, orcQuota, now)
+      .filter((block) => block.provider === "claude" && block.body.kind === "live")
+      .map((block) => block.title)).toEqual(["claude", "claude second"]);
+    const session = sessionQuotaView({
+      quota: read,
+      orcQuota,
+      panes: undefined,
+      processes: undefined,
+      ledger: ledgerOf([]),
+      sessions: [],
+      sessionOfFile: new Map(),
+      unmatched: [],
+      now,
+      timeZone: DateTime.zoneMakeNamedUnsafe("UTC"),
+    });
+    expect(session.accounts.map((account) => account.title)).toEqual(["claude", "claude second"]);
+  });
+
+  test("puts one account block per account between live claude and codex without guessing the login", () => {
     expect(blocksWith(orcQuotaOf("main-second", now)).map((block) => block.title)).toEqual([
-      "claude main",
+      "claude",
       "account main",
       "account second",
       "codex",
@@ -67,7 +104,7 @@ describe("quotaBlocks over the accounts orc quota --json prints", () => {
 
   test("draws an orc that did not answer as a failed accounts block, keeping the live blocks", () => {
     const blocks = blocksWith({ kind: "unreachable", reason: "orc is not installed on PATH", capturedAt: now });
-    expect(blocks.map((block) => block.title)).toEqual(["claude main", "accounts", "codex", "opencode-go"]);
+    expect(blocks.map((block) => block.title)).toEqual(["claude", "accounts", "codex", "opencode-go"]);
     expect(blocks[1]?.body).toEqual({ kind: "unreachable", reason: "orc is not installed on PATH" });
   });
 });

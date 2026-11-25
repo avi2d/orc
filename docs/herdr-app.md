@@ -72,18 +72,35 @@ On the Board tab, click the count in the **Awaiting you** lane header to open th
 <div id="follow-a-run-in-the-agents-tab"><span id="approve-a-run-s-pr"></span><span id="read-a-run-s-changes"></span><span id="chat-with-orc"></span></div>
 
 [Runs and chat](herdr-app-agents.md) covers the Agents tab and chat drawer.
-On the Agents tab, click the count on the **Awaiting you** status filter to open the Inbox, as `cmd-4` does.
+On the Agents tab, open the **Status** select and click the count beside **Awaiting you** to open the Inbox, as `cmd-4` does.
 Select an **Awaiting you** card to see what it needs above the step list, even if the run is not on this machine.
 
 ![An open Awaiting you card on Mac with its question and answer box above the steps.](images/herdr-agents-awaiting.png)
-The Project row shows runs for configured projects by default.
-Choose **All runs** to include runs from other projects.
-Opening a run of another project from the Inbox switches the Project row to **All runs**.
+The **Project** select shows runs for configured projects by default.
+Choose **All runs** in it to include runs from other projects.
+Opening a run of another project from the Inbox switches the **Project** select to **All runs**.
 A merged PR shows its run as Done, and a closed PR shows its run as Failed.
 
 <div id="start-a-scratch-app"><span id="recapture-the-board-screenshots"></span><span id="change-the-mods"></span></div>
 
 [Develop the mods](herdr-app-development.md) covers the scratch App and screenshots.
+
+## Read a Checks step
+
+On the **Agents** tab, select a run and then select a **Checks** step.
+By default, **Summary** shows one row per check with its name, result, and time.
+If a log has no recorded check boundaries, **Summary** shows a note instead of check rows.
+
+Passed checks stay folded.
+A failed check opens below its row.
+Select the row to fold or reopen it.
+For a failed `bun test` check, **Summary** shows the failed test names, their errors, and the pass and fail counts.
+For other failed checks, it shows the last 20 lines before the exit.
+If the step ended before a check reported its result, the row says **Interrupted**.
+
+Select **Raw** in the step bar to see the full log.
+The tab keeps **Raw** selected when you move between steps or runs.
+Select **Summary** on a Checks step or **Turns** on an Agent step to switch back.
 
 ## Related topics
 

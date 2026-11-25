@@ -26,6 +26,8 @@ export const waiterWord = "orc-heavy-wait"
 
 export const ciOnlyWord = "orc-ci-only"
 
+export const ciOnlyPathWord = "orc-ci-only-path"
+
 export interface StandinTiming {
   readonly budgetMinutes: number | null
   readonly pollSeconds: number

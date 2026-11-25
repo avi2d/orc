@@ -1,5 +1,5 @@
 import { DateTime, Effect } from "effect";
-import { type Freshness, freshOf, type QuotaBlock, QuotaFeed, type QuotaPanelSources, readsCadence, type Shown, shownValue } from "@avi2dg/orc-schema";
+import { type Freshness, freshOf, type QuotaBlock, QuotaFeed, type QuotaReadSources, readsCadence, type Shown, shownValue } from "@avi2dg/orc-schema";
 import {
   type Block,
   boxOf,
@@ -60,7 +60,7 @@ const readQuotaShown: Effect.Effect<QuotaReading, never, QuotaFeed> = Effect.gen
   return { shown, now, refreshing: yield* feed.refreshing };
 });
 
-export const quotaModule: PanelModule<QuotaPanelSources | QuotaFeed> = panelModule<NoSettings, QuotaPanelSources | QuotaFeed>({
+export const quotaModule: PanelModule<QuotaReadSources | QuotaFeed> = panelModule<NoSettings, QuotaReadSources | QuotaFeed>({
   id: "quota",
   about: "quota left on each subscription and when it runs out",
   settings: noSettings,

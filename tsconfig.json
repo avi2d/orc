@@ -1,7 +1,7 @@
 {
   "extends": "@avi2dg/checks/tsconfig.effect.json",
   "include": ["**/*", "docs/.vitepress/**/*.ts"],
-  "exclude": ["node_modules", "repos", "docs/.vitepress/dist", "docs/.vitepress/cache", "trials/bb/plugin"],
+  "exclude": ["node_modules", "repos", "**/dist", "docs/.vitepress/dist", "docs/.vitepress/cache"],
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "noEmit": true,

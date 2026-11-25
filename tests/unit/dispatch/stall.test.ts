@@ -145,6 +145,14 @@ describe("a pueue run's stall", () => {
       expect(await beatAt(root, minutesAfterWrite(30))).toEqual(["stalled task-1 on mac: no output since 2026-10-27T10:02:00.000Z"])
     })
   })
+  test("a run writing only review-1.log is not flagged as a stall", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await seedRun(root)
+      await touch(join(root, "runs", "run-1", "review-1.log"), minutesAfterWrite(29))
+      expect(await beatAt(root, minutesAfterWrite(30))).toEqual([])
+    })
+  })
   test("a fresh gate log stays silent instead of flagging a run in review", async () => {
     await withBacklog(async (root) => {
       await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))

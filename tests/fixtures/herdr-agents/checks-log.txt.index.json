@@ -1,0 +1,31 @@
+{
+  "checks": [
+    {
+      "name": "typecheck",
+      "outputStart": 35,
+      "result": {
+        "outputEnd": 196,
+        "passed": true,
+        "seconds": 21.4
+      }
+    },
+    {
+      "name": "unit",
+      "outputStart": 245,
+      "result": {
+        "outputEnd": 818,
+        "passed": true,
+        "seconds": 1.9
+      }
+    },
+    {
+      "name": "e2e",
+      "outputStart": 865,
+      "result": {
+        "outputEnd": 2199,
+        "passed": false,
+        "seconds": 4.2
+      }
+    }
+  ]
+}

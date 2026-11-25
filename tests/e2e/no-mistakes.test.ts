@@ -237,7 +237,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
       })
     })
   }, 60_000)
-  test("only the unanswered review questions are recorded as open, with their text, instead of every question or none", async () => {
+  test("only the unanswered review questions are recorded as open, with their text, and an omitted one asks unknown, instead of every question or none", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
@@ -247,7 +247,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         const open = signals.flatMap((signal) => isRecord(signal) && signal.name === "open-question" ? [String(signal.value)] : [])
         expect(open.toSorted()).toEqual([
           JSON.stringify({ id: "question-4", text: "Which retries are allowed?" }),
-          JSON.stringify({ id: "question-5", text: "" })
+          JSON.stringify({ id: "question-5", text: "", asks: "unknown" })
         ])
       })
     })

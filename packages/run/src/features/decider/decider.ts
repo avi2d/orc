@@ -1,11 +1,11 @@
 import { Data, DateTime, Effect, FileSystem, Option, type Path, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { bundledAgentsDir } from "../../entities/agent/index"
+import { bundledDeciderPolicyFile } from "../../entities/agent/index"
 import { type AttentionItem, claimDeciding, type OpenItem, openItems, recordDecision, reviewQuestionId, routeTaskItems, taskItems } from "../../entities/attention/index"
 import { backlogPaths, findTask, type BacklogError, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { readInstructions, readOrcRules } from "../../entities/orc-rules/index"
 import { answerTask } from "../../entities/parked-runs/index"
-import { askBackWords, neverDecidedReason } from "./decider-guard"
+import { askBackWords, guardReason } from "./decider-guard"
 import { quotedSource, type RuleSource, spaced, type Verdict } from "./quoted-source"
 import { answerOnRule, recommendedAnswer } from "./recommended"
 
@@ -114,8 +114,6 @@ const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlie
 }
 
 const policyRules = (policy: string): string => /^## Rules\s*\n([\s\S]*?)(?=^##\s|$(?![\s\S]))/m.exec(policy)?.[1] ?? ""
-
-const deciderPolicyFile = (): string => bundledAgentsDir() + "/decider-policy.md"
 
 const section = (heading: string, text: string): string => heading + ":\n\n" + text.trim()
 
@@ -236,16 +234,15 @@ const decidableOf = (byId: ReadonlyMap<string, TaskRecord>, entry: OpenItem): De
   return question === undefined || question.answer !== null ? null : { entry, task, question }
 }
 
-// The guard runs before the policy is read, so no policy or rule can hand the decider a question on the list.
 const verdictOf = (ask: AskDecider, policy: Effect.Effect<string>, root: string, { entry, task, question }: Decidable) =>
   Effect.gen(function*() {
-    const guarded = neverDecidedReason(question.text)
+    const guarded = guardReason(entry.item.kind === "review-question" ? question : { text: question.text })
     if (guarded !== null) {
       return { kind: "escalated", reason: guarded } satisfies Verdict
     }
     const read = yield* policy
     return read === ""
-      ? { kind: "escalated", reason: "orc cannot read the decider policy at " + deciderPolicyFile() } satisfies Verdict
+      ? { kind: "escalated", reason: "orc cannot read the decider policy at " + bundledDeciderPolicyFile } satisfies Verdict
       : yield* askOne(ask, read, root, task, question, entry)
   })
 
@@ -257,7 +254,7 @@ export const decideReviewQuestions = (
 ): Effect.Effect<ReadonlyArray<Decided>, BacklogError | TaskFileError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    const policy = yield* Effect.cached(fs.readFileString(deciderPolicyFile()).pipe(Effect.orElseSucceed(() => "")))
+    const policy = yield* Effect.cached(fs.readFileString(bundledDeciderPolicyFile).pipe(Effect.orElseSucceed(() => "")))
     const decided: Array<Decided> = []
     const byId = new Map(tasks.map((task) => [task.spec.id, task] as const))
     for (const entry of yield* openItems(root)) {

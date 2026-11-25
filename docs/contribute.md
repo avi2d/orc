@@ -9,6 +9,17 @@ To run the checks:
 1. Run `bun run typecheck` to typecheck it.
 1. Run `bun run test` to test it.
 
+## Run orc from a checkout
+
+To work on orc, run the `orc` command from a checkout instead of the npm package:
+
+1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
+1. Run `cd orc && bun install --frozen-lockfile` to install the pinned dependencies.
+1. Run `cd packages/run && bun link` to put the checkout's `orc` command on your PATH.
+1. Run `orc --version` to check it.
+
+A linked checkout updates through `orc update` once `update.command` names its update, as [Updating orc](run/updating-orc.md#update-a-linked-checkout) shows.
+
 ## Update the command reference
 
 To update the command reference:
@@ -36,6 +47,18 @@ Generated references and decision records keep the structure their content needs
 `bun run lint` also checks outside tool links.
 The link check fails a page that names a tool from `scripts/outside-tools.json` and never links that tool's URL.
 Link the tool at its first mention, and add a new outside tool to that file with its home page.
+
+## Time the start of orc
+
+To time how fast orc starts:
+
+1. Run `bun run bench:start` to time `orc --help` and one heavy stand-in classification call from source.
+1. Read the median and p90 of each call, printed after the Bun version and the machine.
+
+The script runs each call once to warm up and then 20 times.
+`--runs N` sets the number of timed runs.
+`--orc FILE` and `--standin FILE` time a built file in place of the source entry.
+A file ending in `.ts` or `.js` runs under Bun, and any other file runs as an executable.
 
 ## Preview the docs site
 
