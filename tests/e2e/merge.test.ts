@@ -193,7 +193,10 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
       expect(merged.stderr).toContain("orc merge refused orc-1 and merged nothing: " + prUrl + " has a merge conflict with main")
       expect(merged.stderr).toContain("sent orc-1 back, so the next beat resumes run origin-run")
       expect(await mergeCalls(fixture)).toEqual([])
-      expect(await sentBackTask(fixture)).toContain("update-branch reported a merge conflict between " + head + " and main")
+      const sent = await sentBackTask(fixture)
+    expect(sent).toContain("update-branch reported a merge conflict between " + head + " and main")
+    const front: unknown = Bun.YAML.parse(sent.split("---\n")[1])
+    expect(front).toMatchObject({ merge: { basis: "captain-word", head, stage: "conflicted" } })
     })
   }, 60_000)
 
