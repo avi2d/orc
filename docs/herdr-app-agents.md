@@ -69,7 +69,7 @@ Select Thinking for the model's thinking, or select a finished tool call for its
 ### When the chat stops and resumes
 
 Closing the drawer stops the chat and Pi but keeps the session file in `~/.orc/chat/`.
-Deleting the session file also stops the chat.
+Deleting the session file, or quitting the App, also stops the chat.
 Opening the drawer, or switching views after the terminal exits, starts the chat again on the newest session file in `~/.orc/chat/`.
 It starts a new session file only when that folder holds none.
 When the App loads the drawer, it ends a chat that an earlier Orc release's drawer left running.
