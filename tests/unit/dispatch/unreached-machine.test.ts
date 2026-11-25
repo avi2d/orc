@@ -87,6 +87,7 @@ describe("a dispatch machine orc cannot reach", () => {
         return yield* Fiber.join(fiber)
       }).pipe(Effect.provide(Layer.mergeAll(BunServices.layer, timeoutSpawner, TestClock.layer())), Effect.scoped))
       expect(lost.kind).toBe("unknown")
+      expect(Number.isNaN(Date.parse(await readFile(backlogPaths(root).unreachedFile("orc-1"), "utf8")))).toBe(false)
       expect((await run(findTask(root, "orc-1"))).state.kind).toBe("started")
       expect(await run(openItems(root))).toEqual([])
 
@@ -94,6 +95,7 @@ describe("a dispatch machine orc cannot reach", () => {
       await writeFile(reach, "#!/bin/sh\nprintf '%s\\n' '" + response + "'\n")
       const restored = await run(closeFinished({ root, home: root, config }, await run(findTask(root, "orc-1"))))
       expect(restored.kind).toBe("running")
+      await expect(readFile(backlogPaths(root).unreachedFile("orc-1"), "utf8")).rejects.toThrow()
       expect((await run(findTask(root, "orc-1"))).state.kind).toBe("started")
     })
   })
@@ -132,7 +134,7 @@ describe("a dispatch machine orc cannot reach", () => {
     await withReach(255, async (root, reach) => {
       await startOnReach(root, reach)
       const report = await beat(root)
-      expect(report.actions.map((action) => action.kind)).toEqual(["close-failed"])
+      expect(report.actions.map((action) => action.kind)).toEqual([])
       expect((await run(findTask(root, "orc-1"))).state.kind).toBe("started")
       expect(await run(openItems(root))).toEqual([])
     })

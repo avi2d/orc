@@ -243,7 +243,7 @@ const readClose = (
     }),
     Effect.timeoutOrElse({
       duration: Duration.seconds(closeSeconds),
-      orElse: () => Effect.succeed({ kind: "unread" as const, reason: "the close read timed out after " + closeSeconds + " seconds" })
+      orElse: () => Effect.succeed<CloseReading>({ kind: through === null ? "unread" : "unreached", reason: "the close read timed out after " + closeSeconds + " seconds" })
     })
   )
 
@@ -333,6 +333,9 @@ export const closeFinished = (
     const stale = staleEndingOf(started.at, Date.parse(nowText), reading, unreadSince)
     const ending = reading.kind === "read" ? (stale ?? reading.ending) : stale
     if (ending === null) {
+      if (reading.kind === "unreached") {
+        return { kind: "unknown" } satisfies Progress
+      }
       if (reading.kind !== "read") {
         return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: reading.reason } } satisfies Progress
       }
