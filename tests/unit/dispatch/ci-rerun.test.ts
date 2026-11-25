@@ -8,6 +8,7 @@ import { TestClock } from "effect/testing"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { openItems } from "../../../packages/run/src/entities/attention/attention"
 import { routePullRequestWithRetry } from "../../../packages/run/src/entities/attention/pull-request-retry"
+import { routePullRequest } from "../../../packages/run/src/entities/attention/beat-items"
 import { addTask, claimTask, closeStartedTask, findTask, markCiRerun, markPosted, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { unpostedEvents } from "../../../packages/run/src/entities/events/index"
 import { sendBackClosedTask } from "../../../packages/run/src/entities/parked-runs/index"
@@ -105,6 +106,28 @@ describe("a red check on a ship task's PR", () => {
       expect(await run(openItems(root))).toEqual([])
       await route(root, asked, completed)
       expect(asked).toHaveLength(2)
+      expect((await run(openItems(root)))[0]?.item.text).toContain(details)
+    })
+  })
+
+  test("withdraws an old ready item instead of keeping it while a red run is in progress", async () => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      await run(routePullRequest(root, "orc-1", pr, { ...red, statusCheckRollup: [{ ...red.statusCheckRollup[0], conclusion: "SUCCESS" }] }, "2026-10-27T11:00:00.000Z"))
+      const asked: Array<ReadonlyArray<string>> = []
+      await route(root, asked, { ...red, headRefOid: "b".repeat(40), statusCheckRollup: [...red.statusCheckRollup, { workflowName: "ci", detailsUrl: details, name: "parallel", status: "IN_PROGRESS", conclusion: "", startedAt: "2026-10-27T11:10:00.000Z" }] })
+      expect(await run(openItems(root))).toEqual([])
+      expect(asked).toEqual([])
+    })
+  })
+
+  test("opens a red item instead of holding when the PR already used its rerun", async () => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      const asked: Array<ReadonlyArray<string>> = []
+      await route(root, asked)
+      await route(root, asked, { ...red, statusCheckRollup: [...red.statusCheckRollup, { workflowName: "ci", detailsUrl: details, name: "parallel", status: "IN_PROGRESS", conclusion: "", startedAt: "2026-10-27T11:10:00.000Z" }] })
+      expect(asked).toHaveLength(1)
       expect((await run(openItems(root)))[0]?.item.text).toContain(details)
     })
   })
