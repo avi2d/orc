@@ -14,12 +14,14 @@ const sourceEntry = (path: Path.Path, checkout: string): string => path.join(che
 
 const releaseOf = (path: Path.Path, directory: string, version: string): string => path.join(directory, "v" + version)
 
-export const launcherDirectory = Effect.fnUntraced(function*(userHome: string, main: string, running: string) {
+export const launcherDirectory = Effect.fnUntraced(function*(userHome: string, entryPoint: string, running: string, compiled: boolean) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const directory = path.join(userHome, ".local", "share", "orc")
-  const entry = yield* fs.realPath(sourceEntry(path, releaseOf(path, directory, running))).pipe(Effect.option)
-  return Option.contains(entry, main) ? directory : null
+  const release = releaseOf(path, directory, running)
+  const entry = yield* fs.realPath(compiled ? path.join(release, "orc") : sourceEntry(path, release)).pipe(Effect.option)
+  const actual = yield* fs.realPath(entryPoint).pipe(Effect.option)
+  return Option.isSome(actual) && Option.contains(entry, actual.value) ? directory : null
 })
 
 const runInstallerStep = (command: Command, action: string) => capture(command, null).pipe(
@@ -29,8 +31,8 @@ const runInstallerStep = (command: Command, action: string) => capture(command, 
     : Effect.fail(new InstallFailure({ detail: action + " exited " + String(exitCode), output: (stdout + stderr).trim() })))
 )
 
-const checkRelease = (bun: string, entry: string, version: string) =>
-  runInstallerStep([bun, entry, "--version"], "verify launcher release " + version).pipe(
+const checkRelease = (command: Command, version: string) =>
+  runInstallerStep([...command, "--version"], "verify launcher release " + version).pipe(
     Effect.flatMap((reported) => reported === "orc " + version
       ? Effect.void
       : Effect.fail(new InstallFailure({ detail: "launcher release " + version + " reported the wrong version", output: reported, retryable: false })))
@@ -46,8 +48,12 @@ const prepareRelease = Effect.fnUntraced(function*(directory: string, version: s
   const path = yield* Path.Path
   const checkout = releaseOf(path, directory, version)
   const entry = sourceEntry(path, checkout)
+  const binary = path.join(checkout, "orc")
+  const checkExisting = fs.exists(binary).pipe(
+    Effect.flatMap((exists) => checkRelease(exists ? [binary] : [bun, entry], version))
+  )
   if (yield* fs.exists(checkout)) {
-    yield* checkRelease(bun, entry, version)
+    yield* checkExisting
     return
   }
   yield* Effect.acquireUseRelease(
@@ -58,11 +64,11 @@ const prepareRelease = Effect.fnUntraced(function*(directory: string, version: s
         "clone launcher release " + version
       )
       yield* runInstallerStep([bun, "install", "--cwd", staging, "--frozen-lockfile", "--production", "--ignore-scripts", "--silent"], "install launcher release " + version)
-      yield* checkRelease(bun, sourceEntry(path, staging), version)
+      yield* checkRelease([bun, sourceEntry(path, staging)], version)
       yield* fs.rename(staging, checkout).pipe(
         Effect.catch((error) => fs.exists(checkout).pipe(
           Effect.flatMap((exists) => exists
-            ? checkRelease(bun, entry, version)
+            ? checkExisting
             : Effect.fail(new InstallFailure({ detail: "cannot publish launcher release " + version + ": " + error.message, output: null })))
         ))
       )

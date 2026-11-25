@@ -1,11 +1,12 @@
 import { afterAll, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { readOrcConfig } from "../../packages/run/src/shared/config/index"
-import { formatUpdate, installCommand, isNewer, registryOf } from "../../packages/run/src/features/updating-orc/index"
+import { formatUpdate, installCommand, isNewer, registryOf, runUpdate } from "../../packages/run/src/features/updating-orc/index"
+import { launcherDirectory } from "../../packages/run/src/features/updating-orc/launcher-release"
 
 const root = mkdtempSync(join(tmpdir(), "orc-update-"))
 
@@ -84,6 +85,60 @@ describe("update.command in config.json", () => {
       decoded(homeWith({ providers: [], update: { command: ["bun"], when: "always" } }))
     ])
     expect(refused.map((result) => result.ok)).toEqual([false, false, false])
+  })
+})
+
+describe("launcher updates", () => {
+  test("recognises both source and compiled entries without mistaking another path for a launcher", async () => {
+    const home = join(root, "launcher-layouts")
+    const directory = join(home, ".local/share/orc")
+    const release = join(directory, "v1.2.3")
+    const source = join(release, "packages/run/src/bin.ts")
+    const binary = join(release, "orc")
+    mkdirSync(join(release, "packages/run/src"), { recursive: true })
+    writeFileSync(source, "")
+    writeFileSync(binary, "")
+    const detect = (entry: string, compiled: boolean) =>
+      Effect.runPromise(launcherDirectory(home, entry, "1.2.3", compiled).pipe(Effect.provide(BunServices.layer)))
+    expect(await detect(realpathSync(source), false)).toBe(directory)
+    expect(await detect(realpathSync(binary), true)).toBe(directory)
+    expect(await detect(realpathSync(binary), false)).toBeNull()
+    expect(await detect(realpathSync(source), true)).toBeNull()
+  })
+
+  test("a compiled launcher selects a release instead of running bun add -g", async () => {
+    const home = join(root, "compiled-home")
+    const directory = join(home, ".local/share/orc")
+    const running = join(directory, "v1.0.0/orc")
+    const next = join(directory, "v99.0.0/orc")
+    mkdirSync(join(directory, "v1.0.0"), { recursive: true })
+    mkdirSync(join(directory, "v99.0.0"), { recursive: true })
+    writeFileSync(running, "")
+    writeFileSync(next, '#!/bin/sh\nprintf "orc 99.0.0\\n"\n')
+    chmodSync(next, 0o755)
+    writeFileSync(join(directory, "release"), "1.0.0\n")
+    const bin = join(home, "bin")
+    mkdirSync(bin)
+    writeFileSync(join(bin, "bun"), "#!/bin/sh\nexit 97\n")
+    chmodSync(join(bin, "bun"), 0o755)
+    const path = process.env.PATH
+    process.env.PATH = bin + ":" + (path ?? "")
+    const registry = Bun.serve({ port: 0, fetch: () => Response.json({ version: "99.0.0" }) })
+    try {
+      const result = await Effect.runPromise(runUpdate({
+        home: join(root, "no-config"),
+        env: { HOME: home, npm_config_registry: registry.url.href },
+        running: "1.0.0",
+        main: "/$bunfs/root/orc",
+        executable: running
+      }).pipe(Effect.provide(BunServices.layer)))
+      expect(result.outcome).toBe("installed")
+      expect(readFileSync(join(directory, "release"), "utf8")).toBe("99.0.0\n")
+    } finally {
+      await registry.stop(true)
+      if (path === undefined) delete process.env.PATH
+      else process.env.PATH = path
+    }
   })
 })
 

@@ -25,10 +25,11 @@ To upgrade by hand instead, run `bun add -g @avi2dg/orc`, the same command that 
 ## Update a versioned checkout
 
 If your launcher reads the version from `~/.local/share/orc/release`, run `orc update` through that launcher.
-Orc detects the launcher when its running entry point resolves to `~/.local/share/orc/v<version>/packages/run/src/bin.ts`.
-For example, if `release` holds `1.2.3`, the launcher starts `v1.2.3/packages/run/src/bin.ts` with Bun.
+Orc detects the launcher when its running entry point resolves to `~/.local/share/orc/v<version>/packages/run/src/bin.ts` or its compiled executable resolves to `~/.local/share/orc/v<version>/orc`.
+For example, if `release` holds `1.2.3`, the launcher starts `v1.2.3/packages/run/src/bin.ts` with Bun or runs `v1.2.3/orc`.
 
-Orc clones the new version tag, installs its production dependencies from the lockfile, and checks that the new checkout prints the expected version.
+Orc clones the new version tag, installs its production dependencies from the lockfile with Bun on `PATH`, and checks that the new checkout prints the expected version.
+If the version directory already exists, Orc checks its compiled executable or source entry instead.
 If any step fails, the launcher keeps the old release.
 After an install, run `orc --version` through the launcher to see the new version.
 Runs that already started still use their old checkout.

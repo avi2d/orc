@@ -3,7 +3,7 @@ import { Effect, type FileSystem, type Path, Result, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { UPDATE_JSON_SCHEMA, UpdateJson, installerError, isNewer, type UpdateDocument } from "../../entities/orc-update/index"
 import { readOrcConfig } from "../../shared/config/index"
-import { capture, type Command } from "../../shared/process/index"
+import { capture, selfCommand, type Command } from "../../shared/process/index"
 import { installLauncherRelease, launcherDirectory } from "./launcher-release"
 
 const packageName = "@avi2dg/orc"
@@ -83,9 +83,10 @@ export const runUpdate = (inputs: UpdateInputs): Effect.Effect<UpdateDocument, n
     }
     const configured = config.success.update?.command
     if (configured === undefined) {
-      const directory = yield* launcherDirectory(env.HOME || homedir(), main, running)
+      const compiled = selfCommand(executable, main).length === 1
+      const directory = yield* launcherDirectory(env.HOME || homedir(), compiled ? executable : main, running, compiled)
       if (directory !== null) {
-        return yield* installLauncherRelease(directory, found, running, executable).pipe(
+        return yield* installLauncherRelease(directory, found, running, compiled ? "bun" : executable).pipe(
           Effect.map((previous) => previous === null ? current(running, found) : installed(previous, found, null)),
           Effect.catchTag("InstallFailure", (error) => Effect.succeed(failed(running, found, error.detail, error.output, error.retryable)))
         )
