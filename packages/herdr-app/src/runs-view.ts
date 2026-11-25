@@ -23,6 +23,8 @@ export interface RunsShown {
   readonly selectedKey: string | null
   readonly agents: ReadonlyMap<string, RunAgent | null>
   readonly folded: boolean
+  readonly attention?: (card: Card) => ReadonlyArray<Element>
+  readonly agentAttention?: ReadonlyArray<Element>
 }
 
 const statusColor = (t: Palette, status: CardStatus): Color => {
@@ -119,12 +121,12 @@ const listBody = (t: Palette, shown: RunsShown, visible: ReadonlyArray<Card>, ac
   if (shown.cards.kind === "reading") {
     return div().p(12).text_color(t.muted).child("Reading orc runs --json --local")
   }
-  if (visible.length === 0) {
-    return div().p(12).text_color(t.muted).child("No run matches these filters")
-  }
-  return v_flex().id("cards").flex_1().overflow_y_scrollbar().px(8).py(8).gap(6)
-    .children(visible.map((card) =>
-      cardView(t, card, card.key === shown.selectedKey, card.runId === null ? null : shown.agents.get(card.runId) ?? null, act)))
+  return v_flex().id("cards").flex_1().min_h_0().overflow_y_scrollbar().px(8).py(8).gap(6)
+    .children(visible.length === 0 ? [div().p(4).text_color(t.muted).child("No run matches these filters")] : visible.map((card) =>
+      v_flex().gap(3).flex_shrink_0().min_w_0()
+        .child(cardView(t, card, card.key === shown.selectedKey, card.runId === null ? null : shown.agents.get(card.runId) ?? null, act))
+        .children(shown.attention?.(card) ?? [])))
+    .children(shown.agentAttention ?? [])
 }
 
 const rail = (t: Palette, shown: RunsShown, visible: ReadonlyArray<Card>, act: RunsActions): Element =>

@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened, edited]
 
 concurrency:
-  group: pr-title-${{ github.event.pull_request.number }}
+  group: pr-title-${{ github.event.pull_request.number }}-${{ (github.event.action != 'edited' || github.event.changes.title != null) && 'title' || github.run_id }}
   cancel-in-progress: true
 
 permissions:
@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   title:
+    if: github.event.action != 'edited' || github.event.changes.title != null
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

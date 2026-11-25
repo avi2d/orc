@@ -2,7 +2,7 @@ export { runGit, collectOutput, commitsSince, headOf, branchCommits } from "./gi
 export type { OrcRunCommit } from "./git-run"
 export { PueueState, taskLabel, PueueStatus, parentLabel, orcGroup, PueueResult, heldTask, PueueTask, queuedTasks } from "./pueue-status"
 export type { QueuedTask } from "./pueue-status"
-export { RunnerError } from "./runner-error"
+export { MachineUnreached, RunnerError } from "./runner-error"
 export { capture, ensureGroup, decodeJson, pueue, spawnedQuiet, collectedOutput, decodeSecret } from "./runner-exec"
 export type { Command, Reach, Captured } from "./runner-exec"
 export { selfCommand } from "./self-command"

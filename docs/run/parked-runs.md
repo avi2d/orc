@@ -35,6 +35,8 @@ A question the attention queue owns for the decider shows as `the decider's answ
 Each later beat prints `waits <task-id>: parked on <branch> for the captain's answer to <question-ids>` and never starts it.
 That line names a question the attention queue owns for the decider the same way, as `the decider's answer to <question-ids>`, and so does the `wait` that `orc backlog --json` gives the task.
 
+If the work merged elsewhere, [close the parked task with the merged PR URL](backlog-tasks.md#close-a-parked-task-whose-work-merged-elsewhere) instead of resuming it.
+
 ## Resume a parked task
 
 To answer one question, run `orc backlog answer <task-id> <question-id>=<text>`.

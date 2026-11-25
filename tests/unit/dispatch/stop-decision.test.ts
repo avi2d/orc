@@ -90,6 +90,10 @@ describe("the stale close decision", () => {
   test("an unread close seen again before the grace waits instead of closing failed", () => {
     expect(staleEndingOf(oldStart, Date.now(), { kind: "unread", reason: "pueue is down" }, Date.now())).toBeNull()
   })
+  test("an unreached machine past the grace keeps the task running instead of closing it failed", () => {
+    const unreached = { kind: "unreached" as const, reason: "ssh -o BatchMode=yes win orc runner result exited 255: Connection closed by UNKNOWN port 65535" }
+    expect(staleEndingOf(oldStart, Date.parse("2026-11-07T10:00:00.000Z"), unreached, Date.parse(oldStart))).toBeNull()
+  })
 })
 
 describe("the own-log close decision", () => {

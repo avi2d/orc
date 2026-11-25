@@ -171,7 +171,7 @@ describe("the decider", () => {
   test("a recommended-option rule from the policy rules section is answered instead of escalated", async () => {
     const recommended = { id: "r2", text: "How many retries?\nRecommended: Two retries" }
     await withAskingTask(async (root) => {
-      const rule = "When a review question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
+      const rule = "When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
       const reply = JSON.stringify({ decision: "answer", answer: "Two retries", rule, reason: "the question names Two retries" })
       await decide(root, replies({ [recommended.text]: reply }))
       expect(await itemFile(root, r2Item)).toMatchObject({ owner: "decider", decision: { kind: "answered", rule: { quote: rule, source: "decider policy" } }, state: { kind: "closed", answer: { words: "Two retries" } } })

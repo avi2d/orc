@@ -2,6 +2,46 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.24.0
+
+Released 2026-11-25.
+
+### Features
+
+- **run:** attach compiled orc builds to each release [#355](https://github.com/avi2d/orc/pull/355)
+- **run:** pick models per task with dispatch rules [#354](https://github.com/avi2d/orc/pull/354)
+
+### Fixes
+
+- **run:** let a compiled orc update through its launcher [#357](https://github.com/avi2d/orc/pull/357)
+- **run:** settle routine questions and retry runs that died for a retryable reason [#356](https://github.com/avi2d/orc/pull/356)
+
+## 0.23.0
+
+Released 2026-11-25.
+
+### Features
+
+- **run:** run tasks on OpenAI and OpenCode Go subscriptions beside Claude [#352](https://github.com/avi2d/orc/pull/352)
+- **run:** update Orc from the dispatch beat [#349](https://github.com/avi2d/orc/pull/349)
+
+## 0.22.0
+
+Released 2026-11-25.
+
+### Features
+
+- **run:** build the heavy stand-in as a Bun bytecode binary [#345](https://github.com/avi2d/orc/pull/345)
+- **run:** close parked tasks whose work merged elsewhere [#348](https://github.com/avi2d/orc/pull/348)
+- **herdr-app:** show user-owned attention with answers on the card [#347](https://github.com/avi2d/orc/pull/347)
+- **run:** merge a done task's green PR by itself on yolo projects [#338](https://github.com/avi2d/orc/pull/338)
+- **herdr-app:** replace Runs filter chips with Project and Status selects [#341](https://github.com/avi2d/orc/pull/341)
+
+### Fixes
+
+- **run:** read bundled assets from the compiled orc [#340](https://github.com/avi2d/orc/pull/340)
+- **run:** reuse a completed review when a resumed direct-PR run's branch is unchanged [#342](https://github.com/avi2d/orc/pull/342)
+
 ## 0.21.0
 
 Released 2026-11-24.

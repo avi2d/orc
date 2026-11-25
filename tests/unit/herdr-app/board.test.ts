@@ -5,7 +5,7 @@ import { boardBacklog, boardQueue } from "../../../packages/herdr-app/src/guard-
 
 const task: BoardTask = {
   id: "orc-1", title: "A task", project: "orc", kind: "ship", created: "2026-01-01T00:00:00Z",
-  status: "new", held: false, parked: false, prState: null
+  status: "new", prState: null
 }
 
 test("a task missing prState is refused instead of treated as Done", () => {
@@ -27,11 +27,14 @@ test("a new task is not Running", () => {
   expect(laneFor(task, new Set())).toBe("Planned")
 })
 
-test("a held task and a closed task with an open PR are not in Planned or Done", () => {
-  expect(laneFor({ ...task, held: true }, new Set())).toBe("Awaiting you")
-  expect(laneFor({ ...task, status: "closed", prState: "open" }, new Set())).toBe("Awaiting you")
-  expect(laneFor({ ...task, parked: true }, new Set())).toBe("Awaiting you")
+test("a task the Inbox lists is in Awaiting you instead of its status lane", () => {
   expect(laneFor(task, new Set(["orc-1"]))).toBe("Awaiting you")
+  expect(laneFor({ ...task, status: "started" }, new Set(["orc-1"]))).toBe("Awaiting you")
+  expect(laneFor({ ...task, status: "closed", prState: "open" }, new Set(["orc-1"]))).toBe("Awaiting you")
+})
+
+test("a closed task with an open PR that the Inbox does not list is Done instead of Awaiting you", () => {
+  expect(laneFor({ ...task, status: "closed", prState: "open" }, new Set())).toBe("Done")
 })
 
 test("a started task is not in Planned", () => {

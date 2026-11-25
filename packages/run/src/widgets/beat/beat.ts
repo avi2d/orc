@@ -1,16 +1,15 @@
 import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
-import type { ConfigError } from "../../shared/config/index"
-import { type Account, type DispatchConfig, isYolo, type Machine, type Project, providerOf, readDispatchConfig, readProjects } from "../../shared/config/index"
-import { type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
+import { type Account, type ConfigError, type DispatchConfig, isYolo, type Machine, type Project, providerOf, readDispatchConfig, readProjects, type RoutedModels } from "../../shared/config/index"
+import { machineOverfull, type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
+import { selectTaskRoute } from "./beat-route"
 import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
 import { checkToken, type TokenCache } from "./beat-token"
-import type { BeatAction, Progress } from "../../entities/attention/index"
 import { closeFinished } from "./beat-close"
 import { parkedResumeWait } from "./beat-resume"
-import { type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems } from "../../entities/attention/index"
+import { type BeatAction, type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems, withdrawTaskItems, type Progress } from "../../entities/attention/index"
 import { attentionActions } from "./beat-attention"
 import { type AskDecider, askDeciderWithPi, decideReviewQuestions } from "../../features/decider/index"
 import { handAnswersToResume } from "../../entities/parked-runs/index"
@@ -22,6 +21,8 @@ import { roomWaits, writeBeatWaits } from "./beat-waits"
 import { mergedIds } from "../../entities/events/index"
 import { pollBaseCi, readBaseCi, type ReadBaseCi } from "../../features/merging-a-pr/index"
 import { type ReadUpstream, readUpstream, watchUpstream } from "./upstream"
+import type { Command } from "../../shared/process/index"
+import { runBeatUpdates } from "./beat-update"
 
 export type { BeatAction } from "../../entities/attention/index"
 export type { MachineRoom } from "./beat-place"
@@ -31,6 +32,7 @@ export interface BeatReport {
   readonly beat: string
   readonly at: string
   readonly quota: QuotaReading
+  readonly perTaskRouting?: true
   readonly room: ReadonlyArray<MachineRoom>
   readonly actions: ReadonlyArray<BeatAction>
 }
@@ -80,22 +82,13 @@ const handOn = (
     Effect.catch((error) => Effect.succeed<StartResult>({ kind: "failed", reason: "the start command did not run: " + error.message }))
   )
 
-// Each beat writes its claim before it counts, so of two beats racing for a machine's last slot at least one sees both claims.
-const machineOverfull = (
-  root: string,
-  machine: Machine
-): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  listTasks(root).pipe(
-    Effect.map((tasks) => readRoom([machine], tasks).some((entry) => entry.busy > entry.slots))
-  )
-
 const startTask = (
   root: string,
   task: TaskRecord,
   claim: Claim,
   place: Placed,
   credential: Credential,
-  models: Account["models"]
+  models: { readonly legacy: Account["models"]; readonly routed?: RoutedModels }
 ): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     const machine = place.machine
@@ -119,8 +112,9 @@ const startTask = (
       ORC_RUN_MACHINE: machine.name,
       ORC_TASK_PROVIDER: credential.provider,
       ORC_TASK_ACCOUNT: claim.account,
-      ORC_TASK_IMPLEMENTER_MODEL: models?.implementer ?? "",
-      ORC_TASK_FIXER_MODEL: models?.fixer ?? "",
+      ORC_TASK_IMPLEMENTER_MODEL: models.legacy?.implementer ?? "",
+      ORC_TASK_FIXER_MODEL: models.legacy?.fixer ?? "",
+      ORC_TASK_ROUTED_MODELS: models.routed === undefined ? "" : JSON.stringify(models.routed),
       ORC_TASK_TOKEN_FILE: credential.kind === "file" ? credential.tokenFile : "",
       ORC_TASK_CLAUDE_CONFIG_DIR: credential.kind === "claude-config" ? credential.configDirs[machine.name] ?? "" : ""
     }
@@ -133,10 +127,14 @@ const startTask = (
     if (result.kind === "started") {
       return { kind: "started", task: task.spec.id, machine: machine.name, account: claim.account, log } satisfies BeatAction
     }
-    yield* publishClosed(root, {
+    const at = yield* nowIso
+    const closed = yield* publishClosed(root, {
       ...task,
-      state: { kind: "closed", claim, closing: { outcome: "start-failed", reason: result.reason }, closedAt: yield* nowIso, postedAt: null }
+      state: { kind: "closed", claim, closing: { outcome: "start-failed", reason: result.reason }, closedAt: at, postedAt: null }
     })
+    if (closed) {
+      yield* withdrawTaskItems(root, [task.spec.id], at)
+    }
     return { kind: "start-failed", task: task.spec.id, machine: machine.name, reason: result.reason } satisfies BeatAction
   })
 
@@ -148,7 +146,7 @@ interface BeatContext {
   readonly projects: ReadonlyArray<Project>
   readonly tasks: ReadonlyArray<TaskRecord>
   readonly merged: ReadonlySet<string>
-  readonly account: Account | null
+  readonly quota: QuotaReading
   readonly live: Array<{ readonly machine: string; readonly slots: number; busy: number }>
   readonly overloaded: ReadonlyMap<string, string>
   readonly tokens: TokenCache
@@ -192,10 +190,11 @@ const considerTask = (
     if (placement.kind === "waits") {
       return waits(placement.reason)
     }
-    if (context.account === null) {
-      return waits("no account has room")
+    const route = selectTaskRoute(context.config, context.quota, task.spec)
+    if (route.kind === "waits") {
+      return waits(route.reason)
     }
-    const credential = yield* credentialFor(context, context.account)
+    const credential = yield* credentialFor(context, route.account)
     if (credential.kind === "waits") {
       return waits(credential.reason)
     }
@@ -211,8 +210,9 @@ const considerTask = (
     if (slot !== undefined) {
       slot.busy += 1
     }
-    const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: context.account.name, takenAt: yield* nowIso }
-    const action = yield* startTask(context.root, claimed.record, claim, placement, credential, context.account.models)
+    const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: route.account.name, takenAt: yield* nowIso }
+    const models = route.routed === undefined ? { legacy: route.account.models } : { legacy: undefined, routed: route.routed }
+    const action = yield* startTask(context.root, claimed.record, claim, placement, credential, models)
     if (slot !== undefined) {
       if (action.kind === "given-back") {
         slot.busy = slot.slots
@@ -298,6 +298,7 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
   })
 
 export interface BeatSources {
+  readonly update: Command | null
   readonly readLoad: ReadLoad
   readonly readPullRequest: ReadPullRequest
   readonly readUpstream: ReadUpstream
@@ -305,7 +306,8 @@ export interface BeatSources {
   readonly readBaseCi: ReadBaseCi
 }
 
-export const liveSources = (home: string): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream, askDecider: askDeciderWithPi(home), readBaseCi })
+export const liveSources = (home: string, update: Command | null): BeatSources =>
+  ({ update, readLoad: readMachineLoad, readPullRequest, readUpstream, askDecider: askDeciderWithPi(home), readBaseCi })
 
 const decideAndRelay = (
   root: string,
@@ -343,10 +345,9 @@ export const runBeat = (
     const config = yield* readDispatchConfig(paths.dispatchConfig)
     const projects = yield* readProjects(paths.projects, config.machines)
     yield* ensureBacklog(root)
-    const quota = yield* readQuota(config.quota)
+    const quota = yield* readQuota({ ...config.quota, perTaskRouting: config.routing !== undefined })
     const tasks = yield* listTasks(root)
     const merged = yield* mergedIds(root)
-    const room = readRoom(config.machines, tasks)
     const context: BeatContext = {
       root,
       home,
@@ -355,8 +356,8 @@ export const runBeat = (
       projects,
       tasks,
       merged,
-      account: quota.kind === "read" ? (config.quota.accounts.find((account) => account.name === quota.pick) ?? null) : null,
-      live: room.map((entry) => ({ ...entry })),
+      quota,
+      live: readRoom(config.machines, tasks).map((entry) => ({ ...entry })),
       overloaded: new Map(),
       tokens: new Map()
     }
@@ -380,14 +381,16 @@ export const runBeat = (
     const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at, yoloTask(projects, task), home)).pipe(
       Effect.tap(() => pollBaseCi(root, sources.readBaseCi, projects, latest.map(taskPr).filter((url) => url !== null), at))
     )
-    return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
+    const updates = sources.update === null ? [] : yield* runBeatUpdates(root, home, beat, config.machines, sources.update)
+    return { beat, at, quota, ...(config.routing === undefined ? {} : { perTaskRouting: true }), room: readRoom(config.machines, latest), actions: [
         ...reported,
         ...stalls.flatMap(Option.toArray),
         ...upstream,
         ...queue,
         ...renewals.flatMap(Option.toArray),
         ...actions,
-        ...prs.flatMap(Option.toArray)
+        ...prs.flatMap(Option.toArray),
+        ...updates
       ]
     }
   })

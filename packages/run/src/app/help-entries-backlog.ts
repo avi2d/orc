@@ -49,11 +49,11 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
     examples: ["orc backlog origin orc-9 linux-box run-42"]
   },
   close: {
-    usage: ["orc backlog close <task-id> <done|failed> [<reason>]"],
-    summary: "Close a task by hand as done or failed",
-    about: "Closes a started task as done or failed, with an optional reason, for a machine whose start command orc does not run. On a decision, failed drops it, and done is refused, since only orc backlog answer closes a decision done.",
+    usage: ["orc backlog close <task-id> <done|failed> [<reason>]", "orc backlog close <task-id> --landed-in <pr-url>"],
+    summary: "Close a started task or a parked task whose work landed elsewhere",
+    about: "Closes a started task as done or failed. For a parked task, --landed-in records where the work merged and closes the task done without changing its branch. For a decision, failed drops it, and only orc backlog answer closes it done.",
     options: [],
-    examples: ["orc backlog close orc-9 failed \"the machine was rebuilt\""]
+    examples: ["orc backlog close orc-9 failed \"the runner lost the worktree\"", "orc backlog close orc-9 --landed-in https://github.com/example/project/pull/42"]
   },
   stop: {
     usage: ["orc backlog stop <task-id>"],
@@ -163,7 +163,7 @@ export const attentionAnswerHelp: HelpEntry = {
 export const beatHelp: HelpEntry = {
   usage: ["orc beat [--json]"],
   summary: "Start what can start and close what finished",
-  about: "Reads the room on each machine, starts each task that waits on nothing, closes finished runs and relays answers. Run it from cron or launchd every few minutes.",
+  about: "Reads the room on each machine, starts each task that waits on nothing, closes finished runs and relays answers. Checks for Orc updates on dispatch machines at most once an hour. Run it from cron or launchd every few minutes.",
   options: [{ flag: "--json", meaning: "Print the beat as an orc.beat.v1 JSON document." }],
   examples: ["orc beat"]
 }

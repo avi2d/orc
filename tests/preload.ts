@@ -11,6 +11,7 @@ mkdirSync(home)
 mkdirSync(orcHome)
 process.env.HOME = home
 process.env.ORC_HOME = orcHome
+process.env.ORC_BEAT_UPDATE = "off"
 
 // bun test never emits the process exit event, and a preload's afterAll runs once after the whole run's last test.
 afterAll(() => rmSync(root, { recursive: true, force: true }))

@@ -3,7 +3,7 @@ import type { Failed, Outcome } from "../../../shared/lib";
 import type { Session } from "../sources/live";
 import { addTokens, priceRatios, sumTokens, type Tokens, type Weighting, weightings } from "../contract/tokens";
 import { byPricedShare, estimate, rateSpanHours, spendGate } from "./estimate";
-import { type AccountJoin, sameJoin } from "../sources/account-join";
+import { type AccountJoin, distinctJoins } from "../sources/account-join";
 import {
   type AccountView,
   type Composition,
@@ -205,9 +205,7 @@ const logins = (found: ReadonlyArray<Found>): ReadonlyArray<Login> => {
 };
 
 const joinsOf = (accounts: ReadonlyArray<AccountView>): ReadonlyArray<AccountJoin> =>
-  accounts
-    .flatMap((account) => account.joins)
-    .reduce<ReadonlyArray<AccountJoin>>((seen, join) => (seen.some((known) => sameJoin(known, join)) ? seen : [...seen, join]), []);
+  distinctJoins(accounts.flatMap((account) => account.joins));
 
 interface MergedAccount {
   readonly account: AccountView;

@@ -1,26 +1,36 @@
 interface NeverDecided {
   readonly topic: string
   readonly asks: RegExp
+  readonly about?: RegExp
 }
 
-const deletingVerbs = "delet\\w*|remov\\w*|drop\\w*|discard\\w*|eras(?:e|es|ed|ing)|wip(?:e|es|ed|ing)|purg\\w*|destroy\\w*|prun\\w*|abandon\\w*|overwrit\\w*|reset\\w*|(?:throw|throws|throwing|threw|thrown) away|clean(?:s|ed|ing)? up|rm"
-const deletedVerbs = "deleted|removed|dropped|discarded|erased|wiped|purged|destroyed|pruned|abandoned|overwritten|reset|thrown away|cleaned up"
-const work = "branch(?:es)?|worktrees?|tasks?|runs?|pull requests?|releases?|tags?|backups?|databases?|user data|commit history"
+const deletingVerbs = "delet\\w*|remov\\w*|drop\\w*|discard\\w*|scrap\\w*|eras(?:e|es|ed|ing)|wip(?:e|es|ed|ing)|purg\\w*|destroy\\w*|prun\\w*|abandon\\w*|overwrit\\w*|reset\\w*|(?:throw|throws|throwing|threw|thrown) away|clean(?:s|ed|ing)? up|start(?:s|ed|ing)? over|(?:throw|throws|throwing|threw|thrown) out|revert\\w*|restor(?:e|es|ed|ing)|rm"
+const deletedVerbs = "deleted|removed|dropped|discarded|scrapped|erased|wiped|purged|destroyed|pruned|abandoned|overwritten|reset|thrown away|cleaned up"
+const work = "branch(?:es)?|worktrees?|tasks?|(?<!\\btest\\s)runs?|pull requests?|releases?|tags?|backups?|databases?|user data|commit history|(?:unlanded|unmerged|unpushed) (?:work|changes|commits)"
 const notAName = "(?!\\s+(?:check|name|field|filter|guard|test|option|flag|column|label|chip|key|type|lookup|variable|param\\w*|prop\\w*|argument|list|support|fallback|handling)s?\\b)"
-const between = "(?:\\s+(?!(?:on|in|of|for|from|to|at|by|with|that|which|so|and|or|but|if|when|because|then|than|while)\\b)[\\w./`'-]+){0,3}?"
+const ownWork = "commits?|changes|edits|(?:my|our|your|this|that|the local|uncommitted) (?:change|edit)|work|stash(?:es)?|modifications?|diffs?|what (?:i|we|you|it) (?:changed|edited|wrote|made|added|did)"
+const joiningWords = "on|in|of|for|from|to|at|by|with|that|which|so|and|or|but|if|when|because|then|than|while"
+const between = "(?:\\s+(?!(?:" + joiningWords + ")\\b)[\\w./`'-]+){0,3}?"
 
 const computeMeasure = "time|times|timing|loops?|cpu|memory|ram|performance|runtime|latency|complexity|allocations?|iterations?|cycles?|speed|startup|overhead"
 
 const deletingWork = new RegExp(
   "\\b(?:" + deletingVerbs + ")" + between + "\\s+(?:" + work + ")\\b" + notAName
     + "|\\b(?:" + work + ")\\b(?:\\s+\\w+){0,3}?\\s+(?:" + deletedVerbs + ")\\b"
+    + "|\\b(?:" + ownWork + ")\\b(?:\\s+\\w+){0,3}?\\s+(?:will|would|should|could|may|might|must|is|are|was|were|has|have|had|gets?|got)\\s+(?:been\\s+|be\\s+|get\\s+)?(?:" + deletedVerbs + ")\\b"
     + "|\\b(?:" + deletingVerbs + ")" + between + "\\s+[a-z][a-z0-9]*-\\d+\\b" + notAName
-    + "|\\breset\\s+--hard|\\bbranch\\s+-D\\b",
+    + "|\\b(?:" + deletingVerbs + ")" + between + "\\s+(?:" + ownWork + ")\\b"
+    + "|\\breset\\s+--hard|\\bhard[- ]reset|\\bbranch\\s+-D\\b|\\bstash\\s+(?:drop|clear)\\b|\\bclean\\s+-\\w*f|\\bcheckout\\s+--\\s+\\.|\\brestore\\s+\\.",
   "i"
 )
 
+const deletingVerb = new RegExp("\\b(?:" + deletingVerbs + ")\\b", "i")
+
+const namesUnlandedWork = /\b(?:unlanded|unmerged|unpushed|unfinished|uncommitted)\b/i
+
 const neverDecided: ReadonlyArray<NeverDecided> = [
   { topic: "deleting", asks: deletingWork },
+  { topic: "deleting", asks: deletingVerb, about: namesUnlandedWork },
   { topic: "security", asks: /\b(secur\w*|insecur\w*|vulnerab\w*|exploit\w*)\b/i },
   {
     topic: "credentials",
@@ -30,6 +40,7 @@ const neverDecided: ReadonlyArray<NeverDecided> = [
   { topic: "merging", asks: /\bmerg\w*/i },
   { topic: "pushing", asks: /\bpush\w*\b/i },
   { topic: "releasing", asks: /\b(releas\w*|publish\w*|deploy\w*)/i },
+  { topic: "going public", asks: /\bmak(?:e|es|ing)\b[^.?!\n]{0,40}\bpublic\b|\bpublicly\b|\bpubliciz\w*|\b(?:post|posts|posted|posting|announc\w*|e-?mail\w*|shar(?:e|es|ed|ing))\b[^.?!\n]{0,60}?\b(?:to|on|with|in)\s+(?:the\s+|a\s+|an\s+|our\s+)?(?:clients?|customers?|users?|public|world|upstream|github|gists?|discord|slack|twitter|x|reddit|hacker news|mailing lists?|forums?|channels?|blogs?|issues?|newsletters?)\b|\bupstream\s+(?:\S+\s+)?(?:repo\w*|issues?|projects?|maintainers?)\b|\b(?:github issues?|gists?|discord|slack|twitter|tweet\w*|reddit|hacker news|mailing lists?)\b(?![\w/-])/i },
   { topic: "spending", asks: /\b(pay|pays|paying|paid|payments?|billing|purchas\w*|buy\w*|budget\w*|money|dollars?)\b|\$\s?\d+/i },
   { topic: "spending", asks: new RegExp("(?<!\\b(?:" + computeMeasure + ")\\b[^.?!]*)\\b(?:spend\\w*|spent|costs?|costing)\\b(?![^.?!]*\\b(?:" + computeMeasure + ")\\b)", "i") },
   { topic: "anything that cannot be undone", asks: /\b(irreversib\w*|irrevocab\w*|permanent\w*|undoable|(cannot|can't|can not) be (undone|reversed)|force[- ]push\w*)/i },
@@ -41,7 +52,7 @@ const neverDecided: ReadonlyArray<NeverDecided> = [
 export const neverDecidedReason = (question: string): string | null => {
   for (const entry of neverDecided) {
     const found = entry.asks.exec(question)
-    if (found !== null) {
+    if (found !== null && (entry.about === undefined || entry.about.test(question))) {
       return "orc never hands the decider a question about " + entry.topic + ", and this one says " + JSON.stringify(found[0])
     }
   }
@@ -62,8 +73,13 @@ const askedActionReason = (asks: string): string | null => {
     : "the review question asks the owner to " + named + ", and orc hands every asked action to the owner"
 }
 
+const unclassified = "unknown"
+
+const textReason = (text: string): string | null =>
+  text.trim() === "" ? "the question carries no words orc can check, so orc hands it to the owner" : neverDecidedReason(text)
+
 export const guardReason = (question: { readonly text: string; readonly asks?: string | undefined }): string | null =>
-  question.asks === undefined ? neverDecidedReason(question.text) : askedActionReason(question.asks)
+  question.asks === undefined || question.asks === unclassified ? textReason(question.text) : askedActionReason(question.asks)
 
 export const askBackWords = (question: string): string =>
   "Before it answers, orc's decider asks you: " + question + "\nPut your reply in a new orc_ask question."

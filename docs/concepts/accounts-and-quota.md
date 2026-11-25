@@ -50,7 +50,10 @@ The account's kind says where its credential lives.
 | `token-file` | The path of a token file that exists on the machine, never the token |
 | `token-command` | A token the command prints, sent on standard input and renewed each beat |
 | `claude-config` | The path of that account's Claude config directory on the machine |
-| `none` | Nothing, since the provider's own package logs in |
+| `none` | Nothing, since the provider's Pi login or its own package logs in |
+
+A `none` account spends the one login its provider holds on each machine, so no other account in the quota may run on that provider.
+A Claude account, an OpenAI account and an OpenCode account may each take kind `none` side by side.
 
 A token command account is for a token that lives on the dispatching machine and rolls over.
 The runner keeps it in a folder only its owner can read and removes the folder when the run ends.

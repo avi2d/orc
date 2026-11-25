@@ -91,6 +91,7 @@ const parkedA = parkedTable(["q1,warning,a.go,,ask-user,Which table?"])
 const parkedB = parkedTable(["r1,error,b.go,,auto-fix,Fixable", "review-1,warning,,,manual,needs a human"])
 
 const runnerFor = (start: string, respond?: (response: GateResponse) => Effect.Effect<NoMistakesReply>): NoMistakesRunner => ({
+  init: Effect.die("the repository is initialized in this test"),
   start: () => Effect.succeed({ stdout: start, stderr: "", exitCode: 0 }),
   reattach: Effect.die("no reattach in this test"),
   respond: (response) => respond === undefined ? Effect.die("no gate answers in this test") : respond(response),

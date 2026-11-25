@@ -125,6 +125,7 @@ const reference = [
   page("Commands", "/reference/commands"),
   { text: "The backlog and the beat", link: "/run/backlog-and-beat", items: [
     page("Backlog configuration", "/run/backlog-configuration"),
+    page("Dispatch rules", "/run/dispatch-rules"),
     page("Manage backlog tasks", "/run/backlog-tasks"),
     page("The beat and task runs", "/run/beat-runs")
   ] },
@@ -144,6 +145,7 @@ const reference = [
   page("Seeing runs", "/run/seeing-runs"),
   page("What the no-mistakes fork adds", "/run/no-mistakes-fork"),
   page("Updating orc", "/run/updating-orc"),
+  page("Release assets", "/run/release-assets"),
   page("Where things are in the run package", "/run/layout")
 ]
 

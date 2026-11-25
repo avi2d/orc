@@ -32,6 +32,76 @@ const configProblem = async (root: string, quota: object): Promise<string | null
   ))
 }
 
+describe("routing account references", () => {
+  const accounts = [
+    ...config.quota.accounts,
+    { name: "code", kind: "token-file", tokenFile: "/secrets/code-token", provider: "code", models: { implementer: "code/legacy", fixer: "code/legacy" } }
+  ]
+
+  for (const location of ["rule", "default", "pin"] as const) {
+    test.each([
+      ["missing", "keyed/work", "unknown account"],
+      ["main", "code/work", "provider keyed"],
+      ["code", "keyed/work", "provider code"]
+    ] as const)("a " + location + " candidate on %s rejects %s instead of silently falling back", async (account, implementer, reason) => {
+      await withBacklog(async (root) => {
+        const file = join(root, "dispatch.json")
+        const candidates = ["keyed/valid", { account, models: { implementer } }]
+        const routing = location === "rule"
+          ? { rules: [{ when: {}, candidates }], default: ["keyed/default"] }
+          : location === "default"
+            ? { rules: [], default: candidates }
+            : { rules: [], default: ["keyed/default"], tasks: { "orc-1": { model: { account, models: { implementer } } } } }
+        await writeFile(file, JSON.stringify({ ...config, quota: { ...config.quota, accounts }, routing }))
+        const problem = await run(readDispatchConfig(file).pipe(
+          Effect.map(() => null),
+          Effect.catchTag("ConfigError", (error) => Effect.succeed(error.detail))
+        ))
+        expect(problem).toContain(account)
+        expect(problem).toContain(reason)
+      })
+    })
+
+    test.each([
+      ["string", "missing/work"],
+      ["object", { models: { implementer: "missing/work" } }]
+    ] as const)("a " + location + " %s rejects a provider without a quota account instead of waiting for quota", async (_, candidate) => {
+      await withBacklog(async (root) => {
+        const file = join(root, "dispatch.json")
+        const candidates = ["keyed/valid", candidate]
+        const routing = location === "rule"
+          ? { rules: [{ when: {}, candidates }], default: ["keyed/default"] }
+          : location === "default"
+            ? { rules: [], default: candidates }
+            : { rules: [], default: ["keyed/default"], tasks: { "orc-1": { model: candidate } } }
+        await writeFile(file, JSON.stringify({ ...config, quota: { ...config.quota, accounts }, routing }))
+        const problem = await run(readDispatchConfig(file).pipe(
+          Effect.map(() => null),
+          Effect.catchTag("ConfigError", (error) => Effect.succeed(error.detail))
+        ))
+        expect(problem).toBe("routing names the provider missing, which has no quota account")
+      })
+    })
+  }
+
+  test("named accounts accept inherited and explicit providers instead of rejecting valid routes", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      const routing = {
+        rules: [{ when: {}, candidates: [{ account: "main", models: { implementer: "keyed/work", fixer: "keyed/fix", reviewer: "keyed/review" } }] }],
+        default: [{ account: "code", models: { implementer: "code/work" } }],
+        tasks: {
+          "orc-1": { model: { account: "code", models: { implementer: "code/pinned", fixer: "code/fix", reviewer: "code/review" } } },
+          "orc-2": { model: "code/pinned" },
+          "orc-3": { model: { models: { implementer: "keyed/pinned" } } }
+        }
+      } satisfies DispatchConfig["routing"]
+      await writeFile(file, JSON.stringify({ ...config, quota: { ...config.quota, accounts }, routing }))
+      expect((await run(readDispatchConfig(file))).routing).toEqual(routing)
+    })
+  })
+})
+
 describe("readDispatchConfig", () => {
   test("accepts a quota without a floor instead of requiring a percentage", async () => {
     await withBacklog(async (root) => {
@@ -129,21 +199,49 @@ describe("readDispatchConfig", () => {
       const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
       await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts: [{ name: "main", kind: "none" }] } }))
       const read = await run(readDispatchConfig(file).pipe(Effect.as("read"), Effect.catchTag("ConfigError", (error) => Effect.succeed(error.detail))))
-      expect(read).toBe("the account main takes kind none and holds no token, so the machine mac names a renew command it never takes")
+      expect(read).toBe("the machine mac names a renew command it never takes, because no account uses a token command")
     })
   })
   test("refuses a second account beside a kind none account instead of spending the wrong login", async () => {
     await withBacklog(async (root) => {
       expect(await configProblem(root, { accounts: [{ name: "main", kind: "none" }, { name: "alt", kind: "none" }] })).toBe(
-        "the account main takes kind none and names no login, so the quota names no other account beside it"
+        "the account main takes kind none and names no login, so no other account runs on its provider keyed, but alt does"
       )
     })
   })
   test("refuses a token account beside a kind none account instead of spending the wrong login", async () => {
     await withBacklog(async (root) => {
       expect(await configProblem(root, { accounts: [{ name: "main", tokenFile: "/a" }, { name: "alt", kind: "none" }] })).toBe(
-        "the account alt takes kind none and names no login, so the quota names no other account beside it"
+        "the account alt takes kind none and names no login, so no other account runs on its provider keyed, but main does"
       )
+    })
+  })
+  test("refuses a kind none account beside another account on its own provider instead of spending one login twice", async () => {
+    await withBacklog(async (root) => {
+      const models = { implementer: "codex/gpt-5.5", fixer: "codex/gpt-5.5" }
+      const accounts = [{ name: "main", tokenFile: "/a" }, { name: "openai", provider: "codex", models, kind: "none" }, { name: "openai-2", provider: "codex", models, tokenFile: "/b" }]
+      expect(await configProblem(root, { accounts })).toBe(
+        "the account openai takes kind none and names no login, so no other account runs on its provider codex, but openai-2 does"
+      )
+    })
+  })
+  test("keeps kind none accounts on providers no other account runs on instead of refusing a login per provider", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      const openai = { name: "openai", provider: "codex", models: { implementer: "codex/gpt-5.5", fixer: "codex/gpt-5.5" }, kind: "none" }
+      const go = { name: "go", provider: "opencode-go", models: { implementer: "opencode-go/kimi-k2", fixer: "opencode-go/kimi-k2" }, kind: "none" }
+      await writeFile(file, JSON.stringify({ machines: config.machines, quota: { ...config.quota, accounts: [{ name: "main", tokenFile: "/a" }, openai, go] } }))
+      const quota = (await run(readDispatchConfig(file))).quota
+      expect(quota.accounts.map((account) => [account.name, account.kind, providerOf(quota, account)])).toEqual([["main", "token-file", "keyed"], ["openai", "none", "codex"], ["go", "none", "opencode-go"]])
+    })
+  })
+  test("keeps the renew command a token command account needs beside a kind none account on another provider instead of calling it dead", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
+      const openai = { name: "openai", provider: "codex", models: { implementer: "codex/gpt-5.5", fixer: "codex/gpt-5.5" }, kind: "none" }
+      await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts: [{ name: "main", tokenCommand: ["my-token-command", "main"] }, openai] } }))
+      expect((await run(readDispatchConfig(file))).quota.accounts.map((account) => account.kind)).toEqual(["token-command", "none"])
     })
   })
   test("keeps several token accounts when no account is kind none", async () => {

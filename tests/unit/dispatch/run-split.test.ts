@@ -7,6 +7,7 @@ import { Effect, FileSystem, Layer, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { runBeat } from "../../../packages/run/src/widgets/beat/beat"
+import { openItem, openItems } from "../../../packages/run/src/entities/attention/attention"
 import { formatBeat } from "../../../packages/run/src/widgets/beat/board"
 import { parentLabel, taskLabel } from "../../../packages/run/src/shared/process/pueue-status"
 import { killHeld, startTask } from "../../../packages/run/src/features/queueing-a-task/index"
@@ -99,6 +100,7 @@ const beatAfterChildSplit = async (body: (root: string, lines: ReadonlyArray<str
     await run(addTask(root, { ...child, title: "Third slice", body: "# Third slice\n", dependsOn: ["orc-2"] }))
     await run(claimTask(root, "orc-2"))
     await run(writeTaken(root, { spec: { ...child, id: "orc-2" }, hold: null, parked: null, state: { kind: "started", claim, started } }))
+    await run(openItem(root, "orc-2.pr-ready", { kind: "pr-ready", task: "orc-2", text: "Old merge request", asked: started.at, owner: "user" }))
     const workerTaskFile = join(root, "run-2-task.md")
     await writeFile(workerTaskFile, child.body)
     await run(Effect.acquireUseRelease(
@@ -171,7 +173,7 @@ describe("the beat applying a worker's split proposal", () => {
     })
   })
 
-  test("a split from a child gives its parent the slices as children instead of nesting a parent", async () => {
+  test("a split from a child gives its parent the slices without nesting a parent or leaving its merge request open", async () => {
     await beatAfterChildSplit(async (root, lines) => {
       const tasks = await run(listTasks(root))
       expect(tasks.filter((task) => task.spec.parent === "orc-1").map((task) => [task.spec.id, task.spec.kind, task.spec.title])).toEqual([
@@ -181,6 +183,7 @@ describe("the beat applying a worker's split proposal", () => {
       ])
       const parents = new Set(tasks.filter((task) => task.spec.kind === "parent").map((task) => task.spec.id))
       expect(tasks.filter((task) => task.spec.parent !== null && parents.has(task.spec.id))).toEqual([])
+      expect((await run(openItems(root))).filter(({ item }) => item.task === "orc-2")).toEqual([])
       const proposer = tasks.find((task) => task.spec.id === "orc-2")
       expect(proposer?.spec.kind).toBe("ship")
       expect(proposer?.state.kind === "closed" ? proposer.state.closing.outcome + ":" + proposer.state.closing.reason : "")

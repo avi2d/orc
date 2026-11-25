@@ -17,12 +17,12 @@ const withoutLoneWord = (rows: ReadonlyArray<Row>, width: number, separator: str
 };
 
 export const wrapParts = (parts: ReadonlyArray<string>, width: number, separator = " \u00b7 ", kept?: number): ReadonlyArray<string> => {
-  const rows = parts.reduce<ReadonlyArray<Row>>((lines, part) => {
-    const last = lines.at(-1);
-    if (last === undefined) return [[part]];
-    const joined = [...last, part];
-    return widthOf(joined.join(separator)) <= width ? [...lines.slice(0, -1), joined] : [...lines, [part]];
-  }, []);
+  const rows: Array<Array<string>> = [];
+  for (const part of parts) {
+    const last = rows.at(-1);
+    if (last !== undefined && widthOf([...last, part].join(separator)) <= width) last.push(part);
+    else rows.push([part]);
+  }
   const balanced = kept !== undefined && rows.length > kept ? rows : withoutLoneWord(rows, width, separator);
   return balanced.map((row) => row.join(separator));
 };

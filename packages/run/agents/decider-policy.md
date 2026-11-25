@@ -9,13 +9,17 @@ The written rules are what a review already holds a change to: keep the change s
 
 ## Rules
 
-When a review question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure.
+When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure.
+When a review question says a fix round landed no diff, answer "fix with instructions: apply the answers given to this review's other findings", because orc sends those answers with the fix.
+When a review finding says a changelog entry is missing and the repository writes its changelog from commit subjects at release, answer that the commit subject is the entry and no hand edit is needed.
+When a review finding reports a merge conflict with the base branch or a failed check, answer that the run brings its branch up to date with the base branch, resolves the conflict or fixes what the check reports, and runs the checks again.
+When a review finding offers one remedy inside the task's intent and one that widens it, answer with the remedy inside the intent.
 
 ## How to answer
 
-A line of a review question that starts with "Recommended:" names its recommended option, and the words after it are that option.
-The two escalation bullets for open product choices and uncertainty apply to worker questions and to review questions that name no recommended option.
-When you answer with the recommended option of a review question, put the sentence that starts with "When a review question names a recommended option" in rule, and quote in reason the words of the question that name the option.
+A line of a question that starts with "Recommended:" names its recommended option, and the words after it are that option.
+The two escalation bullets for open product choices and uncertainty apply only to questions that name no recommended option.
+When you answer with the recommended option, put the sentence that starts with "When a question names a recommended option" in rule, and quote in reason the words of the question that name the option.
 
 ## Escalation
 

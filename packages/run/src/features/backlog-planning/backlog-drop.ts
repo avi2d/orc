@@ -1,5 +1,6 @@
 import { Effect, FileSystem } from "effect"
-import { answeredOnly, BacklogError, isHeld, listTasks, newGrab, parseTaskFile, platformFailure, publishOnce, renderTaskFile, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { answeredOnly, BacklogError, closeNewTask, findTask, fullPrUrl, isHeld, landedClosing, listTasks, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { withdrawTaskItems } from "../../entities/attention/index"
 
 export type DropTask = {
   readonly kind: "DropTask"
@@ -35,34 +36,25 @@ const dropRefusal = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>): string
   return waiting.length === 0 ? null : waiting.join(", ") + " waits on " + id + ", so change that with orc backlog depend first"
 }
 
-const droppedRecord = (fresh: TaskRecord, reason: string, closedAt: string): TaskRecord => ({
+type UnclaimedClose = Extract<Extract<TaskRecord["state"], { readonly kind: "closed" }>, { readonly claim: null }>["closing"]
+
+const closedRecord = (fresh: TaskRecord, closing: UnclaimedClose, closedAt: string): TaskRecord => ({
   ...fresh,
   hold: isHeld(fresh) ? null : fresh.hold,
   parked: answeredOnly(fresh.parked),
-  state: { kind: "closed", claim: null, closing: { outcome: "dropped", reason }, closedAt, postedAt: null }
+  state: { kind: "closed", claim: null, closing, closedAt, postedAt: null }
 })
 
-// rename(2) takes the one task file at most once, so a beat's claim and a drop never both get the task.
-const moveDropped = (root: string, listed: TaskRecord, tasks: ReadonlyArray<TaskRecord>, reason: string, closedAt: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, Requirements> =>
-  Effect.gen(function*() {
-    const id = listed.spec.id
-    const { fs, paths, file, grabbed, putBack, read } = yield* newGrab(root, id)
-    const settle = Effect.gen(function*() {
-      const fresh = yield* parseTaskFile(file, "new", yield* read)
-      const refused = dropRefusal(fresh, tasks)
-      if (refused !== null) {
-        return yield* new BacklogError({ detail: refused })
-      }
-      const dropped = droppedRecord(fresh, reason, closedAt)
-      if (!(yield* publishOnce(paths.folder("closed"), id + ".md", renderTaskFile(dropped)))) {
-        return yield* new BacklogError({ detail: id + " was closed by another command" })
-      }
-      return dropped
-    })
-    const dropped = yield* settle.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
-    yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
-    return dropped
-  })
+const moveNewToClosed = (
+  root: string,
+  id: string,
+  refusal: (task: TaskRecord) => string | null,
+  closing: UnclaimedClose,
+  closedAt: string
+): Effect.Effect<TaskRecord, BacklogError | TaskFileError, Requirements> =>
+  closeNewTask(root, id, (fresh) => refusal(fresh) ?? closedRecord(fresh, closing, closedAt)).pipe(
+    Effect.tap(() => withdrawTaskItems(root, [id], closedAt))
+  )
 
 export const dropTask = (root: string, id: string, reason: string, closedAt: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, Requirements> =>
   Effect.gen(function*() {
@@ -75,5 +67,26 @@ export const dropTask = (root: string, id: string, reason: string, closedAt: str
     if (refused !== null) {
       return yield* new BacklogError({ detail: refused })
     }
-    return yield* moveDropped(root, listed, tasks, reason, closedAt)
+    return yield* moveNewToClosed(root, id, (fresh) => dropRefusal(fresh, tasks), { outcome: "dropped", reason }, closedAt)
+  })
+
+const landedRefusal = (task: TaskRecord): string | null =>
+  task.state.kind === "new" && task.parked !== null && task.spec.kind !== "decision"
+    ? null
+    : task.spec.id + " is not a parked task in the new backlog, so it cannot close with --landed-in"
+
+export const closeLandedTask = (root: string, id: string, pr: string, at: string): Effect.Effect<string, BacklogError | TaskFileError, Requirements> =>
+  Effect.gen(function*() {
+    const url = fullPrUrl(pr)
+    if (url === null) {
+      return yield* new BacklogError({ detail: "orc backlog close --landed-in takes the full URL of the merged PR" })
+    }
+    const task = yield* findTask(root, id)
+    const refused = landedRefusal(task)
+    if (refused !== null) {
+      return yield* new BacklogError({ detail: refused })
+    }
+    const closing = landedClosing(url)
+    yield* moveNewToClosed(root, id, landedRefusal, closing, at)
+    return closing.reason
   })

@@ -197,7 +197,7 @@ Subcommands:
   add        Add a task to the backlog
   edit       Replace the text of a task that has not started
   origin     Record where a parked task's run lives
-  close      Close a task by hand as done or failed
+  close      Close a started task or a parked task whose work landed elsewhere
   stop       Kill a task's run and close the task stopped
   drop       Drop a new task with a reason
   posted     Mark a closed task or an event as posted to the chat
@@ -278,13 +278,15 @@ Examples:
 
 ```text
 Usage: orc backlog close <task-id> <done|failed> [<reason>]
+       orc backlog close <task-id> --landed-in <pr-url>
 
-Closes a started task as done or failed, with an optional reason, for a machine
-whose start command orc does not run. On a decision, failed drops it, and done
-is refused, since only orc backlog answer closes a decision done.
+Closes a started task as done or failed. For a parked task, --landed-in records
+where the work merged and closes the task done without changing its branch. For
+a decision, failed drops it, and only orc backlog answer closes it done.
 
 Examples:
-  orc backlog close orc-9 failed "the machine was rebuilt"
+  orc backlog close orc-9 failed "the runner lost the worktree"
+  orc backlog close orc-9 --landed-in https://github.com/example/project/pull/42
 ```
 
 #### orc backlog stop
@@ -501,7 +503,8 @@ Examples:
 Usage: orc beat [--json]
 
 Reads the room on each machine, starts each task that waits on nothing, closes
-finished runs and relays answers. Run it from cron or launchd every few minutes.
+finished runs and relays answers. Checks for Orc updates on dispatch machines at
+most once an hour. Run it from cron or launchd every few minutes.
 
 Options:
   --json  Print the beat as an orc.beat.v1 JSON document.
@@ -915,9 +918,11 @@ Examples:
 Usage: orc update [--json]
 
 Reads the newest version of @avi2dg/orc from the npm registry and installs it
-only when it is newer than the running orc. The install runs bun add -g
-@avi2dg/orc@<version>, or the update.command config.json names. A registry read
-that fails or takes more than 15 seconds leaves orc as it is.
+only when it is newer than the running orc. A Bun global install runs bun add -g
+@avi2dg/orc@<version>. A versioned launcher prepares a release before switching
+its release file: a checkout when run from source, a release archive when
+compiled. An update.command in config.json overrides both. A registry read that
+fails or takes more than 15 seconds leaves orc as it is.
 
 Options:
   --json  Print the result as an orc.update.v1 JSON document.

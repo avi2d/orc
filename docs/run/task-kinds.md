@@ -138,6 +138,8 @@ orc-3 new Show the plan
 orc-4 new waits orc-2,orc-3 Plan at intake
 ```
 
+A parked child closed with `orc backlog close --landed-in` shows as `done landed in <pr-url>`.
+
 To drop a child from the plan, run `orc backlog plan <task-id> --drop <child-id>`, which removes its task file and lowers the parent's count.
 Orc refuses a child that is taken, started, closed or parked, and one another open task waits on until `orc backlog depend` changes that wait.
 To add a slice, run `orc backlog add <project> <task-file> --parent <task-id>`, and to reorder slices, run `orc backlog depend`.

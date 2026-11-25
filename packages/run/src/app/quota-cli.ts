@@ -10,6 +10,6 @@ export const runQuotaCli = (
 ): Effect.Effect<void, ConfigError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const config = yield* readDispatchConfig(backlogPaths(backlogRoot(home)).dispatchConfig)
-    const reading = yield* readQuota(config.quota)
-    yield* Console.log(json ? JSON.stringify(reading) : describeQuota(reading))
+    const reading = yield* readQuota({ ...config.quota, perTaskRouting: config.routing !== undefined })
+    yield* Console.log(json ? JSON.stringify(reading) : describeQuota(reading, config.routing !== undefined))
   })

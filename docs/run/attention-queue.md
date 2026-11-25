@@ -24,10 +24,25 @@ Its policy is in `packages/run/agents/decider-policy.md`.
 No-mistakes names the action it asks of you in the `question_action` column of each `ask-user` finding and each `question-<id>` finding.
 Orc carries that value through `asking.json`, the run history and the parked question in the task file.
 When a question names `none`, orc sends it to the decider.
-When it names `merge`, `delete` for deleting unlanded work, `login`, or any other value, orc sends it to you.
+When it names `merge`, `delete` for deleting unlanded work, `login`, `push`, `release`, or any other value orc does not know, orc sends it to you.
 
-A question that names no action goes through a topic check instead.
-Orc sends questions about deletion, security, credentials, merging, pushing, releasing, spending, irreversible actions, site appearance, legal text, and logins to you.
+### The topic check
+
+No-mistakes writes `unknown` for an `ask-user` finding its reviewer did not classify.
+A question that names `unknown` or no action goes through a topic check instead.
+Orc sends questions about deletion, security, credentials, merging, pushing, releasing, going public, spending, irreversible actions, site appearance, legal text, and logins to you.
+The topic check reads the whole question, including context and reports of completed actions.
+A question that names `merge conflicts` or says a step pushes a tag goes to you, even if it only asks whether to continue.
+Going public means making something public, doing it publicly, or posting, announcing, emailing or sharing to an outside place such as a client, a channel or an issue.
+An upstream repository, issue or project, or a service such as a gist, Discord, Slack or Reddit, counts on its own.
+The word public or share alone, as in `public API`, does not count.
+Dropping, discarding, scrapping, resetting, reverting, restoring, or throwing away or out commits, changes, edits, modifications, diffs, work, a stash or what you changed counts as deleting work.
+Singular change or edit counts after my, our, your, this, that, the local, or uncommitted.
+The noun counts within three words after the verb without a joining word such as `in`, or before a past form such as `discarded`.
+Own work needs a helper verb before the past form, as in `will be discarded` or `will be scrapped`.
+A hard reset, `git reset --hard`, `git branch -D`, `git stash drop` or `clear`, `git clean -f`, `git checkout -- .` and `git restore .` also count.
+The name `test runs` never counts as deleting work.
+A question with no words at all goes to you.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
 Rules and policy do not widen either check.
 
@@ -50,13 +65,24 @@ The decider can:
 
 ### Follow the recommended option
 
-A line of a review question that starts with `Recommended:` names its recommended option, and leading whitespace before it is allowed.
+A line of a question that starts with `Recommended:` names its recommended option, and leading whitespace before it is allowed.
 The policy tells the decider to answer such a question with that option, even when it picks between product choices the intent leaves open or the decider is not sure.
-When the decider still escalates a review question with that line on one of those two bullets, orc answers it with the recommended option and records the policy's Rules sentence as the rule.
+When the decider still escalates a question with that line on one of those two bullets, orc answers it with the recommended option and records the policy's Rules sentence as the rule.
 An escalation on any other bullet, or with no bullet, stays with you, and so does a question on the topic list above.
-When the decider answers a review question on that Rules sentence, orc records the question's `Recommended:` option as the answer, whatever option the reply named.
-Orc escalates such an answer to a review question with no `Recommended:` line, and to a worker question.
-The rule and the override apply only to review questions, so a worker question that leaves a product choice open still escalates, even when the worker recommends an option.
+When the decider answers a question on that Rules sentence, orc records the question's `Recommended:` option as the answer, whatever option the reply named.
+Orc escalates such an answer to a question with no `Recommended:` line.
+The rule and the override apply to review questions and worker questions alike, once they pass the topic check.
+
+### Settle routine review findings
+
+The policy's Rules section settles these findings in a review question classified as `none`, and in an unclassified question that passes the topic check:
+
+- A fix round that landed no diff gets `fix with instructions`, and orc sends the answers to the review's other findings with the fix.
+- A missing changelog entry, in a repository whose release writes the changelog from commit subjects, gets the commit subject as its entry.
+- A merge conflict with the base branch or a failed check gets a fix from the run, which then runs the checks again.
+- A finding with one remedy inside the task's intent and one that widens it gets the remedy inside the intent.
+
+An unclassified merge conflict, or an unclassified changelog finding that names a release, still goes to you on its words.
 
 ### Handle a failed call
 
@@ -82,10 +108,18 @@ A question asked again with the same words keeps its item.
 A question asked again with different words opens a new item, and the old item is withdrawn.
 An answered question asked again opens a new item, and the old item keeps its answer.
 
+## Items for run events
+
 The beat opens an item for each run event, owned by the user:
 
 - A run that died opens a `run-died` item, when its task closes failed or its start fails.
   A run that ends done or that you stop opens none.
+  Two failures retry instead of opening the item.
+  When no-mistakes refuses to start because the repository is not initialized, the run runs `no-mistakes init --skip-user-skill` and starts no-mistakes again.
+  When the command that reaches a dispatch machine exits 255, as ssh does when its connection fails, the task stays started and the next beat reads it again.
+- A dispatch machine that orc has not reached for 10 minutes, counted from the first beat that could not reach it, opens a `machine-unreached` item for each started task on that machine.
+  Each item names the machine and the error of the command that reaches it, and the task stays started.
+  A beat that reaches the machine again withdraws the item, and so does closing its task.
 - A red check on a closed ship task's PR opens a `check-red` item for the PR's head commit.
   Checks that turn green on that commit, or a new commit, withdraw it.
   Merging the PR or closing it without merging withdraws it.
@@ -95,17 +129,28 @@ The beat opens an item for each run event, owned by the user:
   Merging the PR closes it with the answer `merged`.
   Closing the PR without merging closes it with the answer `closed without merging`.
 
+### Items for update failures
+
+A failed [update check](beat-runs.md#updating-orc-on-dispatch-machines) opens an `update-failed` item for a dispatch machine.
+A retry that fails for the same version updates the open item without replacing any answer.
+A successful check withdraws the open item.
+Use `orc attention answer <item-id> <words>` to record an acknowledgement.
+A retry that fails again before a check succeeds leaves the answered item closed.
+After a successful check, the next failure opens a new item and the answered item keeps its answer.
+
 ## Recording a choice
 
-Each item the beat opens names its `subject` and lists its `options`, each with the `outcome` it leads to, and its `recommendation` names one of them:
+The following items name a `subject` and list `options`, each with the `outcome` it leads to.
+The `recommendation` names one option:
 
 - A `run-died` item offers `rerun` or `close`, and recommends `rerun`.
 - A `check-red` item offers `send back` or `close`, and recommends `send back`.
 - A `pr-ready` item offers `merge` or `hold`, and recommends `merge`.
 - A `failing-command` item offers `continue` or `stop`, and recommends `continue`.
+- A `machine-unreached` item offers `wait` or `close`, and recommends `wait`.
 - An `overdue-wait` item offers `answer` or `drop`, and recommends `answer`.
 
-To record a choice on a `run-died`, `check-red`, `pr-ready` or `failing-command` item, run `orc attention answer <item-id> <words>`.
+To record a choice on a `run-died`, `check-red`, `pr-ready`, `failing-command` or `machine-unreached` item, run `orc attention answer <item-id> <words>`.
 Run the command the outcome names to carry out the option.
 `orc attention answer` only records the choice and closes the item.
 It refuses a review question, a worker question or an overdue wait and names the task to answer with `orc backlog answer` instead.
@@ -121,6 +166,8 @@ The text view shows the decider's answers under `Decided:`.
 Run `orc attention --json` for an `orc.attention.v1` document with `at`, `items`, and `decided`.
 An open item in `items` carries its `subject`, `options` and `recommendation` when it has them.
 The output shape is in `packages/run/src/features/attention-list/attention-view.ts`.
+Closing a task withdraws the items open at the time of the close.
+The beat can open new items about the run's failure or the PR it tracks after the close.
 An answered item leaves `decided` when its task closes.
 
 Run `orc backlog thread <task-id>` to see one task's items alongside its holds, questions, answers, and notes.

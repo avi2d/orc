@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { bypassLine, callerTool, parseStandinCall, projectTool, standinMarker, type StandinCall } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
+import { bypassLine, callerTool, helperCommandOf, parseStandinCall, projectTool, standinMarker, type StandinCall } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
 
 const call: StandinCall = {
   tool: "cargo",
@@ -104,5 +104,21 @@ describe("projectTool", () => {
     await writeFile(join(inner, "node_modules", ".bin", "oxlint"), "#!/bin/sh\n# " + standinMarker + ".\n", { mode: 0o755 })
     expect(projectTool("oxlint", join(inner, "src"))).toBe(join(outer, "oxlint"))
     expect(projectTool("tsc", inner)).toBe("")
+  })
+})
+
+describe("helperCommandOf", () => {
+  test("a source run starts bun on the helper file instead of the module alone", () => {
+    expect(helperCommandOf("/bin/bun", "/repo/heavy-standin-runtime.ts", "/repo/heavy-standin-main.ts")).toEqual([
+      "/bin/bun", "--no-env-file", "--config=/dev/null", "/repo/heavy-standin-main.ts"
+    ])
+  })
+
+  test.each([
+    ["/$bunfs/root/heavy-standin", "/$bunfs/root/heavy-standin-main.ts"],
+    ["B:\\~BUN\\root\\heavy-standin.exe", "B:\\~BUN\\root\\heavy-standin-main.ts"],
+    ["B:/~BUN/root/heavy-standin.exe", "B:/~BUN/root/heavy-standin-main.ts"]
+  ])("a compiled run from %s starts its own file instead of bun flags and an embedded path", (modulePath, main) => {
+    expect(helperCommandOf("/opt/heavy-standin", modulePath, main)).toEqual(["/opt/heavy-standin"])
   })
 })

@@ -1,7 +1,7 @@
 import { Config, Context, Duration, Effect, Layer, Option, Schema } from "effect";
 import { CommandRunner } from "../../../shared/lib";
-import { type Decoded, decodeJson, decoded } from "../../../shared/lib";
-import { mapOutcome, type Outcome, type Reading, zipOutcomes } from "../../../shared/lib";
+import { type Decoded, decodeJson } from "../../../shared/lib";
+import { type Failed, failureOf, ok, type Outcome, type Reading } from "../../../shared/lib";
 import { runDecoded, stamped } from "../../../shared/lib";
 import { selector } from "../../../shared/config";
 import { activeRunStatuses } from "../contract/queues";
@@ -50,14 +50,10 @@ const mostAdvancedEach = (runs: ReadonlyArray<ActionRun>): ReadonlyArray<ActionR
   return [...byId.values()];
 };
 
-export const activeRuns = (outcomes: ReadonlyArray<Outcome<ReadonlyArray<ActionRun>>>): Outcome<ReadonlyArray<ActionRun>> =>
-  mapOutcome(
-    outcomes.reduce<Outcome<ReadonlyArray<ActionRun>>>(
-      (all, runs) => zipOutcomes(all, runs, (earlier, later) => [...earlier, ...later]),
-      decoded([]),
-    ),
-    mostAdvancedEach,
-  );
+export const activeRuns = (outcomes: ReadonlyArray<Outcome<ReadonlyArray<ActionRun>>>): Outcome<ReadonlyArray<ActionRun>> => {
+  const failed = outcomes.find((outcome): outcome is Failed => outcome.kind !== "ok");
+  return failed === undefined ? ok(mostAdvancedEach(outcomes.flatMap((outcome) => (outcome.kind === "ok" ? outcome.value : [])))) : failureOf(failed);
+};
 
 export interface ActionsReading {
   readonly repo: string;

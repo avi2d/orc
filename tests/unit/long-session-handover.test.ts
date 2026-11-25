@@ -176,6 +176,7 @@ describe("a handover written after no-mistakes", () => {
         await mkdir(sessionDir, { recursive: true })
         await writeFile(join(sessionDir, "2026-10-01T09-00-00-000Z_long-nm.jsonl"), sessionJsonl)
         const fixedAfterLoop: NoMistakesRunner = {
+          init: Effect.die("no init in this test"),
           start: () => Effect.promise(() =>
             appendFile(logFile, "def5678\x1fFix B\n").then(() => ({
               stdout: "outcome: passed\npr: https://example.com/pr/1\n",

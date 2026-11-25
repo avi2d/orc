@@ -1,9 +1,9 @@
-import { Effect, type FileSystem, type Path } from "effect"
+import { Effect, type FileSystem, type Path, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { homedir } from "node:os"
-import { resolveAgentFile, type AgentFile, type AgentKind, type PiThinkingLevel } from "../../entities/agent/index"
+import { finishAgentFile, readAgentFile, resolveAgentFile, type AgentFile, type PiThinkingLevel } from "../../entities/agent/index"
 import type { HostTools, SandboxKind } from "../../shared/sandbox/index"
-import { configuredModels, readOrcConfig, routeOfAgents, type RunDelivery } from "../../shared/config/index"
+import { configuredModels, readOrcConfig, routeOfAgents, type OrcConfig, type RoutedModels, RoutedModelsJson, type RunDelivery } from "../../shared/config/index"
 import { planSandbox, type SandboxPlan } from "./sandbox-plan"
 import type { Checkout } from "../../entities/task-copy/index"
 import { OrcRunError } from "../../shared/lib/index"
@@ -20,6 +20,37 @@ export interface PreparedAgents {
   readonly plan: SandboxPlan
 }
 
+interface ModelPins {
+  readonly tokenFile: string | undefined
+  readonly provider: string | undefined
+  readonly implementerModel: string | undefined
+  readonly fixerModel: string | undefined
+  readonly implementerThinking: PiThinkingLevel | undefined
+  readonly fixerThinking: PiThinkingLevel | undefined
+}
+
+export const prepareRoles = Effect.fnUntraced(function*(
+  location: { readonly projectDir: string; readonly orcHome: string; readonly agentsDir: string | undefined },
+  config: Pick<OrcConfig, "file" | "models">,
+  delivery: RunDelivery | undefined,
+  pins: Pick<ModelPins, "implementerModel" | "fixerModel" | "implementerThinking" | "fixerThinking">,
+  route: RoutedModels | undefined
+) {
+  const configured = configuredModels(config, {
+    implementer: pins.implementerModel ?? route?.implementer,
+    fixer: pins.fixerModel ?? route?.fixer ?? route?.implementer
+  })
+  const implementerFile = yield* readAgentFile("implementer", location)
+  const fixerFile = yield* readAgentFile("fixer", location)
+  const configModel = (model: string | undefined) => ({ file: config.file, model })
+  const agent = yield* finishAgentFile(implementerFile, { configModel: configModel(configured.implementer), thinking: pins.implementerThinking })
+  const fixer = yield* finishAgentFile(fixerFile, { configModel: configModel(configured.fixer), thinking: pins.fixerThinking })
+  const reviewer: PreparedReviewer = delivery === "direct-PR"
+    ? { kind: "direct-PR", reviewer: yield* resolveAgentFile("reviewer", { ...location, configModel: configModel(route?.reviewer ?? fixer.model) }) }
+    : { kind: "no-mistakes" }
+  return { agent, fixer, reviewer }
+}, Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
+
 export const prepareAgents = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
@@ -32,22 +63,18 @@ export const prepareAgents = (
   agentsDir: string | undefined,
   sandboxKind: SandboxKind,
   delivery: RunDelivery | undefined,
-  pins: { readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly implementerModel: string | undefined; readonly fixerModel: string | undefined; readonly implementerThinking: PiThinkingLevel | undefined; readonly fixerThinking: PiThinkingLevel | undefined }
+  pins: ModelPins
 ): Effect.Effect<PreparedAgents, OrcRunError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const config = yield* readOrcConfig(home).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read " + cause.file + ": " + cause.detail }))
     )
     const folders = yield* prepareRunFolders(fs, path, runDir, effectiveTaskFile, instructionsFile)
-    const configured = configuredModels(config, { implementer: pins.implementerModel, fixer: pins.fixerModel })
-    const resolveRole = (kind: AgentKind, model: string | undefined, thinking: PiThinkingLevel | undefined) =>
-      resolveAgentFile(kind, { projectDir: checkout.projectDir, orcHome: home, agentsDir, configModel: { file: config.file, model }, thinking })
-        .pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
-    const agent: AgentFile = yield* resolveRole("implementer", configured.implementer, pins.implementerThinking)
-    const fixer: AgentFile = yield* resolveRole("fixer", configured.fixer, pins.fixerThinking)
-    const reviewer: PreparedReviewer = delivery === "direct-PR"
-      ? { kind: "direct-PR", reviewer: yield* resolveRole("reviewer", fixer.model, undefined) }
-      : { kind: "no-mistakes" }
+    const routeText = Bun.env.ORC_DISPATCH_ROUTED_MODELS
+    const route = routeText === undefined ? undefined : yield* Schema.decodeEffect(RoutedModelsJson)(routeText, { onExcessProperty: "error" }).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read dispatched models: " + cause.message }))
+    )
+    const { agent, fixer, reviewer } = yield* prepareRoles({ projectDir: checkout.projectDir, orcHome: home, agentsDir }, config, delivery, pins, route)
     const piBinary = Bun.which("pi")
     const nodeBinary = Bun.which("node")
     const models = reviewer.kind === "direct-PR" ? { agent: agent.model, fixer: fixer.model, reviewer: reviewer.reviewer.model } : { agent: agent.model, fixer: fixer.model }
@@ -59,6 +86,6 @@ export const prepareAgents = (
       return yield* refuse("orc: node is not on the host PATH")
     }
     const host: HostTools = { piBinary, nodeBinary, homeDir: homedir() }
-    const plan = yield* planSandbox(fs, path, spawner, host, { projectDir: checkout.projectDir, runDir: folders.runDir, piAgentDir: folders.piAgentDir }, models, { config, provider, tokenFileFlag: pins.tokenFile }, sandboxKind)
+    const plan = yield* planSandbox(fs, path, spawner, host, { projectDir: checkout.projectDir, runDir: folders.runDir, piAgentDir: folders.piAgentDir, orcHome: home }, models, { config, provider, tokenFileFlag: pins.tokenFile }, sandboxKind)
     return { folders, agent, fixer, reviewer, plan }
   })

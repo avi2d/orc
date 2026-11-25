@@ -1,10 +1,11 @@
 import { type BeatAction, type BeatReport, type MachineRoom } from "./beat"
 import type { BeatWaits } from "./beat-waits"
 import { type TaskWait, taskWaiting } from "./beat-place"
-import { type ChildCount, childCount, decisionAnswer, dependencyWaits, fullPrUrl, type TaskKind, type TaskPriority, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, ranClosing, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
+import { type ChildCount, childCount, decisionAnswer, dependencyWaits, fullPrUrl, type TaskKind, type TaskPriority, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, ranClosing, taskLandedIn, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
 import type { Project } from "../../shared/config/index"
 import { describeQuota } from "./quota"
 import type { ChatEvent, PrState } from "../../entities/events/index"
+import { updateLine } from "../../entities/attention/index"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
 const BEAT_JSON_SCHEMA = "orc.beat.v1" as const
@@ -35,6 +36,7 @@ type TaskStatusJson =
     readonly started: Started | null
     readonly outcome: "done" | "failed" | "stopped" | "start-failed" | "dropped"
     readonly reason: string
+    readonly landedIn?: string
     readonly pr: string | null
     readonly report: string | null
     readonly answer: { readonly words: string; readonly at: string } | null
@@ -108,13 +110,15 @@ const claimJson = (record: TaskRecord): TaskStatusJson => {
     }
     case "closed": {
       const ran = ranClosing(record)
+      const landedIn = taskLandedIn(record)
       return {
         status: "closed",
         claim: state.claim,
         started: ran?.started ?? null,
         outcome: state.closing.outcome,
         reason: state.closing.reason,
-        pr: fullPrUrl(ran?.pr) ?? fullPrUrl(record.parked?.origin?.pr),
+        ...(landedIn === null ? {} : { landedIn }),
+        pr: landedIn === null ? fullPrUrl(ran?.pr) ?? fullPrUrl(record.parked?.origin?.pr) : null,
         report: ran?.report ?? null,
         answer: decisionAnswer(record),
         closedAt: state.closedAt,
@@ -248,6 +252,9 @@ export const formatBoard = (view: BacklogView): string => {
 
 const actionLine = (action: BeatAction): string => {
   switch (action.kind) {
+    case "update": {
+      return updateLine(action)
+    }
     case "started": {
       return "started " + action.task + " on " + action.machine + " with " + action.account + ", output to " + action.log
     }
@@ -331,7 +338,7 @@ const renewal = (action: BeatAction): boolean =>
 export const formatBeat = (report: BeatReport): string =>
   [
     report.beat + " at " + report.at,
-    describeQuota(report.quota),
+    describeQuota(report.quota, report.perTaskRouting),
     "room: " + (report.room.map((entry) => entry.machine + " " + entry.busy + " of " + entry.slots + " busy").join(", ") || "no machine"),
     ...report.actions.map(actionLine),
     ...(report.actions.every(renewal) ? ["no new task"] : [])
