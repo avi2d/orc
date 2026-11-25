@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { chmod, exists, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
@@ -10,7 +10,8 @@ import { openDatabase, recordRun, recordStep } from "../../packages/run/src/enti
 import { decodeShowJson } from "../../packages/run/src/features/seeing-runs/index"
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url))
-const compiledOrc = join(repoRoot, "packages/run/dist/orc")
+const windows = process.platform === "win32"
+const compiledOrc = join(repoRoot, "packages", "run", "dist", windows ? "orc.exe" : "orc")
 const compileTimeout = 300_000
 
 interface Ran {
@@ -19,22 +20,37 @@ interface Ran {
   readonly stderr: string
 }
 
+// Windows names PATH as Path, and an environment holding both spellings leaves the child either one.
+const overlay = (env: Record<string, string>): Record<string, string | undefined> => {
+  const replaced = new Set(Object.keys(env).map((key) => key.toUpperCase()))
+  return { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !replaced.has(key.toUpperCase()))), ...env }
+}
+
 const run = async (command: ReadonlyArray<string>, env: Record<string, string>, cwd: string): Promise<Ran> => {
-  const proc = Bun.spawn([...command], { stdin: "ignore", stdout: "pipe", stderr: "pipe", cwd, env: { ...process.env, ...env } })
+  const proc = Bun.spawn([...command], { stdin: "ignore", stdout: "pipe", stderr: "pipe", cwd, env: overlay(env) })
   const [stdout, stderr, exitCode] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
   return { exitCode, stdout, stderr }
 }
 
 const quotaScript = "console.log(JSON.stringify({ schema: \"orc.quota.v1\", accounts: [{ name: \"main\", remainingPercent: 50 }] }))"
 
-const piScript = "process.exit(Bun.spawnSync([...JSON.parse(process.env.ORC_CHAT_ORC ?? \"[]\"), \"--version\"], { stdout: \"inherit\", stderr: \"inherit\" }).exitCode)"
-
-const fakePi = [
-  "#!/bin/sh",
-  "printf 'ORC_CHAT_ORC=%s\\n' \"$ORC_CHAT_ORC\"",
-  "exec '" + process.execPath + "' -e '" + piScript + "'",
+const piScript = [
+  "console.log(\"ORC_CHAT_ORC=\" + process.env.ORC_CHAT_ORC)",
+  "process.exit(Bun.spawnSync([...JSON.parse(process.env.ORC_CHAT_ORC ?? \"[]\"), \"--version\"], { stdout: \"inherit\", stderr: \"inherit\" }).exitCode)",
   ""
 ].join("\n")
+
+// Windows starts a fake tool only through an extension it knows, and a .cmd file needs no compiling.
+const writeFakePi = async (bin: string): Promise<void> => {
+  const script = join(bin, "pi.js")
+  await writeFile(script, piScript)
+  if (windows) {
+    await writeFile(join(bin, "pi.cmd"), "@\"" + process.execPath + "\" \"" + script + "\" %*\r\n")
+    return
+  }
+  await writeFile(join(bin, "pi"), "#!/bin/sh\nexec '" + process.execPath + "' '" + script + "' \"$@\"\n")
+  await chmod(join(bin, "pi"), 0o755)
+}
 
 interface Fixture {
   readonly dir: string
@@ -54,9 +70,8 @@ const withFixture = async (body: (fixture: Fixture) => Promise<void>): Promise<v
     }))
     await writeFile(join(home, "backlog", "projects.json"), JSON.stringify({ projects: [] }))
     await writeFile(join(home, "config.json"), JSON.stringify({ providers: [], models: { orchestrator: "acme/orchestrator-1" } }))
-    await writeFile(join(bin, "pi"), fakePi)
-    await chmod(join(bin, "pi"), 0o755)
-    await body({ dir, env: { ORC_HOME: home, PATH: bin + ":" + (process.env.PATH ?? "") } })
+    await writeFakePi(bin)
+    await body({ dir, env: { ORC_HOME: home, PATH: bin + delimiter + (process.env.PATH ?? "") } })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -124,6 +139,11 @@ describe("compiled orc", () => {
       expect(chat.stdout).toContain("ORC_CHAT_ORC=" + JSON.stringify([await realpath(compiledOrc)]))
       expect(chat.stdout).toContain("orc " + packageJson.version)
       expect(await exists(join(env.ORC_HOME, "chat-tools.js"))).toBe(true)
+
+      // orc run starts git through a #!/bin/sh shim that Windows cannot start, so only POSIX reaches the embedded agent file.
+      if (windows) {
+        return
+      }
 
       const repo = join(dir, "repo")
       await mkdir(repo)
