@@ -20,6 +20,22 @@ const failedRun = (root: string) => run(Effect.acquireUseRelease(
 ))
 
 describe("a failed run", () => {
+  test("a run stopped by its owner closes instead of being retried", async () => {
+    await withBacklog(async (root) => {
+      await startTaskOne(root, ["orc", "runner", "start"], null)
+      await run(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "stopped", started: "2026-10-27T10:02:00.000Z", endReason: "the run was stopped" })),
+        (db) => Effect.sync(() => db.close())
+      ))
+      const task = (await run(listTasks(root)))[0]
+      if (task === undefined) throw new Error("missing task")
+      const progress = await Effect.runPromise(closeFinished({ root, home: root, config: sweepConfig }, task).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueDone(root, "Killed")))))
+      expect(progress).toMatchObject({ kind: "ended", action: { kind: "closed", outcome: "stopped" } })
+      expect((await run(listTasks(root)))[0]?.state.kind).toBe("closed")
+    })
+  })
+
   test("a second failure closes instead of retrying again and includes the log tail in run-died", async () => {
     await withBacklog(async (root) => {
       await startTaskOne(root, ["orc", "runner", "start"], null)
