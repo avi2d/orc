@@ -6,8 +6,8 @@ const sendBackQuestionId = "send-back"
 export const isSendBackQuestion = (question: string): boolean =>
   question === sendBackQuestionId || question.startsWith(sendBackQuestionId + "-")
 
-const sendBackQuestion = (id: string, words: string, at: string): ParkedQuestion =>
-  ({ id, text: "The captain sent the pull request back", asked: at, blocks: true, answer: { words, at, relayedTo: null } })
+const sendBackQuestion = (id: string, words: string, at: string, source: "captain" | "ci" = "captain"): ParkedQuestion =>
+  ({ id, text: source === "ci" ? "A CI check sent the pull request back" : "The captain sent the pull request back", asked: at, blocks: true, answer: { words, at, relayedTo: null } })
 
 const notSentBack = (id: string, kind: string) =>
   new BacklogError({ detail: "orc backlog send-back refused: " + id + " is " + kind + ", and only a closed task goes back" })
@@ -45,7 +45,7 @@ export const sendBackClosedTask = (
       if (ran === null) {
         return yield* new BacklogError({ detail: id + " closed without a run, so it has no branch to send back" })
       }
-      const parked: Parked = { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at)], origin: ran.pr === null ? origin : { ...origin, pr: ran.pr }, at, sentBackAt: at }
+      const parked: Parked = { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at, ciChecks.length === 0 ? "captain" : "ci")], origin: ran.pr === null ? origin : { ...origin, pr: ran.pr }, at, sentBackAt: at }
       const { retry: _retry, ...retryable } = record
       const { merge: _merge, ...unmerged } = retryable
       const sent: TaskRecord = { ...(mergeRecord === "kept" ? retryable : unmerged), ...(ciChecks.length === 0 ? {} : { ciSentBack: [...new Set([...(record.ciSentBack ?? []), ...ciChecks])] }), parked, state: { kind: "new" } }
