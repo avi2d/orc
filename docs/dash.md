@@ -34,7 +34,8 @@ To install `orc-dash` and `orc-dash-capture`:
 
 1. Download the archive for your platform and its checksum from the [Orc releases on GitHub](https://github.com/avi2d/orc/releases).
 1. Check the archive's checksum as [Release assets](run/release-assets.md#checksum-file) describes.
-1. Unpack the archive into a folder and add that folder to `PATH`.
+1. Unpack the archive into a folder outside `PATH`.
+1. Copy only `orc-dash` and `orc-dash-capture` into a folder on `PATH`.
 1. Run `orc-dash --help` and `orc-dash-capture --help` to check that both commands start.
 
 If you use a versioned launcher, see [Updating orc](run/updating-orc.md#update-a-versioned-checkout) for how to follow its selected release.

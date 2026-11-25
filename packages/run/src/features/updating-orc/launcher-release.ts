@@ -18,10 +18,7 @@ export const releasesUrl = packageJson.repository.url.replace(/^git\+/, "").repl
 
 const downloadTimeoutMs = 600_000
 
-const dashboardCommands = [
-  { name: "orc-dash", usage: "orc-dash <subcommand>" },
-  { name: "orc-dash-capture", usage: "usage: orc-dash-capture (pi-call | claude-statusline)" }
-] as const
+const dashboardCommands = ["orc-dash", "orc-dash-capture"] as const
 
 const sourceEntry = (path: Path.Path, checkout: string): string => path.join(checkout, "packages", "run", "src", "bin.ts")
 
@@ -58,11 +55,8 @@ const checkRelease = Effect.fnUntraced(function*(root: string, version: string, 
     return
   }
   yield* checkOrcVersion([path.join(root, "orc")], version)
-  for (const { name, usage } of dashboardCommands) {
-    const reported = yield* runInstallerStep([path.join(root, name), "--help"], "verify " + name + " in launcher release " + version)
-    if (!reported.split("\n").some((line) => line.trimStart().startsWith(usage))) {
-      return yield* new InstallFailure({ detail: "launcher release " + version + " did not report " + name + " usage", output: reported, retryable: false })
-    }
+  for (const name of dashboardCommands) {
+    yield* runInstallerStep([path.join(root, name), "--help"], "verify " + name + " in launcher release " + version)
   }
 })
 
@@ -105,7 +99,7 @@ const unpackRelease = Effect.fnUntraced(function*(staging: string, version: stri
   yield* fs.writeFile(file, archive)
   yield* runInstallerStep(["tar", "-xzf", file, "-C", staging], "unpack launcher release " + version)
   yield* fs.remove(file)
-  for (const name of ["orc", ...dashboardCommands.map(({ name }) => name)]) {
+  for (const name of ["orc", ...dashboardCommands]) {
     yield* fs.chmod(path.join(staging, name), 0o755)
   }
 })

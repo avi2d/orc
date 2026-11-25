@@ -45,7 +45,9 @@ A completed task can be queued again.
 
 ### Alert stream
 
-When `orc-dash` is on `PATH`, the runner queues `orc-dash alerts --json` and appends its output to `~/.orc/backlog/alerts.jsonl`.
+When a compiled `orc runner start` queues the alert stream, it prefers the `orc-dash` beside `orc` to one on `PATH`.
+If no sibling executable is available, or orc runs from source, the runner looks for `orc-dash` on `PATH`.
+When it finds `orc-dash`, the runner queues `orc-dash alerts --json` and appends its output to `~/.orc/backlog/alerts.jsonl`.
 A running stream is not duplicated.
 If pueue refuses the stream, the runner reports the error and still queues the task.
 

@@ -25,24 +25,26 @@ describe("compiled launcher updates", () => {
     return { home, directory, running, bin }
   }
 
-  const fakeOrc = '#!/bin/sh\nprintf "orc 99.0.0\\n"\n'
-  const fakeDash = '#!/bin/sh\nprintf "USAGE\\n  orc-dash <subcommand> [flags]\\n"\n'
-  const fakeCapture = '#!/bin/sh\nprintf "usage: orc-dash-capture (pi-call | claude-statusline) [--help]\\n"\n'
+  const fakeCommands = {
+    orc: '#!/bin/sh\nprintf "orc 99.0.0\\n"\n',
+    "orc-dash": '#!/bin/sh\nprintf "orc-dash [options] <command>\\n"\n',
+    "orc-dash-capture": '#!/bin/sh\nprintf "usage: orc-dash-capture (pi-call | claude-statusline | x)\\n"\n'
+  }
 
-  const writeCommands = (directory: string, capture = fakeCapture): void => {
-    writeFileSync(join(directory, "orc"), fakeOrc, { mode: 0o755 })
-    writeFileSync(join(directory, "orc-dash"), fakeDash, { mode: 0o755 })
-    writeFileSync(join(directory, "orc-dash-capture"), capture, { mode: 0o755 })
+  const writeCommands = (directory: string, overrides: Partial<typeof fakeCommands> = {}): void => {
+    for (const [name, command] of Object.entries({ ...fakeCommands, ...overrides })) {
+      writeFileSync(join(directory, name), command, { mode: 0o755 })
+    }
   }
 
   const archiveName = "orc-99.0.0-" + process.platform + "-" + process.arch + ".tar.gz"
 
   type Assets = Map<string, Uint8Array<ArrayBuffer> | string>
 
-  const releaseArchive = (dir: string, capture?: string): Uint8Array<ArrayBuffer> => {
+  const releaseArchive = (dir: string, overrides: Partial<typeof fakeCommands> = {}): Uint8Array<ArrayBuffer> => {
     const stage = join(dir, "stage")
     mkdirSync(join(stage, "herdr-app"), { recursive: true })
-    writeCommands(stage, capture)
+    writeCommands(stage, overrides)
     writeFileSync(join(stage, "heavy-standin"), "")
     const archive = join(dir, archiveName)
     const tar = Bun.spawnSync(["tar", "-czf", archive, "-C", stage, "orc", "orc-dash", "orc-dash-capture", "heavy-standin", "herdr-app"])
@@ -86,7 +88,7 @@ describe("compiled launcher updates", () => {
     }
   }
 
-  test("a compiled launcher selects a prepared release instead of running bun add -g", async () => {
+  test("a compiled launcher selects a prepared release despite changed dashboard help instead of running bun add -g", async () => {
     const machine = compiledMachine("compiled-prepared")
     mkdirSync(join(machine.directory, "v99.0.0"))
     writeCommands(join(machine.directory, "v99.0.0"))
@@ -95,25 +97,37 @@ describe("compiled launcher updates", () => {
     expect(readFileSync(join(machine.directory, "release"), "utf8")).toBe("99.0.0\n")
   })
 
-  test("a compiled launcher downloads its platform archive instead of cloning a source checkout with bun", async () => {
+  test("a compiled launcher accepts changed dashboard help in its platform archive instead of cloning a source checkout with bun", async () => {
     const machine = compiledMachine("compiled-download")
     const archive = releaseArchive(machine.home)
     const result = await updateCompiled(machine, checksummedAssets(archive))
     expect(result).toMatchObject({ outcome: "installed", running: "1.0.0", found: "99.0.0" })
     expect(readFileSync(join(machine.directory, "release"), "utf8")).toBe("99.0.0\n")
-    expect(readFileSync(join(machine.directory, "v99.0.0/orc"), "utf8")).toBe(fakeOrc)
-    expect(Bun.spawnSync([join(machine.directory, "v99.0.0/orc-dash"), "--help"]).stdout.toString()).toContain("orc-dash <subcommand>")
-    expect(Bun.spawnSync([join(machine.directory, "v99.0.0/orc-dash-capture"), "--help"]).stdout.toString()).toContain("usage: orc-dash-capture")
+    expect(readFileSync(join(machine.directory, "v99.0.0/orc"), "utf8")).toBe(fakeCommands.orc)
+    for (const name of ["orc-dash", "orc-dash-capture"]) {
+      expect(Bun.spawnSync([join(machine.directory, "v99.0.0", name), "--help"]).exitCode).toBe(0)
+    }
     expect(existsSync(join(machine.directory, "v99.0.0/herdr-app"))).toBe(true)
     expect(existsSync(join(machine.directory, "v99.0.0", archiveName))).toBe(false)
   })
 
-  test("a compiled launcher rejects a checksummed archive that ships orc-dash in place of orc-dash-capture", async () => {
-    const machine = compiledMachine("compiled-swapped-tool")
-    const result = await updateCompiled(machine, checksummedAssets(releaseArchive(machine.home, fakeDash)))
-    expect(result).toMatchObject({ outcome: "failed", detail: expect.stringContaining("orc-dash-capture") })
+  test.each(["orc-dash", "orc-dash-capture"])("a compiled launcher rejects a checksummed archive when %s exits nonzero", async (command) => {
+    const machine = compiledMachine("compiled-failed-startup-" + command)
+    const archive = releaseArchive(machine.home, { [command]: "#!/bin/sh\nexit 23\n" })
+    const result = await updateCompiled(machine, checksummedAssets(archive))
+    expect(result).toMatchObject({ outcome: "failed", detail: expect.stringContaining(command) })
     expect(readFileSync(join(machine.directory, "release"), "utf8")).toBe("1.0.0\n")
     expect(existsSync(join(machine.directory, "v99.0.0"))).toBe(false)
+  })
+
+  test.each(["orc-dash", "orc-dash-capture"])("a compiled launcher does not select a prepared release when %s exits nonzero", async (command) => {
+    const machine = compiledMachine("compiled-prepared-failed-startup-" + command)
+    const release = join(machine.directory, "v99.0.0")
+    mkdirSync(release)
+    writeCommands(release, { [command]: "#!/bin/sh\nexit 23\n" })
+    const result = await updateCompiled(machine, new Map())
+    expect(result).toMatchObject({ outcome: "failed", detail: expect.stringContaining(command) })
+    expect(readFileSync(join(machine.directory, "release"), "utf8")).toBe("1.0.0\n")
   })
 
   test("a compiled launcher does not select an existing release that left out orc-dash-capture", async () => {

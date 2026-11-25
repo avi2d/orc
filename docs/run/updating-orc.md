@@ -31,13 +31,13 @@ For example, if `release` holds `1.2.3`, the launcher starts `v1.2.3/packages/ru
 If the launcher starts the source entry, Orc clones the new version tag, installs its production dependencies from the lockfile with the Bun that runs orc, and checks that the new checkout prints the expected version.
 If the launcher runs the compiled `orc`, Orc downloads the archive for its platform and the archive's `.sha256` file from the GitHub release, as [Release assets](release-assets.md) lists them.
 Orc checks the archive's SHA-256, then unpacks it with `orc-dash` and `orc-dash-capture` beside `orc` in the same version directory.
-Before selecting the release, Orc checks its version and both dashboard commands' help output.
+Before selecting the release, Orc checks its version and runs both dashboard commands with `--help` to check that they start.
+Both commands must exit 0, regardless of their help text.
 The compiled update needs no Bun.
 If the version directory already exists, Orc runs the same checks on that directory before selecting it.
 If any step fails, the launcher keeps the old release.
 After an install, run `orc --version` through the launcher to see the new version.
 Runs that already started still use their old checkout.
-When a compiled `orc runner start` queues the alert stream, it prefers the `orc-dash` beside `orc` to one on `PATH`.
 If you use launchers for `orc-dash` or `orc-dash-capture`, have them read the same `release` file as the `orc` launcher to follow updates.
 
 ## Update a linked checkout
