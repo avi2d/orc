@@ -82,6 +82,6 @@ To feed an account's block, give the `settings.json` in that account's folder a 
 
 Put `orc-dash-capture` on Claude Code's `PATH` as [Install orc-dash](dash.md#install) describes.
 If the statusline does not inherit that `PATH`, use the absolute path to the command or its launcher.
-If your Claude Code statusline or Pi hook still runs `bun .../dist/capture-bin.js`, replace that invocation with `orc-dash-capture` and keep its capture kind.
+To move an existing hook off the old Bun bundle, see [Capture command](session-quota/capture.md#capture-command).
 Claude Code started with `CLAUDE_CONFIG_DIR` set to the folder reads that `settings.json` and runs the statusline with the same variable, so each reading names the folder.
 The writer prints nothing, so to keep another statusline's text, read stdin once and pipe it to both commands.
