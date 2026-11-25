@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { $ } from "bun"
+import { Effect } from "effect"
 import { tmpdir } from "node:os"
 import packageJson from "../packages/run/package.json" with { type: "json" }
 import { compileDashboardTool, dashboardTools } from "./compile-dashboard"
@@ -16,7 +17,7 @@ try {
   await $`${process.execPath} ${root + "packages/herdr-app/scripts/build.ts"} ${stage + "/herdr-app"}`
   for (const tool of dashboardTools) {
     const executable = stage + "/" + tool.name
-    await compileDashboardTool(tool, executable)
+    await Effect.runPromise(compileDashboardTool(tool, executable))
     const help = await $`${executable} --help`.env({ ...process.env, PATH: stage }).text()
     process.stderr.write(help)
   }

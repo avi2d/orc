@@ -12,7 +12,7 @@ To run the checks:
 1. Run `bun run lint` to run oxlint and every kit lint gate.
 1. Run `bun run typecheck` to run `tsc` and the Effect language service diagnostics.
 1. Run `bun run build` to build the workspace and regenerate the command reference and diagrams.
-   The build syncs the run version, bundles `orc`, builds the heavy stand-in and Herdr App, and compiles `orc-dash` and `orc-dash-capture` into their packages' `dist/` folders.
+   The build syncs the run version, bundles `orc`, builds the heavy stand-in and [Herdr App](https://herdr.dev), and compiles `orc-dash` and `orc-dash-capture` into their packages' `dist/` folders.
    It also checks Effect scope and the changelog, then copies `CHANGELOG.md` into the run package.
 
 CI runs the tests the change reaches on a pull request.

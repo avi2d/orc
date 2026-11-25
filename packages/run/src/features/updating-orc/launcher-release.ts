@@ -99,8 +99,8 @@ const unpackRelease = Effect.fnUntraced(function*(staging: string, version: stri
   yield* fs.writeFile(file, archive)
   yield* runInstallerStep(["tar", "-xzf", file, "-C", staging], "unpack launcher release " + version)
   yield* fs.remove(file)
-  for (const name of ["orc", ...dashboardCommands]) {
-    yield* fs.chmod(path.join(staging, name), 0o755)
+  for (const command of ["orc", ...dashboardCommands]) {
+    yield* fs.chmod(path.join(staging, command), 0o755)
   }
 })
 
