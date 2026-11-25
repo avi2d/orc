@@ -52,7 +52,7 @@ const markLanded = (fixture: Fixture, id: string) => orcOk(fixture, ["backlog", 
 
 const attention = async (fixture: Fixture): Promise<unknown> => JSON.parse(await orcOk(fixture, ["attention", "--json"]))
 
-test("a parked child closed as landed counts as done without keeping it in the plan list or touching its branch", async () => {
+test("a parked child closed as landed stays visible as done with its landing PR without touching its branch", async () => {
   await withFixture(async (fixture) => {
     await task(fixture, "orc-1", { kind: "parent" })
     await task(fixture, "orc-2", { parent: "orc-1", ...parked })
@@ -66,7 +66,7 @@ test("a parked child closed as landed counts as done without keeping it in the p
     expect(await markLanded(fixture, "orc-2")).toBe("closed orc-2 done: work landed in " + mergedPr + "\n")
     const plan = await orcOk(fixture, ["backlog", "plan", "orc-1"])
     expect(plan).toContain("1 of 1 done")
-    expect(plan).not.toContain("orc-2")
+    expect(plan).toContain("orc-2 done landed in " + mergedPr + " orc-2")
     expect(await Bun.file(backlog(fixture, "new", "orc-2.md")).exists()).toBe(false)
     const board: unknown = JSON.parse(await orcOk(fixture, ["backlog", "--json"]))
     expect(board).toMatchObject({ tasks: expect.arrayContaining([

@@ -370,7 +370,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (typeof parked === "string") {
       return yield* new TaskFileError({ file, detail: parked })
     }
-    if (parked?.questions.some((question) => question.answer === null) === true && state.kind === "closed") {
+    if (parked?.questions.some((question) => question.answer === null) === true && state.kind === "closed" && state.closing.outcome !== "start-failed") {
       return yield* new TaskFileError({ file, detail: "a closed task carries an unanswered parked question" })
     }
     return {

@@ -131,7 +131,7 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
   plan: {
     usage: ["orc backlog plan <task-id> [--drop <task-id>]"],
     summary: "Show a parent task's plan, or drop a child from it",
-    about: "Prints a parent task's progress, how it was split, and what each child waits on. Children closed with --landed-in count as done but leave the list.",
+    about: "Prints a parent task's count, how it was split, and one line per child with its state and what it waits on.",
     options: [{ flag: "--drop <task-id>", meaning: "Remove this new child from the plan." }],
     examples: ["orc backlog plan orc-12", "orc backlog plan orc-12 --drop orc-14"]
   },

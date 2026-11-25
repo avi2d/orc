@@ -34,7 +34,8 @@ const childState = (child: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged:
       return "started on " + child.state.claim.machine
     }
     case "closed": {
-      return child.state.closing.outcome + shipState(child, merged)
+      const landedIn = taskLandedIn(child)
+      return child.state.closing.outcome + (landedIn === null ? shipState(child, merged) : " landed in " + landedIn)
     }
   }
 }
@@ -45,7 +46,7 @@ export const planText = (root: string, id: string): Effect.Effect<string, Backlo
     const merged = yield* mergedIds(root)
     const parent = yield* parentIn(tasks, id)
     const count = childCount(parent, tasks, merged)
-    const children = tasks.filter((task) => task.spec.parent === id && taskLandedIn(task) === null)
+    const children = tasks.filter((task) => task.spec.parent === id)
     return [
       parent.spec.id + " parent " + parent.spec.project + " " + count.done + " of " + count.total + " done " + parent.spec.title,
       parent.spec.split === null ? "split by hand" : "split at " + parent.spec.split.by + ": " + parent.spec.split.reason,

@@ -69,7 +69,6 @@ A parent with an open child or a task another open task depends on cannot be dro
 
 Run `orc backlog close <task-id> --landed-in <pr-url>` with the full URL of the merged PR.
 Orc records that URL in the close reason and marks the parked task done.
-The task leaves its parent's list of children but still counts toward the parent's done total.
 Tasks that depend on it no longer wait for it.
 Orc withdraws the task's open attention items and leaves the parked run's branch and PR untouched.
 The command records your decision without checking the PR on the forge.

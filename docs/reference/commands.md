@@ -439,8 +439,8 @@ Examples:
 ```text
 Usage: orc backlog plan <task-id> [--drop <task-id>]
 
-Prints a parent task's progress, how it was split, and what each child waits on.
-Children closed with --landed-in count as done but leave the list.
+Prints a parent task's count, how it was split, and one line per child with its
+state and what it waits on.
 
 Options:
   --drop <task-id>  Remove this new child from the plan.
