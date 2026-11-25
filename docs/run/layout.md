@@ -29,6 +29,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/widgets/beat/quota.ts` | The quota reading from the configured command and the pick of an account |
 | `packages/run/src/widgets/beat/beat.ts` | The beat: room, placement, take and start |
 | `packages/run/src/widgets/beat/beat-close.ts` | The closing of finished runs and the running output time |
+| `packages/run/src/widgets/beat/beat-split.ts` | The application of a worker's split proposal when its run ends |
 | `packages/run/src/widgets/beat/beat-update.ts` | The hourly update claim and the check on each dispatch machine |
 | `packages/run/src/widgets/beat/beat-place.ts` | The room reading, the placement of each new task and the wait it names |
 | `packages/run/src/widgets/beat/beat-origin.ts` | The `orc backlog origin` write of a parked task's machine and run, and its refusals |
@@ -92,7 +93,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/decider/decider.ts` | The decider: one call per open question it owns with the rules it reads, its reply checked as an answer on a quoted rule, an ask back, a duplicate link or an escalation, and that decision recorded on the item |
 | `packages/run/src/features/decider/decider-guard.ts` | The asked actions and the fixed list of topics orc never hands the decider, and the words an ask back hands the worker |
 | `packages/run/src/features/decider/decider-ask.ts` | The decider's call, Pi on `models.decider` with the policy as its system prompt and no tools |
-| `packages/run/src/features/decider/recommended.ts` | The recommended-option override for review questions with a `Recommended:` line |
+| `packages/run/src/features/decider/recommended.ts` | The recommended-option override for questions with a `Recommended:` line |
 | `packages/run/src/features/decider/quoted-source.ts` | The check that a quoted rule is a whole clause of a rule the decider read |
 
 ## features/heavy-commands
