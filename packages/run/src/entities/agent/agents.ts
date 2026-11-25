@@ -156,16 +156,16 @@ export const agentFileCandidates = (
   { kind, path: agentsDir === undefined ? bundledAgentFiles[kind] : path.join(agentsDir, kind + ".md"), source: "bundled" }
 ]
 
-export const resolveAgentFile = (
+interface AgentFileSearch {
+  readonly projectDir: string
+  readonly orcHome: string
+  readonly agentsDir?: string | undefined
+}
+
+export const readAgentFile = (
   kind: AgentKind,
-  options: {
-    readonly projectDir: string
-    readonly orcHome: string
-    readonly agentsDir?: string | undefined
-    readonly configModel: { readonly file: string; readonly model: string | undefined }
-    readonly thinking?: PiThinkingLevel | undefined
-  }
-): Effect.Effect<AgentFile, AgentFileError, FileSystem.FileSystem | Path.Path> =>
+  options: AgentFileSearch
+): Effect.Effect<ParsedAgentFile, AgentFileError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
@@ -173,14 +173,24 @@ export const resolveAgentFile = (
     for (const location of candidates) {
       const text = yield* readIfPresent(fs, location.path)
       if (text !== null) {
-        const parsed = yield* parseAgentFile(text, location)
-        const model = parsed.model ?? options.configModel.model
-        if (model === undefined) {
-          return yield* fail(location.path, "names no model and " + options.configModel.file + " names no " + kind + " model, so name one in either")
-        }
-        return { ...parsed, model, thinking: options.thinking ?? parsed.thinking }
+        return yield* parseAgentFile(text, location)
       }
     }
     return yield* new AgentFileError({ message: "orc: no " + kind + ".md agent file found beside the bundled ones" })
   })
+
+interface AgentDefaults {
+  readonly configModel: { readonly file: string; readonly model: string | undefined }
+  readonly thinking?: PiThinkingLevel | undefined
+}
+
+export const finishAgentFile = (parsed: ParsedAgentFile, defaults: AgentDefaults, pin?: string): Effect.Effect<AgentFile, AgentFileError> => {
+  const model = pin ?? parsed.model ?? defaults.configModel.model
+  return model === undefined
+    ? fail(parsed.path, "names no model and " + defaults.configModel.file + " names no " + parsed.kind + " model, so name one in either")
+    : Effect.succeed({ ...parsed, model, thinking: defaults.thinking ?? parsed.thinking })
+}
+
+export const resolveAgentFile = (kind: AgentKind, options: AgentFileSearch & AgentDefaults) =>
+  readAgentFile(kind, options).pipe(Effect.flatMap((parsed) => finishAgentFile(parsed, options)))
 

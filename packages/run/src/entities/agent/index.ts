@@ -3,6 +3,8 @@ export {
   bundledAgentFiles,
   bundledDeciderPolicyFile,
   agentFileCandidates,
+  finishAgentFile,
+  readAgentFile,
   resolveAgentFile,
   piThinkingLevels,
   isThinkingLevel,

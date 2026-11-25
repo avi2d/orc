@@ -83,6 +83,38 @@ describe("models the beat hands to orc run", () => {
     expect(run).not.toContain("--fixer-model")
   })
 
+  test("a handed implementer pin reaches both routed roles instead of leaving the fixer on the route", async () => {
+    const models = { implementer: "keyed/worker", fixer: "keyed/repair" }
+    const run = await queuedRun({ ORC_TASK_ROUTED_MODELS: JSON.stringify(models), ORC_TASK_IMPLEMENTER_MODEL: "keyed/pinned" })
+    const args = parseArgs(run.slice(run.indexOf("run")))
+    if (args.kind !== "RunAgent") {
+      throw new Error("the runner did not queue orc run")
+    }
+    const roles = await Effect.runPromise(prepareRoles(
+      { projectDir: "/unused/project", orcHome: "/unused/home", agentsDir: undefined },
+      { file: "config.json" },
+      undefined, args, models
+    ).pipe(Effect.provide(BunServices.layer)))
+    expect([roles.agent.model, roles.fixer.model]).toEqual(["keyed/pinned", "keyed/pinned"])
+  })
+
+  test("an agent-file model pins both routed roles instead of changing only the implementer", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-routed-pin-"))
+    try {
+      await mkdir(join(root, "agents"))
+      await writeFile(join(root, "agents", "implementer.md"), "---\nmodel: keyed/pinned\nthinking: high\ntools: read\n---\nImplement the task.\n")
+      const roles = await Effect.runPromise(prepareRoles(
+        { projectDir: root, orcHome: root, agentsDir: undefined },
+        { file: "config.json" },
+        undefined, { implementerModel: undefined, fixerModel: undefined, implementerThinking: undefined, fixerThinking: undefined },
+        { implementer: "keyed/worker", fixer: "keyed/repair" }
+      ).pipe(Effect.provide(BunServices.layer)))
+      expect([roles.agent.model, roles.fixer.model]).toEqual(["keyed/pinned", "keyed/pinned"])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   test("with no models set the queued orc run carries no model flags", async () => {
     const run = await queuedRun({})
     expect(run).toContain("--provider")

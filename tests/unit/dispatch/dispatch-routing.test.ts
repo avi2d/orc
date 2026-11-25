@@ -69,6 +69,28 @@ test("a task pin replaces a matching rule and never spills onto a different mode
   ] })).toEqual({ kind: "waits", reason: "no account has room for the pinned model research/pinned" })
 })
 
+test("a design task uses Fable only with room on its account and falls back to Opus, not the general default", () => {
+  const design = decode({
+    rules: [{ when: { category: "design" }, candidates: [
+      { models: { implementer: "claude/fable" }, account: "fable-access" },
+      "claude/opus"
+    ] }],
+    default: ["code/worker"],
+    tasks: { "editor-1": { category: "design" } }
+  })
+  const designQuota = (fable: number) => ({ floorPercent: 20, accounts: [
+    { name: "fable-access", provider: "claude", remainingPercent: fable },
+    { name: "standard", provider: "claude", remainingPercent: 70 },
+    { name: "coder", provider: "code", remainingPercent: 90 }
+  ] })
+  expect(resolveDispatch(design, task, designQuota(20))).toEqual({
+    kind: "routed", account: "fable-access", models: { implementer: "claude/fable" }
+  })
+  expect(resolveDispatch(design, task, designQuota(19))).toEqual({
+    kind: "routed", account: "standard", models: { implementer: "claude/opus" }
+  })
+})
+
 test("routing settings reject a candidate that would use a credential on another provider", () => {
   expect(() => decode({ rules: [], default: [{ models: { implementer: "code/large", reviewer: "review/opus" } }] }))
     .toThrow("the implementer, fixer, and reviewer must use one provider")

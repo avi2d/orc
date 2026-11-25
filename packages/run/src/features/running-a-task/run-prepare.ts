@@ -1,7 +1,7 @@
 import { Effect, type FileSystem, type Path, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { homedir } from "node:os"
-import { resolveAgentFile, type AgentFile, type AgentKind, type PiThinkingLevel } from "../../entities/agent/index"
+import { finishAgentFile, readAgentFile, resolveAgentFile, type AgentFile, type PiThinkingLevel } from "../../entities/agent/index"
 import type { HostTools, SandboxKind } from "../../shared/sandbox/index"
 import { configuredModels, readOrcConfig, routeOfAgents, type OrcConfig, type RoutedModels, RoutedModelsJson, type RunDelivery } from "../../shared/config/index"
 import { planSandbox, type SandboxPlan } from "./sandbox-plan"
@@ -40,16 +40,18 @@ export const prepareRoles = Effect.fnUntraced(function*(
     implementer: pins.implementerModel ?? route?.implementer,
     fixer: pins.fixerModel ?? route?.fixer ?? route?.implementer
   })
-  const resolveRole = (kind: AgentKind, model: string | undefined, thinking: PiThinkingLevel | undefined) =>
-    resolveAgentFile(kind, { ...location, configModel: { file: config.file, model }, thinking })
-      .pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
-  const agent = yield* resolveRole("implementer", configured.implementer, pins.implementerThinking)
-  const fixer = yield* resolveRole("fixer", configured.fixer, pins.fixerThinking)
+  const implementerFile = yield* readAgentFile("implementer", location)
+  const fixerFile = yield* readAgentFile("fixer", location)
+  const pairPin = route === undefined ? undefined
+    : pins.implementerModel ?? pins.fixerModel ?? implementerFile.model ?? fixerFile.model ?? undefined
+  const configModel = (model: string | undefined) => ({ file: config.file, model })
+  const agent = yield* finishAgentFile(implementerFile, { configModel: configModel(configured.implementer), thinking: pins.implementerThinking }, pairPin)
+  const fixer = yield* finishAgentFile(fixerFile, { configModel: configModel(configured.fixer), thinking: pins.fixerThinking }, pairPin)
   const reviewer: PreparedReviewer = delivery === "direct-PR"
-    ? { kind: "direct-PR", reviewer: yield* resolveRole("reviewer", route?.reviewer ?? fixer.model, undefined) }
+    ? { kind: "direct-PR", reviewer: yield* resolveAgentFile("reviewer", { ...location, configModel: configModel(route?.reviewer ?? fixer.model) }) }
     : { kind: "no-mistakes" }
   return { agent, fixer, reviewer }
-})
+}, Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
 
 export const prepareAgents = (
   fs: FileSystem.FileSystem,
