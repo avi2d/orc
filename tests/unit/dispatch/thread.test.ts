@@ -169,7 +169,7 @@ describe("orc backlog thread", () => {
     withBacklog(async (root) => {
       await startedTask(root)
       const asked = "2026-11-02T10:20:00.000Z"
-      await run(askStartedTask(root, "orc-1", { asked, questions: [{ id: "r2", text: "How many retries?" }, { id: "question-3", text: "Merge the PR once it is green?" }] }))
+      await run(askStartedTask(root, "orc-1", { asked, questions: [{ id: "question-2", text: "How many retries?" }, { id: "question-3", text: "Merge the PR once it is green?" }] }))
       await run(routeTaskItems(root, await run(listTasks(root)), asked))
       const ask: AskDecider = {
         home: "/nonexistent/orc-home",
@@ -185,10 +185,10 @@ describe("orc backlog thread", () => {
         schema: "orc.thread.v1",
         task: "orc-1",
         entries: [
-          { kind: "question", who: "worker", id: reviewQuestionId("orc-1", "r2", asked) },
+          { kind: "question", who: "worker", id: reviewQuestionId("orc-1", "question-2", asked) },
           { kind: "question", who: "worker", id: reviewQuestionId("orc-1", "question-3", asked) },
-          { kind: "decision", who: "decider", id: reviewQuestionId("orc-1", "r2", asked), text: "answered: the intent says twice, quoting task orc-1: \"Retry a failed upload twice, then give up.\"" },
-          { kind: "answer", who: "decider", id: reviewQuestionId("orc-1", "r2", asked), text: "Two retries" },
+          { kind: "decision", who: "decider", id: reviewQuestionId("orc-1", "question-2", asked), text: "answered: the intent says twice, quoting task orc-1: \"Retry a failed upload twice, then give up.\"" },
+          { kind: "answer", who: "decider", id: reviewQuestionId("orc-1", "question-2", asked), text: "Two retries" },
           { kind: "decision", who: "decider", id: reviewQuestionId("orc-1", "question-3", asked), text: "escalated: orc never hands the decider a question about merging, and this one says \"Merge\"" },
           { kind: "answer", who: "user", id: reviewQuestionId("orc-1", "question-3", asked), text: "Yes, merge it", at: "2099-01-01T00:00:00.000Z" }
         ]
