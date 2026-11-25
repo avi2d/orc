@@ -10,16 +10,26 @@ class InstallFailure extends Schema.TaggedError<InstallFailure>()("InstallFailur
   retryable: Schema.optionalKey(Schema.Literal(false))
 }) {}
 
+export type LauncherBuild =
+  | { readonly kind: "source"; readonly bun: string }
+  | { readonly kind: "compiled"; readonly releases: string; readonly platform: string }
+
+export const releasesUrl = packageJson.repository.url.replace(/^git\+/, "").replace(/\.git$/, "") + "/releases/download"
+
+const downloadTimeoutMs = 600_000
+
 const sourceEntry = (path: Path.Path, checkout: string): string => path.join(checkout, "packages", "run", "src", "bin.ts")
 
 const releaseOf = (path: Path.Path, directory: string, version: string): string => path.join(directory, "v" + version)
 
-export const launcherDirectory = Effect.fnUntraced(function*(userHome: string, main: string, running: string) {
+export const launcherDirectory = Effect.fnUntraced(function*(userHome: string, entryPoint: string, running: string, compiled: boolean) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const directory = path.join(userHome, ".local", "share", "orc")
-  const entry = yield* fs.realPath(sourceEntry(path, releaseOf(path, directory, running))).pipe(Effect.option)
-  return Option.contains(entry, main) ? directory : null
+  const release = releaseOf(path, directory, running)
+  const entry = yield* fs.realPath(compiled ? path.join(release, "orc") : sourceEntry(path, release)).pipe(Effect.option)
+  const actual = yield* fs.realPath(entryPoint).pipe(Effect.option)
+  return Option.isSome(actual) && Option.contains(entry, actual.value) ? directory : null
 })
 
 const runInstallerStep = (command: Command, action: string) => capture(command, null).pipe(
@@ -29,40 +39,74 @@ const runInstallerStep = (command: Command, action: string) => capture(command, 
     : Effect.fail(new InstallFailure({ detail: action + " exited " + String(exitCode), output: (stdout + stderr).trim() })))
 )
 
-const checkRelease = (bun: string, entry: string, version: string) =>
-  runInstallerStep([bun, entry, "--version"], "verify launcher release " + version).pipe(
+const checkRelease = (command: Command, version: string) =>
+  runInstallerStep([...command, "--version"], "verify launcher release " + version).pipe(
     Effect.flatMap((reported) => reported === "orc " + version
       ? Effect.void
       : Effect.fail(new InstallFailure({ detail: "launcher release " + version + " reported the wrong version", output: reported, retryable: false })))
   )
+
+const download = (url: string) => {
+  const failure = (cause: unknown) => new InstallFailure({ detail: "download " + url + ": " + (cause instanceof Error ? cause.message : String(cause)), output: null })
+  return Effect.tryPromise({
+    try: (signal) => fetch(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(downloadTimeoutMs)]) }),
+    catch: failure
+  }).pipe(
+    Effect.flatMap((response) => response.ok
+      ? Effect.tryPromise({ try: () => response.bytes(), catch: failure })
+      : Effect.fail(failure("answered " + String(response.status))))
+  )
+}
 
 const removeTemporary = (fs: FileSystem.FileSystem, path: string, recursive = false) =>
   fs.remove(path, { recursive, force: true }).pipe(
     Effect.catchTag("PlatformError", (error) => Console.error("cannot remove " + path + ": " + error.message))
   )
 
-const prepareRelease = Effect.fnUntraced(function*(directory: string, version: string, bun: string) {
+const cloneRelease = Effect.fnUntraced(function*(staging: string, version: string, bun: string) {
+  yield* runInstallerStep(
+    ["git", "clone", "--quiet", "--depth", "1", "--branch", "v" + version, packageJson.repository.url.replace(/^git\+/, ""), staging],
+    "clone launcher release " + version
+  )
+  yield* runInstallerStep([bun, "install", "--cwd", staging, "--frozen-lockfile", "--production", "--ignore-scripts", "--silent"], "install launcher release " + version)
+})
+
+const unpackRelease = Effect.fnUntraced(function*(staging: string, version: string, build: Extract<LauncherBuild, { readonly kind: "compiled" }>) {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const name = "orc-" + version + "-" + build.platform + ".tar.gz"
+  const url = build.releases + "/v" + version + "/" + name
+  const [archive, checksum] = yield* Effect.all([download(url), download(url + ".sha256")], { concurrency: 2 })
+  const digest = new Bun.CryptoHasher("sha256").update(archive).digest("hex")
+  if (new TextDecoder().decode(checksum).trim() !== digest + "  " + name) {
+    return yield* new InstallFailure({ detail: name + " does not match its SHA-256 file", output: null })
+  }
+  const file = path.join(staging, name)
+  yield* fs.writeFile(file, archive)
+  yield* runInstallerStep(["tar", "-xzf", file, "-C", staging], "unpack launcher release " + version)
+  yield* fs.remove(file)
+  yield* fs.chmod(path.join(staging, "orc"), 0o755)
+})
+
+const prepareRelease = Effect.fnUntraced(function*(directory: string, version: string, build: LauncherBuild) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const checkout = releaseOf(path, directory, version)
-  const entry = sourceEntry(path, checkout)
+  const launched = (root: string): Command => build.kind === "compiled" ? [path.join(root, "orc")] : [build.bun, sourceEntry(path, root)]
+  const checkExisting = checkRelease(launched(checkout), version)
   if (yield* fs.exists(checkout)) {
-    yield* checkRelease(bun, entry, version)
+    yield* checkExisting
     return
   }
   yield* Effect.acquireUseRelease(
     fs.makeTempDirectory({ directory, prefix: ".v" + version + "." }),
     (staging) => Effect.gen(function*() {
-      yield* runInstallerStep(
-        ["git", "clone", "--quiet", "--depth", "1", "--branch", "v" + version, packageJson.repository.url.replace(/^git\+/, ""), staging],
-        "clone launcher release " + version
-      )
-      yield* runInstallerStep([bun, "install", "--cwd", staging, "--frozen-lockfile", "--production", "--ignore-scripts", "--silent"], "install launcher release " + version)
-      yield* checkRelease(bun, sourceEntry(path, staging), version)
+      yield* build.kind === "compiled" ? unpackRelease(staging, version, build) : cloneRelease(staging, version, build.bun)
+      yield* checkRelease(launched(staging), version)
       yield* fs.rename(staging, checkout).pipe(
         Effect.catch((error) => fs.exists(checkout).pipe(
           Effect.flatMap((exists) => exists
-            ? checkRelease(bun, entry, version)
+            ? checkExisting
             : Effect.fail(new InstallFailure({ detail: "cannot publish launcher release " + version + ": " + error.message, output: null })))
         ))
       )
@@ -83,7 +127,7 @@ const selectRelease = Effect.fnUntraced(function*(directory: string, version: st
   )
 })
 
-export const installLauncherRelease = Effect.fnUntraced(function*(directory: string, version: string, running: string, bun: string) {
+export const installLauncherRelease = Effect.fnUntraced(function*(directory: string, version: string, running: string, build: LauncherBuild) {
   if (!stableVersion.test(version)) {
     return yield* new InstallFailure({ detail: "the launcher only accepts versions of the form X.Y.Z", output: null, retryable: false })
   }
@@ -97,7 +141,7 @@ export const installLauncherRelease = Effect.fnUntraced(function*(directory: str
     if (!isNewer(version, previous)) {
       return null
     }
-    yield* prepareRelease(directory, version, bun)
+    yield* prepareRelease(directory, version, build)
     yield* selectRelease(directory, version)
     return previous
   })

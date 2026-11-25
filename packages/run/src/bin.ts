@@ -9,7 +9,7 @@ import { appHomeDir, bundledAppDir, formatAppInstall, herdrAppSourceDir, install
 import { type OrcArgs, parseArgs } from "./app/args"
 import { runChat } from "./features/chat/index"
 import { type AccountName, signIn } from "./features/signing-in/index"
-import { encodeUpdateJson, formatUpdate, runUpdate } from "./features/updating-orc/index"
+import { encodeUpdateJson, formatUpdate, releasesUrl, runUpdate } from "./features/updating-orc/index"
 import { helpText, overview, usageErrorText } from "./app/help"
 import { runDispatch } from "./app/dispatch-cli"
 import { runQuotaCli } from "./app/quota-cli"
@@ -221,7 +221,8 @@ const update = (args: Extract<OrcArgs, { readonly kind: "Update" }>) =>
       env: Bun.env,
       running: packageJson.version,
       main: Bun.main,
-      executable: process.execPath
+      executable: process.execPath,
+      releases: releasesUrl
     }).pipe(Effect.provide(BunServices.layer))
     yield* Console.log(args.json ? yield* encodeUpdateJson(result) : formatUpdate(result))
     if (result.outcome === "failed") {
