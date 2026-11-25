@@ -78,8 +78,10 @@ const unfinishedScopes = (view: PullRequestView): ReadonlySet<string> =>
   new Set(newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry)).filter((run) => run.status !== "COMPLETED").map(runScope))
 
 export const pendingRedRuns = (view: PullRequestView): boolean => {
-  const unfinished = unfinishedScopes(view)
-  return failedRuns(view).some((run) => actionsRunId(run) !== undefined && unfinished.has(runScope(run)))
+  const failedScopes = new Set(failedRuns(view).filter((run) => actionsRunId(run) !== undefined).map(runScope))
+  const pending = newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry))
+    .filter((run) => run.status !== "COMPLETED" && failedScopes.has(runScope(run)))
+  return pending.length > 0 && pending.every((run) => run.status === "QUEUED" || run.status === "IN_PROGRESS")
 }
 
 export const redRuns = (view: PullRequestView): ReadonlyArray<{ readonly run: string; readonly name: string }> => {

@@ -137,7 +137,8 @@ The beat opens these items for a closed ship task's PR, owned by the user:
 
 - A red GitHub Actions check on the PR makes orc run `gh run rerun <run-id> --failed` once per PR.
   orc records the rerun in the task file and posts a chat event.
-  While a run with a red check still has unfinished checks, orc waits and does neither.
+  While the unfinished checks in a red run are queued or in progress, orc waits and does neither.
+  If a check waits for approval or is pending, orc opens the `check-red` item instead.
   Sending the task back does not reset the rerun allowance for that PR.
   If a check is still red after the rerun, or if no red check has an Actions run link, orc opens a `check-red` item with the available failed check links.
   Checks that turn green on that commit, or a new commit, withdraw it.
