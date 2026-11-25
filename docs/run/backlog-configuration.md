@@ -171,7 +171,30 @@ A Pi package that logs in on its own takes this kind, as in a `claude-bridge` pa
 
 Its `config.json` provider names the package with `credential` `package`, and its `env` points at the login the runs take, such as a `CLAUDE_CONFIG_DIR`.
 With no `CLAUDE_CONFIG_DIR` the runs take your ordinary Claude login under `~/.claude`.
-A quota that names more than one account when any of them is kind `none` is refused, and so is a kind `none` account beside a machine `renew` command.
+A kind `none` account spends the one login its provider holds, so a quota with another account on that provider is refused.
+A kind `none` account beside a machine `renew` command is refused too, unless a token command account takes the renewal.
+
+### Subscription logins on other providers
+
+A Pi login names no token, so an account for a subscription Pi signs in to, such as a ChatGPT plan on Pi's `openai` provider or an OpenCode Go plan, takes kind `none` and its own `provider`.
+Sign Pi in to each provider on every machine that runs tasks, and define each one in `config.json` with `credential` `pi-login`.
+Each account sits beside the Claude account the runs already take, and the beat picks among all of them:
+
+```json
+{
+  "quota": {
+    "provider": "claude-bridge",
+    "command": ["subquo", "read", "--json"],
+    "accounts": [
+      { "name": "main", "kind": "claude-config", "configDirs": { "mac": "/Users/me/claude/main" } },
+      { "name": "codex", "kind": "none", "provider": "openai", "models": { "implementer": "openai/gpt-5.5", "fixer": "openai/gpt-5.5" } },
+      { "name": "opencode-go", "kind": "none", "provider": "opencode-go", "models": { "implementer": "opencode-go/kimi-k3", "fixer": "opencode-go/kimi-k3" } }
+    ]
+  }
+}
+```
+
+With subquo as the quota command, each account name is the id subquo gives that subscription.
 
 ### Claude config accounts
 
