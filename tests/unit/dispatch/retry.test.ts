@@ -140,8 +140,7 @@ describe("backlog retry", () => {
             : { kind: "closed", task: id, machine: "node-a", outcome, reason: "exit 1", pr: null, report: null }
           await run(openRunDeaths(root, [action], at))
           const first = (await run(openItems(root)))[0]
-          expect(first).toBeDefined()
-          if (answeredItem && first !== undefined) {
+          if (answeredItem) {
             await run(answerItem(root, first.id, { words: "rerun", at }))
           }
           await run(retryTask(root, id))
@@ -150,7 +149,7 @@ describe("backlog retry", () => {
           await run(openRunDeaths(root, [action], later))
           const second = await run(openItems(root))
           expect(second).toHaveLength(1)
-          expect(second[0]?.id).not.toBe(first?.id)
+          expect(second[0]?.id).not.toBe(first.id)
           expect(second[0]?.item.asked).toBe(later)
         })
       })

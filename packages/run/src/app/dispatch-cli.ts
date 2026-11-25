@@ -189,7 +189,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "CloseLandedTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "SendBack" | "NoteTask" | "ShowThread" | "DependTask" | "PrioritizeTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "CloseLandedTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "SendBack" | "NoteTask" | "ShowThread" | "DependTask" | "PrioritizeTask" | "MergeTask" | "ShowPlan" | "DropChild" | "RetryTask" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -246,6 +246,9 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "DropChild": {
       return DateTime.now.pipe(Effect.flatMap((now) => dropChild(backlogRoot(place), args.parent, args.child, DateTime.formatIso(now))))
+    }
+    case "RetryTask": {
+      return retryTask(backlogRoot(place), args.id)
     }
   }
 }
@@ -321,14 +324,10 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       case "PrioritizeTask":
       case "MergeTask":
       case "ShowPlan":
-      case "DropChild": {
-        yield* requireBacklog(backlogRoot(place))
-        yield* Console.log(yield* taskVerbLine(args, place))
-        break
-      }
+      case "DropChild":
       case "RetryTask": {
         yield* requireBacklog(backlogRoot(place))
-        yield* Console.log(yield* retryTask(backlogRoot(place), args.id))
+        yield* Console.log(yield* taskVerbLine(args, place))
         break
       }
       case "StopTask": {
