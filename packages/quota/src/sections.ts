@@ -163,14 +163,13 @@ const headerLines = (block: QuotaBlock, width: number, now: DateTime.Utc): Block
     ...planWords(block).map((text) => ({ text, tone: "muted" as const })),
     ...(state === undefined ? [] : [state]),
   ];
-  return details.reduce<Block>(
-    (lines, { text, tone }) => {
-      const last = lines.at(-1) ?? [];
-      const joined = [...last, span(` · ${text}`, tone)];
-      return lineWidth(joined) <= width ? [...lines.slice(0, -1), joined] : [...lines, [span(`${indent}${text}`, tone)]];
-    },
-    [[span(`● ${block.title}`, tintOfProvider(block.provider), { bold: true })]],
-  );
+  const lines: Array<Line> = [[span(`● ${block.title}`, tintOfProvider(block.provider), { bold: true })]];
+  for (const { text, tone } of details) {
+    const joined = [...(lines.at(-1) ?? []), span(` · ${text}`, tone)];
+    if (lineWidth(joined) <= width) lines[lines.length - 1] = joined;
+    else lines.push([span(`${indent}${text}`, tone)]);
+  }
+  return lines;
 };
 
 const emptyBody = (body: QuotaBlockBody, width: number): Block => {

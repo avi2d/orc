@@ -72,5 +72,8 @@ export const readingJoin = <E extends Account>(evidence: Evidence, entries: Read
   return evidence.credentialKey === undefined ? assumedJoin(own) : keyedJoin(own, evidence.credentialKey);
 };
 
-export const sameJoin = (left: AccountJoin, right: AccountJoin): boolean =>
+const sameJoin = (left: AccountJoin, right: AccountJoin): boolean =>
   left.kind === right.kind && (left.kind !== "credential-key" || (right.kind === "credential-key" && left.key === right.key));
+
+export const distinctJoins = (joins: ReadonlyArray<AccountJoin>): ReadonlyArray<AccountJoin> =>
+  joins.filter((join, index) => joins.findIndex((known) => sameJoin(known, join)) === index);

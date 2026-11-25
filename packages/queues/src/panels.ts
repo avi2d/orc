@@ -174,12 +174,15 @@ const runLines = (pueue: PueueView, room: number, width: number, now: DateTime.U
 
 const separator = span(" · ", "muted");
 
-const joinedLines = (parts: ReadonlyArray<Span>, width: number): Block =>
-  parts.reduce<ReadonlyArray<Line>>((lines, part) => {
+const joinedLines = (parts: ReadonlyArray<Span>, width: number): Block => {
+  const lines: Array<Line> = [];
+  for (const part of parts) {
     const last = lines.at(-1);
-    if (last !== undefined && lineWidth([...last, separator, part]) <= width) return [...lines.slice(0, -1), [...last, separator, part]];
-    return [...lines, [part]];
-  }, []);
+    if (last !== undefined && lineWidth([...last, separator, part]) <= width) lines[lines.length - 1] = [...last, separator, part];
+    else lines.push([part]);
+  }
+  return lines;
+};
 
 const wrapped = (parts: ReadonlyArray<string>, width: number, tone: Tone): Block => joinedLines(parts.map((text) => span(text, tone)), width);
 
