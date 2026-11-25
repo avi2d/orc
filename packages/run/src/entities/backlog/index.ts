@@ -135,3 +135,4 @@ export {
 export type {
   ChildCount,
 } from "./task-dependency"
+export { closeNewTask } from "./close-new"

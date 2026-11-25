@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { mkdir, readdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Fiber, FileSystem, Layer, Result } from "effect"
@@ -9,52 +8,13 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/app/dispatch-args"
 import { addTask, claimTask, closeStartedTask, listTasks, ranClosing, releaseTask, writeTaken, type TaskRecord, renderTaskFile } from "../../packages/run/src/entities/backlog/index"
 import { runBeat } from "../../packages/run/src/widgets/beat/beat"
-import { closeFinished } from "../../packages/run/src/widgets/beat/beat-close"
-import { openItem, openItems } from "../../packages/run/src/entities/attention/attention"
 import { quietSources } from "../lib/beat-sources"
+import { backlogStates, beatWith, type BeatSpawner, claim, config, pueueAnswering, pueueDone, quotaReply, recordRun, run, spec, startTaskOne, withBacklog } from "../lib/dispatch-beat"
 import { formatBeat } from "../../packages/run/src/widgets/beat/board"
-import { insertRun, openDatabase } from "../../packages/run/src/entities/run-history/index"
-import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/shared/config/dispatch-config"
+import { type Project, readDispatchConfig } from "../../packages/run/src/shared/config/dispatch-config"
 import { assessQuota } from "../../packages/run/src/widgets/beat/quota"
-import { taskLabel } from "../../packages/run/src/shared/process/pueue-status"
-
-const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
-  Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
-
-const withBacklog = async (body: (root: string) => Promise<void>): Promise<void> => {
-  const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"))
-  try {
-    await body(root)
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
-}
-
-const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: 0 as const, created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
-
-const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
-
-const config: DispatchConfig = {
-  machines: [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 4, start: ["true"] }],
-  quota: { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", kind: "token-file", tokenFile: "/secrets/main-token" }], floorPercent: 15 }
-}
 
 const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc", linux: "/home/a/orc" } }]
-
-const quotaReply = JSON.stringify({ schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 80 }] })
-
-// Answers pueue status and the quota command itself, and runs every other command for real.
-const pueueStub = (statusJson: string): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner, never, ChildProcessSpawner.ChildProcessSpawner> =>
-  Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
-    const real = yield* ChildProcessSpawner.ChildProcessSpawner
-    return ChildProcessSpawner.make((command) =>
-      ChildProcess.isStandardCommand(command) && command.command === "pueue"
-        ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + statusJson + "\nJ"]))
-        : ChildProcess.isStandardCommand(command) && command.command === "orc-quota"
-          ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + quotaReply + "\nJ"]))
-          : real.spawn(command)
-    )
-  }))
 
 // Answers the quota command itself and reads the task file at the moment the beat asks for the start command, before any process runs.
 const recordingSpawner = (taskFile: string, seen: Array<string>): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner, never, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem> =>
@@ -414,32 +374,7 @@ describe("the beat", () => {
   })
 })
 
-const macProjects = [{ name: "orc", checkouts: { mac: "/checkout" } }]
-
 const orcStart = ["orc", "runner", "start"]
-
-type BeatSpawner = Layer.Layer<ChildProcessSpawner.ChildProcessSpawner>
-
-const startTaskOne = async (root: string, start: ReadonlyArray<string>, next: { readonly dependsOn: ReadonlyArray<string> } | null): Promise<void> => {
-  await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start }] }))
-  await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
-  await run(addTask(root, spec))
-  if (next !== null) {
-    await run(addTask(root, { ...spec, title: "Fix the other thing", dependsOn: next.dependsOn }))
-  }
-  await run(claimTask(root, "orc-1"))
-  const first = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
-  if (first === undefined) {
-    throw new Error("the backlog holds no orc-1")
-  }
-  await run(writeTaken(root, { spec: first.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
-}
-
-const pueueAnswering = (root: string, status: unknown): BeatSpawner =>
-  pueueStub(JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "orc-1"), group: "orc", path: "/checkout", status } } })).pipe(Layer.provide(BunServices.layer))
-
-const pueueDone = (root: string, result: unknown): BeatSpawner =>
-  pueueAnswering(root, { Done: { start: "2026-10-27T10:02:00.000Z", end: "2026-10-27T10:05:00.000Z", result } })
 
 const pueueInstead = (onPueue: ReturnType<typeof ChildProcessSpawner.ChildProcessSpawner.of>["spawn"]): BeatSpawner =>
   Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
@@ -453,9 +388,6 @@ const pueueInstead = (onPueue: ReturnType<typeof ChildProcessSpawner.ChildProces
     )
   })).pipe(Layer.provide(BunServices.layer))
 
-const beatWith = (root: string, spawner: BeatSpawner) =>
-  Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
-
 const beatWithTestClock = (root: string, spawner: BeatSpawner) =>
   Effect.runPromise(
     Effect.gen(function*() {
@@ -466,9 +398,6 @@ const beatWithTestClock = (root: string, spawner: BeatSpawner) =>
     }).pipe(Effect.provide(Layer.mergeAll(BunServices.layer, spawner, TestClock.layer())), Effect.scoped)
   )
 
-const backlogStates = async (root: string): Promise<ReadonlyArray<string>> =>
-  (await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)
-
 interface BeatAfterRun {
   readonly states: ReadonlyArray<string>
   readonly actions: ReadonlyArray<string>
@@ -476,13 +405,6 @@ interface BeatAfterRun {
   readonly prs: ReadonlyArray<string | null>
   readonly lines: ReadonlyArray<string>
 }
-
-const recordRun = (home: string, prLink: string): Promise<void> =>
-  run(Effect.acquireUseRelease(
-    openDatabase(home),
-    (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "succeeded", started: "2026-10-27T10:02:00.000Z", prLink })),
-    (db) => Effect.sync(() => db.close())
-  ))
 
 const beatAfterRun = async (root: string, result: unknown): Promise<BeatAfterRun> => {
   await startTaskOne(root, orcStart, { dependsOn: [] })
@@ -498,54 +420,6 @@ const beatAfterRun = async (root: string, result: unknown): Promise<BeatAfterRun
 }
 
 describe("the beat's closing sweep", () => {
-  test("a runner close withdraws old attention before a caller can leave stale merge requests open", async () => {
-    await withBacklog(async (root) => {
-      await startTaskOne(root, ["true"], null)
-      const task = (await run(listTasks(root))).at(0)
-      if (task === undefined) {
-        throw new Error("the backlog holds no orc-1")
-      }
-      for (const kind of ["review-question", "pr-ready", "check-red", "run-died", "failing-command"] as const) {
-        await run(openItem(root, "orc-1." + kind, { kind, task: "orc-1", text: "Old request", asked: spec.created, owner: "user" }))
-      }
-      const progress = await run(closeFinished({ root, home: root, config }, task))
-      expect(progress).toMatchObject({ kind: "ended", action: { kind: "closed", task: "orc-1", outcome: "failed" } })
-      expect(await backlogStates(root)).toEqual(["orc-1:closed"])
-      expect(await run(openItems(root))).toEqual([])
-    })
-  })
-
-  test("a failed start preserves unanswered parked history instead of deleting it or leaving its attention open", async () => {
-    await withBacklog(async (root) => {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }] }))
-      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
-      const added = await run(addTask(root, spec))
-      const parked = {
-        branch: "orc/orc-1",
-        origin: { machine: "mac", run: "run-1" },
-        questions: [
-          { id: "r2", text: "Keep the old flag?", asked: spec.created, blocks: true, answer: { words: "Keep it", at: spec.created, relayedTo: null } },
-          { id: "ask-1", text: "Pick a color?", asked: spec.created, blocks: false, answer: null, owner: "user" as const }
-        ]
-      }
-      await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked }))
-      await recordRun(root, "https://github.com/example/orc/pull/7")
-      const spawner = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
-        const real = yield* ChildProcessSpawner.ChildProcessSpawner
-        return ChildProcessSpawner.make((command) =>
-          ChildProcess.isStandardCommand(command) && command.options.env?.ORC_TASK_ID === "orc-1"
-            ? real.spawn(ChildProcess.make(join(root, "missing-start-command")))
-            : real.spawn(command)
-        )
-      })).pipe(Layer.provide(pueueDone(root, "Success")))
-      const report = await beatWith(root, spawner)
-      expect(report.actions).toContainEqual(expect.objectContaining({ kind: "start-failed", task: "orc-1" }))
-      const closed = (await run(listTasks(root))).at(0)
-      expect(closed).toMatchObject({ state: { kind: "closed", closing: { outcome: "start-failed" } }, parked })
-      expect((await run(openItems(root))).map(({ item }) => item.kind)).toEqual(["run-died"])
-    })
-  })
-
   test("a started task whose pueue run succeeded is closed done and its slot starts the next task instead of staying started", async () => {
     await withBacklog(async (root) => {
       const beat = await beatAfterRun(root, "Success")

@@ -1,5 +1,5 @@
 import { Effect, FileSystem } from "effect"
-import { answeredOnly, BacklogError, findTask, fullPrUrl, isHeld, landedClosing, listTasks, newGrab, parseTaskFile, platformFailure, publishOnce, renderTaskFile, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { answeredOnly, BacklogError, closeNewTask, findTask, fullPrUrl, isHeld, landedClosing, listTasks, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { withdrawTaskItems } from "../../entities/attention/index"
 
 export type DropTask = {
@@ -52,25 +52,9 @@ const moveNewToClosed = (
   closing: UnclaimedClose,
   closedAt: string
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, Requirements> =>
-  Effect.gen(function*() {
-    const { fs, paths, file, grabbed, putBack, read } = yield* newGrab(root, id)
-    const settle = Effect.gen(function*() {
-      const fresh = yield* parseTaskFile(file, "new", yield* read)
-      const refused = refusal(fresh)
-      if (refused !== null) {
-        return yield* new BacklogError({ detail: refused })
-      }
-      const closed = closedRecord(fresh, closing, closedAt)
-      if (!(yield* publishOnce(paths.folder("closed"), id + ".md", renderTaskFile(closed)))) {
-        return yield* new BacklogError({ detail: id + " was closed by another command" })
-      }
-      return closed
-    })
-    const closed = yield* settle.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
-    yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
-    yield* withdrawTaskItems(root, [id], closedAt)
-    return closed
-  })
+  closeNewTask(root, id, (fresh) => refusal(fresh) ?? closedRecord(fresh, closing, closedAt)).pipe(
+    Effect.tap(() => withdrawTaskItems(root, [id], closedAt))
+  )
 
 export const dropTask = (root: string, id: string, reason: string, closedAt: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, Requirements> =>
   Effect.gen(function*() {

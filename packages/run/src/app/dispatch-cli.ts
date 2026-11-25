@@ -1,14 +1,15 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs } from "./dispatch-args"
-import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted, runLabel, backlogPresent, backlogRoot as backlogRootOf, noBacklog, type TaskFileError } from "../entities/backlog/index"
+import { backlogPaths, BacklogError, findTask, listTasks, markPosted, runLabel, backlogPresent, backlogRoot as backlogRootOf, noBacklog, type TaskFileError } from "../entities/backlog/index"
 import { readAttention, routeTaskItems, withdrawTaskItems } from "../entities/attention/index"
 import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readBeatWaits, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText, taskPrState } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
-import { closeLandedTask, dropTask, edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
+import { edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
 import { type ConfigError, readFailure, type DispatchConfig, readDispatchConfig, readProjects } from "../shared/config/index"
 import { holdRun, sendBack, killHeld, queueFromText, renewTask, startTask, stopNow, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson, ensureAlertStream, liveAlertStream } from "../features/queueing-a-task/index"
+import { closeLandedNow, closeNow, dropNow } from "./dispatch-close"
 import { mergeNow } from "./dispatch-merge"
 import { RunnerError, type Command } from "../shared/process/index"
 import { encodeToken, sessionToken } from "../entities/token/index"
@@ -133,42 +134,6 @@ const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult"
     yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
   })
 
-const closeDecision = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, place: DispatchPlace, at: string) =>
-  Effect.gen(function*() {
-    if (args.outcome === "done") {
-      return yield* new BacklogError({ detail: args.id + " is a decision, so it closes done only by its answer: orc backlog answer " + args.id + " <words>" })
-    }
-    const reason = args.reason.trim() === "" ? "the captain dropped the decision" : args.reason
-    yield* dropTask(backlogRoot(place), args.id, reason, at)
-    return "dropped " + args.id + ": " + reason
-  })
-
-const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, place: DispatchPlace) =>
-  Effect.gen(function*() {
-    const at = DateTime.formatIso(yield* DateTime.now)
-    if ((yield* findTask(backlogRoot(place), args.id)).spec.kind === "decision") {
-      return yield* closeDecision(args, place, at)
-    }
-    yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, { pr: null, report: null }, at)
-    yield* withdrawTaskItems(backlogRoot(place), [args.id], at)
-    return "closed " + args.id + " " + args.outcome
-  })
-
-const closeLandedNow = (args: Extract<CommandArgs, { readonly kind: "CloseLandedTask" }>, place: DispatchPlace) =>
-  Effect.gen(function*() {
-    const root = backlogRoot(place)
-    const at = DateTime.formatIso(yield* DateTime.now)
-    const reason = yield* closeLandedTask(root, args.id, args.pr, at)
-    return "closed " + args.id + " done: " + reason
-  })
-
-const dropNow = (args: Extract<CommandArgs, { readonly kind: "DropTask" }>, place: DispatchPlace) =>
-  Effect.gen(function*() {
-    const at = DateTime.formatIso(yield* DateTime.now)
-    yield* dropTask(backlogRoot(place), args.id, args.reason, at)
-    return "dropped " + args.id + ": " + args.reason
-  })
-
 const killNow = (args: Extract<CommandArgs, { readonly kind: "RunnerKill" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
     let label = runLabel(place.home, args.task, args.label === undefined ? yield* defaultKind(place, args.task) : undefined, args.label)
@@ -238,13 +203,13 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
       return recordOrigin(backlogRoot(place), place.home, args)
     }
     case "CloseTask": {
-      return closeNow(args, place)
+      return closeNow(args, place.home)
     }
     case "CloseLandedTask": {
-      return closeLandedNow(args, place)
+      return closeLandedNow(args, place.home)
     }
     case "DropTask": {
-      return dropNow(args, place)
+      return dropNow(args, place.home)
     }
     case "MarkPosted": {
       return markPostedNow(args.id, place)

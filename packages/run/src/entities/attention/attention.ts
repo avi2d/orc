@@ -349,9 +349,6 @@ const routeTask = (root: string, task: TaskRecord, at: string): Effect.Effect<Re
 
 export const withdrawTaskItems = (root: string, tasks: ReadonlyArray<string>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    if (tasks.length === 0) {
-      return
-    }
     const closing = new Set(tasks)
     for (const entry of yield* openItems(root)) {
       if (closing.has(entry.item.task)) {
