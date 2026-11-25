@@ -286,6 +286,10 @@ const startAlertStream = (home: string) => {
     )
 }
 
+const printBeat = (json: boolean, place: DispatchPlace) =>
+  runBeat(backlogRoot(place), place.home, liveSources(place.home, place.env.ORC_BEAT_UPDATE === "off" ? null : place.self)).pipe(
+    Effect.flatMap((report) => Console.log(json ? JSON.stringify(beatJson(report)) : formatBeat(report))))
+
 const execute = (args: CommandArgs, place: DispatchPlace) =>
   Effect.gen(function*() {
     switch (args.kind) {
@@ -326,8 +330,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "Beat": {
-        const report = yield* runBeat(backlogRoot(place), place.home, liveSources(place.home))
-        yield* Console.log(args.json ? JSON.stringify(beatJson(report)) : formatBeat(report))
+        yield* printBeat(args.json, place)
         break
       }
       case "RunnerStart": {

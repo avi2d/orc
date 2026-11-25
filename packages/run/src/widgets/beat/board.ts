@@ -5,6 +5,7 @@ import { type ChildCount, childCount, decisionAnswer, dependencyWaits, fullPrUrl
 import type { Project } from "../../shared/config/index"
 import { describeQuota } from "./quota"
 import type { ChatEvent, PrState } from "../../entities/events/index"
+import { updateLine } from "../../entities/attention/index"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
 const BEAT_JSON_SCHEMA = "orc.beat.v1" as const
@@ -251,6 +252,9 @@ export const formatBoard = (view: BacklogView): string => {
 
 const actionLine = (action: BeatAction): string => {
   switch (action.kind) {
+    case "update": {
+      return updateLine(action)
+    }
     case "started": {
       return "started " + action.task + " on " + action.machine + " with " + action.account + ", output to " + action.log
     }
@@ -334,7 +338,7 @@ const renewal = (action: BeatAction): boolean =>
 export const formatBeat = (report: BeatReport): string =>
   [
     report.beat + " at " + report.at,
-    describeQuota(report.quota),
+    describeQuota(report.quota, report.perTaskRouting),
     "room: " + (report.room.map((entry) => entry.machine + " " + entry.busy + " of " + entry.slots + " busy").join(", ") || "no machine"),
     ...report.actions.map(actionLine),
     ...(report.actions.every(renewal) ? ["no new task"] : [])

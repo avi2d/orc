@@ -22,6 +22,7 @@ export const quietSources = (
   readUpstream: ReadUpstream = noUpstream,
   askDecider: AskDecider = escalateAll
 ): BeatSources => ({
+  update: null,
   readLoad,
   readPullRequest,
   readUpstream,

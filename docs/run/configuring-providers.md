@@ -30,6 +30,8 @@ This example names opencode-go through a Pi login, anthropic through a token fil
 
 `models.planner` names the model `orc backlog add` asks to split a request over budget, through your own Pi with no tools, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows, and without it orc splits nothing.
 
+[Dispatch rules](dispatch-rules.md) can pick different agent models for each backlog task.
+
 ## Provider credentials
 
 Each provider names its Pi provider `id`, the part of a model name before the `/`, and its `credential`:

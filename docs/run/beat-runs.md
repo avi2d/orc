@@ -18,7 +18,8 @@ A decision never starts.
 
 The project's machine needs a checkout and a free slot.
 An account needs room above zero and at or above the configured floor.
-The beat chooses the account with the most room.
+Without [dispatch rules](dispatch-rules.md), the beat chooses the account with the most room.
+With routing, the rules choose an account and models for each runnable task.
 A task restricted to a machine waits for a slot there.
 New tasks start in priority order, as [Set priority](backlog-tasks.md#set-priority) describes.
 
@@ -38,10 +39,13 @@ After 10 minutes without reaching the machine, the beat opens a `machine-unreach
 A run still waiting for an answer stays started and the beat relays the answer.
 To stop a task yourself, run `orc backlog stop <task-id>` where the backlog lives, as [Stop a task](backlog-tasks.md#stop-a-task) describes.
 
-Custom start commands receive `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT`, `ORC_TASK_IMPLEMENTER_MODEL`, `ORC_TASK_FIXER_MODEL`, `ORC_TASK_TOKEN_FILE`, `ORC_TASK_CLAUDE_CONFIG_DIR`, and `ORC_TASK_INSTRUCTIONS`.
+Custom start commands receive `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT`, `ORC_TASK_IMPLEMENTER_MODEL`, `ORC_TASK_FIXER_MODEL`, `ORC_TASK_ROUTED_MODELS`, `ORC_TASK_TOKEN_FILE`, `ORC_TASK_CLAUDE_CONFIG_DIR`, and `ORC_TASK_INSTRUCTIONS`.
 `ORC_TASK_LOG` names the log path, and `ORC_RUN_MACHINE` names the machine.
-`ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` hold the picked account's models, or empty strings when the account names no `models`.
-If your custom start command forwards the task to another machine, forward both model variables with it.
+Without routing, `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` hold the picked account's models, or empty strings when the account names no `models`.
+When routing is set, both variables are empty and `ORC_TASK_ROUTED_MODELS` holds the routed models as JSON.
+The JSON requires `implementer` and can include `fixer` and `reviewer`.
+Without routing, `ORC_TASK_ROUTED_MODELS` is empty.
+If your custom start command forwards the task to another machine, forward all three model variables with it.
 `ORC_TASK_TOKEN_FILE` holds a path, not a token.
 For a token-command account, the token arrives as `orc.token.v1` on standard input.
 For a `none` account, standard input is empty.
@@ -58,6 +62,25 @@ A runner task with no new output for 30 minutes reports a stall.
 
 Run `orc beat --json` for the `orc.beat.v1` action document.
 It reports starts, closures, parked questions, stalls, upstream changes, attention items, and the PRs the beat merged, is updating or did not merge, as `yolo-merged`, `yolo-updating` and `merge-refused`.
+
+## Updating Orc on dispatch machines
+
+After dispatching tasks, the beat runs [`orc update --json`](updating-orc.md) on the machine the beat runs on and through each `orc runner start -- <command>` in `dispatch.json`.
+The beat names its own machine after the `dispatch.json` entry whose start runs `orc runner start` with no `--` command, and calls it `a dispatch machine` when no entry does.
+The beat records the check time under `ORC_HOME` and checks again no sooner than an hour later.
+Set `ORC_BEAT_UPDATE=off` on the beat process to skip the update check.
+
+Each check adds an `update` action to `orc.beat.v1` with the machine name and the `orc.update.v1` result.
+If the update command does not return a result, the action reports `unread` and names the reason.
+When Orc moves to a new version, the chat posts a line such as `orc on a dispatch machine moved from 1.2.3 to 1.2.4`.
+If an update fails, `orc attention` shows one `update-failed` item for that machine with the installer's error.
+A failure that can be retried goes to the decider, so it stays out of your Awaiting you list, and no one decides it.
+The beat retries it on the next hourly check, and the next successful check withdraws the item.
+A failure that cannot be retried, such as a release that reports the wrong version, goes to you.
+
+The beat that checked for the update and any runs already underway keep their running version.
+The next scheduled beat uses the new version if its launcher reads the selected release or its path resolves to the updated Bun installation.
+Start each machine on a release that supports its install method before relying on the beat to maintain it.
 
 ## Merging a task's PR
 

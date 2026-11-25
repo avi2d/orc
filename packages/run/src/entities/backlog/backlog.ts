@@ -1,23 +1,20 @@
-import { Array as Arr, Effect, FileSystem, Schema } from "effect"
+import { Array as Arr, Effect, FileSystem } from "effect"
+import { TaskId, taskIdPattern } from "../../shared/lib/index"
 import { fullPrUrl, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { answerWait, type DeciderOwns } from "./task-wait"
 import { renderTaskFile } from "./task-record-render"
 import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, readNames, recoverGrabs, scratchName, takenGrab } from "./backlog-write"
 
 export { BacklogError, readNames } from "./backlog-write"
-
-// A project name may hold dashes, so an id splits at its last dash.
-const idPattern = /^([A-Za-z0-9][A-Za-z0-9._-]*)-(\d+)$/
+export { TaskId }
 const taskFilePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*-\d+\.md$/
 
 const splitId = (id: string): { readonly project: string; readonly number: number } | null => {
-  const split = idPattern.exec(id)
+  const split = taskIdPattern.exec(id)
   return split === null ? null : { project: split[1], number: Number(split[2]) }
 }
 
-export const isTaskId = (id: string): boolean => idPattern.test(id)
-
-export const TaskId = Schema.String.check(Schema.isPattern(idPattern))
+export const isTaskId = (id: string): boolean => taskIdPattern.test(id)
 
 export const ensureBacklog = (root: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {

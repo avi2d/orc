@@ -1,6 +1,7 @@
+import { Effect, type FileSystem } from "effect"
 import { deliveryFor, type RunDelivery } from "../../shared/config/index"
 import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "../../shared/config/index"
-import { answerWait, closedUndone, decisionWait, type DeciderOwns, type TaskRecord, childCount, dependencyWaits, isHeld, missingOriginWait, taskPriorities } from "../../entities/backlog/index"
+import { answerWait, type BacklogError, closedUndone, decisionWait, type DeciderOwns, listTasks, type TaskFileError, type TaskRecord, childCount, dependencyWaits, isHeld, missingOriginWait, taskPriorities } from "../../entities/backlog/index"
 
 export interface MachineRoom {
   readonly machine: string
@@ -16,6 +17,15 @@ export const readRoom = (machines: ReadonlyArray<Machine>, tasks: ReadonlyArray<
       (task.state.kind === "taken" || task.state.kind === "started") && task.state.claim?.machine === machine.name
     ).length
   }))
+
+// Each beat writes its claim before it counts, so of two beats racing for a machine's last slot at least one sees both claims.
+export const machineOverfull = (
+  root: string,
+  machine: Machine
+): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  listTasks(root).pipe(
+    Effect.map((tasks) => readRoom([machine], tasks).some((entry) => entry.busy > entry.slots))
+  )
 
 const priorityRank = (task: TaskRecord): number => task.spec.priority ?? taskPriorities.length
 

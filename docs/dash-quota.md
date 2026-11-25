@@ -41,7 +41,7 @@ Its header names its standing:
 
 | Header | Meaning |
 | --- | --- |
-| `next run` | The beat picks this account for the next task |
+| `next run` | The beat picks this account for the next task. With [dispatch rules](run/dispatch-rules.md), no account shows it |
 | `under the 20% floor` | The room is below the quota's `floorPercent`, here 20% |
 | none | The beat picks another account first |
 

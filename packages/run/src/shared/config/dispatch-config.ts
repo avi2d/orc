@@ -2,6 +2,8 @@ import { Effect, FileSystem, Path, Result, Schema } from "effect"
 import { AbsolutePath, ConfigError, duplicateOf, readJsonFile, readJsonFileIfPresent } from "./json-file"
 import { ModelRef, ProviderId } from "./orc-config"
 import { providerOfModel } from "./model-route"
+import { DispatchRouting, readRouting } from "./dispatch-routing"
+import { type Contribution, parsedUpstream } from "./contribution"
 import { type DeliveryMode, isDeliveryMode, unknownMode } from "./delivery"
 import { ownedBySweep } from "./machine-reach"
 
@@ -86,6 +88,7 @@ const tagAccount = (account: RawAccount): Account =>
       : { ...account, kind: "token-command" as const }
 
 const DispatchEnvelope = Schema.Struct({
+  routing: Schema.optionalKey(Schema.Unknown),
   machines: Schema.Array(RawMachine),
   quota: Schema.Struct({
     provider: ProviderId,
@@ -95,7 +98,8 @@ const DispatchEnvelope = Schema.Struct({
   })
 })
 
-export type DispatchConfig = Omit<typeof DispatchEnvelope.Type, "machines" | "quota"> & {
+export type DispatchConfig = {
+  readonly routing?: DispatchRouting
   readonly machines: ReadonlyArray<Machine>
   readonly quota: Omit<typeof DispatchEnvelope.Type["quota"], "accounts" | "floorPercent"> & {
     readonly floorPercent: number
@@ -113,13 +117,6 @@ const RawProject = Schema.Struct({
   upstream: Schema.optionalKey(Schema.Unknown)
 })
 type RawProject = typeof RawProject.Type
-
-export interface Contribution {
-  readonly url: string
-  readonly owner: string
-  readonly repo: string
-  readonly number: number
-}
 
 export type Project = Omit<RawProject, "mode" | "yolo" | "instructions" | "floor" | "upstream"> & {
   readonly mode?: DeliveryMode
@@ -143,32 +140,6 @@ const parsedInstructions = (project: { readonly name: string; readonly instructi
     return "the project " + name + " names instructions " + JSON.stringify(instructions) + ", which is not a file path"
   }
   return instructions === undefined ? { name } : { name, instructions }
-}
-
-// GitHub ignores case in owner and repository names and numbers issues and pull requests from one sequence, and an owner holds no dot.
-export const contributionId = (contribution: Contribution): string =>
-  contribution.owner.toLowerCase() + "." + contribution.repo.toLowerCase() + "." + String(contribution.number)
-
-const contributionPattern = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)\/(?:issues|pull)\/([1-9]\d*)$/
-
-const notUpstream = (name: string, value: unknown): string =>
-  "the project " + name + " names upstream " + JSON.stringify(value) + ", which is not a list of GitHub issue or pull request URLs"
-
-const parsedUpstream = (name: string, upstream: unknown): ReadonlyArray<Contribution> | string => {
-  if (!Array.isArray(upstream)) {
-    return notUpstream(name, upstream)
-  }
-  const contributions: Array<Contribution> = []
-  for (const entry of upstream) {
-    const match = typeof entry === "string" ? contributionPattern.exec(entry) : null
-    if (match === null) {
-      return "the project " + name + " names the upstream entry " + JSON.stringify(entry) + ", which is not a GitHub issue or pull request URL such as https://github.com/owner/repo/pull/12"
-    }
-    contributions.push({ url: match[0], owner: match[1], repo: match[2], number: Number(match[3]) })
-  }
-  const ids = contributions.map(contributionId)
-  const again = contributions.find((contribution, index) => ids.indexOf(contributionId(contribution)) !== index)
-  return again === undefined ? contributions : "the project " + name + " names the upstream URL " + again.url + " twice"
 }
 
 const checkedProject = (project: RawProject): Project | string => {
@@ -264,6 +235,16 @@ const accountModelsProblem = (provider: string, accounts: ReadonlyArray<Account>
   return null
 }
 
+// A kind none account names no login of its own, so a second account on its provider would spend that same login.
+const sharedLoginProblem = (provider: string, accounts: ReadonlyArray<Account>): string | null => {
+  const on = (account: Account): string => providerOf({ provider }, account)
+  for (const account of accounts.filter((entry) => entry.kind === "none")) {
+    const other = accounts.find((entry) => entry !== account && on(entry) === on(account))
+    if (other !== undefined) return "the account " + account.name + " takes kind none and names no login, so no other account runs on its provider " + on(account) + ", but " + other.name + " does"
+  }
+  return null
+}
+
 const claudeConfigProblem = (accounts: ReadonlyArray<Account>, machines: ReadonlyArray<Machine>): string | null => {
   for (const account of accounts) {
     if (account.kind !== "claude-config") continue
@@ -301,22 +282,22 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
           return yield* new ConfigError({ file, detail: "the account " + duplicate + " is named twice" })
         }
         const accounts = yield* Effect.forEach(config.quota.accounts, (entry) => readAccount(file, entry))
-        const accountProblem = claudeConfigProblem(accounts, machines) ?? accountModelsProblem(config.quota.provider, accounts)
+        const accountProblem = claudeConfigProblem(accounts, machines) ?? accountModelsProblem(config.quota.provider, accounts) ?? sharedLoginProblem(config.quota.provider, accounts)
         if (accountProblem !== null) return yield* new ConfigError({ file, detail: accountProblem })
-        const single = accounts.find((entry) => entry.kind === "none")
-        if (single !== undefined && accounts.length > 1) {
-          return yield* new ConfigError({ file, detail: "the account " + single.name + " takes kind none and names no login, so the quota names no other account beside it" })
-        }
+        const tokenless = accounts.find((entry) => entry.kind === "none")
         const commandAccount = accounts.find((entry) => entry.kind === "token-command")
         const unrenewed = config.machines.find((entry) => entry.renew === undefined)
         if (commandAccount !== undefined && unrenewed !== undefined) {
           return yield* new ConfigError({ file, detail: "the machine " + unrenewed.name + " has no renew command, which the account " + commandAccount.name + " needs to carry its token past its expiry" })
         }
         const renewed = config.machines.find((entry) => entry.renew !== undefined)
-        if (single !== undefined && renewed !== undefined) {
-          return yield* new ConfigError({ file, detail: "the account " + single.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes" })
+        if (tokenless !== undefined && commandAccount === undefined && renewed !== undefined) return yield* new ConfigError({ file, detail: "the machine " + renewed.name + " names a renew command it never takes, because no account uses a token command" })
+        const quota = { ...config.quota, floorPercent: config.quota.floorPercent ?? 0, accounts }
+        if (config.routing === undefined) {
+          return { machines, quota }
         }
-        return { machines, quota: { ...config.quota, floorPercent: config.quota.floorPercent ?? 0, accounts } }
+        const routing = yield* readRouting(file, config.routing, accounts.map((account) => ({ name: account.name, provider: providerOf(quota, account) })))
+        return { machines, quota, routing }
       })
     )
   )

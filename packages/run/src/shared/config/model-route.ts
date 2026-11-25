@@ -23,7 +23,7 @@ export interface HandedModels {
   readonly fixer: string | undefined
 }
 
-export const configuredModels = (config: OrcConfig, handed: HandedModels): HandedModels => ({
+export const configuredModels = (config: Pick<OrcConfig, "models">, handed: HandedModels): HandedModels => ({
   implementer: handed.implementer ?? config.models?.implementer,
   fixer: handed.fixer ?? config.models?.fixer
 })
