@@ -15,9 +15,12 @@ A token account also supplies `--token-file`.
 
 ### Select models and thinking levels
 
-`ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` select the run's models.
-A model in an agent file takes precedence.
-When the variables are empty, the run uses its config or agent files.
+`ORC_TASK_ROUTED_MODELS` holds the routed models as JSON, with a required `implementer` and optional `fixer` and `reviewer`.
+The runner preserves these models for `orc run`.
+`ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` select the corresponding role's model before the routed or configured default.
+Each role uses its agent file's model before these variables and defaults.
+When all three model variables are empty, the run uses its config or agent files.
+If your custom start command forwards a task to another machine, forward all three model variables.
 
 `ORC_TASK_IMPLEMENTER_THINKING` and `ORC_TASK_FIXER_THINKING` select the run's thinking levels.
 The runner passes them to `orc run` as `--implementer-thinking` and `--fixer-thinking`.
@@ -27,7 +30,9 @@ The runner refuses any other level before it queues the run.
 The run history records the handed level on the step row.
 Without the variables, the run uses the agent file's `thinking` line.
 
-The beat sets the two model variables from the picked account's `models` in `dispatch.json`, and leaves them empty for an account that names none.
+Without routing, the beat sets `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` from the picked account's `models` in `dispatch.json`.
+It leaves both empty for an account that names no models.
+When routing is set, the beat leaves both empty and sets `ORC_TASK_ROUTED_MODELS` instead.
 It sets neither thinking variable yet.
 
 ### Queue limits and files

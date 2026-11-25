@@ -9,6 +9,7 @@ Both files live in `$ORC_HOME/backlog`, or `~/.orc/backlog` when `ORC_HOME` is u
 ## Dispatch configuration
 
 `dispatch.json` defines machines, their slot limits and commands, and the quota and accounts.
+Its optional [`routing` section](dispatch-rules.md) picks models and quota accounts per task.
 Each slot limit also sets the pueue `orc` group's parallel limit when `orc runner start` queues a task.
 
 Each account has one credential kind:
@@ -79,9 +80,12 @@ An account may name its own `provider`, and the `models` its runs take from that
 }
 ```
 
-The beat then picks the roomiest account across every provider.
-The run it starts takes that account's provider and models, through `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL`.
-An account without a `provider` takes the quota's `provider`, and without `models` the run takes the models of `config.json` or the agent files.
+Without [dispatch rules](dispatch-rules.md), the beat picks the account with the most remaining quota across every provider.
+Without routing, the run takes that account's provider and models through `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL`.
+With routing, the run takes the selected account's provider and receives the routed models as JSON through `ORC_TASK_ROUTED_MODELS`.
+The beat leaves the other two model variables empty.
+An account without a `provider` takes the quota's `provider`.
+When neither routing nor account `models` is set, the run takes its models from `config.json` or the agent files.
 An account whose provider differs from the quota's must name `models`, and each model must come from the account's provider.
 A model an agent file names still takes precedence, so the agent files of a project that runs on several providers name no model.
 
@@ -109,6 +113,7 @@ Run `orc quota` on the machine that runs the beat to see its quota line without 
 For example, set `quota.command` to `["subquo", "read", "--json"]` and run `orc quota --json` to read your configured accounts.
 
 A JSON reading with `kind: "read"` gives `floorPercent`, `accounts` in configuration order, and `pick`, which is the chosen account name or `null`.
+With [dispatch rules](dispatch-rules.md#candidates-and-quota), `pick` is always `null`, because the account is chosen per task.
 Each usable account gives `remainingPercent` and, if the source supplies it, `resetsAt`.
 Each unusable account gives its `reason`.
 A reading with `kind: "unread"` gives `reason` and a machine-readable `cause`: `command-missing`, `exit`, `timeout`, `no-json`, `spawn`, `schema`, or `account-missing`.
