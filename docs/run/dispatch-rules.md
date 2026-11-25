@@ -33,7 +33,7 @@ A string candidate names a `provider/model` for all Orc agent roles.
 An object candidate requires `models.implementer` and can name `models.fixer` and `models.reviewer`.
 If omitted, the fixer uses the implementer model, and the reviewer uses the fixer model.
 The reviewer model applies only to Orc's `direct-PR` delivery.
-The no-mistakes reviewer has its own settings.
+The [no-mistakes](https://github.com/kunchenguid/no-mistakes) reviewer has its own settings.
 
 All models in a candidate must use the same provider.
 Orc takes the account on that provider with the most quota above zero and at or above `quota.floorPercent`.
@@ -42,6 +42,7 @@ The named account must exist in `quota.accounts`, and its provider must match th
 Orc refuses the dispatch configuration if either check fails.
 If no account qualifies, Orc tries the next candidate.
 Each provider in use must appear in `config.json` and have a quota account in `dispatch.json`.
+Once a run starts, Orc does not retry it on another candidate if the chosen model fails.
 The quota reading does not check whether an account can run a particular model.
 For a model that only some accounts can run, name one of those accounts in the candidate.
 
@@ -69,7 +70,7 @@ The task ID, category, account, and model names reflect the projects, quota acco
       {
         "when": { "category": "design" },
         "candidates": [
-          { "account": "fable-access", "models": { "implementer": "claude-bridge/claude-fable-5" } },
+          { "account": "fable-access", "models": { "implementer": "claude-bridge/claude-fable-5-2" } },
           "claude-bridge/claude-opus-5-5"
         ]
       },
@@ -78,15 +79,15 @@ The task ID, category, account, and model names reflect the projects, quota acco
       { "when": { "category": "diagnosis" }, "candidates": ["claude-bridge/claude-opus-5-5"] },
       {
         "when": { "kind": "ship", "project": "editor", "category": "specified", "minEstimatedLines": 151 },
-        "candidates": ["codex/gpt-6.2-sol", "claude-bridge/claude-opus-5-5"]
+        "candidates": ["openai/gpt-6.2-sol", "claude-bridge/claude-opus-5-5"]
       },
-      { "when": { "kind": "scout" }, "candidates": ["codex/gpt-6.1-terra", "claude-bridge/claude-opus-5-5"] }
+      { "when": { "kind": "scout" }, "candidates": ["openai/gpt-6.1-terra", "claude-bridge/claude-opus-5-5"] }
     ],
     "default": ["claude-bridge/claude-opus-5-5"],
     "tasks": {
       "editor-10": { "category": "design" },
       "editor-11": { "category": "specified", "estimatedLines": 175 },
-      "editor-12": { "model": "codex/gpt-6.2-sol" }
+      "editor-12": { "model": "openai/gpt-6.2-sol" }
     }
   }
 }
