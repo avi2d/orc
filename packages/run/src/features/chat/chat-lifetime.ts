@@ -28,6 +28,7 @@ export const whileSessionExists = Effect.fnUntraced(function*<E, R>(
   )
   if (!(yield* leaseHeld)) return 0
   let original = session === null ? null : yield* stat(session)
+  if (drawerLease !== null && original === null) return 0
   const untilEnded = Effect.gen(function*() {
     while (true) {
       yield* Effect.sleep("1 second")

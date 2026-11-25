@@ -31,10 +31,12 @@ const fakeHerdr = (saved: ReadonlyArray<string> = []) => {
   }
   for (const name of saved) store(folder + "/" + name, "")
   const launches: Array<ReadonlyArray<string>> = []
+  const removals: Array<Promise<typeof ok>> = []
   let appRunning = true
   return {
     files,
     launches,
+    removals,
     quitApp: () => { appRunning = false },
     ownerRunning: (pid: number) => Effect.sync(() => appRunning && pid === appPid),
     write: (path: string, text: string) => Promise.resolve(store(path, text)),
@@ -44,8 +46,15 @@ const fakeHerdr = (saved: ReadonlyArray<string> = []) => {
         return Promise.resolve({ ...ok, stdout: names.join("\n") + "\n" })
       }
       if (program === "sh") return Promise.resolve({ ...ok, stdout: String(appPid) + "\n" })
-      if (program === "rm") files.delete(args[1] ?? "")
-      else if (program !== "mkdir") throw new Error("Unexpected command " + program)
+      if (program === "rm") {
+        const completed = Promise.resolve().then(() => {
+          files.delete(args[1] ?? "")
+          return ok
+        })
+        removals.push(completed)
+        return completed
+      }
+      if (program !== "mkdir") throw new Error("Unexpected command " + program)
       return Promise.resolve(ok)
     },
     hc: (args: ReadonlyArray<string>) => {
@@ -176,6 +185,10 @@ test("an already closed drawer does not spawn Pi against a missing lease", async
   expect(await startsPi((host) => host.controller.obey("close"))).toBe(0)
 })
 
+test("an open drawer does not spawn Pi when its session was deleted before launch", async () => {
+  expect(await startsPi((host) => { host.files.delete(launchOf(host.launches[0]).session) })).toBe(0)
+})
+
 test("a lease left by a Herdr App that has quit does not spawn Pi", async () => {
   expect(await startsPi((host) => host.quitApp())).toBe(0)
 })
@@ -253,11 +266,13 @@ test("opening the installed drawer launches one chat rather than none", async ()
   expect(app.launches).toHaveLength(1)
 })
 
-test("closing the drawer's App view removes the lease before close returns, not on a later tick", async () => {
+test("closing the drawer's App view removes its lease without deleting its transcript", async () => {
   const { view, send } = await installDrawer()
   await send("toggle")
   const { session, lease } = launchOf(app.launches[0])
   expect(app.files.has(lease)).toBe(true)
   view.close(cx)
+  expect(app.removals).toHaveLength(1)
+  await app.removals[0]
   expect([...app.files.keys()]).toEqual([session])
 })
