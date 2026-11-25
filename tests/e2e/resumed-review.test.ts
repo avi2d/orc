@@ -15,7 +15,7 @@ const reviewer: AgentFile = {
   body: "Review the change.", path: "reviewer.md", source: "bundled"
 }
 
-const finding = { id: "unchecked-input", file: "a", line: 1, severity: "minor", action: "Validate the input.", description: "The input crosses a trust boundary." }
+const finding = { id: "unchecked-input", file: "a", line: 1, severity: "minor" as const, action: "Validate the input.", description: "The input crosses a trust boundary." }
 
 const git = (dir: string, ...args: Array<string>): string => {
   const result = Bun.spawnSync(["git", ...args], {
