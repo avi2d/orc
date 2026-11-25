@@ -54,6 +54,13 @@ const attentionEntry = (record: Fields, at: string): Guarded<AttentionEntry> => 
   return ok({ ...named.value, ...content.value, owner: owner.value, asked: asked.value })
 }
 
+const withEntry = <T>(value: unknown, at: string, read: (record: Fields, entry: AttentionEntry) => Guarded<T>): Guarded<T> => {
+  const record = fields(value, at)
+  if (record.kind === "refused") return record
+  const entry = attentionEntry(record.value, at)
+  return entry.kind === "refused" ? entry : read(record.value, entry.value)
+}
+
 const attentionOption: Guard<AttentionOption> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
@@ -95,25 +102,24 @@ const readDecision: Guard<Decision> = (value, at) => {
   return ok({ kind: kind.value, basis: basis.value, recommendation: recommendation.value })
 }
 
-const attentionItem: Guard<AttentionItem> = (value, at) => {
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  const entry = attentionEntry(record.value, at)
-  if (entry.kind === "refused") return entry
-  const subject = absentOrString(record.value, "subject", at)
+const attentionItem: Guard<AttentionItem> = (value, at) =>
+  withEntry(value, at, (record, entry) => readItem(record, entry, at))
+
+const readItem = (record: Fields, entry: AttentionEntry, at: string): Guarded<AttentionItem> => {
+  const subject = absentOrString(record, "subject", at)
   if (subject.kind === "refused") return subject
-  const options = record.value["options"] === undefined ? ok([]) : arrayOf(record.value, "options", at, attentionOption)
+  const options = record["options"] === undefined ? ok([]) : arrayOf(record, "options", at, attentionOption)
   if (options.kind === "refused") return options
-  const recommendation = absentOrString(record.value, "recommendation", at)
+  const recommendation = absentOrString(record, "recommendation", at)
   if (recommendation.kind === "refused") return recommendation
-  const decision = record.value["decision"] === undefined ? ok(null) : readDecision(record.value["decision"], child(at, "decision"))
+  const decision = record["decision"] === undefined ? ok(null) : readDecision(record["decision"], child(at, "decision"))
   if (decision.kind === "refused") return decision
-  const age = number(record.value, "ageSeconds", at)
+  const age = number(record, "ageSeconds", at)
   if (age.kind === "refused") return age
   if (!Number.isSafeInteger(age.value) || age.value < 0) return refused(child(at, "ageSeconds"), "a non-negative integer", age.value)
-  const overdue = record.value["overdue"]
+  const overdue = record["overdue"]
   if (typeof overdue !== "boolean") return refused(child(at, "overdue"), "a boolean", overdue)
-  return ok({ ...entry.value, subject: subject.value, options: options.value, recommendation: recommendation.value, decision: decision.value, overdueSeconds: overdue ? age.value : null })
+  return ok({ ...entry, subject: subject.value, options: options.value, recommendation: recommendation.value, decision: decision.value, overdueSeconds: overdue ? age.value : null })
 }
 
 const answerWords: Guard<string> = (value, at) => {
@@ -121,18 +127,17 @@ const answerWords: Guard<string> = (value, at) => {
   return record.kind === "ok" ? string(record.value, "words", at) : record
 }
 
-const decidedItem: Guard<DecidedAttention> = (value, at) => {
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  const entry = attentionEntry(record.value, at)
-  if (entry.kind === "refused") return entry
-  const decision = readDecision(record.value["decision"], child(at, "decision"))
+const decidedItem: Guard<DecidedAttention> = (value, at) =>
+  withEntry(value, at, (record, entry) => readDecided(record, entry, at))
+
+const readDecided = (record: Fields, entry: AttentionEntry, at: string): Guarded<DecidedAttention> => {
+  const decision = readDecision(record["decision"], child(at, "decision"))
   if (decision.kind === "refused") return decision
-  const answer = answerWords(record.value["answer"], child(at, "answer"))
+  const answer = answerWords(record["answer"], child(at, "answer"))
   if (answer.kind === "refused") return answer
-  const overturned = record.value["overturned"] === undefined ? ok(null) : answerWords(record.value["overturned"], child(at, "overturned"))
+  const overturned = record["overturned"] === undefined ? ok(null) : answerWords(record["overturned"], child(at, "overturned"))
   if (overturned.kind === "refused") return overturned
-  return ok({ ...entry.value, decision: decision.value, answer: answer.value, overturned: overturned.value })
+  return ok({ ...entry, decision: decision.value, answer: answer.value, overturned: overturned.value })
 }
 
 export const attention: Guard<AttentionQueue> = (value, at) => {
