@@ -55,15 +55,16 @@ const trigger = (t: Palette, name: MenuName, menu: FilterMenu<unknown>, open: Me
     .child(div().flex_shrink_0().text_color(t.dim).child(String(menu.chosen.count)))
     .child(div().flex_shrink_0().text_color(t.dim).child("▾"))
 
-const menuList = <A>(t: Palette, name: MenuName, menu: FilterMenu<A>, left: number, pick: (cx: Context, value: A | null) => void): Element =>
+const menuList = <A>(t: Palette, name: MenuName, menu: FilterMenu<A>, left: number, act: RunsActions, pick: (cx: Context, value: A | null) => void): Element =>
   v_flex().id(`filter-${name}-menu`).absolute().top(headerHeight + triggerHeight + 4).left(left).w(menuWidth).max_h(320).overflow_y_scrollbar()
     .on_mouse_down("left", (_event, cx) => cx.stop_propagation())
+    .on_mouse_down_out((_event, cx) => act.openMenu(cx, null))
     .p(4).gap(2).rounded(6).border_1().border_color(t.border).bg(t.raised).shadow_md()
     .children(menu.choices.map((choice) => {
       const chosen = choice === menu.chosen
       const count = div().flex_shrink_0().text_color(t.dim).child(choice.count.toString())
       const shownCount = name === "status" && choice.value === "Awaiting you"
-        ? count.id("inbox-count").px(4).rounded(4).hover((style) => style.bg(t.hover).text_color(t.foreground)).on_click((_event, cx) => openInbox(cx))
+        ? count.id("inbox-count").px(4).rounded(4).hover((style) => style.bg(t.hover).text_color(t.foreground)).on_click((_event, cx) => { act.openMenu(cx, null); openInbox(cx) })
         : count
       return h_flex().id(`filter-${name}-${choice.name}`).px(8).py(3).gap(8).rounded(4).justify_between().cursor_pointer()
         .bg(chosen ? t.selected : t.raised).text_color(chosen ? t.foreground : t.muted)
@@ -82,9 +83,9 @@ const openList = (t: Palette, all: ReadonlyArray<Card>, shown: RunsShown, act: R
   const filter = shown.filter
   switch (shown.menu) {
     case "project":
-      return [menuList(t, "project", projectMenu(all, filter), columnPadding, (cx, project) => { if (project !== null) act.setFilter(cx, { ...filter, ...project }) })]
+      return [menuList(t, "project", projectMenu(all, filter), columnPadding, act, (cx, project) => { if (project !== null) act.setFilter(cx, { ...filter, ...project }) })]
     case "status":
-      return [menuList(t, "status", statusMenu(all, filter), columnPadding + menuWidth + menuGap, (cx, status) => act.setFilter(cx, { ...filter, status }))]
+      return [menuList(t, "status", statusMenu(all, filter), columnPadding + menuWidth + menuGap, act, (cx, status) => act.setFilter(cx, { ...filter, status }))]
     case null:
       return []
   }

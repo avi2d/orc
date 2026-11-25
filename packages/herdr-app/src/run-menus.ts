@@ -23,12 +23,11 @@ const filterMenu = <A extends string>(title: FilterMenu<A>["title"], values: Rea
 export type ProjectChoice = { readonly project: string | null; readonly allRuns: boolean }
 
 export const projectMenu = (cards: ReadonlyArray<Card>, filter: Filter): FilterMenu<ProjectChoice> => {
-  const forStatus = cards.filter((card) => filter.status === null || card.standing.status === filter.status)
   const choices: ReadonlyArray<FilterChoice<ProjectChoice>> = [
-    { value: { project: null, allRuns: false }, name: "All", count: forStatus.filter((card) => card.known).length },
-    ...projectsOf(cards).map((project) => ({ value: { project, allRuns: false }, name: project, count: forStatus.filter((card) => card.project === project).length })),
-    { value: { project: null, allRuns: true }, name: "All runs", count: forStatus.length }
-  ]
+    { value: { project: null, allRuns: false }, name: "All" },
+    ...projectsOf(cards).map((project) => ({ value: { project, allRuns: false }, name: project })),
+    { value: { project: null, allRuns: true }, name: "All runs" }
+  ].map((choice) => ({ ...choice, count: filterCards(cards, { ...filter, ...choice.value }).length }))
   const chosen = choices.find((choice) => choice.value?.project === filter.project && choice.value.allRuns === filter.allRuns)
     ?? { value: { project: filter.project, allRuns: filter.allRuns }, name: filter.project ?? "All", count: 0 }
   return { title: "Project", chosen, choices }
