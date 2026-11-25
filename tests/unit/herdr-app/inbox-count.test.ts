@@ -219,7 +219,7 @@ test("the Board's Awaiting you lane lists the tasks the Inbox lists instead of a
     pr: "https://github.com/example/garden/pull/11", report: null, closedAt: "2026-11-24T09:00:00Z"
   }
   documents.set("orc backlog --json", {
-    schema: "orc.backlog.v1", projects: ["garden"],
+    schema: "orc.backlog.v1", projects: [{ name: "garden" }],
     tasks: [...["garden-2", "garden-3", "garden-7", "garden-8"].map(openTask), parked, closed]
   })
   documents.set("orc attention --json", fixture)

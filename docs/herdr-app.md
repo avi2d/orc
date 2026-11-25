@@ -43,7 +43,6 @@ The tabs refresh while visible and show a reason when a command fails.
 ## Answer in the Inbox
 
 Select **Inbox** or press `cmd-4` to see everything Orc assigns to you in one list, oldest first.
-The Inbox includes items from runs on other machines.
 Each card shows the task ID and title, who asks, the subject, each option with its outcome, and the recommendation.
 An option with a picture shows as a tile, and any other option shows as a button.
 The Inbox outlines the recommended option.
@@ -53,14 +52,14 @@ The Agents tab shows the same cards under each run in **Awaiting you**.
 
 To answer a question, a decision, a hold or an event:
 
-1. Click an option, or type your own answer into the box below the options and press Enter or **Send**.
+1. Click an option, or type your own answer and press Enter or **Send**.
 1. The Inbox runs the command for that item, and the card shows **Answer recorded**:
    - `orc backlog answer <task> <id>=<answer>` for a question or a decision.
    - `orc backlog answer <task> <answer>` for a hold.
    - `orc attention answer <item> <answer>` for an event, such as a run that died.
-     The answer records your choice and does not run the command in the option's outcome.
+     It does not run the option's outcome.
 
-For an overdue hold, type an answer to the hold, or click **drop** and give a reason to run `orc backlog drop <task> <reason>`.
+For an overdue hold, type an answer, or click **drop** and give a reason to run `orc backlog drop <task> <reason>`.
 
 To merge a PR that waits:
 
@@ -68,10 +67,9 @@ To merge a PR that waits:
 1. Confirm the dialog, and the Inbox runs `orc merge <task> --basis captain-word`.
 
 Click **hold** to leave the PR open, and the Inbox runs `orc attention answer <item> hold`.
-When a command fails, the card shows the command and the first line of its error.
+When a command fails, the card shows it with the first line of its error.
 
-Questions that the agent owns, and the agent's answers, stay in the collapsed **Agent attention** section at the end of the list.
-Open it to see each one with its basis.
+Questions the agent owns, and its answers, stay in the collapsed **Agent attention** section at the end, each with its basis.
 Where you replaced an agent's answer, your answer shows beside it as **Decided by you**.
 
 ## Tab guides
