@@ -28,7 +28,7 @@ If your launcher reads the version from `~/.local/share/orc/release`, run `orc u
 Orc detects the launcher when its running entry point resolves to `~/.local/share/orc/v<version>/packages/run/src/bin.ts` or its compiled executable resolves to `~/.local/share/orc/v<version>/orc`.
 For example, if `release` holds `1.2.3`, the launcher starts `v1.2.3/packages/run/src/bin.ts` with Bun or runs `v1.2.3/orc`.
 
-If the launcher starts the source entry, Orc clones the new version tag, installs its production dependencies from the lockfile with Bun on `PATH`, and checks that the new checkout prints the expected version.
+If the launcher starts the source entry, Orc clones the new version tag, installs its production dependencies from the lockfile with the Bun that runs orc, and checks that the new checkout prints the expected version.
 If the launcher runs the compiled `orc`, Orc downloads the archive for its platform and the archive's `.sha256` file from the GitHub release, as [Release assets](release-assets.md) lists them.
 Orc then checks the archive's SHA-256, unpacks it into `v<version>`, and checks that the new `orc` prints the expected version, so the update needs no Bun.
 If the version directory already exists, Orc checks only the entry the launcher would run, the source entry or the compiled `orc`.
