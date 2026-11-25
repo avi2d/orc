@@ -96,4 +96,19 @@ describe("a red check on a ship task's PR", () => {
     })
   })
 
+  test("does not rerun the same PR again after send-back and re-close", async () => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      const asked: Array<ReadonlyArray<string>> = []
+      await route(root, asked)
+      await run(sendBackClosedTask(root, "task-1", "fix it", "2026-10-27T12:10:00.000Z", { machine: "worker", run: "run-1", pr }))
+      await run(claimTask(root, "task-1"))
+      const task = await run(findTask(root, "task-1"))
+      await run(writeTaken(root, { ...task, state: { kind: "started", claim, started: { at: "2026-10-27T12:11:00.000Z", log: "/tmp/task.log" } } }))
+      await run(closeStartedTask(root, "task-1", "done", "", { pr, report: null }, "2026-10-27T12:12:00.000Z"))
+      await route(root, asked)
+      expect(asked).toHaveLength(1)
+      expect((await run(openItems(root)))[0]?.item.text).toContain(details)
+    })
+  })
 })
