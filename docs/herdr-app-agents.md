@@ -65,5 +65,6 @@ Select ✕ to close it, or switch to Turns and press Escape.
 
 Turns is read only and shows each model reply, its tokens, and its tool calls.
 Select Thinking for the model's thinking, or select a finished tool call for its output.
-Closing the drawer keeps the chat running.
+Closing the drawer stops the chat and Pi but keeps the session file in `~/.orc/chat/`.
+Deleting the session file also stops the chat.
 Opening it or switching views after the terminal exits starts a new chat.

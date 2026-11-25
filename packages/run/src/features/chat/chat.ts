@@ -1,6 +1,7 @@
 import { Console, Data, Effect, FileSystem, Path } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { boardsVar } from "./chat-board"
+import { whileSessionExists } from "./chat-lifetime"
 import { orcCommandVar } from "./chat-run"
 import { chatToolNames } from "./chat-tools"
 import { chatToolsBundle } from "./chat-tools-bundle"
@@ -71,7 +72,8 @@ const chatLaunch = (orcHome: string, chatTools: string, model: string, rules: Or
 export const runChat = (
   orcHome: string,
   self: Command,
-  sessionFile: string | null
+  sessionFile: string | null,
+  drawerLease: string | null = null
 ): Effect.Effect<number, ChatError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const config = yield* readOrcConfig(orcHome).pipe(
@@ -91,9 +93,10 @@ export const runChat = (
     const [program, ...args] = launch.command
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     // extendEnv lays this over the shell's environment, so the provider's env wins over an exported variable.
-    const handle = yield* spawner.spawn(ChildProcess.make(program, args, { env: { ...providerEnvOf(config, model), ...launch.env }, extendEnv: true, stdin: "inherit", stdout: "inherit", stderr: "inherit" }))
-    return yield* handle.exitCode
+    const pi = spawner.exitCode(ChildProcess.make(program, args, {
+      env: { ...providerEnvOf(config, model), ...launch.env }, extendEnv: true, stdin: "inherit", stdout: "inherit", stderr: "inherit", forceKillAfter: "1 second"
+    }))
+    return yield* whileSessionExists(pi, absoluteSession, drawerLease)
   }).pipe(
-    Effect.scoped,
-    Effect.catchTag("PlatformError", (error) => Effect.fail(new ChatError({ message: "orc chat: cannot start pi: " + error.message })))
+    Effect.catchTag("PlatformError", (error) => Effect.fail(new ChatError({ message: "orc chat: " + error.message })))
   )
