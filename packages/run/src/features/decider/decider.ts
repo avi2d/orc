@@ -5,6 +5,8 @@ import { type AttentionItem, claimDeciding, type OpenItem, openItems, recordDeci
 import { backlogPaths, findTask, type BacklogError, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { readInstructions, readOrcRules } from "../../entities/orc-rules/index"
 import { answerTask } from "../../entities/parked-runs/index"
+import { gateCapQuestionId, isQuestion } from "../../entities/review-gate/index"
+import { ciWaitingQuestionId } from "../../entities/pull-request/index"
 import { askBackWords, guardReason } from "./decider-guard"
 import { quotedSource, type RuleSource, spaced, type Verdict } from "./quoted-source"
 import { answerOnRule, recommendedAnswer } from "./recommended"
@@ -236,7 +238,9 @@ const decidableOf = (byId: ReadonlyMap<string, TaskRecord>, entry: OpenItem): De
 
 const verdictOf = (ask: AskDecider, policy: Effect.Effect<string>, root: string, { entry, task, question }: Decidable) =>
   Effect.gen(function*() {
-    const guarded = guardReason(entry.item.kind === "review-question" ? question : { text: question.text })
+    const isOrcQuestion = question.id === gateCapQuestionId || question.id === ciWaitingQuestionId
+    const kind = entry.item.kind === "worker-question" ? "worker-question" : isOrcQuestion || isQuestion(question) ? "review-question" : "review-finding"
+    const guarded = guardReason(question, kind)
     if (guarded !== null) {
       return { kind: "escalated", reason: guarded } satisfies Verdict
     }

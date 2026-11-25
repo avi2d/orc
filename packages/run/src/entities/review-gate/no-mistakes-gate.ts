@@ -139,7 +139,7 @@ export const parseRun = (output: string): ParsedRun => {
 
 type Classified = Pick<NoMistakesFinding, "id" | "action">
 
-const isQuestion = (finding: Classified): boolean => finding.id.startsWith("question-")
+export const isQuestion = (finding: Pick<NoMistakesFinding, "id">): boolean => finding.id.startsWith("question-")
 
 const orcActions = new Set(["auto-fix", "no-op"])
 

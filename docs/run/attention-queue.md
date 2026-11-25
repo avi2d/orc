@@ -23,16 +23,20 @@ Its policy is in `packages/run/agents/decider-policy.md`.
 
 No-mistakes names the action it asks of you in the `question_action` column of each `ask-user` finding and each `question-<id>` finding.
 Orc carries that value through `asking.json`, the run history and the parked question in the task file.
-When a question names `none`, orc sends it to the decider.
-When it names `merge`, `delete` for deleting unlanded work, `login`, `push`, `release`, or any other value orc does not know, orc sends it to you.
+A review finding is a row of the no-mistakes findings table, and a review question is a `question-<id>` row.
+Orc's own `gate-cap` and `ci-waiting` questions count as review questions.
+No-mistakes writes `unknown` for an `ask-user` finding its reviewer did not classify.
+A review finding with no `question_action`, or with `none` or `unknown`, goes to the decider without a topic check, because a finding describes code.
+A review question with a missing or `unknown` action falls back to the topic check on its text.
+The action `none` bypasses the topic check.
+The actions `merge`, `delete`, `login`, `push`, and `release` go to you.
+Any other action value goes to you because orc does not know it.
 
 ### The topic check
 
-No-mistakes writes `unknown` for an `ask-user` finding its reviewer did not classify.
-A question that names `unknown` or no action goes through a topic check instead.
-Orc sends questions about deletion, security, credentials, merging, pushing, releasing, going public, spending, irreversible actions, site appearance, legal text, and logins to you.
-The topic check reads the whole question, including context and reports of completed actions.
-A question that names `merge conflicts` or says a step pushes a tag goes to you, even if it only asks whether to continue.
+The topic check sends questions about deletion, security, credentials, merging, pushing, releasing, going public, spending, irreversible actions, site appearance, legal text, and logins to you.
+For a worker question, or a review question with a missing or `unknown` action, it reads the whole question, including context and reports of completed actions.
+Those questions go to you if they name `merge conflicts` or say a step pushes a tag, even if they only ask whether to continue.
 Going public means making something public, doing it publicly, or posting, announcing, emailing or sharing to an outside place such as a client, a channel or an issue.
 An upstream repository, issue or project, or a service such as a gist, Discord, Slack or Reddit, counts on its own.
 The word public or share alone, as in `public API`, does not count.
@@ -42,7 +46,7 @@ The noun counts within three words after the verb without a joining word such as
 Own work needs a helper verb before the past form, as in `will be discarded` or `will be scrapped`.
 A hard reset, `git reset --hard`, `git branch -D`, `git stash drop` or `clear`, `git clean -f`, `git checkout -- .` and `git restore .` also count.
 The name `test runs` never counts as deleting work.
-A question with no words at all goes to you.
+Any question or finding with no words goes to you, regardless of its action.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
 Rules and policy do not widen either check.
 
@@ -71,18 +75,18 @@ When the decider still escalates a question with that line on one of those two b
 An escalation on any other bullet, or with no bullet, stays with you, and so does a question on the topic list above.
 When the decider answers a question on that Rules sentence, orc records the question's `Recommended:` option as the answer, whatever option the reply named.
 Orc escalates such an answer to a question with no `Recommended:` line.
-The rule and the override apply to review questions and worker questions alike, once they pass the topic check.
+The rule and the override apply to worker questions, review questions and review findings alike, once they reach the decider.
 
 ### Settle routine review findings
 
-The policy's Rules section settles these findings in a review question classified as `none`, and in an unclassified question that passes the topic check:
+The policy's Rules section settles these findings when they reach the decider:
 
 - A fix round that landed no diff gets `fix with instructions`, and orc sends the answers to the review's other findings with the fix.
 - A missing changelog entry, in a repository whose release writes the changelog from commit subjects, gets the commit subject as its entry.
 - A merge conflict with the base branch or a failed check gets a fix from the run, which then runs the checks again.
 - A finding with one remedy inside the task's intent and one that widens it gets the remedy inside the intent.
 
-An unclassified merge conflict, or an unclassified changelog finding that names a release, still goes to you on its words.
+A worker question or a review question without an action still goes to you if it names a merge conflict or a release.
 
 ### Handle a failed call
 
@@ -107,6 +111,12 @@ Answering a review question or a worker question with `orc backlog answer <task-
 A question asked again with the same words keeps its item.
 A question asked again with different words opens a new item, and the old item is withdrawn.
 An answered question asked again opens a new item, and the old item keeps its answer.
+A resumed run that reports again a question of the asking it resumes keeps the answer that asking took.
+
+Each beat writes the answer of a closed item into its task file when the task file still lists that question unanswered.
+The next resume hands that answer to the run.
+A blocking question with no answer and no open item opens one `unasked-question` item for its task, owned by the user.
+The item names each such question, and answering each with `orc backlog answer` withdraws it.
 
 ## Items for run events
 
@@ -149,11 +159,12 @@ The `recommendation` names one option:
 - A `failing-command` item offers `continue` or `stop`, and recommends `continue`.
 - A `machine-unreached` item offers `wait` or `close`, and recommends `wait`.
 - An `overdue-wait` item offers `answer` or `drop`, and recommends `answer`.
+- An `unasked-question` item offers `answer` or `drop`, and recommends `answer`.
 
 To record a choice on a `run-died`, `check-red`, `pr-ready`, `failing-command` or `machine-unreached` item, run `orc attention answer <item-id> <words>`.
 Run the command the outcome names to carry out the option.
 `orc attention answer` only records the choice and closes the item.
-It refuses a review question, a worker question or an overdue wait and names the task to answer with `orc backlog answer` instead.
+It refuses a review question, a worker question, an overdue wait or an unasked question and names the task to answer with `orc backlog answer` instead.
 
 A held task whose `--until` date has passed opens an `overdue-wait` item, owned by the user and asked at the start of the next day on the machine local clock.
 Answering the hold closes the item with the hold's answer.
