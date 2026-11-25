@@ -94,6 +94,16 @@ const beatAt = async (root: string, now: number, state: PueueState = running): P
 const stalledLine = "stalled task-1 on mac: no output since 2026-10-27T11:00:00.000Z"
 
 describe("a pueue run's stall", () => {
+  test("a stalled run retries on its kept branch instead of remaining started", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await seedRun(root)
+      await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
+      await beatAt(root, minutesAfterWrite(30))
+      const task = (await run(listTasks(root))).find((entry) => entry.spec.id === "task-1")
+      expect(task).toMatchObject({ state: { kind: "new" }, retry: { run: "run-1" }, parked: { branch: "orc/task-1", origin: { machine: "mac", run: "run-1" } } })
+    })
+  })
   test("output 30 minutes old flags the run instead of waiting longer", async () => {
     await withBacklog(async (root) => {
       await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
