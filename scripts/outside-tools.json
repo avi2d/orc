@@ -26,5 +26,6 @@
   { "name": "OpenCode", "url": "https://opencode.ai" },
   { "name": "quota-axi", "url": "https://github.com/kunchenguid/quota-axi" },
   { "name": "Lavish", "url": "https://github.com/kunchenguid/lavish-axi" },
-  { "name": "axi", "url": "https://github.com/kunchenguid/axi" }
+  { "name": "axi", "url": "https://github.com/kunchenguid/axi" },
+  { "name": "Effect", "url": "https://effect.website" }
 ]
