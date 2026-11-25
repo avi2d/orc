@@ -1,11 +1,11 @@
 import { Effect, FileSystem } from "effect"
 import { driveNoMistakes, waitForAnswers, type AllowWord, type OpenQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
-import { ciVerdictLine, type CiVerdict, type DirectPrRecord, openDirectPr, type PullRequestOpener, readCiVerdict } from "../../entities/pull-request/index"
+import { ciWaitingQuestionId, ciVerdictLine, type CiVerdict, type DirectPrRecord, openDirectPr, type PullRequestOpener, readCiVerdict } from "../../entities/pull-request/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
 import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
-import { ciWaitingQuestionId, type RunCheckpoints, type SandboxOps } from "./run-ops"
+import type { RunCheckpoints, SandboxOps } from "./run-ops"
 import { recordOpenAsks } from "./history-write"
 import { reviewSentence, reviewAtHead } from "./review-turn"
 
@@ -14,7 +14,10 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + (rounds.at(-1)?.passed === true ? ", and the checks passed. " : ". No local checks ran. ")
     const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
     if (run.delivery.kind === "direct-PR") {
+      const reviewStarted = new Date().toISOString()
+      yield* checkpoints.reviewStart(run.delivery.reviewer, reviewStarted)
       const review = yield* reviewAtHead(run, runAgent, run.delivery.reviewer, priorDir)
+      yield* checkpoints.reviewDone(run.delivery.reviewer, review, reviewStarted, new Date().toISOString())
       const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
       const reviewed = checked + reviewSentence(review)
       if (pr.status !== "opened") {

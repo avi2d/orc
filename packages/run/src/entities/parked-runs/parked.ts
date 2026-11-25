@@ -15,9 +15,11 @@ const parkedQuestions = (
   asking: string | null,
   askedOf: (question: OpenQuestion) => string
 ): Parked["questions"] => {
+  // A resumed run reports again the questions of the asking it resumes, so one stamped with the known asking is that asking and keeps its answer.
+  const sameAsking = (known: ParkedQuestion, question: OpenQuestion) => question.asked !== undefined && question.asked === known.asked
   const stillAsked = (known: ParkedQuestion, question: OpenQuestion) =>
     known.id === question.id && known.text === question.text && (known.asked === "" || question.asked === undefined || known.asked === askedOf(question)) &&
-    (known.answer === null || answersAsking(known.answer, asking))
+    (known.answer === null || answersAsking(known.answer, asking) || sameAsking(known, question))
   const kept = prior.filter((known) => known.answer !== null && answersAsking(known.answer, asking) && !open.some((question) => question.id === known.id))
   return Arr.appendAll(
     Arr.map(open, (question): ParkedQuestion => {

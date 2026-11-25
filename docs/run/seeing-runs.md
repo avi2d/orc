@@ -48,6 +48,7 @@ Runs recorded before these facts show each as `null`.
 
 To see one run step by step, run `orc show <run-id>`.
 It lists each step with its agent, session, signals, latest score and evidence, every file as a full link.
+Each step prints its `model` when an agent ran it, and its `minutes` from start to end once it ended.
 To print the same facts as JSON, run `orc show <run-id> --json`.
 Its JSON document names its version first as `schema`, starting at `orc.show.v1`.
 Its `run` gives the same `task`, `machine` and `worktree` as `orc runs --json`.

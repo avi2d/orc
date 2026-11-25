@@ -12,6 +12,7 @@ import { type AccountName, signIn } from "./features/signing-in/index"
 import { encodeUpdateJson, formatUpdate, releasesUrl, runUpdate } from "./features/updating-orc/index"
 import { helpText, overview, usageErrorText } from "./app/help"
 import { runDispatch } from "./app/dispatch-cli"
+import { isStandinInvocation, runStandinInvocation } from "./entities/heavy-queue/index"
 import { runQuotaCli } from "./app/quota-cli"
 import { decodeJson, pueue, PueueState, queuedTasks, RunnerError, selfCommand } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
@@ -300,5 +301,10 @@ const program = Effect.gen(function*() {
 })
 
 if (import.meta.main) {
-  runMain(program, { disableErrorReporting: true })
+  const words = process.argv.slice(2)
+  if (Bun.isStandaloneExecutable && isStandinInvocation(words[0] ?? "")) {
+    process.exitCode = await runStandinInvocation(words)
+  } else {
+    runMain(program, { disableErrorReporting: true })
+  }
 }

@@ -5,22 +5,15 @@ import { isWorkerQuestion, loopQuestionId } from "../agent/index"
 export const deciderTimeoutMillis = 180 * 1000
 const deciderClaimMillis = deciderTimeoutMillis + 60 * 1000
 
-import type { AttentionItem, Asked, AttentionOption, Decision, ItemAnswer } from "./attention-item"
+import type { AttentionItem, Asked, Decision, ItemAnswer } from "./attention-item"
 import type { AskOption } from "../review-gate/index"
+import { choice, itemId, unaskedQuestion, type Choice } from "./attention-ask"
 import { attentionFolder, encodeItem, fileSuffix, openItem, readExistingItem, readItem, replaceItem, withItemClaim, writeItem } from "./attention-store"
 
 export type { Asked }
 
 export { openItem, readItem } from "./attention-store"
-
-// The same parts always name one file, so routing an item again opens nothing new.
-export const itemId = (...parts: ReadonlyArray<string>): string => parts.map((part) => part.replace(/[^A-Za-z0-9_-]/g, "_")).join(".")
-
-type Choice = Pick<Asked, "subject" | "options" | "recommendation">
-
-// The recommended option comes first, so an item cannot recommend an option it does not list.
-export const choice = (subject: string, recommended: AttentionOption, ...others: ReadonlyArray<AttentionOption>): Choice =>
-  ({ subject, options: [recommended, ...others], recommendation: recommended.text })
+export { choice, itemId } from "./attention-ask"
 
 const choiceOf = (asked: Asked): Choice => ({
   ...(asked.subject === undefined ? {} : { subject: asked.subject }),
@@ -197,9 +190,9 @@ export const readAttention = (root: string, tasks: ReadonlyArray<TaskRecord>): E
     }
   })
 
-type TaskItemKind = Extract<AttentionItem["kind"], "review-question" | "worker-question" | "overdue-wait">
+type TaskItemKind = Extract<AttentionItem["kind"], "review-question" | "worker-question" | "overdue-wait" | "unasked-question">
 
-const taskItemKinds: ReadonlySet<AttentionItem["kind"]> = new Set<TaskItemKind>(["review-question", "worker-question", "overdue-wait"])
+const taskItemKinds: ReadonlySet<AttentionItem["kind"]> = new Set<TaskItemKind>(["review-question", "worker-question", "overdue-wait", "unasked-question"])
 
 // A hold names the day it is answered by, so its wait passes once that whole day has.
 const overdueWait = (task: TaskRecord, at: string): { readonly id: string; readonly asked: Asked | null; readonly answer: ItemAnswer | null } | null => {
@@ -223,14 +216,25 @@ const overdueWait = (task: TaskRecord, at: string): { readonly id: string; reado
   return { id, asked, answer: hold.answer }
 }
 
-// openItem publishes once and cannot rewrite a withdrawn item, so this rewrites it open with the text the task asks now.
-const openOrReopenTaskItem: ItemWrite = whenAlreadyOpened((root, id, asked) =>
+// openItem publishes once and cannot rewrite an item, so this rewrites a withdrawn or open one with the text the task asks now.
+// A lost replace means another writer changed the item, so the item is live exactly when it reads open now.
+const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const existing = yield* readExistingItem(root, id)
-    if (existing !== null && existing.item.state.kind === "withdrawn") {
-      yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, ...choiceOf(asked), state: { kind: "open" } }))
+    if (yield* openItem(root, id, asked)) {
+      return true
     }
-  }))
+    const existing = yield* readExistingItem(root, id)
+    if (existing === null || existing.item.state.kind === "closed") {
+      return false
+    }
+    if (existing.item.state.kind === "open" && existing.item.text === asked.text) {
+      return true
+    }
+    if (yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, ...choiceOf(asked), state: { kind: "open" } }))) {
+      return true
+    }
+    return (yield* readItem(root, id))?.state.kind === "open"
+  })
 
 // The task file holds the answer that stands, so an item closed on the answer it replaced takes the new one and keeps the old one.
 const overturnClosedItem = (root: string, id: string, existing: { readonly before: string; readonly item: AttentionItem }, answer: ItemAnswer): Effect.Effect<CloseOutcome, BacklogError, FileSystem.FileSystem> =>
@@ -265,7 +269,7 @@ const routeOne = (root: string, id: string, asked: Asked | null, answer: ItemAns
   if (answer !== null) {
     return Effect.as(closeOrCloseReopenedTaskItem(root, id, answer, overturns), false)
   }
-  return asked === null ? Effect.succeed(false) : Effect.as(openOrReopenTaskItem(root, id, asked), true)
+  return asked === null ? Effect.succeed(false) : openOrReopenTaskItem(root, id, asked)
 }
 
 const routeQuestion = (root: string, task: string, question: ParkedQuestion): Effect.Effect<string | null, BacklogError, FileSystem.FileSystem> => {
@@ -295,6 +299,7 @@ const closeAskedBackEarlier = (root: string, task: TaskRecord, asked: string, at
 const routeTask = (root: string, task: TaskRecord, at: string): Effect.Effect<ReadonlyArray<string>, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const live: Array<string> = []
+    const unasked: Array<ParkedQuestion> = []
     for (const question of task.parked?.questions ?? []) {
       const id = yield* routeQuestion(root, task.spec.id, question)
       if (id !== null) {
@@ -302,9 +307,16 @@ const routeTask = (root: string, task: TaskRecord, at: string): Effect.Effect<Re
         continue
       }
       const answer = question.answer
+      if (answer === null && question.blocks && task.state.kind === "new") {
+        unasked.push(question)
+      }
       if (answer !== null && answer.by !== "asked-back" && isWorkerQuestion(question.id)) {
         yield* closeAskedBackEarlier(root, task, question.asked, at)
       }
+    }
+    const silent = unaskedQuestion(task, unasked, at)
+    if (silent !== null && (yield* openOrReopenTaskItem(root, silent.id, silent.asked))) {
+      live.push(silent.id)
     }
     const wait = overdueWait(task, at)
     if (wait !== null && (yield* routeOne(root, wait.id, wait.asked, wait.answer))) {
@@ -323,9 +335,14 @@ export const withdrawTaskItems = (root: string, tasks: ReadonlyArray<string>, at
     }
   })
 
+const staleTaskItemReasons: Partial<Record<AttentionItem["kind"], string>> = {
+  "overdue-wait": "hold no longer waits",
+  "unasked-question": "each question it named has an answer or an open item"
+}
+
 const staleItemReason = (item: AttentionItem, task: TaskRecord, live: boolean): string | null => {
   if (taskItemKinds.has(item.kind) && !live) {
-    return task.state.kind === "closed" ? "task closed" : item.kind === "overdue-wait" ? "hold no longer waits" : "question no longer asked"
+    return task.state.kind === "closed" ? "task closed" : staleTaskItemReasons[item.kind] ?? "question no longer asked"
   }
   if (task.state.kind !== "closed") {
     return null

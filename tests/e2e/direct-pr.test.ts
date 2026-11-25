@@ -54,6 +54,7 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(outcome.run?.prLink).toBe(ghPrLink)
           expect(outcome.run?.status).toBe("running")
           expect(outcome.signals).toContainEqual({ name: "open-question", value: expect.stringContaining('"id":"ci-waiting"') })
+          expect(outcome.steps).toContainEqual({ name: "review", status: "failed" })
           expect(outcome.steps).toContainEqual({ name: "pr", status: "passed" })
           expect(outcome.steps).not.toContainEqual(expect.objectContaining({ name: "no-mistakes" }))
           const body = await readFile(bodyFile, "utf8")

@@ -13,7 +13,7 @@ import { OrcRunError } from "../../shared/lib/index"
 import { historyFailure, markRunStopped, openDatabase, openQuestionsForRun, orcHomeDir, stoppedEndReason, updateStep } from "../../entities/run-history/index"
 import { stepsForRun } from "../../entities/run-history/index"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "./run-resume"
-import { finishRun, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordOpenAsks, recordOpenQuestion, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish, recordStepSession } from "./history-write"
+import { deliveryCheckpoints, finishRun, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordOpenAsks, recordOpenQuestion, recordImplementStart, recordResumePublish, recordStepSession } from "./history-write"
 import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
 import { longSessionWarning, type LongSessionCounts } from "../../entities/agent/index"
 import { runFull } from "./run-loop"
@@ -298,10 +298,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       },
       fixSession: (attempt, file) => recordStepSession(db, run.runId, "fix", attempt, file),
       fixDone: (fix) => recordFixDone(db, run.runId, fix),
-      noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
-      noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
-      pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
-      pullRequestDone: (record) => recordPullRequestDone(db, run, record),
+      ...deliveryCheckpoints(db, run),
       questionAsked: (step, question) => recordOpenQuestion(db, run.runId, step, question)
     }
     const endFailed = (reason: string) =>

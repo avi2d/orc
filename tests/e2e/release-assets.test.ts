@@ -1,27 +1,28 @@
 import { describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import packageJson from "../../packages/run/package.json" with { type: "json" }
+import { runnerStartEnv, withFixture } from "./runner-helpers"
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url))
 const buildTimeout = 300_000
 
-const run = async (command: ReadonlyArray<string>, cwd: string): Promise<{ readonly exitCode: number, readonly stdout: string, readonly stderr: string }> => {
-  const proc = Bun.spawn([...command], { stdin: "ignore", stdout: "pipe", stderr: "pipe", cwd })
+const run = async (command: ReadonlyArray<string>, cwd: string, env = process.env): Promise<{ readonly exitCode: number, readonly stdout: string, readonly stderr: string }> => {
+  const proc = Bun.spawn([...command], { stdin: "ignore", stdout: "pipe", stderr: "pipe", cwd, env })
   const [stdout, stderr, exitCode] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
   return { exitCode, stdout, stderr }
 }
 
 describe("release assets", () => {
-  test("bun run release:assets writes this platform's orc archive with the compiled orc, the compiled heavy stand-in and the Herdr App, and a sha256sum line that matches the archive rather than another file", async () => {
+  test("the checksummed release runs both dashboard commands without Bun and queues its own orc-dash instead of a PATH copy", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-release-assets-e2e-"))
     try {
       const out = join(dir, "out")
       const built = await run([process.execPath, "run", "release:assets", out], repoRoot)
-      expect(built.exitCode).toBe(0)
+      expect(built.exitCode, built.stderr).toBe(0)
 
       const name = "orc-" + packageJson.version + "-" + process.platform + "-" + process.arch + ".tar.gz"
       expect((await readdir(out)).toSorted()).toEqual([name, name + ".sha256"])
@@ -34,12 +35,29 @@ describe("release assets", () => {
       await mkdir(unpacked)
       const extracted = await run(["tar", "-xzf", join(out, name), "-C", unpacked], dir)
       expect(extracted.exitCode).toBe(0)
-      expect((await readdir(unpacked)).toSorted()).toEqual(["heavy-standin", "herdr-app", "orc"])
+      expect((await readdir(unpacked)).toSorted()).toEqual(["heavy-standin", "herdr-app", "orc", "orc-dash", "orc-dash-capture"])
       expect((await readdir(join(unpacked, "herdr-app"))).toSorted()).toEqual(["keys.json", "layouts", "mods"])
 
-      const version = await run([join(unpacked, "orc"), "--version"], dir)
-      expect(version.exitCode).toBe(0)
+      const noBun = { ...process.env, PATH: dir }
+      const version = await run([join(unpacked, "orc"), "--version"], dir, noBun)
+      expect(version.exitCode, version.stderr).toBe(0)
       expect(version.stdout.trim()).toBe("orc " + packageJson.version)
+
+      const dash = await run([join(unpacked, "orc-dash"), "--help"], dir, noBun)
+      expect(dash.exitCode, dash.stderr).toBe(0)
+      expect(dash.stdout).toContain("orc-dash <subcommand>")
+
+      const capture = await run([join(unpacked, "orc-dash-capture"), "--help"], dir, noBun)
+      expect(capture.exitCode, capture.stderr).toBe(0)
+      expect(capture.stdout).toContain("usage: orc-dash-capture (pi-call | claude-statusline)")
+
+      await withFixture(async (fixture) => {
+        const env = { ...process.env, ...fixture.env, ...await runnerStartEnv(fixture), HOME: fixture.home }
+        const started = await run([join(unpacked, "orc"), "runner", "start"], fixture.dir, env)
+        expect(started.exitCode, started.stderr).toBe(0)
+        const args = await readFile(join(fixture.pueue, "alerts-add-args"), "utf8")
+        expect(args.trimEnd().split("\n").slice(-3)).toEqual([join(await realpath(unpacked), "orc-dash"), "alerts", "--json"])
+      })
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

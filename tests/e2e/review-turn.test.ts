@@ -6,7 +6,8 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
-import { reviewSentence, runReviewTurn, type ReviewOutcome } from "../../packages/run/src/features/running-a-task/review-turn"
+import { reviewSentence, runReviewTurn } from "../../packages/run/src/features/running-a-task/review-turn"
+import type { ReviewOutcome } from "../../packages/run/src/features/running-a-task/review-outcome"
 import type { AgentRun, SandboxOps } from "../../packages/run/src/features/running-a-task/run-ops"
 
 const reviewer: AgentFile = {

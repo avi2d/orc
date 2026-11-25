@@ -276,15 +276,17 @@ const runnerVerbLine = (args: RunnerVerb, place: DispatchPlace) => {
 }
 
 // The task is queued by now, so a stream that will not queue is told in the task's log and fails no task.
-const startAlertStream = (home: string) => {
-  const stream = liveAlertStream()
-  return stream === null
-    ? Effect.void
-    : ensureAlertStream(home, stream).pipe(
+const startAlertStream = (home: string, self: Command) =>
+  Effect.gen(function*() {
+    const stream = yield* liveAlertStream(self)
+    if (stream === null) {
+      return
+    }
+    yield* ensureAlertStream(home, stream).pipe(
       Effect.flatMap((line) => line === null ? Effect.void : Console.log(line)),
       Effect.catchTag("RunnerError", (error) => Console.error("orc runner start queued no alert stream: " + error.detail))
     )
-}
+  })
 
 const printBeat = (json: boolean, place: DispatchPlace) =>
   runBeat(backlogRoot(place), place.home, liveSources(place.home, place.env.ORC_BEAT_UPDATE === "off" ? null : place.self)).pipe(
@@ -338,7 +340,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         if (line !== null) {
           yield* Console.log(line)
         }
-        yield* startAlertStream(place.home)
+        yield* startAlertStream(place.home, place.self)
         yield* startHeavyWatch(place.home, place.self, "orc runner start")
         break
       }
