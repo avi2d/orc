@@ -3,6 +3,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import registerAsk, { askDirFlag, askToolName, replySuffix } from "../../packages/run/src/entities/agent/orc-ask-extension"
+import * as workerAsk from "../../packages/run/src/entities/agent/worker-ask"
 
 interface Registered {
   readonly execute: (toolCallId: string, params: unknown, signal?: AbortSignal) => Promise<{ readonly content: ReadonlyArray<{ readonly text: string }> }>
@@ -45,6 +46,10 @@ const texts = (result: { readonly content: ReadonlyArray<unknown> } | undefined)
   (result?.content ?? []).map((block) => typeof block === "object" && block !== null && "text" in block ? block.text : block)
 
 describe("the orc_ask tool inside Pi", () => {
+  test("orc launches pi with the tool name and flag the extension registers, instead of names that drifted apart", () => {
+    expect([workerAsk.askToolName, workerAsk.askDirFlag]).toEqual([askToolName, askDirFlag])
+  })
+
   test("a blocking ask answered within the wait returns the answer as its own result, instead of returning before the answer", async () => {
     await withAskDir(async (dir) => {
       const { tool } = loadAsk(dir)

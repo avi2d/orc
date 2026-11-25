@@ -200,7 +200,7 @@ const printStepLog = (args: Extract<OrcArgs, { readonly kind: "ShowStepLog" }>) 
 
 const runInstallApp = Effect.gen(function*() {
   const home = yield* Config.String("HOME")
-  const result = yield* readyBundledApp(herdrAppSourceDir(), bundledAppDir()).pipe(
+  const result = yield* readyBundledApp(Bun.isStandaloneExecutable ? null : herdrAppSourceDir(), bundledAppDir()).pipe(
     Effect.andThen((source) => installApp(source, appHomeDir(home))),
     Effect.provide(BunServices.layer),
     Effect.catchTag("AppInstallError", (error) => Console.error("orc app install: " + error.detail).pipe(Effect.andThen(Effect.fail("orc app install refused"))))

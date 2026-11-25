@@ -20,7 +20,7 @@ const below = (layer: string, above: string) => ({
 
 export default defineConfig({
   devOnly: [...DEV_ONLY, "^scripts/", "^packages/herdr-app/scripts/", "^docs/\\.vitepress/", "^docs/map/"],
-  orphans: ["^packages/herdr-app/scripts/", "^docs/map/"],
+  orphans: ["^packages/herdr-app/scripts/", "^packages/run/scripts/compile\\.ts$", "^docs/map/"],
   // The swc parser reads no Vue file, so the modules only a Vue file imports are named as orphans above.
   options: { exclude: "[.]vue$", builtInModules: { add: ["bun", "gpui-kit", "gpui-base", "gpui-shell", "herdr"] } },
   forbidden: [

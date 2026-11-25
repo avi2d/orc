@@ -16,13 +16,14 @@ It also applies a worker split proposal, as [Task kinds](https://github.com/avi2
 
 ## Install
 
+Orc runs on Bun, so install it with Bun.
 To install orc:
 
-1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
-1. Run `cd orc` to enter it.
-1. Run `bun install --frozen-lockfile` to install the pinned dependencies.
-1. Run `cd packages/run` to enter the run package.
-1. Run `bun link` to put the `orc` command on your PATH.
+1. Run `bun add -g @avi2dg/orc` to put the `orc` command on your PATH.
+1. Run `orc --version` to check it.
+
+To upgrade orc, run `bun add -g @avi2dg/orc` again, or run `orc update`, as [Updating orc](https://github.com/avi2d/orc/blob/main/docs/run/updating-orc.md) shows.
+To run orc from a checkout of the repository instead, follow [Contribute](https://github.com/avi2d/orc/blob/main/docs/contribute.md#run-orc-from-a-checkout).
 
 ## Run a task
 
