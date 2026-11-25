@@ -36,31 +36,43 @@ The command writes only names beginning with `orc`, leaving Herdr's own mods and
 | Board | `cmd-1` | The backlog tasks in five lanes, and the task panel for the selected card |
 | Resources | `cmd-2` | Each subscription's quota windows, and each machine's cores, load, memory, disk and running orc runs |
 | Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps, step output and changes |
-| Inbox | `cmd-4` | Every open question, decision, hold and PR that waits for you, across all tasks |
+| Inbox | `cmd-4` | Every open question, decision, hold, event and PR that Orc assigns to you, across all tasks |
 
 The tabs refresh while visible and show a reason when a command fails.
 
 ## Answer in the Inbox
 
-Select **Inbox** or press `cmd-4` to see everything that waits for you in one list, oldest first.
-The Inbox includes questions from runs on other machines.
-Each item shows the task ID and title, who asks, the full question, and its options.
+Select **Inbox** or press `cmd-4` to see everything Orc assigns to you in one list, oldest first.
+The Inbox includes items from runs on other machines.
+Each card shows the task ID and title, who asks, the subject, each option with its outcome, and the recommendation.
 An option with a picture shows as a tile, and any other option shows as a button.
-When the decider recommends an option, the Inbox outlines it and shows the recommendation below the options.
+The Inbox outlines the recommended option.
+If Orc did not record options, the card shows the original text and says **No options recorded**.
+An overdue card shows how long it has waited.
+The Agents tab shows the same cards under each run in **Awaiting you**.
 
-![The Inbox on Mac with questions from two garden tasks and two holds.](images/herdr-inbox.png)
+To answer a question, a decision, a hold or an event:
 
-To answer a question or a hold:
+1. Click an option, or type your own answer into the box below the options and press Enter or **Send**.
+1. The Inbox runs the command for that item, and the card shows **Answer recorded**:
+   - `orc backlog answer <task> <id>=<answer>` for a question or a decision.
+   - `orc backlog answer <task> <answer>` for a hold.
+   - `orc attention answer <item> <answer>` for an event, such as a run that died.
+     The answer records your choice and does not run the command in the option's outcome.
 
-1. Click an option, or type into the answer box and press Enter or **Send**.
-1. The Inbox runs `orc backlog answer <task> <id>=<answer>` for a question and `orc backlog answer <task> <answer>` for a hold, as the Board task panel does, and drops the item once the answer is recorded.
+For an overdue hold, type an answer to the hold, or click **drop** and give a reason to run `orc backlog drop <task> <reason>`.
 
 To merge a PR that waits:
 
-1. Click **Approve**.
+1. Click **merge**, or **Merge PR** when Orc recorded no options.
 1. Confirm the dialog, and the Inbox runs `orc merge <task> --basis captain-word`.
 
-When a command fails, the item shows the command and the first line of its error.
+Click **hold** to leave the PR open, and the Inbox runs `orc attention answer <item> hold`.
+When a command fails, the card shows the command and the first line of its error.
+
+Questions that the agent owns, and the agent's answers, stay in the collapsed **Agent attention** section at the end of the list.
+Open it to see each one with its basis.
+Where you replaced an agent's answer, your answer shows beside it as **Decided by you**.
 
 ## Tab guides
 
@@ -73,13 +85,6 @@ On the Board tab, click the count in the **Awaiting you** lane header to open th
 
 [Runs and chat](herdr-app-agents.md) covers the Agents tab and chat drawer.
 On the Agents tab, open the **Status** select and click the count beside **Awaiting you** to open the Inbox, as `cmd-4` does.
-**Awaiting you** shows the items Orc assigns to you, even if the run is on another machine.
-The Agents tab and Inbox show each item's subject, options, outcomes, and recommendation on the card.
-Select an option to answer without opening the run.
-If Orc did not record options, the card shows the original text and says **No options recorded**.
-An overdue card shows how long it has waited.
-Open **Agent attention** to see what the agent owns or answered, and the basis for its decisions.
-If you replaced an agent answer, the Inbox shows your answer separately.
 The **Project** select shows runs for configured projects by default.
 Choose **All runs** in it to include runs from other projects.
 Opening a run of another project from the Inbox switches the **Project** select to **All runs**.

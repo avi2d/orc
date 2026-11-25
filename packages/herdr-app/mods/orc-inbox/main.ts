@@ -1,7 +1,7 @@
 import { type AsyncContext, type Context, type Element, View, div } from "gpui-kit"
 import { v_flex } from "gpui-base"
 import { openOverlay } from "herdr"
-import { AgentAttentionSection, userOverrides } from "../../src/agent-attention-view"
+import { AgentAttentionSection } from "../../src/agent-attention-view"
 import { runMerge } from "../../src/agents-merge"
 import { listenFor } from "../../src/ask-view"
 import type { InboxApproval } from "../../src/inbox"
@@ -69,7 +69,6 @@ export default class OrcInbox extends View {
     const body = v_flex().id("items").flex_1().min_h_0().overflow_y_scrollbar().p(16).gap(12)
     return root.child(body
       .children(items.length === 0 ? [div().text_color(t.muted).child("No task awaits you")] : items.map((item) => this.answers.item(t, item, (approval) => this.askMerge(approval))))
-      .children(userOverrides(t, agent))
       .children(this.agentAttention.render(t, agent)))
   }
 }

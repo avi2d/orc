@@ -1,7 +1,7 @@
 import { type AsyncContext, type Context, type Element, View } from "gpui-kit"
 import { InputState, h_flex } from "gpui-base"
 import { layout, run, setShared, shared } from "herdr"
-import { AgentAttentionSection, userOverrides } from "../../src/agent-attention-view"
+import { AgentAttentionSection } from "../../src/agent-attention-view"
 import type { InboxItem } from "../../src/inbox"
 import type { AgentAttention } from "../../src/inbox-read"
 import { type Card, type Filter, type RunAgent, cardAnswers, filterCards, goesOn, openedFilter, recordedStatus, runAgent } from "../../src/agents"
@@ -327,7 +327,7 @@ export default class OrcAgents extends View {
       .child(runsColumn(t, {
         cards: this.cards, filter: this.filter, menu: this.menu, selectedKey: card?.key ?? null, agents: this.agents, folded: this.folded,
         attention: (listed) => cardAttention(listed).map((item) => this.answers.item(t, item, (asked) => act.askMerge(listed, asked))),
-        agentAttention: [...userOverrides(t, this.agent), ...this.agentAttention.render(t, this.agent)]
+        agentAttention: this.agentAttention.render(t, this.agent)
       }, act))
       .child(stepsColumn(t, card, {
         reading: card === null ? null : this.currentSteps(card),

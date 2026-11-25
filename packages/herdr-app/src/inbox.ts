@@ -125,10 +125,6 @@ export const choice = (item: InboxItem, option: AskOption): Choice => {
   if (item.action.kind === "merge" && option.text === "merge") return { kind: "merge" }
   if (item.action.kind === "unavailable") return { kind: "unavailable" }
   if (item.action.kind === "overdue-hold") return { kind: "write", prefix: option.text, label: option.text === "drop" ? "Give a reason for dropping the task" : "Write an answer to the hold" }
-  if (item.action.kind === "answer" && option.outcome !== undefined) {
-    const prefix = /^(answer|fix) <(?:words|how)>$/.exec(option.text)?.[1]
-    if (prefix !== undefined) return { kind: "write", prefix, label: prefix === "fix" ? "Say what to fix" : "Write an answer" }
-  }
   return { kind: "reply", words: option.text }
 }
 
@@ -137,7 +133,7 @@ export const inboxArgv = (item: InboxItem, text: string, prefix = ""): ReadonlyA
   if (words === "") return null
   switch (item.action.kind) {
     case "unavailable": return null
-    case "answer": return answerArgv(item.task, item.action.target, prefix === "fix" ? `fix ${words}` : words)
+    case "answer": return answerArgv(item.task, item.action.target, words)
     case "overdue-hold": return prefix === "drop" ? ["backlog", "drop", item.task, ...(words.startsWith("-") ? ["--"] : []), words] : answerArgv(item.task, { kind: "hold" }, words)
     case "event": return eventArgv(item.action.id, words)
     case "merge": return item.action.attentionId === undefined || words === "merge" ? null : eventArgv(item.action.attentionId, words)

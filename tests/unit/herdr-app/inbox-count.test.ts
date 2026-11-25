@@ -66,9 +66,12 @@ const click = (element: Node | null): void => {
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node }))
 void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Input: node, Avatar: node, AvatarFallback: node, AvatarImage: node,
+  h_flex: node, v_flex: node, Input: { new: () => node() }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
-  InputState: { new: () => ({ value: () => "", set_value: () => undefined }) }
+  InputState: { new: () => {
+    let typed = ""
+    return { value: () => typed, set_value: (text: string) => { typed = text }, on: () => undefined, focus: () => undefined, release: () => undefined }
+  } }
 }))
 void mock.module("herdr", () => ({
   shared: () => null, setShared: () => undefined, layout: () => null, theme: () => ({}),
@@ -84,14 +87,16 @@ void mock.module("herdr", () => ({
   run: (name: string, args: unknown) => ran.push({ name, args })
 }))
 
+const openTask = (id: string) => ({
+  id, title: "Update the report", project: "garden", kind: "ship", body: "", created: "2026-11-24T08:00:00Z",
+  priority: null, dependsOn: [], prState: null, status: "new", hold: null, parked: null
+})
+
 const loadAttention = async () => {
   const { readAgents } = await import("../../../packages/herdr-app/src/agents-read")
   const { readInbox } = await import("../../../packages/herdr-app/src/inbox-read")
   documents.set("orc backlog --json", {
-    schema: "orc.backlog.v1", tasks: fixture.items.map((item) => ({
-      id: item.task, title: "Update the report", project: "garden", kind: "ship", body: "", created: "2026-11-24T08:00:00Z",
-      priority: null, dependsOn: [], prState: null, status: "new", hold: null, parked: null
-    }))
+    schema: "orc.backlog.v1", tasks: fixture.items.map((item) => openTask(item.task))
   })
   documents.set("orc attention --json", fixture)
   documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [] })
@@ -105,13 +110,13 @@ const loadAttention = async () => {
 const cmd4 = { name: "layout.select", args: { stack: "orc-views", child: "orc-inbox" } }
 
 const task: BoardTask = {
-  id: "orc-1", title: "A task", project: "orc", kind: "ship", created: "2026-01-01", status: "new", held: true, parked: false, prState: null
+  id: "orc-1", title: "A task", project: "orc", kind: "ship", created: "2026-01-01", status: "new", prState: null
 }
 
 test("the Awaiting you lane count on the Board opens the Inbox as cmd-4 does instead of folding the lane", async () => {
   const { default: OrcBoard } = await import("../../../packages/herdr-app/mods/orc-board/main")
   const board = new OrcBoard()
-  board.reading = { kind: "ok", value: { backlog: { tasks: [task], projects: [] }, attention: { items: [] } } }
+  board.reading = { kind: "ok", value: { backlog: { tasks: [task], projects: [] }, awaiting: new Set([task.id]) } }
   ran.length = 0
   stopped.length = 0
   click(find(board.render(), "inbox-count"))
@@ -196,4 +201,85 @@ test("an Inbox choice sends the option text to the right question once instead o
   } finally {
     documents.clear()
   }
+})
+
+
+const idsIn = (lane: Node | null): ReadonlyArray<string> =>
+  (lane?.kids ?? []).flatMap((kid) => typeof kid === "string" ? [] : (nodes.get(kid)?.calls ?? []).flatMap((call) => call.name === "id" ? [String(call.args[0])] : []))
+
+test("the Board's Awaiting you lane lists the tasks the Inbox lists instead of a task parked on an agent's question or a closed task with an open PR", async () => {
+  const { default: OrcBoard } = await import("../../../packages/herdr-app/mods/orc-board/main")
+  const { readInbox } = await import("../../../packages/herdr-app/src/inbox-read")
+  const parked = {
+    ...openTask("garden-9"),
+    parked: { branch: "orc/garden-9", questions: [{ id: "ask-1", text: "Which file format should the export use?", asked: "2026-11-25T07:59:00.000Z", answer: null }] }
+  }
+  const closed = {
+    ...openTask("garden-11"), status: "closed", prState: "open", claim: null, started: null, outcome: "done",
+    pr: "https://github.com/example/garden/pull/11", report: null, closedAt: "2026-11-24T09:00:00Z"
+  }
+  documents.set("orc backlog --json", {
+    schema: "orc.backlog.v1", projects: ["garden"],
+    tasks: [...["garden-2", "garden-3", "garden-7", "garden-8"].map(openTask), parked, closed]
+  })
+  documents.set("orc attention --json", fixture)
+  const board = new OrcBoard()
+  const [reading, inbox] = await Promise.all([board.load(), readInbox()]).finally(() => documents.clear())
+  if (inbox.kind !== "ok") throw new Error(inbox.kind === "failed" ? inbox.reason : inbox.kind)
+  board.reading = reading
+  const element = board.render()
+  const userOwned = ["garden-2", "garden-3", "garden-7", "garden-8"]
+  expect([...new Set(inbox.value.items.map((item) => item.task))].sort()).toEqual(userOwned)
+  expect(idsIn(find(element, "cards-Awaiting you"))).toEqual(userOwned.map((id) => `card-${id}`))
+  expect(find(element, "inbox-count")?.kids).toEqual(["4"])
+  expect(idsIn(find(element, "cards-Planned"))).toEqual(["card-garden-9"])
+})
+
+test("an Inbox question with options also sends a typed answer instead of offering only the option buttons", async () => {
+  const { default: OrcInbox } = await import("../../../packages/herdr-app/mods/orc-inbox/main")
+  const { InboxAnswers } = await import("../../../packages/herdr-app/src/inbox-view")
+  const { inbox } = await loadAttention()
+  const view = new OrcInbox()
+  view.answers = new InboxAnswers(() => undefined)
+  view.reading = { kind: "ok", value: inbox }
+  view.answers.sync(cx, inbox.items)
+  const key = "garden-8/garden-8.ask-1.2026-11-25T07_48_00_000Z"
+  const element = view.render()
+  expect(find(element, `option-${key}-A`)).not.toBeNull()
+  view.answers.boxes.get(key)?.set_value("Wide, but only on desktop")
+  const command = "orc backlog answer garden-8 ask-1=Wide, but only on desktop"
+  documents.set(command, "answered")
+  executed.length = 0
+  spawned.length = 0
+  try {
+    click(find(element, `send-${key}`))
+    await Promise.all(spawned)
+    expect(executed).toEqual([command])
+  } finally {
+    documents.clear()
+  }
+})
+
+test("an answer you gave in place of the agent's stays in the collapsed Agent attention section instead of above it", async () => {
+  const { default: OrcInbox } = await import("../../../packages/herdr-app/mods/orc-inbox/main")
+  const { inboxDocuments } = await import("../../../packages/herdr-app/src/inbox-read")
+  const { guardJson } = await import("../../../packages/herdr-app/src/guard")
+  const { attention } = await import("../../../packages/herdr-app/src/guard-attention")
+  const replaced = {
+    ...fixture,
+    decided: fixture.decided.map((item) => ({ ...item, answer: { words: "Three retries", at: "2026-11-25T07:59:00.000Z" }, overturned: { words: "Two retries", at: "2026-11-25T07:58:00.000Z" } }))
+  }
+  const queue = guardJson(JSON.stringify(replaced), attention)
+  if (queue.kind !== "ok") throw new Error(queue.reason)
+  const view = new OrcInbox()
+  view.reading = { kind: "ok", value: inboxDocuments([], queue.value) }
+  const closed = wordsOf(view.render())
+  expect(closed).not.toContain("garden-10 · Decided by you")
+  expect(closed).not.toContain("Three retries")
+  click(find(view.render(), "toggle-agent-attention"))
+  const opened = wordsOf(view.render())
+  expect(opened).toContain("garden-10 · Decided by the agent")
+  expect(opened).toContain("Two retries")
+  expect(opened).toContain("garden-10 · Decided by you")
+  expect(opened).toContain("Three retries")
 })

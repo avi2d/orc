@@ -3,16 +3,13 @@ import { ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { run, setShared, shared } from "herdr"
 import { openInbox, refreshWhenShown, selectedTaskKey } from "../../src/views"
 import { type BoardTask, type Lane, type LaneView, type QueuedRun, cardBox, cardHeight, clampedLaneView, clickedSelection, kindLabel, laneJump, lanes, panelCommand, queueLine, selectionOnBoard, tasksInLane, titleClip, wheelOffset } from "../../src/board"
-import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog, boardQueue } from "../../src/guard-board"
+import { type BoardDocuments, readBoard } from "../../src/board-read"
+import { boardQueue } from "../../src/guard-board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 
 type Palette = ReturnType<typeof palette>
 const taskBlock = "orc-task"
-interface BoardDocuments {
-  readonly backlog: BoardBacklog
-  readonly attention: BoardAttention
-}
 
 const perLane = <T>(make: () => T): Record<Lane, T> =>
   ({ Backlog: make(), Planned: make(), "Awaiting you": make(), Running: make(), Done: make() })
@@ -33,11 +30,7 @@ export default class OrcBoard extends View {
   panelShown: boolean | null = null
   focusHandle: FocusHandle | null = null
 
-  load = (): Promise<Reading<BoardDocuments>> => Promise.all([
-    readJson("orc", ["backlog", "--json"], boardBacklog),
-    readJson("orc", ["attention", "--json"], boardAttention)
-  ]).then(([backlog, attention]) =>
-    backlog.kind !== "ok" ? backlog : attention.kind !== "ok" ? attention : { kind: "ok", value: { backlog: backlog.value, attention: attention.value } })
+  load = readBoard
 
   loadQueue = (): Promise<Reading<ReadonlyArray<QueuedRun>>> => readJson("orc", ["runs", "--json"], boardQueue)
 
@@ -108,9 +101,8 @@ export default class OrcBoard extends View {
     const root = this.closeOnEscape(v_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground))
     if (this.reading.kind === "failed") return root.child(div().p(16).text_color(t.blocked).child(this.reading.reason))
     if (this.reading.kind === "reading") return root.child(div().p(16).text_color(t.muted).child("Reading the backlog"))
-    const { backlog, attention } = this.reading.value
+    const { backlog, awaiting } = this.reading.value
     const queued = this.queue.kind === "ok" ? this.queue.value : []
-    const owned = new Set(attention.items.filter((item) => item.owner === "user").map((item) => item.task))
     const filters = h_flex().id("filters").gap(4).px(12).py(8).flex_wrap().items_center()
       .child(div().text_color(t.dim).child("Project"))
       .child(this.chip(t, "project-all", "All", this.project === null, (cx) => { this.project = null; cx.notify() }))
@@ -119,7 +111,7 @@ export default class OrcBoard extends View {
       .children(backlog.projects === null ? [div().px(12).text_color(t.blocked).child("Projects could not be read")] : [])
       .children(this.queue.kind === "failed" ? [div().px(12).text_color(t.blocked).child("Queue could not be read")] : [])
       .child(h_flex().id("lanes").flex_1().min_h_0().min_w_0().overflow_x_scroll()
-        .children(lanes.map((lane) => this.lane(t, lane, tasksInLane(backlog.tasks, lane, this.project, owned), queued))))
+        .children(lanes.map((lane) => this.lane(t, lane, tasksInLane(backlog.tasks, lane, this.project, awaiting), queued))))
   }
 
   count(t: Palette, lane: Lane, count: number): Element {

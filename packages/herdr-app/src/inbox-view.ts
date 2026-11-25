@@ -26,8 +26,7 @@ type WriteChoice = Extract<ReturnType<typeof choice>, { kind: "write" }>
 type AskMerge = (item: InboxApproval) => void
 
 const needsAnswerBox = (item: InboxItem): boolean =>
-  item.action.kind !== "merge" && item.action.kind !== "unavailable" &&
-  (item.ask.options.length === 0 || item.ask.options.some((option) => choice(item, option).kind === "write"))
+  item.action.kind !== "merge" && item.action.kind !== "unavailable"
 
 export class InboxAnswers {
   readonly boxes = new Map<string, InputState>()
@@ -120,9 +119,8 @@ export class InboxAnswers {
     if (item.action.kind === "unavailable") return [div().text_color(t.muted).child("This answer cannot be sent from the app.")]
     if (item.kind === "pr" && item.ask.options.length === 0) return [h_flex().child(actionButton(t, `approve-${item.key}`, "Merge PR", false, () => askMerge(item)))]
     const box = this.boxes.get(item.key)
-    const writing = this.writing.get(item.key)
-    if (box === undefined || (item.ask.options.length > 0 && writing === undefined)) return []
-    return [section(t, writing?.label ?? "Your answer", h_flex().gap(8).items_center()
+    if (box === undefined) return []
+    return [section(t, this.writing.get(item.key)?.label ?? "Your answer", h_flex().gap(8).items_center()
       .child(Input.new(box).flex_1().min_w_0().h(32).px(8).rounded(6).border(1).border_color(t.border).bg(t.background))
       .child(actionButton(t, `send-${item.key}`, "Send", false, (cx) => this.answerFromBox(cx, item))))]
   }

@@ -20,6 +20,12 @@ const decidedView = (t: Palette, item: DecidedAttention): Element =>
     .child(section(t, "Answer", div().whitespace_normal().child(item.overturned ?? item.answer)))
     .child(section(t, "Basis", div().whitespace_normal().child(item.decision.basis)))
 
+const overrideView = (t: Palette, item: DecidedAttention): Element =>
+  v_flex().id(`override-${item.id}`).gap(4).p(10).rounded(6).bg(t.raised).min_w_0()
+    .child(div().font_semibold().child(`${item.task} · Decided by you`))
+    .child(div().whitespace_normal().child(item.text))
+    .child(section(t, "Answer replacing the agent’s", div().whitespace_normal().child(item.answer)))
+
 export class AgentAttentionSection {
   expanded = false
 
@@ -31,14 +37,7 @@ export class AgentAttentionSection {
       .child(actionButton(t, "toggle-agent-attention", label, false, (cx: Context) => { this.expanded = !this.expanded; cx.notify() }))
       .children(this.expanded ? [
         ...agent.pending.map((item) => pendingView(t, item)),
-        ...agent.decided.map((item) => decidedView(t, item))
+        ...agent.decided.flatMap((item) => item.overturned === null ? [decidedView(t, item)] : [decidedView(t, item), overrideView(t, item)])
       ] : [])]
   }
 }
-
-export const userOverrides = (t: Palette, agent: AgentAttention): ReadonlyArray<Element> =>
-  agent.decided.filter((item) => item.overturned !== null).map((item) =>
-    v_flex().id(`override-${item.id}`).gap(4).p(10).rounded(6).bg(t.raised).min_w_0()
-      .child(div().font_semibold().child(`${item.task} · Decided by you`))
-      .child(div().whitespace_normal().child(item.text))
-      .child(section(t, "Answer replacing the agent’s", div().whitespace_normal().child(item.answer))))
