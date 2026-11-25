@@ -2,7 +2,7 @@ import { Config, Context, DateTime, Effect, FileSystem, Layer, Schema } from "ef
 import { CommandRunner } from "../../../shared/lib";
 import { decodeJson, decodeValue } from "../../../shared/lib";
 import { mapOutcome, ok, type Outcome, unreachable } from "../../../shared/lib";
-import { duplicateOf, MachinesFile, ProjectsFile, rawAccounts, strictAccount } from "./dispatch-schema";
+import { duplicateOf, MachinesFile, ProjectsFile, rawAccounts, sharedLoginProblem, strictAccount } from "./dispatch-schema";
 import { backlogRoot, missingBacklog, readBeatWaits, stateOf, taskFields, type DispatchMachine, type DispatchProject, type DispatchReading, type DispatchSnapshot, type DispatchTask, type TaskFolder } from "./dispatch";
 const taskOf = (folder: TaskFolder, file: string, stem: string, text: string): DispatchTask | string => {
   const front = taskFields(file, text);
@@ -171,16 +171,13 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
           machinesFile + ": the machine " + unrenewed.name + " has no renew command, which the account " + commandAccount.name + " needs to carry its token past its expiry"
         );
       }
-      const single = decodedMachines.value.quota.accounts.find((entry) => "kind" in entry && entry.kind === "none");
-      if (single !== undefined && decodedMachines.value.quota.accounts.length > 1) {
-        return unreachable(
-          machinesFile + ": the account " + single.name + " takes kind none and names no login, so the quota names no other account beside it"
-        );
-      }
+      const shared = sharedLoginProblem(decodedMachines.value.quota);
+      if (shared !== null) return unreachable(machinesFile + ": " + shared);
+      const tokenless = decodedMachines.value.quota.accounts.find((entry) => "kind" in entry && entry.kind === "none");
       const renewed = decodedMachines.value.machines.find((entry) => entry.renew !== undefined);
-      if (single !== undefined && renewed !== undefined) {
+      if (tokenless !== undefined && commandAccount === undefined && renewed !== undefined) {
         return unreachable(
-          machinesFile + ": the account " + single.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes"
+          machinesFile + ": the account " + tokenless.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes"
         );
       }
       return ok(decodedMachines.value.machines);

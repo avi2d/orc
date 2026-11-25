@@ -264,6 +264,16 @@ const accountModelsProblem = (provider: string, accounts: ReadonlyArray<Account>
   return null
 }
 
+// A kind none account names no login of its own, so a second account on its provider would spend that same login.
+const sharedLoginProblem = (provider: string, accounts: ReadonlyArray<Account>): string | null => {
+  const on = (account: Account): string => providerOf({ provider }, account)
+  for (const account of accounts.filter((entry) => entry.kind === "none")) {
+    const other = accounts.find((entry) => entry !== account && on(entry) === on(account))
+    if (other !== undefined) return "the account " + account.name + " takes kind none and names no login, so no other account runs on its provider " + on(account) + ", but " + other.name + " does"
+  }
+  return null
+}
+
 const claudeConfigProblem = (accounts: ReadonlyArray<Account>, machines: ReadonlyArray<Machine>): string | null => {
   for (const account of accounts) {
     if (account.kind !== "claude-config") continue
@@ -301,21 +311,16 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
           return yield* new ConfigError({ file, detail: "the account " + duplicate + " is named twice" })
         }
         const accounts = yield* Effect.forEach(config.quota.accounts, (entry) => readAccount(file, entry))
-        const accountProblem = claudeConfigProblem(accounts, machines) ?? accountModelsProblem(config.quota.provider, accounts)
+        const accountProblem = claudeConfigProblem(accounts, machines) ?? accountModelsProblem(config.quota.provider, accounts) ?? sharedLoginProblem(config.quota.provider, accounts)
         if (accountProblem !== null) return yield* new ConfigError({ file, detail: accountProblem })
-        const single = accounts.find((entry) => entry.kind === "none")
-        if (single !== undefined && accounts.length > 1) {
-          return yield* new ConfigError({ file, detail: "the account " + single.name + " takes kind none and names no login, so the quota names no other account beside it" })
-        }
+        const tokenless = accounts.find((entry) => entry.kind === "none")
         const commandAccount = accounts.find((entry) => entry.kind === "token-command")
         const unrenewed = config.machines.find((entry) => entry.renew === undefined)
         if (commandAccount !== undefined && unrenewed !== undefined) {
           return yield* new ConfigError({ file, detail: "the machine " + unrenewed.name + " has no renew command, which the account " + commandAccount.name + " needs to carry its token past its expiry" })
         }
         const renewed = config.machines.find((entry) => entry.renew !== undefined)
-        if (single !== undefined && renewed !== undefined) {
-          return yield* new ConfigError({ file, detail: "the account " + single.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes" })
-        }
+        if (tokenless !== undefined && commandAccount === undefined && renewed !== undefined) return yield* new ConfigError({ file, detail: "the account " + tokenless.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes" })
         return { machines, quota: { ...config.quota, floorPercent: config.quota.floorPercent ?? 0, accounts } }
       })
     )

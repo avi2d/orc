@@ -87,7 +87,7 @@ describe("the dispatch panel reader", () => {
     expect(machines.kind).toBe("unreachable");
     if (machines.kind === "unreachable") {
       expect(machines.reason).toContain("the account main takes kind none and names no login");
-      expect(machines.reason).toContain("names no other account beside it");
+      expect(machines.reason).toContain("no other account runs on its provider acme, but alt does");
     }
   });
   test("refuses a token account beside a kind none account instead of spending the wrong login", async () => {
@@ -96,6 +96,26 @@ describe("the dispatch panel reader", () => {
     );
     expect(machines.kind).toBe("unreachable");
     if (machines.kind === "unreachable") expect(machines.reason).toContain("the account alt takes kind none and names no login");
+  });
+  test("keeps kind none accounts on providers no other account runs on instead of refusing a login per provider", async () => {
+    const openai = { name: "openai", provider: "codex", models: { implementer: "codex/gpt-5.5", fixer: "codex/gpt-5.5" }, kind: "none" };
+    const go = { name: "go", provider: "opencode-go", models: { implementer: "opencode-go/kimi-k2", fixer: "opencode-go/kimi-k2" }, kind: "none" };
+    const machines = await machinesAt(backlogWith({ machines: [machine], quota: { ...quota, accounts: [{ name: "main", tokenFile: "/a" }, openai, go] } }));
+    expect(machines.kind).toBe("ok");
+  });
+  test("refuses a kind none account beside another account on its own provider instead of spending one login twice", async () => {
+    const models = { implementer: "codex/gpt-5.5", fixer: "codex/gpt-5.5" };
+    const accounts = [{ name: "main", tokenFile: "/a" }, { name: "openai", provider: "codex", models, kind: "none" }, { name: "openai-2", provider: "codex", models, tokenFile: "/b" }];
+    const machines = await machinesAt(backlogWith({ machines: [machine], quota: { ...quota, accounts } }));
+    expect(machines.kind).toBe("unreachable");
+    if (machines.kind === "unreachable") expect(machines.reason).toContain("the account openai takes kind none and names no login, so no other account runs on its provider codex, but openai-2 does");
+  });
+  test("keeps the renew command a token command account needs beside a kind none account on another provider instead of calling it dead", async () => {
+    const openai = { name: "openai", provider: "codex", models: { implementer: "codex/gpt-5.5", fixer: "codex/gpt-5.5" }, kind: "none" };
+    const machines = await machinesAt(
+      backlogWith({ machines: [{ ...machine, renew: ["true"] as const }], quota: { ...quota, accounts: [{ name: "main", tokenCommand: ["my-token-command", "main"] }, openai] } }),
+    );
+    expect(machines.kind).toBe("ok");
   });
   test("keeps an account with its own provider and models instead of reporting them as unknown keys", async () => {
     const openai = { name: "openai", provider: "codex", models: { implementer: "codex/gpt-5.5", fixer: "codex/gpt-5.5" }, tokenFile: "/b" };

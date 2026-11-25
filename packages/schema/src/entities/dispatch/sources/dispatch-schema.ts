@@ -60,4 +60,20 @@ export const rawAccounts = (value: unknown): ReadonlyArray<unknown> => {
   return Result.isSuccess(decoded) ? decoded.success.quota.accounts : [];
 };
 
+type Quota = typeof MachinesFile.Type["quota"];
+
+// A kind none account names no login of its own, so a second account on its provider would spend that same login.
+export const sharedLoginProblem = (quota: Quota): string | null => {
+  const providerOf = (account: Quota["accounts"][number]): string => account.provider ?? quota.provider;
+  for (const account of quota.accounts) {
+    if (!("kind" in account) || account.kind !== "none") continue;
+    const own = providerOf(account);
+    const other = quota.accounts.find((entry) => entry !== account && providerOf(entry) === own);
+    if (other !== undefined) {
+      return "the account " + account.name + " takes kind none and names no login, so no other account runs on its provider " + own + ", but " + other.name + " does";
+    }
+  }
+  return null;
+};
+
 export const duplicateOf = (names: ReadonlyArray<string>): string | null => names.find((name, index) => names.indexOf(name) !== index) ?? null;
