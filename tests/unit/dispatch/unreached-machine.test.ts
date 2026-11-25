@@ -3,13 +3,16 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, Layer } from "effect"
+import { Effect, Fiber, Layer } from "effect"
+import { TestClock } from "effect/testing"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { addTask, backlogPaths, claimTask, findTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { openItems } from "../../../packages/run/src/entities/attention/index"
 import { readResultReaching, readResultThrough } from "../../../packages/run/src/features/queueing-a-task/index"
 import { MachineUnreached, RunnerError } from "../../../packages/run/src/shared/process/index"
 import { runBeat } from "../../../packages/run/src/widgets/beat/beat"
+import { closeFinished } from "../../../packages/run/src/widgets/beat/beat-close"
+import { readDispatchConfig } from "../../../packages/run/src/shared/config/dispatch-config"
 import { quietSources } from "../../lib/beat-sources"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
@@ -65,6 +68,36 @@ const openKinds = async (root: string) => (await run(openItems(root))).map((entr
 const beat = (root: string) => Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, localStub))))
 
 describe("a dispatch machine orc cannot reach", () => {
+  test("a lost ssh read does not close a live run failed and a later read restores its running state", async () => {
+    await withReach(255, async (root, reach) => {
+      await startOnReach(root, reach)
+      const config = await run(readDispatchConfig(join(root, "dispatch.json")))
+      const task = await run(findTask(root, "orc-1"))
+      const timeoutSpawner = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
+        const real = yield* ChildProcessSpawner.ChildProcessSpawner
+        return ChildProcessSpawner.make((command) =>
+          ChildProcess.isStandardCommand(command) && command.command === "sh"
+            ? Effect.never
+            : real.spawn(command))
+      })).pipe(Layer.provide(BunServices.layer))
+      const lost = await Effect.runPromise(Effect.gen(function*() {
+        yield* TestClock.setTime(Date.now())
+        const fiber = yield* Effect.forkScoped(closeFinished({ root, home: root, config }, task))
+        yield* Effect.forkScoped(Effect.forever(TestClock.adjust("1 second")))
+        return yield* Fiber.join(fiber)
+      }).pipe(Effect.provide(Layer.mergeAll(BunServices.layer, timeoutSpawner, TestClock.layer())), Effect.scoped))
+      expect(lost.kind).toBe("unknown")
+      expect((await run(findTask(root, "orc-1"))).state.kind).toBe("started")
+      expect(await run(openItems(root))).toEqual([])
+
+      const response = JSON.stringify({ schema: "orc.runner.v1", result: { task: "orc-1", status: "running", pueueTask: 11, run: null, started: longStarted } })
+      await writeFile(reach, "#!/bin/sh\nprintf '%s\\n' '" + response + "'\n")
+      const restored = await run(closeFinished({ root, home: root, config }, await run(findTask(root, "orc-1"))))
+      expect(restored.kind).toBe("running")
+      expect((await run(findTask(root, "orc-1"))).state.kind).toBe("started")
+    })
+  })
+
   test("a result read that ssh ends with 255 fails as unreached, instead of as a runner refusal", async () => {
     await withReach(255, async (_root, reach) => {
       const failure = await Effect.runPromise(Effect.flip(readResultReaching(["sh", reach], "orc-1")).pipe(Effect.provide(BunServices.layer)))
