@@ -3,6 +3,8 @@ import { Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 import { deciderAnswerKinds, OverturnedFront, parkedAnswerOf } from "./task-record-answer"
 import { ChoicesFront, choicesOf, type ParkedQuestion } from "./task-record-question"
+import { MergeRecord } from "./task-record-merge"
+import { closedWithUnansweredQuestion, heldWhileActive, priorPrOf, splitFrontmatter } from "./task-record-parts"
 
 export { isDeciderAnswer } from "./task-record-answer"
 export type { CaptainAnswer, DeciderAnswer, ParkedAnswer } from "./task-record-answer"
@@ -114,9 +116,11 @@ type TaskState =
   | ClosedState
 
 export interface TaskRecord {
+  readonly merge?: MergeRecord
   readonly spec: TaskSpec
   readonly hold: Hold | null
   readonly parked: Parked | null
+  readonly priorPr?: string
   readonly state: TaskState
 }
 
@@ -205,11 +209,12 @@ const Frontmatter = Schema.Struct({
   reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),
   report: Schema.optional(Schema.String),
-  posted_at: Schema.optional(Schema.String)
+  posted_at: Schema.optional(Schema.String),
+  merge: Schema.optional(MergeRecord)
 })
 type Frontmatter = typeof Frontmatter.Type
 
-export const fence = "---"
+export { fence } from "./task-record-parts"
 
 const claimOf = (front: Frontmatter): Claim | null =>
   front.beat === undefined || front.taken_for === undefined || front.account === undefined || front.taken_at === undefined
@@ -323,17 +328,6 @@ const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => 
   return { kind: "closed", claim, closing, closedAt: front.closed_at, postedAt: front.posted_at ?? null }
 }
 
-const splitFrontmatter = (text: string): { readonly head: string; readonly body: string } | null => {
-  if (!text.startsWith(fence + "\n")) {
-    return null
-  }
-  const end = text.indexOf("\n" + fence + "\n", fence.length)
-  if (end === -1) {
-    return null
-  }
-  return { head: text.slice(fence.length + 1, end + 1), body: text.slice(end + fence.length + 2) }
-}
-
 export const parseTaskFile = (file: string, folder: TaskFolder, text: string): Effect.Effect<TaskRecord, TaskFileError> =>
   Effect.gen(function*() {
     const parts = splitFrontmatter(text)
@@ -363,14 +357,14 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (typeof hold === "string") {
       return yield* new TaskFileError({ file, detail: hold })
     }
-    if (hold !== null && hold.answer === null && (state.kind === "started" || state.kind === "closed")) {
+    if (heldWhileActive(hold, state)) {
       return yield* new TaskFileError({ file, detail: "a " + state.kind + " task carries an unanswered hold" })
     }
     const parked = parkedOf(front)
     if (typeof parked === "string") {
       return yield* new TaskFileError({ file, detail: parked })
     }
-    if (parked?.questions.some((question) => question.answer === null) === true && state.kind === "closed" && state.closing.outcome !== "start-failed") {
+    if (closedWithUnansweredQuestion(parked, state)) {
       return yield* new TaskFileError({ file, detail: "a closed task carries an unanswered parked question" })
     }
     return {
@@ -390,6 +384,8 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
       },
       hold,
       parked,
+      ...(front.merge === undefined ? {} : { merge: front.merge }),
+      ...priorPrOf(front.pr, state),
       state
     }
   })

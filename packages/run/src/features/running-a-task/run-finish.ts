@@ -13,6 +13,10 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
   Effect.gen(function*() {
     const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + (rounds.at(-1)?.passed === true ? ", and the checks passed. " : ". No local checks ran. ")
     const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
+    if (run.delivery.kind === "orc") {
+      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
+      return { ...settled, completed: pr.status === "opened", waitingOnCi: false, prLink: pr.prLink, endReason: checked + pr.result }
+    }
     if (run.delivery.kind === "direct-PR") {
       const reviewStarted = new Date().toISOString()
       yield* checkpoints.reviewStart(run.delivery.reviewer, reviewStarted)

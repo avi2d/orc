@@ -29,6 +29,12 @@ const readProjectList = async (root: string, list: ReadonlyArray<object>): Promi
 }
 
 describe("readProjects", () => {
+  test("accepts orc delivery and rejects an unknown delivery mode instead of defaulting it", async () => {
+    await withBacklog(async (root) => {
+      expect(await readProjectList(root, [{ ...projects[0], mode: "orc" }])).toEqual([{ ...projects[0], mode: "orc" }])
+      expect(await readProjectList(root, [{ ...projects[0], mode: "unknown" }])).toContain("names the mode unknown")
+    })
+  })
   test("resolves a relative instructions path against the projects file's folder instead of the working folder", async () => {
     await withBacklog(async (root) => {
       await mkdir(join(root, "notes"))

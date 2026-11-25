@@ -57,7 +57,7 @@ Run orc <command> --help to learn what a command does and the options it takes.
 
 ```text
 Usage: orc run [<task-file>] [--kind <ship|scout|task|parent>]
-           [--delivery <no-mistakes|direct-PR>] [--branch <name>]
+           [--delivery <no-mistakes|direct-PR|orc>] [--branch <name>]
            [--sandbox <nono|none>] [--token-file <path>] [--provider <id>]
            [--implementer-model <model>] [--fixer-model <model>]
            [--implementer-thinking <level>] [--fixer-thinking <level>]
@@ -72,11 +72,11 @@ Options:
                             What the task ends in. ship ends in a PR, scout and
                             task end in a report, and parent runs a parent's
                             final check. Defaults to ship.
-  --delivery <no-mistakes|direct-PR>
+  --delivery <no-mistakes|direct-PR|orc>
                             How a ship task reaches its PR. Defaults to
-                            no-mistakes, and direct-PR opens the PR after a
-                            review turn that records findings and blocks
-                            nothing.
+                            no-mistakes. direct-PR records a review before
+                            opening the PR, and orc rebases and opens the PR
+                            without review or a CI verdict.
   --branch <name>           The branch to commit to, or to resume. Defaults to
                             orc/<run-id>.
   --sandbox <nono|none>     Where the agent runs. Defaults to nono, and none
@@ -199,6 +199,7 @@ Subcommands:
   origin     Record where a parked task's run lives
   close      Close a started task or a parked task whose work landed elsewhere
   stop       Kill a task's run and close the task stopped
+  retry      Run a failed or stopped task again
   drop       Drop a new task with a reason
   posted     Mark a closed task or an event as posted to the chat
   hold       Keep a new task back until you answer it
@@ -299,6 +300,19 @@ stopped. Run it where the backlog lives.
 
 Examples:
   orc backlog stop orc-9
+```
+
+#### orc backlog retry
+
+```text
+Usage: orc backlog retry <task-id>
+
+Returns a failed or stopped task to the backlog on the machine it ran on,
+reusing its kept branch when one exists. A failed start keeps its pending
+answers and any machine pin; without a pin, the beat places it normally.
+
+Examples:
+  orc backlog retry orc-9
 ```
 
 #### orc backlog drop

@@ -142,7 +142,7 @@ describe("run events in the attention queue", () => {
     await withBacklog(async (root) => {
       await run(openRunDeaths(root, [{ kind: "start-failed", task: "orc-4", machine: "mac", reason: "no shell" }], "2026-10-27T12:00:00.000Z"))
       await run(openItem(root, "orc-1.r2.a", { kind: "review-question", task: "orc-1", text: "Keep the flag?", asked: "2026-10-27T12:00:00.000Z", owner: "user" }))
-      expect(await run(answerItem(root, "orc-4.run-died", { words: "Requeue it", at: "2026-10-27T12:05:00.000Z" }))).toBe("closed")
+      expect(await run(answerItem(root, "orc-4.run-died.2026-10-27T12_00_00_000Z", { words: "Requeue it", at: "2026-10-27T12:05:00.000Z" }))).toBe("closed")
       expect(await run(answerItem(root, "orc-1.r2.a", { words: "Keep it", at: "2026-10-27T12:05:00.000Z" }))).toEqual({ kind: "answered elsewhere", task: "orc-1" })
       expect((await run(openItems(root))).map(({ id }) => id)).toEqual(["orc-1.r2.a"])
       expect(parseDispatchArgs("attention", ["answer", "orc-4.run-died", "Requeue", "it"])).toEqual({ kind: "AnswerItem", id: "orc-4.run-died", words: "Requeue it" })

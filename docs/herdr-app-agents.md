@@ -47,7 +47,13 @@ To merge the PR:
 1. Confirm the dialog.
 
 The App runs `orc merge <task> --basis captain-word`.
+While it runs, the button names the stage Orc records in the task file.
+When the PR is behind main, the button reads **Updating from main** and then **Checks running**.
 If the command fails, the error appears under the button.
+If the update conflicts, **Merge conflict with main** appears there instead of the error.
+If a check is red, **Check failed** and the name of the check appear there instead.
+When the merge sends the task back, its card reads **Sent back** with the PR and stage, such as **Sent back PR #48: Merge conflict**.
+When you send the task back yourself, Orc drops the recorded stage and the card reads **Sent back** with the PR alone.
 
 ### Read a run's changes
 
@@ -65,5 +71,11 @@ Select ✕ to close it, or switch to Turns and press Escape.
 
 Turns is read only and shows each model reply, its tokens, and its tool calls.
 Select Thinking for the model's thinking, or select a finished tool call for its output.
-Closing the drawer keeps the chat running.
-Opening it or switching views after the terminal exits starts a new chat.
+
+### When the chat stops and resumes
+
+Closing the drawer stops the chat and Pi but keeps the session file in `~/.orc/chat/`.
+Deleting the session file, or quitting the App, also stops the chat.
+Opening the drawer, or switching views after the terminal exits, starts the chat again on the newest session file in `~/.orc/chat/`.
+It starts a new session file only when that folder holds none.
+When the App loads the drawer, it ends a chat that an earlier Orc release's drawer left running.

@@ -46,7 +46,7 @@ const startAndClose = async (root: string, record: TaskRecord, outcome: "done" |
 const sentBackWithPr = async (root: string): Promise<TaskRecord> => {
   const added = await run(addTask(root, spec))
   await startAndClose(root, added, "done", pr)
-  return run(sendBackClosedTask(root, "orc-1", "rename the flag", "2026-11-01T12:00:00.000Z", { machine: "linux", run: "origin-run" }))
+  return run(sendBackClosedTask(root, "orc-1", "rename the flag", "2026-11-01T12:00:00.000Z", { machine: "linux", run: "origin-run" }, "cleared"))
 }
 
 describe("a sent-back task keeps its PR", () => {
@@ -55,7 +55,7 @@ describe("a sent-back task keeps its PR", () => {
       await sentBackWithPr(root)
       const before = await readFile(join(root, "new", "orc-1.md"), "utf8")
       const refused = await Effect.runPromise(
-        sendBack(root, root, { kind: "SendBack", id: "orc-1", words: "and its help" }, "2026-11-01T13:00:00.000Z").pipe(
+        sendBack(root, root, { kind: "SendBack", id: "orc-1", words: "and its help" }, "2026-11-01T13:00:00.000Z", "cleared").pipe(
           Effect.flip,
           Effect.map((error) => error.detail),
           Effect.provide(Layer.mergeAll(BunServices.layer, ghReplying("MERGED")))
@@ -79,7 +79,7 @@ describe("a sent-back task keeps its PR", () => {
     await withBacklog(async (root) => {
       await sentBackWithPr(root)
       const added = await Effect.runPromise(
-        sendBack(root, root, { kind: "SendBack", id: "orc-1", words: "and its help" }, "2026-11-01T13:00:00.000Z").pipe(
+        sendBack(root, root, { kind: "SendBack", id: "orc-1", words: "and its help" }, "2026-11-01T13:00:00.000Z", "cleared").pipe(
           Effect.provide(Layer.mergeAll(BunServices.layer, ghReplying("OPEN")))
         )
       )

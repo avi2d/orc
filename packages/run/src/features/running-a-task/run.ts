@@ -208,7 +208,7 @@ export const runAgentStep = (
     const { fs, path, spawner, home, runId, git, checkout, sandboxKind } = opened
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: withHeavyPath(home, hostPath ?? ""), git: checkout.git }
     const { folders, agent, fixer, reviewer, plan } = yield* prepareRunAgents(opened, request).pipe(
-      Effect.tap(() => request.delivery === "direct-PR" ? Effect.void : requireNoMistakes(noMistakes, checkout.projectDir)),
+      Effect.tap(() => request.delivery !== undefined && request.delivery !== "no-mistakes" ? Effect.void : requireNoMistakes(noMistakes, checkout.projectDir)),
       Effect.onError(() => removeRunDir(opened))
     )
     const started = new Date().toISOString()

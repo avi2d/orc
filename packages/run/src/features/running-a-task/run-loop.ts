@@ -11,6 +11,7 @@ import { askedNote, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, w
 import { holdReleaseGuidance, holdReleaseWordsOf } from "../../entities/review-gate/index"
 import { freshFixOf, releaseGuidanceOf, resumedFix } from "./fix-guidance"
 import { finishAfterChecks } from "./run-finish"
+import { rebaseDelivery } from "./rebase-delivery"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
 import type { AgentOutcome, AgentRun, AgentRunResult, AgentStep, ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
@@ -363,10 +364,13 @@ const runFullReport = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, tra
     if (!done.completed) {
       return { ...base, commits: done.commits, completed: false, checksRounds: null, fixes: [], fixAttempts: 0, endReason: done.endReason }
     }
+    if (run.delivery.kind === "orc") {
+      yield* rebaseDelivery(run, run.delivery.opener)
+    }
     const rounds: Array<ChecksRoundSummary> = [...plan.inheritedRounds]
     const fixes: Array<RecordedFixAttempt> = [...plan.inheritedFixes]
     const commits = [...done.commits]
-    if (plan.skipChecks) {
+    if (plan.skipChecks && run.delivery.kind !== "orc") {
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, tracked, ops.runAgent, plan.priorDir)
     }
     return yield* runChecksFixLoop(run, ops, base, rounds, fixes, commits, plan, tracked)

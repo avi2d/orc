@@ -126,7 +126,7 @@ The beat opens an item for each run event, owned by the user:
   A run that ends done or that you stop opens none.
   Two failures retry instead of opening the item.
   When no-mistakes refuses to start because the repository is not initialized, the run runs `no-mistakes init --skip-user-skill` and starts no-mistakes again.
-  When the command that reaches a dispatch machine exits 255, as ssh does when its connection fails, the task stays started and the next beat reads it again.
+  When the command that reaches a dispatch machine exits 255, as ssh does when its connection fails, or its read times out, the task stays started with an unknown state and the next beat reads it again.
 - A dispatch machine that orc has not reached for 10 minutes, counted from the first beat that could not reach it, opens a `machine-unreached` item for each started task on that machine.
   Each item names the machine and the error of the command that reaches it, and the task stays started.
   A beat that reaches the machine again withdraws the item, and so does closing its task.
@@ -153,7 +153,7 @@ After a successful check, the next failure opens a new item and the answered ite
 The following items name a `subject` and list `options`, each with the `outcome` it leads to.
 The `recommendation` names one option:
 
-- A `run-died` item offers `rerun` or `close`, and recommends `rerun`.
+- A `run-died` item offers `rerun` through `orc backlog retry <task-id>` or `close`, and recommends `rerun`.
 - A `check-red` item offers `send back` or `close`, and recommends `send back`.
 - A `pr-ready` item offers `merge` or `hold`, and recommends `merge`.
 - A `failing-command` item offers `continue` or `stop`, and recommends `continue`.
