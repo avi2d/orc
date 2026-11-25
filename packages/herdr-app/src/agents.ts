@@ -1,5 +1,7 @@
 import type { Backlog, Run, Runs, ShownStep, Step, Task } from "./guard"
 import type { InboxAnswer, InboxApproval, InboxItem } from "./inbox"
+import { mergeArgv } from "./task"
+import { askText } from "./thread"
 
 export const cardStatuses = ["Awaiting you", "Running", "Queued", "Failed", "Done"] as const
 export type CardStatus = typeof cardStatuses[number]
@@ -26,6 +28,7 @@ export interface Card {
   readonly runId: string | null
   readonly checkout: Checkout | null
   readonly sendBack: string | null
+  readonly merge?: Task["merge"]
 }
 
 export interface Checkout {
@@ -128,6 +131,10 @@ const prPlace = (runId: string, link: string, task: Task | undefined, merged: Re
     return { standing: { status: "Done" }, where: pr }
   }
   if (task.status !== "closed" && task.parkedOrigin === runId) {
+    if (task.merge?.stage === "conflicted" || task.merge?.stage === "check-failed") {
+      const recorded: InboxApproval = { key: `${task.id}/merge`, kind: "pr", task: task.id, title: task.title, who: "beat", asked: null, link, ask: askText(`Merge ${pr}?`), recommendation: null, action: { kind: "merge", argv: mergeArgv(task.id) } }
+      return awaitingApproval(recorded)
+    }
     return { standing: { status: "Done" }, where: `Sent back ${pr}` }
   }
   if (!newest) {
@@ -201,7 +208,8 @@ const runCard = (run: Run, task: Task | undefined, place: Place, project: string
   ...place,
   runId: run.id,
   checkout: run.worktree === null ? null : { worktree: run.worktree, branch: run.branch },
-  sendBack: sendBackOf(task, place.standing)
+  sendBack: sendBackOf(task, place.standing),
+  ...(task?.merge === undefined ? {} : { merge: task.merge })
 })
 
 const taskCard = (task: Task, active: ReadonlySet<string>, pending: ReadonlyArray<InboxAnswer>): ReadonlyArray<Card> => {
@@ -251,7 +259,8 @@ const remainingCards = (backlog: Backlog, active: ReadonlySet<string>, approvals
     if (approval === undefined || approvalsShown.has(task.id) || task.prState === "closed" || task.prState === "merged" || input.merged.has(task.id)) return queued
     return [...queued, {
       key: approval.key, id: task.id, kind: task.kind, delivery: null, title: task.title, project: task.project, known,
-      ...awaitingApproval(approval), runId: null, checkout: null, sendBack: task.status === "closed" ? task.id : null
+      ...awaitingApproval(approval), runId: null, checkout: null, sendBack: task.status === "closed" ? task.id : null,
+      ...(task.merge === undefined ? {} : { merge: task.merge })
     }]
   })
 

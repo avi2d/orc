@@ -113,7 +113,17 @@ type TaskState =
   | { readonly kind: "started"; readonly claim: Claim; readonly started: Started }
   | ClosedState
 
+export const MergeRecord = Schema.Struct({
+  basis: Schema.Literals(["captain-word", "yolo-green"]),
+  head: Schema.String,
+  green: Schema.Array(Schema.String),
+  stage: Schema.Literals(["updating", "checks-running", "conflicted", "check-failed", "merged"]),
+  detail: Schema.optional(Schema.String)
+})
+export type MergeRecord = typeof MergeRecord.Type
+
 export interface TaskRecord {
+  readonly merge?: MergeRecord
   readonly spec: TaskSpec
   readonly hold: Hold | null
   readonly parked: Parked | null
@@ -205,7 +215,8 @@ const Frontmatter = Schema.Struct({
   reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),
   report: Schema.optional(Schema.String),
-  posted_at: Schema.optional(Schema.String)
+  posted_at: Schema.optional(Schema.String),
+  merge: Schema.optional(MergeRecord)
 })
 type Frontmatter = typeof Frontmatter.Type
 
@@ -390,6 +401,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
       },
       hold,
       parked,
+      ...(front.merge === undefined ? {} : { merge: front.merge }),
       state
     }
   })

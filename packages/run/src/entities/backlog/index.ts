@@ -31,6 +31,7 @@ export {
   markPosted,
   rewriteNew,
   rewriteTaken,
+  rewriteClosed,
   findTask,
 } from "./backlog"
 export type {
@@ -97,6 +98,7 @@ export type {
   Hold,
   Parked,
   TaskRecord,
+  MergeRecord,
   TaskPriority,
 } from "./task-record"
 export { answersAwaited, answerWait, decisionWait, missingOriginWait, type DeciderOwns } from "./task-wait"

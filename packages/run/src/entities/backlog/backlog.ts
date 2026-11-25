@@ -278,37 +278,10 @@ const readTask = (
     return text === null ? null : yield* parseTaskFile(file, folder, text)
   })
 
-const readClosed = (root: string, id: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  readTask(root, "closed", id).pipe(
-    Effect.filterOrFail((record) => record !== null, () => new BacklogError({ detail: "the backlog holds no closed " + id }))
-  )
-
-const writePosted = (root: string, id: string, postedAt: string): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const paths = backlogPaths(root)
-    const record = yield* readClosed(root, id)
-    if (record.state.kind !== "closed" || record.state.postedAt !== null) {
-      return false
-    }
-    const posted: TaskRecord = { ...record, state: { ...record.state, postedAt } }
-    const file = paths.taskFile("closed", id)
-    const scratch = scratchName(paths.folder("closed"), id)
-    yield* fs.writeFileString(scratch, renderTaskFile(posted)).pipe(Effect.mapError(platformFailure("write " + scratch)))
-    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
-    return true
-  })
-
-export const markPosted = (
-  root: string,
-  id: string,
-  postedAt: string
-): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> => writePosted(root, id, postedAt)
-
 export type Rewrite<A> = { readonly kind: "write"; readonly record: TaskRecord; readonly result: A } | { readonly kind: "keep"; readonly result: A }
 
 // rename(2) takes the one task file at most once, so a hold, an answer, a beat's claim and a park never hold the same file together.
-const rewriteIn = (folder: "new" | "taken") => <A>(
+const rewriteIn = (folder: "new" | "taken" | "closed") => <A>(
   root: string,
   id: string,
   decide: (fresh: TaskRecord) => Effect.Effect<Rewrite<A>, BacklogError, FileSystem.FileSystem>
@@ -344,6 +317,16 @@ const rewriteIn = (folder: "new" | "taken") => <A>(
 export const rewriteNew = rewriteIn("new")
 
 export const rewriteTaken = rewriteIn("taken")
+
+export const rewriteClosed = rewriteIn("closed")
+
+export const markPosted = (root: string, id: string, postedAt: string): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  rewriteClosed<boolean>(root, id, (record) => {
+    if (record.state.kind !== "closed" || record.state.postedAt !== null) {
+      return Effect.succeed({ kind: "keep", result: false })
+    }
+    return Effect.succeed({ kind: "write", record: { ...record, state: { ...record.state, postedAt } }, result: true })
+  })
 
 export const findTask = (root: string, id: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   listTasks(root).pipe(
