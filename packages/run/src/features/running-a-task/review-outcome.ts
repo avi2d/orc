@@ -14,9 +14,8 @@ const OrcReviewFinding = Schema.Struct({
   severity: Schema.Literals(["error", "warning", "info"])
 })
 
-export const OrcReviewFindings = Schema.Array(OrcReviewFinding)
+const OrcReviewFindings = Schema.Array(OrcReviewFinding)
 export const decodeOrcReviewFindings = Schema.decodeUnknownResult(Schema.fromJsonString(OrcReviewFindings))
-export type OrcReviewFinding = typeof OrcReviewFinding.Type
 
 export const ReviewFindings = Schema.Array(ReviewFinding)
 
