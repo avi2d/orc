@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runStatus } from "../../packages/run/src/entities/run-history/index"
-import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, recordingKinds, runDirectPrResume, runDirectPrStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, recordingKinds, runDirectPrResume, runDirectPrStep, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const isNamedSignal = (value: unknown): value is { readonly name: string } =>
   typeof value === "object" && value !== null && "name" in value && typeof value.name === "string"
@@ -27,6 +27,39 @@ const branchOn = (origin: string): string | null => {
 const lintPasses = async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 })
 
 const callLines = (calls: string): ReadonlyArray<string> => calls.split("\n").filter((line) => line !== "")
+
+describe("orc delivery", () => {
+  test("rebases onto the updated base before checks and opens a PR without review or no-mistakes", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        await withOrigin(dir, async () => {
+          const baseBranch = git(dir, ["branch", "--show-current"])
+          git(dir, ["push", "-u", "origin", baseBranch])
+          git(dir, ["remote", "set-head", "origin", baseBranch])
+          const sha = await readyToCheck(dir, home)
+          await writeFile(join(dir, "base.txt"), "new base\n")
+          git(dir, ["add", "base.txt"])
+          git(dir, ["commit", "-qm", "base update"])
+          const base = git(dir, ["rev-parse", "HEAD"])
+          git(dir, ["push", "origin", baseBranch])
+          git(dir, ["checkout", "-q", "orc/test"])
+          const kinds: Array<string> = []
+          let checkedBase = ""
+          const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), async () => {
+            checkedBase = git(dir, ["rev-parse", "HEAD^"])
+            return lintPasses()
+          })
+          expect(checkedBase).toBe(base)
+          expect(kinds).toEqual(["implementer"])
+          expect(outcome.nmCalls).toBe("")
+          expect(outcome.ghCalls).toContain("pr create --head orc/test")
+          expect(outcome.ghCalls).not.toContain("check-runs")
+          expect(outcome.report.prLink).toBe(ghPrLink)
+        })
+      })
+    })
+  })
+})
 
 describe("a direct-PR run opens its own PR after the checks", () => {
   test("pushes the branch and opens the PR instead of starting no-mistakes", async () => {

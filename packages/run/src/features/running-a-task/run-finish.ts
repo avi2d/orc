@@ -13,6 +13,10 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
   Effect.gen(function*() {
     const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + (rounds.at(-1)?.passed === true ? ", and the checks passed. " : ". No local checks ran. ")
     const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
+    if (run.delivery.kind === "orc") {
+      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
+      return { ...settled, completed: pr.status === "opened", waitingOnCi: false, prLink: pr.prLink, endReason: checked + pr.result }
+    }
     if (run.delivery.kind === "direct-PR") {
       const reviewStarted = new Date().toISOString()
       yield* checkpoints.reviewStart(run.delivery.reviewer, reviewStarted)
@@ -56,10 +60,10 @@ const ciVerdictOfHead = (run: HistoryRun, opener: PullRequestOpener, prLink: str
     return yield* readCiVerdict(opener.checkRuns, prLink, head)
   })
 
-const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>): string => {
+const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>, delivery: "direct-PR" | "orc"): string => {
   const passed = rounds.at(-1)?.checks.map((check) => check.name) ?? []
   const closing = passed.length === 0
-    ? "orc opened this PR without local checks or no-mistakes. GitHub CI decides completion.\n"
+    ? "orc opened this PR without local checks or no-mistakes." + (delivery === "direct-PR" ? " GitHub CI decides completion." : "") + "\n"
     : "orc opened this PR after " + passed.join(", ") + " passed, without no-mistakes.\n"
   return subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing
 }
@@ -80,7 +84,7 @@ const openPullRequest = (
     const subjects = listed.map((commit) => commit.subject.trim()).filter((subject) => subject !== "")
     const bodySubjects = subjects.length > 0 ? subjects : (head !== "" ? [head] : [])
     const bodyFile = run.path.join(run.runDir, prBodyFileName)
-    yield* run.fs.writeFileString(bodyFile, prBody(bodySubjects, rounds)).pipe(
+    yield* run.fs.writeFileString(bodyFile, prBody(bodySubjects, rounds, run.delivery.kind === "orc" ? "orc" : "direct-PR")).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
     )
     const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, bodyFile)
