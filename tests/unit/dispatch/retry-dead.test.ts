@@ -20,6 +20,17 @@ const failedRun = (root: string) => run(Effect.acquireUseRelease(
 ))
 
 describe("a failed run", () => {
+  test("a failed runner without a run ID closes instead of retrying without an origin", async () => {
+    await withBacklog(async (root) => {
+      await startTaskOne(root, ["orc", "runner", "start"], null)
+      const task = (await run(listTasks(root)))[0]
+      if (task === undefined) throw new Error("missing task")
+      const progress = await Effect.runPromise(closeFinished({ root, home: root, config: sweepConfig }, task).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueDone(root, { Failed: 1 })))))
+      expect(progress).toMatchObject({ kind: "ended", action: { kind: "closed", outcome: "failed" } })
+      expect((await run(listTasks(root)))[0]?.state.kind).toBe("closed")
+    })
+  })
+
   test("a run stopped by its owner closes instead of being retried", async () => {
     await withBacklog(async (root) => {
       await startTaskOne(root, ["orc", "runner", "start"], null)
