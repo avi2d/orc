@@ -342,6 +342,9 @@ const splitFrontmatter = (text: string): { readonly head: string; readonly body:
 const closedWithUnansweredQuestion = (parked: Parked | null, state: TaskState): boolean =>
   state.kind === "closed" && state.closing.outcome !== "start-failed" && parked?.questions.some((question) => question.answer === null) === true
 
+const unlessRefused = <A extends object | null>(file: string, value: A | string): Effect.Effect<A, TaskFileError> =>
+  typeof value === "string" ? Effect.fail(new TaskFileError({ file, detail: value })) : Effect.succeed(value)
+
 export const parseTaskFile = (file: string, folder: TaskFolder, text: string): Effect.Effect<TaskRecord, TaskFileError> =>
   Effect.gen(function*() {
     const parts = splitFrontmatter(text)
@@ -363,21 +366,12 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (front.id !== stem) {
       return yield* new TaskFileError({ file, detail: "the frontmatter id " + front.id + " is not the file " + (stem ?? file) })
     }
-    const state = kind === "decision" ? decisionStateOf(folder, front, stateOf) : stateOf(folder, front)
-    if (typeof state === "string") {
-      return yield* new TaskFileError({ file, detail: state })
-    }
-    const hold = kind === "decision" ? holdOf({ ...front, answer: undefined, answered_at: undefined }) : holdOf(front)
-    if (typeof hold === "string") {
-      return yield* new TaskFileError({ file, detail: hold })
-    }
+    const state = yield* unlessRefused(file, kind === "decision" ? decisionStateOf(folder, front, stateOf) : stateOf(folder, front))
+    const hold = yield* unlessRefused(file, kind === "decision" ? holdOf({ ...front, answer: undefined, answered_at: undefined }) : holdOf(front))
     if (hold !== null && hold.answer === null && (state.kind === "started" || state.kind === "closed")) {
       return yield* new TaskFileError({ file, detail: "a " + state.kind + " task carries an unanswered hold" })
     }
-    const parked = parkedOf(front)
-    if (typeof parked === "string") {
-      return yield* new TaskFileError({ file, detail: parked })
-    }
+    const parked = yield* unlessRefused(file, parkedOf(front))
     if (closedWithUnansweredQuestion(parked, state)) {
       return yield* new TaskFileError({ file, detail: "a closed task carries an unanswered parked question" })
     }

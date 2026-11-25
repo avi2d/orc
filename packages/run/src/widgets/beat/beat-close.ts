@@ -298,6 +298,23 @@ const trackUnreached = (
     }
   })
 
+const trackReading = (
+  context: CloseContext,
+  task: string,
+  machine: string,
+  reading: CloseReading
+): Effect.Effect<{ readonly nowText: string; readonly unreadSince: number | null }, BacklogError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const unreadFile = backlogPaths(context.root).unreadFile(task)
+    const nowText = yield* nowIso
+    const unreadSince = reading.kind === "unread"
+      ? yield* readSince(fs, unreadFile, nowText)
+      : yield* clearSince(fs, unreadFile)
+    yield* trackUnreached(context.root, task, machine, reading, fs, nowText)
+    return { nowText, unreadSince }
+  })
+
 const deadRunOf = (reading: CloseReading): string | undefined =>
   reading.kind === "read" && reading.result.status === "failed" && reading.result.reason !== "the run was killed" ? reading.result.run?.id : undefined
 
@@ -357,13 +374,7 @@ export const closeFinished = (
     }
     const through = throughFor(machine)
     const reading: CloseReading = yield* readClose(task, context.home, label, through)
-    const fs = yield* FileSystem.FileSystem
-    const unreadFile = backlogPaths(context.root).unreadFile(task.spec.id)
-    const nowText = yield* nowIso
-    const unreadSince = reading.kind === "unread"
-      ? yield* readSince(fs, unreadFile, nowText)
-      : yield* clearSince(fs, unreadFile)
-    yield* trackUnreached(context.root, task.spec.id, claim.machine, reading, fs, nowText)
+    const { nowText, unreadSince } = yield* trackReading(context, task.spec.id, claim.machine, reading)
     const stale = staleEndingOf(started.at, Date.parse(nowText), reading, unreadSince)
     const ending = reading.kind === "read" ? (stale ?? reading.ending) : stale
     if (ending === null) {
