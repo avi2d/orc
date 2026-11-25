@@ -1,7 +1,7 @@
 import { type Card, buildCards } from "./agents"
 import { type Backlog, type Guard, backlog, ok, runs } from "./guard"
-import { askingRuns, attention } from "./guard-attention"
-import { readInboxItems } from "./inbox-read"
+import { attention } from "./guard-attention"
+import { type AgentAttention, inboxDocuments } from "./inbox-read"
 import { type Reading, readJson } from "./orc-read"
 import type { TaskDetail } from "./task"
 import { taskDetails } from "./task-guard"
@@ -15,20 +15,18 @@ const agentsBacklog: Guard<{ readonly backlog: Backlog; readonly details: Readon
 
 export interface AgentsDocuments {
   readonly cards: ReadonlyArray<Card>
-  readonly unread: ReadonlyMap<string, string>
+  readonly agent: AgentAttention
 }
 
 export const readAgents = (): Promise<Reading<AgentsDocuments>> =>
   Promise.all([
     readJson("orc", ["runs", "--json", "--local"], runs),
     readJson("orc", ["backlog", "--json"], agentsBacklog),
-    readJson("orc", ["attention", "--json"], attention),
-    readJson("orc", ["runs", "--json"], askingRuns)
-  ]).then(([local, listed, asked, asking]) => {
+    readJson("orc", ["attention", "--json"], attention)
+  ]).then(([local, listed, asked]) => {
     if (local.kind !== "ok") return local
     if (listed.kind !== "ok") return listed
     if (asked.kind !== "ok") return asked
-    if (asking.kind !== "ok") return asking
-    return readInboxItems({ backlog: listed.value.details, attention: asked.value, runs: asking.value })
-      .then(({ items, unread }) => ({ kind: "ok" as const, value: { cards: buildCards(local.value, listed.value.backlog, items, new Set(unread.keys())), unread } }))
+    const { items, agent } = inboxDocuments(listed.value.details, asked.value)
+    return { kind: "ok", value: { cards: buildCards(local.value, listed.value.backlog, items), agent } }
   })

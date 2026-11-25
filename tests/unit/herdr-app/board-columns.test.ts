@@ -48,13 +48,13 @@ void mock.module("herdr", () => ({
 
 const task = (index: number): BoardTask => ({
   id: `orc-${index}`, title: "A task", project: "orc", kind: "ship", created: `2026-01-${String(index + 1).padStart(2, "0")}`,
-  status: "new", held: false, parked: false, prState: null
+  status: "new", prState: null
 })
 
 test("each open column gives its cards a scroll area that shrinks below their height while the header keeps its own", async () => {
   const { default: OrcBoard } = await import("../../../packages/herdr-app/mods/orc-board/main")
   const board = new OrcBoard()
-  board.reading = { kind: "ok", value: { backlog: { tasks: Array.from({ length: 12 }, (_, index) => task(index)), projects: [] }, attention: { items: [] } } }
+  board.reading = { kind: "ok", value: { backlog: { tasks: Array.from({ length: 12 }, (_, index) => task(index)), projects: [] }, awaiting: new Set() } }
   const root: object = board.render()
   const row = find(root, "lanes")
   expect(row !== null && called(row, "flex_1") && called(row, "min_h_0")).toBe(true)

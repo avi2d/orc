@@ -1,0 +1,125 @@
+{
+  "schema": "orc.attention.v1",
+  "at": "2026-11-25T08:00:00.000Z",
+  "items": [
+    {
+      "id": "garden-2.run-died",
+      "kind": "run-died",
+      "task": "garden-2",
+      "text": "The run died while installing dependencies.",
+      "subject": "The run of garden-2",
+      "options": [
+        {
+          "text": "rerun",
+          "outcome": "orc backlog add <project> <task-file> adds the task again under a new id, and the next beat starts it"
+        },
+        {
+          "text": "close",
+          "outcome": "the task stays closed failed, and no run starts"
+        }
+      ],
+      "recommendation": "rerun",
+      "asked": "2026-11-25T06:38:00.000Z",
+      "owner": "user",
+      "ageSeconds": 4920,
+      "overdue": true
+    },
+    {
+      "id": "garden-7.question-3.2026-11-25T07_00_00_000Z",
+      "kind": "review-question",
+      "task": "garden-7",
+      "text": "Which scope should the report cover?",
+      "asked": "2026-11-25T07:00:00.000Z",
+      "owner": "user",
+      "decision": {
+        "kind": "escalated",
+        "reason": "The task does not specify the scope.",
+        "at": "2026-11-25T07:01:00.000Z"
+      },
+      "ageSeconds": 3600,
+      "overdue": true
+    },
+    {
+      "id": "garden-8.ask-1.2026-11-25T07_48_00_000Z",
+      "kind": "worker-question",
+      "task": "garden-8",
+      "text": "Which layout should the report use?",
+      "subject": "The layout of the report",
+      "options": [
+        {
+          "text": "Wide",
+          "outcome": "Show both columns side by side."
+        },
+        {
+          "text": "Narrow",
+          "outcome": "Stack the columns so both fit on narrow screens."
+        }
+      ],
+      "recommendation": "Narrow",
+      "asked": "2026-11-25T07:48:00.000Z",
+      "owner": "user",
+      "decision": {
+        "kind": "escalated",
+        "reason": "The task leaves the layout open.",
+        "at": "2026-11-25T07:49:00.000Z"
+      },
+      "ageSeconds": 720,
+      "overdue": true
+    },
+    {
+      "id": "garden-3.pr-ready.bbbb",
+      "kind": "pr-ready",
+      "task": "garden-3",
+      "text": "The pull request is ready to merge. Checks are green.",
+      "subject": "The pull request of garden-3",
+      "options": [
+        {
+          "text": "merge",
+          "outcome": "orc merge garden-3 merges the PR into main, and the item closes with the answer merged"
+        },
+        {
+          "text": "hold",
+          "outcome": "the PR stays open and unmerged, and the item closes"
+        }
+      ],
+      "recommendation": "merge",
+      "asked": "2026-11-25T07:50:00.000Z",
+      "owner": "user",
+      "ageSeconds": 600,
+      "overdue": true
+    },
+    {
+      "id": "garden-9.ask-1.2026-11-25T07_59_00_000Z",
+      "kind": "worker-question",
+      "task": "garden-9",
+      "text": "Which file format should the export use?",
+      "asked": "2026-11-25T07:59:00.000Z",
+      "owner": "decider",
+      "ageSeconds": 60,
+      "overdue": false
+    }
+  ],
+  "decided": [
+    {
+      "id": "garden-10.question-1.2026-11-25T07_57_00_000Z",
+      "kind": "review-question",
+      "task": "garden-10",
+      "text": "How many times should the run retry?",
+      "asked": "2026-11-25T07:57:00.000Z",
+      "owner": "decider",
+      "decision": {
+        "kind": "answered",
+        "reason": "The task says to retry twice.",
+        "rule": {
+          "source": "task garden-10",
+          "quote": "Retry a failed upload twice."
+        },
+        "at": "2026-11-25T07:58:00.000Z"
+      },
+      "answer": {
+        "words": "Two retries",
+        "at": "2026-11-25T07:58:00.000Z"
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
-import type { AskingRun, AttentionItem } from "./guard-attention"
-import { type AnswerTarget, type TaskDetail, mergeArgv } from "./task"
-import { type AskText, type Thread, type ThreadCard, type ThreadLine, askText, threadCards } from "./thread"
+import type { AttentionItem } from "./guard-attention"
+import { type AnswerTarget, type TaskDetail, answerArgv, mergeArgv } from "./task"
+import { type AskOption, type AskText, type ThreadLine, askText } from "./thread"
 
 interface InboxEntry {
   readonly key: string
@@ -10,91 +10,132 @@ interface InboxEntry {
   readonly asked: string | null
   readonly ask: AskText
   readonly recommendation: string | null
+  readonly overdueSeconds?: number
 }
 
+type Reply =
+  | { readonly kind: "answer"; readonly target: AnswerTarget }
+  | { readonly kind: "event"; readonly id: string }
+  | { readonly kind: "overdue-hold" }
+  | { readonly kind: "unavailable" }
+
 export interface InboxAnswer extends InboxEntry {
-  readonly kind: "question" | "decision" | "hold"
-  readonly action: { readonly kind: "answer"; readonly target: AnswerTarget }
+  readonly kind: "question" | "decision" | "hold" | "event"
+  readonly action: Reply
 }
 
 export interface InboxApproval extends InboxEntry {
   readonly kind: "pr"
   readonly link: string
-  readonly action: { readonly kind: "merge"; readonly argv: ReadonlyArray<string> }
+  readonly action: { readonly kind: "merge"; readonly argv: ReadonlyArray<string>; readonly attentionId?: string }
 }
 
 export type InboxItem = InboxAnswer | InboxApproval
 
-export interface InboxSources {
-  readonly backlog: ReadonlyArray<TaskDetail>
-  readonly attention: ReadonlyArray<AttentionItem>
-  readonly runs: ReadonlyArray<AskingRun>
-  readonly threads: ReadonlyMap<string, Thread>
-}
-
-const openPr = (task: TaskDetail): string | null =>
-  task.state.status === "closed" && task.state.pr !== null && (task.prState === "open" || task.prState === null) ? task.state.pr : null
-
-const runAsks = (runs: ReadonlyArray<AskingRun>, task: string): boolean =>
-  runs.some((run) => run.questions > 0 && (run.task === task || run.branch === `orc/${task}` || run.branch === `orc/${task}-parent`))
-
-const holdOpen = (task: TaskDetail): boolean =>
-  task.hold !== null && (task.hold.answer === null || task.hold.questions.some((question) => question.answer === null))
-
-const parkedOpen = (task: TaskDetail): boolean =>
-  task.parked !== null && task.parked.questions.some((question) => question.answer === null)
+const openPr = (task: TaskDetail | undefined): string | null =>
+  task?.state.status === "closed" && (task.prState === "open" || task.prState === null) ? task.state.pr : null
 
 const questionKinds: ReadonlySet<string> = new Set(["worker-question", "review-question"])
 
-export const inboxTasks = (sources: Omit<InboxSources, "threads">): ReadonlyArray<string> =>
-  sources.backlog.filter((task) =>
-    holdOpen(task) || parkedOpen(task) || openPr(task) !== null || runAsks(sources.runs, task.id) || sources.attention.some((item) => item.task === task.id && questionKinds.has(item.kind))
-  ).map((task) => task.id)
+const attentionKey = (...parts: ReadonlyArray<string>): string => parts.map((part) => part.replace(/[^A-Za-z0-9_-]/g, "_")).join(".")
 
-const settled = (card: ThreadCard): boolean =>
-  card.answers.length > 0 || card.notes.some((note) => note.kind === "withdrawn")
-
-const cardItem = (task: TaskDetail, card: ThreadCard, attention: ReadonlyArray<AttentionItem>): InboxAnswer | null => {
-  if (card.reply === null || settled(card)) return null
-  const action = { kind: "answer", target: card.reply } as const
-  const base = { key: `${task.id}/${card.key}`, task: task.id, title: task.title, who: card.line.who, asked: card.line.at, recommendation: null, action }
-  if (card.line.kind === "hold") return { ...base, kind: "hold", ask: askText(card.line.text) }
-  if (card.line.kind !== "question") return null
-  const item = attention.find((entry) => entry.id === card.line.id)
-  if (card.line.who === "beat") return null
-  return item?.escalated === true
-    ? { ...base, kind: "decision", ask: card.ask ?? askText(card.line.text), recommendation: item.recommendation }
-    : { ...base, kind: "question", ask: card.ask ?? askText(card.line.text) }
+const questionReply = (item: AttentionItem, task: TaskDetail | undefined): Reply | null => {
+  if (task?.state.status === "closed") return null
+  const stored = task?.parked?.questions.find((question) => attentionKey(item.task, question.id, question.asked ?? "") === item.id)
+  if (stored?.answer) return null
+  if (task?.parked && stored === undefined) return { kind: "unavailable" }
+  const parts = item.id.split(".")
+  const id = stored?.id ?? (parts.length === 3 ? parts[1] : "")
+  return id ? { kind: "answer", target: { kind: "question", id } } : { kind: "unavailable" }
 }
 
-export const approvalItem = (task: Pick<TaskDetail, "id" | "title">, pr: string, asked: string | null): InboxApproval => ({
-  key: `${task.id}/pr`,
-  kind: "pr",
-  link: pr,
-  task: task.id,
-  title: task.title,
-  who: "beat",
-  asked,
-  ask: askText(`Merge the PR ${pr}?`),
-  recommendation: null,
-  action: { kind: "merge", argv: mergeArgv(task.id) }
+const recordedAsk = (item: AttentionItem): AskText => {
+  const subject = item.subject?.trim()
+  const text = item.text.trim()
+  return {
+    question: subject || text,
+    context: subject && subject !== text ? text : null,
+    options: item.options.map((option, index) => ({
+      letter: String.fromCharCode(65 + index), text: option.text, picture: option.picture,
+      ...(option.outcome ? { outcome: option.outcome } : {})
+    }))
+  }
+}
+
+const attentionBase = (item: AttentionItem, task: TaskDetail | undefined): InboxEntry => ({
+  key: `${item.task}/${item.id}`, task: item.task, title: task?.title ?? "", who: questionKinds.has(item.kind) ? "worker" : "beat",
+  asked: item.asked, ask: recordedAsk(item), recommendation: item.decision?.recommendation ?? item.recommendation,
+  ...(item.overdueSeconds === null ? {} : { overdueSeconds: item.overdueSeconds })
 })
 
-const prItem = (task: TaskDetail): InboxApproval | null => {
-  const pr = openPr(task)
-  return pr === null || task.state.status !== "closed" ? null : approvalItem(task, pr, task.state.closedAt)
+const isSettledPr = (task: TaskDetail | undefined): boolean => task?.prState === "merged" || task?.prState === "closed"
+
+const attentionCard = (item: AttentionItem, task: TaskDetail | undefined): InboxItem | null => {
+  const base = attentionBase(item, task)
+  if (questionKinds.has(item.kind)) {
+    const action = questionReply(item, task)
+    return action === null ? null : { ...base, kind: item.decision?.kind === "escalated" ? "decision" : "question", action }
+  }
+  if (item.kind === "overdue-wait") return { ...base, kind: "hold", action: { kind: "overdue-hold" } }
+  if ((item.kind === "pr-ready" || item.kind === "check-red") && isSettledPr(task)) return null
+  if (item.kind === "pr-ready") {
+    const link = openPr(task)
+    if (link !== null) return { ...base, kind: "pr", link, action: { kind: "merge", argv: mergeArgv(item.task), attentionId: item.id } }
+  }
+  return { ...base, kind: "event", action: { kind: "event", id: item.id } }
 }
 
-const millisOf = (at: string | null): number => {
-  const millis = at === null ? Number.NaN : Date.parse(at)
+const holdCards = (task: TaskDetail, overdue: boolean): ReadonlyArray<InboxAnswer> => {
+  const hold = task.hold
+  if (task.state.status === "closed" || hold === null || hold.answer !== null) return []
+  const base = { task: task.id, title: task.title, who: "user", asked: hold.at, recommendation: null } as const
+  if (hold.questions.length > 0) return hold.questions.filter((question) => question.answer === null).map((question) => ({
+    ...base, key: `${task.id}/hold/${hold.at}/${question.id}`, kind: "hold", ask: askText(question.text),
+    action: { kind: "answer", target: { kind: "question", id: question.id } }
+  }))
+  if (overdue) return []
+  return [{ ...base, key: `${task.id}/hold/${hold.at}`, kind: "hold", ask: askText(hold.reason), action: { kind: "answer", target: { kind: "hold" } } }]
+}
+
+const millisOf = (item: InboxItem): number => {
+  const millis = item.asked === null ? Number.NaN : Date.parse(item.asked)
   return Number.isNaN(millis) ? Number.MAX_SAFE_INTEGER : millis
 }
 
-export const inboxItems = (sources: InboxSources): ReadonlyArray<InboxItem> => {
-  const wanted = new Set(inboxTasks(sources))
-  return sources.backlog.filter((task) => wanted.has(task.id)).flatMap((task) => {
-    const thread = sources.threads.get(task.id)
-    const cards = thread === undefined ? [] : threadCards(thread, task)
-    return [...cards.map((card) => cardItem(task, card, sources.attention)), prItem(task)].filter((item) => item !== null)
-  }).sort((left, right) => millisOf(left.asked) - millisOf(right.asked))
+export const inboxItems = (backlog: ReadonlyArray<TaskDetail>, items: ReadonlyArray<AttentionItem>): ReadonlyArray<InboxItem> => {
+  const tasks = new Map(backlog.map((task) => [task.id, task]))
+  const userItems = items.filter((item) => item.owner === "user")
+  const overdue = new Set(userItems.filter((item) => item.kind === "overdue-wait").map((item) => item.task))
+  return [
+    ...userItems.map((item) => attentionCard(item, tasks.get(item.task))).filter((item) => item !== null),
+    ...backlog.flatMap((task) => holdCards(task, overdue.has(task.id)))
+  ].sort((left, right) => millisOf(left) - millisOf(right))
+}
+
+const eventArgv = (id: string, text: string): ReadonlyArray<string> =>
+  ["attention", "answer", id, ...(text.startsWith("-") ? ["--"] : []), text]
+
+type Choice =
+  | { readonly kind: "reply"; readonly words: string }
+  | { readonly kind: "write"; readonly prefix: string; readonly label: string }
+  | { readonly kind: "merge" }
+  | { readonly kind: "unavailable" }
+
+export const choice = (item: InboxItem, option: AskOption): Choice => {
+  if (item.action.kind === "merge" && option.text === "merge") return { kind: "merge" }
+  if (item.action.kind === "unavailable") return { kind: "unavailable" }
+  if (item.action.kind === "overdue-hold") return { kind: "write", prefix: option.text, label: option.text === "drop" ? "Give a reason for dropping the task" : "Write an answer to the hold" }
+  return { kind: "reply", words: option.text }
+}
+
+export const inboxArgv = (item: InboxItem, text: string, prefix = ""): ReadonlyArray<string> | null => {
+  const words = text.trim()
+  if (words === "") return null
+  switch (item.action.kind) {
+    case "unavailable": return null
+    case "answer": return answerArgv(item.task, item.action.target, words)
+    case "overdue-hold": return prefix === "drop" ? ["backlog", "drop", item.task, ...(words.startsWith("-") ? ["--"] : []), words] : answerArgv(item.task, { kind: "hold" }, words)
+    case "event": return eventArgv(item.action.id, words)
+    case "merge": return item.action.attentionId === undefined || words === "merge" ? null : eventArgv(item.action.attentionId, words)
+  }
 }
