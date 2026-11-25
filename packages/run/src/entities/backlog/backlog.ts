@@ -1,6 +1,7 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
 import { TaskId, taskIdPattern } from "../../shared/lib/index"
-import { fullPrUrl, type CiRerun, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
+import { fullPrUrl } from "./task-record-text"
+import { type CiRerun, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { answerWait, type DeciderOwns } from "./task-wait"
 import { renderTaskFile } from "./task-record-render"
 import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, readNames, recoverGrabs, scratchName, takenGrab } from "./backlog-write"

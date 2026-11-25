@@ -75,17 +75,16 @@ export {
   isDeciderAnswer,
   openQuestions,
   taskPr,
-  fullPrUrl,
   ranClosing,
   decisionAnswer,
   landedClosing,
   taskLandedIn,
-  isCalendarDate,
   taskPriorities,
   isTaskPriority,
   TaskFileError,
   parseTaskFile,
 } from "./task-record"
+export { fullPrUrl, isCalendarDate } from "./task-record-text"
 export type {
   SplitMark,
   Claim,

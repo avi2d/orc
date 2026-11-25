@@ -3,6 +3,7 @@ import { Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 import { deciderAnswerKinds, OverturnedFront, parkedAnswerOf } from "./task-record-answer"
 import { ChoicesFront, choicesOf, type ParkedQuestion } from "./task-record-question"
+import { fullPrUrl, isCalendarDate } from "./task-record-text"
 
 export { isDeciderAnswer } from "./task-record-answer"
 export type { CaptainAnswer, DeciderAnswer, ParkedAnswer } from "./task-record-answer"
@@ -142,15 +143,6 @@ export const taskLandedIn = (task: TaskRecord): string | null =>
   task.state.kind === "closed" && "landedIn" in task.state.closing ? task.state.closing.landedIn : null
 
 export const taskPr = (task: TaskRecord): string | null => ranClosing(task)?.pr ?? null
-
-const prUrlPattern = /^https:\/\/[^/]+\/[^/]+\/[^/]+\/pull\/\d+$/
-
-export const fullPrUrl = (pr: string | null | undefined): string | null => pr !== null && pr !== undefined && prUrlPattern.test(pr) ? pr : null
-
-const datePattern = /^\d{4}-\d{2}-\d{2}$/
-
-export const isCalendarDate = (text: string): boolean =>
-  datePattern.test(text) && !Number.isNaN(Date.parse(text)) && new Date(text).toISOString().slice(0, 10) === text
 
 export class TaskFileError extends Data.TaggedError("TaskFileError")<{
   readonly file: string
@@ -340,6 +332,8 @@ const splitFrontmatter = (text: string): { readonly head: string; readonly body:
   return { head: text.slice(fence.length + 1, end + 1), body: text.slice(end + fence.length + 2) }
 }
 
+const heldUnanswered = (state: TaskState, hold: Hold | null): boolean => hold !== null && hold.answer === null && (state.kind === "started" || state.kind === "closed")
+
 const closedWithUnansweredQuestion = (parked: Parked | null, state: TaskState): boolean =>
   state.kind === "closed" && state.closing.outcome !== "start-failed" && parked?.questions.some((question) => question.answer === null) === true
 
@@ -372,7 +366,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (typeof hold === "string") {
       return yield* new TaskFileError({ file, detail: hold })
     }
-    if (hold !== null && hold.answer === null && (state.kind === "started" || state.kind === "closed")) {
+    if (heldUnanswered(state, hold)) {
       return yield* new TaskFileError({ file, detail: "a " + state.kind + " task carries an unanswered hold" })
     }
     const parked = parkedOf(front)

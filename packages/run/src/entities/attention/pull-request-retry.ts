@@ -13,7 +13,7 @@ const rerunFailed = (
   repo: string,
   runs: ReturnType<typeof redRuns>,
   at: string
-): Effect.Effect<boolean, never, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const ids = [...new Set(runs.map((run) => run.run))]
     const failures: Array<string> = []
