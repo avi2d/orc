@@ -139,6 +139,7 @@ const expectedFiles = [
   "src/widgets/beat/beat-origin.ts",
   "src/widgets/beat/beat-place.ts",
   "src/widgets/beat/beat-resume.ts",
+  "src/widgets/beat/beat-split.ts",
   "src/widgets/beat/beat-token.ts",
   "src/widgets/beat/beat-waits.ts",
   "src/widgets/beat/beat.ts",

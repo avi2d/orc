@@ -35,7 +35,7 @@ describe("a parked run", () => {
       await startOnLinux(fixture)
       await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [], models: { decider: "acme/small" } }))
       const pi = join(fixture.dir, "bin", "pi")
-      const answer = JSON.stringify({ decision: "answer", answer: "Two retries", rule: "When a review question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure.", reason: "the intent says twice" })
+      const answer = JSON.stringify({ decision: "answer", answer: "Two retries", rule: "When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure.", reason: "the intent says twice" })
       const escalate = JSON.stringify({ decision: "escalate", reason: "only the captain knows" })
       await writeFile(pi, "#!/bin/sh\nif grep -q 'stopped on, question-4' ; then printf '%s\\n' '" + answer + "' ; else printf '%s\\n' '" + escalate + "' ; fi\n")
       await chmod(pi, 0o755)
