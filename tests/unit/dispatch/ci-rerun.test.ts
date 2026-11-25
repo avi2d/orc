@@ -132,6 +132,17 @@ describe("a red check on a ship task's PR", () => {
     })
   })
 
+  test("keeps equally named checks from different Actions runs instead of collapsing them", () => {
+    const view: PullRequestView = {
+      ...red,
+      statusCheckRollup: [
+        ...red.statusCheckRollup,
+        { workflowName: "ci", detailsUrl: "https://github.com/acme/orc/actions/runs/5252/job/1", name: "test", status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-10-27T11:10:00.000Z" }
+      ]
+    }
+    expect(redRuns(view)).toEqual([{ run: "4242", name: "ci/test" }, { run: "5252", name: "ci/test" }])
+  })
+
   test("opens the red item instead of aborting when the rerun marker cannot be written", async () => {
     await withBacklog(async (root) => {
       await closeWithPr(root)
