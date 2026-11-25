@@ -35,7 +35,7 @@ export const compileDashboardTool = (
   )
 }
 
-const choose = (name: string | undefined, outfile: string | undefined): Effect.Effect<void, CompileDashboardError> => {
+const choose = (name: string | undefined): Effect.Effect<void, CompileDashboardError> => {
   const tool = dashboardTools.find((candidate) => candidate.name === name)
   return tool === undefined
     ? Effect.fail(
@@ -43,7 +43,7 @@ const choose = (name: string | undefined, outfile: string | undefined): Effect.E
         message: "choose which command to compile: " + dashboardTools.map((candidate) => candidate.name).join(", ")
       })
     )
-    : compileDashboardTool(tool, outfile)
+    : compileDashboardTool(tool)
 }
 
-if (import.meta.main) void Effect.runPromise(choose(process.argv[2], process.argv[3]))
+if (import.meta.main) void Effect.runPromise(choose(process.argv[2]))
