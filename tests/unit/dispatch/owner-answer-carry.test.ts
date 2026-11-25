@@ -100,6 +100,7 @@ const closedItem = {
 const withParked174 = async (body: (root: string) => Promise<void>): Promise<void> =>
   withBacklog(async (root) => {
     await mkdir(join(root, "new"), { recursive: true })
+    await mkdir(join(root, "taken"), { recursive: true })
     await mkdir(join(root, "attention"), { recursive: true })
     await writeFile(join(root, "new", task174 + ".md"), parkedTaskFile)
     await writeFile(join(root, "attention", r3Item + ".json"), JSON.stringify(closedItem, null, 2) + "\n")
