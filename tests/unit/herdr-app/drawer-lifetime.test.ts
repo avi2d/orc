@@ -33,6 +33,7 @@ const fakeHerdr = (saved: ReadonlyArray<string> = [], earlierLive: ReadonlyArray
   const live = new Set(earlierLive)
   const finished = new Set<string>()
   const leases = new Map<string, string>()
+  let leasesHonored = true
   const finish = (address: string) => {
     live.delete(address)
     finished.add(address)
@@ -50,6 +51,7 @@ const fakeHerdr = (saved: ReadonlyArray<string> = [], earlierLive: ReadonlyArray
     kills,
     removals,
     quitApp: () => { appRunning = false },
+    ignoreLeases: () => { leasesHonored = false },
     ownerRunning: (pid: number) => Effect.sync(() => appRunning && pid === appPid),
     write: (path: string, text: string) => Promise.resolve(store(path, text)),
     exec: (program: string, args: ReadonlyArray<string>) => {
@@ -63,7 +65,7 @@ const fakeHerdr = (saved: ReadonlyArray<string> = [], earlierLive: ReadonlyArray
           const lease = args[1] ?? ""
           files.delete(lease)
           const address = leases.get(lease)
-          if (address !== undefined) finish(address)
+          if (address !== undefined && leasesHonored) finish(address)
           return ok
         })
         removals.push(completed)
@@ -84,7 +86,7 @@ const fakeHerdr = (saved: ReadonlyArray<string> = [], earlierLive: ReadonlyArray
       }
       if (command === "kill") {
         kills.push(terminal)
-        live.delete(terminal)
+        finish(terminal)
         return Promise.resolve(ok)
       }
       if (command !== "run") throw new Error("Unexpected hc command " + command)
@@ -108,11 +110,11 @@ const fakeHerdr = (saved: ReadonlyArray<string> = [], earlierLive: ReadonlyArray
   }
 }
 
-const drawer = (saved: ReadonlyArray<string> = []) => {
+const drawer = (saved: ReadonlyArray<string> = [], sleep: (ms: number) => Promise<void> = unused) => {
   const herdr = fakeHerdr(saved)
   let shows = 0
   const controller = new DrawerController({
-    ...drawerTerminal({ exec: (program, args) => herdr.exec(program, args), hc: (args) => herdr.hc(args), sleep: unused, write: herdr.write }, home),
+    ...drawerTerminal({ exec: (program, args) => herdr.exec(program, args), hc: (args) => herdr.hc(args), sleep, write: herdr.write }, home),
     show: () => String(++shows),
     hide: () => undefined
   })
@@ -172,6 +174,17 @@ for (const end of ["close", "toggle", "gone:1", "dispose"] as const) {
     expect([...host.finished]).toEqual([])
   })
 }
+
+test("closing a drawer whose chat ignores its lease kills and removes the terminal instead of leaving it running or failing every reopen", async () => {
+  const host = drawer([], () => Promise.resolve())
+  host.ignoreLeases()
+  await host.controller.obey("toggle")
+  await host.controller.obey("close")
+  expect(host.kills).toEqual(["terminal-1"])
+  expect([...host.finished]).toEqual([])
+  await host.controller.obey("toggle")
+  expect(host.launches).toHaveLength(2)
+})
 
 test("waiting only for Pi leaves the chat terminal and Pi running after the session is unlinked", async () => {
   expect(await afterDrawerEnds("unlink", (pi) => pi)).toEqual({ terminalRunning: true, piRunning: true })

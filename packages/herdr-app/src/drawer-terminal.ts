@@ -35,13 +35,21 @@ const terminalState = (hc: TerminalHost["hc"], terminal: string): Promise<string
 const terminalLive = (hc: TerminalHost["hc"], terminal: string): Promise<boolean> =>
   terminalState(hc, terminal).then((state) => state === "live")
 
-const removeAfterExit = (host: TerminalHost, address: string, remaining = 100): Promise<void> =>
-  terminalState(host.hc, address).then((state) => {
-    if (state === null) return
-    if (state === "finished") return host.hc(["rm", address, "--json"]).then((result) => { output(result) })
-    if (remaining === 0) throw new Error("Drawer terminal did not exit: " + address)
-    return host.sleep(100).then(() => removeAfterExit(host, address, remaining - 1))
-  })
+const running = (state: string | null): boolean => state !== null && state !== "finished"
+
+const awaitExit = (host: TerminalHost, address: string, remaining = 100): Promise<string | null> =>
+  terminalState(host.hc, address).then((state) => running(state) && remaining > 0
+    ? host.sleep(100).then(() => awaitExit(host, address, remaining - 1))
+    : state)
+
+const removeAfterExit = (host: TerminalHost, address: string): Promise<void> =>
+  awaitExit(host, address)
+    .then((state) => running(state) ? host.hc(["kill", address, "--json"]).then(output).then(() => awaitExit(host, address)) : state)
+    .then((state) => {
+      if (state === null) return
+      if (running(state)) throw new Error("Drawer terminal did not exit: " + address)
+      return host.hc(["rm", address, "--json"]).then((result) => { output(result) })
+    })
 
 export const previousReleaseChatKey = "orc-drawer.chat"
 const previousReleaseChatName = "orc-chat"
