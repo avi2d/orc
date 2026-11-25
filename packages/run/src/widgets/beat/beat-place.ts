@@ -1,4 +1,5 @@
 import { Effect, type FileSystem } from "effect"
+import type { BeatAction } from "../../entities/attention/index"
 import { deliveryFor, type RunDelivery } from "../../shared/config/index"
 import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "../../shared/config/index"
 import { answerWait, type BacklogError, closedUndone, decisionWait, type DeciderOwns, listTasks, type TaskFileError, type TaskRecord, childCount, dependencyWaits, isHeld, missingOriginWait, taskPriorities } from "../../entities/backlog/index"
@@ -29,10 +30,15 @@ export const machineOverfull = (
 
 const priorityRank = (task: TaskRecord): number => task.spec.priority ?? taskPriorities.length
 
-export const startOrder = (left: TaskRecord, right: TaskRecord): number =>
+const startOrder = (left: TaskRecord, right: TaskRecord): number =>
   priorityRank(left) - priorityRank(right) ||
   left.spec.created.localeCompare(right.spec.created) ||
   left.spec.id.localeCompare(right.spec.id, "en", { numeric: true })
+
+export const startable = (tasks: ReadonlyArray<TaskRecord>, closed: ReadonlyArray<BeatAction>): ReadonlyArray<TaskRecord> => {
+  const retried = new Set(closed.flatMap((action) => action.kind === "retry" ? [action.task] : []))
+  return tasks.filter((task) => task.state.kind === "new" && !retried.has(task.spec.id)).toSorted(startOrder)
+}
 
 const freeRoom = (room: MachineRoom): number => Math.max(0, room.slots - room.busy)
 

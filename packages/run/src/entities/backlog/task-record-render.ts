@@ -113,6 +113,7 @@ export const renderTaskFile = (record: TaskRecord): string =>
     ...(record.spec.priority === null ? [] : [field("priority", record.spec.priority)]),
     field("created", record.spec.created),
     ...holdFields(record.hold),
+    ...(record.retry === undefined ? [] : [field("retry", record.retry)]),
     ...parkedFields(record.parked),
     ...(record.merge === undefined ? [] : [field("merge", record.merge)]),
     ...(ranClosing(record) === null && record.priorPr !== undefined ? [field("pr", record.priorPr)] : []),
