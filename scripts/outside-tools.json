@@ -12,6 +12,7 @@
   { "name": "Bun", "url": "https://bun.com" },
   { "name": "npm", "url": "https://www.npmjs.com" },
   { "name": "Homebrew", "url": "https://brew.sh" },
+  { "name": "mise", "url": "https://mise.jdx.dev" },
   { "name": "ssh", "url": "https://www.openssh.com" },
   { "name": "oxlint", "url": "https://oxc.rs" },
   { "name": "Tailwind", "url": "https://tailwindcss.com" },
@@ -20,9 +21,11 @@
   { "name": "SQLite", "url": "https://sqlite.org" },
   { "name": "Claude", "url": "https://claude.com" },
   { "name": "Claude Code", "url": "https://claude.com/product/claude-code" },
+  { "name": "claude.ai", "url": "https://claude.ai" },
   { "name": "Codex", "url": "https://github.com/openai/codex" },
   { "name": "OpenCode", "url": "https://opencode.ai" },
   { "name": "quota-axi", "url": "https://github.com/kunchenguid/quota-axi" },
   { "name": "Lavish", "url": "https://github.com/kunchenguid/lavish-axi" },
-  { "name": "axi", "url": "https://github.com/kunchenguid/axi" }
+  { "name": "axi", "url": "https://github.com/kunchenguid/axi" },
+  { "name": "Effect", "url": "https://effect.website" }
 ]
