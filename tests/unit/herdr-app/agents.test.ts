@@ -41,6 +41,13 @@ const board = buildCards(
 )
 
 describe("sending a PR back", () => {
+  test("the approval card retains each recorded merge stage instead of showing only a generic merge", () => {
+    const prRun = run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: approval.link })
+    for (const stage of ["updating", "checks-running", "conflicted", "check-failed", "merged"] as const) {
+      const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed", merge: { stage, detail: null } })]), [approval])
+      expect(card.merge).toEqual({ stage, detail: null })
+    }
+  })
   const prRun = run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })
 
   test("a closed task's open PR offers send-back with the captain's words, not an empty review", () => {
