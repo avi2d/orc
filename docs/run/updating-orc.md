@@ -15,7 +15,7 @@ To update orc on a machine:
 
 `orc update` reads the newest version of `@avi2dg/orc` from the registry `npm_config_registry` names, else from `https://registry.npmjs.org`.
 When that version is newer than the running one, a Bun global install runs `bun add -g @avi2dg/orc@<version>`.
-If the machine uses a launcher that reads `~/.local/share/orc/release`, Orc prepares the new checkout before changing that file.
+If the machine uses a launcher that reads `~/.local/share/orc/release`, Orc prepares the new release before changing that file.
 An `update.command` overrides both install methods.
 When the versions are equal, or the running orc is newer, it installs nothing.
 A registry read that fails or takes more than 15 seconds installs nothing, and the command prints why.
@@ -28,8 +28,10 @@ If your launcher reads the version from `~/.local/share/orc/release`, run `orc u
 Orc detects the launcher when its running entry point resolves to `~/.local/share/orc/v<version>/packages/run/src/bin.ts` or its compiled executable resolves to `~/.local/share/orc/v<version>/orc`.
 For example, if `release` holds `1.2.3`, the launcher starts `v1.2.3/packages/run/src/bin.ts` with Bun or runs `v1.2.3/orc`.
 
-Orc clones the new version tag, installs its production dependencies from the lockfile with Bun on `PATH`, and checks that the new checkout prints the expected version.
-If the version directory already exists, Orc checks its compiled executable or source entry instead.
+If the launcher starts the source entry, Orc clones the new version tag, installs its production dependencies from the lockfile with Bun on `PATH`, and checks that the new checkout prints the expected version.
+If the launcher runs the compiled `orc`, Orc downloads the archive for its platform and the archive's `.sha256` file from the GitHub release, as [Release assets](release-assets.md) lists them.
+Orc then checks the archive's SHA-256, unpacks it into `v<version>`, and checks that the new `orc` prints the expected version, so the update needs no Bun.
+If the version directory already exists, Orc checks only the entry the launcher would run, the source entry or the compiled `orc`.
 If any step fails, the launcher keeps the old release.
 After an install, run `orc --version` through the launcher to see the new version.
 Runs that already started still use their old checkout.
