@@ -141,6 +141,8 @@ The beat opens these items for a closed ship task's PR, owned by the user:
   If a check waits for approval or is pending, orc opens the `check-red` item instead.
   Sending the task back does not reset the rerun allowance for that PR.
   If a check is still red after the rerun, or if no red check has an Actions run link, orc opens a `check-red` item with the available failed check links.
+  Within an Actions run, the latest result for each check name determines its state.
+  Checks in different Actions runs stay separate even when their names match.
   Checks that turn green on that commit, or a new commit, withdraw it.
   Merging the PR or closing it without merging withdraws it.
 - A PR with every check reporting green opens a `pr-ready` item for its head commit.
