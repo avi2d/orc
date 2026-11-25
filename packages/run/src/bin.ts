@@ -299,6 +299,4 @@ const program = Effect.gen(function*() {
   }
 })
 
-if (import.meta.main) {
-  runMain(program, { disableErrorReporting: true })
-}
+runMain(program, { disableErrorReporting: true })
