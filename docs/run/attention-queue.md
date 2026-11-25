@@ -126,7 +126,7 @@ The beat opens an item for each run event, owned by the user:
   A run that ends done or that you stop opens none.
   Two failures retry instead of opening the item.
   When no-mistakes refuses to start because the repository is not initialized, the run runs `no-mistakes init --skip-user-skill` and starts no-mistakes again.
-  When the command that reaches a dispatch machine exits 255, as ssh does when its connection fails, the task stays started and the next beat reads it again.
+  When the command that reaches a dispatch machine exits 255, as ssh does when its connection fails, or its read times out, the task stays started with an unknown state and the next beat reads it again.
 - A dispatch machine that orc has not reached for 10 minutes, counted from the first beat that could not reach it, opens a `machine-unreached` item for each started task on that machine.
   Each item names the machine and the error of the command that reaches it, and the task stays started.
   A beat that reaches the machine again withdraws the item, and so does closing its task.
