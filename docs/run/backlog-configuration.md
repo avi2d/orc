@@ -113,6 +113,7 @@ Run `orc quota` on the machine that runs the beat to see its quota line without 
 For example, set `quota.command` to `["subquo", "read", "--json"]` and run `orc quota --json` to read your configured accounts.
 
 A JSON reading with `kind: "read"` gives `floorPercent`, `accounts` in configuration order, and `pick`, which is the chosen account name or `null`.
+With [dispatch rules](dispatch-rules.md#candidates-and-quota), `pick` is always `null`, because the account is chosen per task.
 Each usable account gives `remainingPercent` and, if the source supplies it, `resetsAt`.
 Each unusable account gives its `reason`.
 A reading with `kind: "unread"` gives `reason` and a machine-readable `cause`: `command-missing`, `exit`, `timeout`, `no-json`, `spawn`, `schema`, or `account-missing`.
