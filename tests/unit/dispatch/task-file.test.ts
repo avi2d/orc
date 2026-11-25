@@ -16,6 +16,11 @@ const frontmatter = (kindLine: string): string =>
   "---\nid: task-1\ntitle: Map the parser\nproject: orc\n" + kindLine + "machine: null\ndepends_on: []\ncreated: 2026-10-27T10:00:00.000Z\n---\n# Map the parser\n"
 
 describe("task files", () => {
+  test("a closed task retains its approved merge stage instead of dropping it", async () => {
+    const text = "---\nid: task-1\ntitle: Example\nproject: orc\nmachine: null\ndepends_on: []\ncreated: 2026-10-27T10:00:00Z\nbeat: beat-1\ntaken_for: worker\naccount: main\ntaken_at: 2026-10-27T10:01:00Z\nstarted_at: 2026-10-27T10:02:00Z\noutcome: done\nclosed_at: 2026-10-27T11:00:00Z\npr: https://github.com/example/repo/pull/1\nmerge: { basis: captain-word, head: abc, green: [test], stage: checks-running }\n---\nExample\n"
+    const record = await run(parseTaskFile("task-1.md", "closed", text))
+    expect((await run(parseTaskFile("task-1.md", "closed", renderTaskFile(record)))).merge).toEqual({ basis: "captain-word", head: "abc", green: ["test"], stage: "checks-running" })
+  })
   test("a hand-written task file reads as a new task with its body intact", async () => {
     const text = "---\nid: task-7\ntitle: Fix the thing\nproject: orc\nmachine: mac\ndepends_on: [task-3]\ncreated: 2026-10-27T10:00:00.000Z\n---\n# Fix the thing\n\nDo it.\n"
     const record = await run(parseTaskFile("task-7.md", "new", text))
