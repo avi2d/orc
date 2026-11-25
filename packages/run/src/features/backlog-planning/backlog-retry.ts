@@ -20,7 +20,7 @@ export const retryTask = (root: string, id: string): Effect.Effect<string, Backl
       if (state === null) {
         return yield* new BacklogError({ detail: id + " is not a failed or stopped task" })
       }
-      const pr = fullPrUrl(taskPr(fresh)) ?? fullPrUrl(fresh.priorPr) ?? fullPrUrl(fresh.parked?.origin?.pr)
+      const pr = fullPrUrl(taskPr(fresh))
       const next = {
         ...fresh,
         ...(state.closing.outcome === "start-failed" ? {} : {

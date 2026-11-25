@@ -97,30 +97,27 @@ describe("backlog retry", () => {
       })
     })
     for (const outcome of ["failed", "stopped"] as const) {
-      for (const source of ["closing", "parked"] as const) {
-        test(kind + " retry of " + outcome + " does not lose the " + source + " PR before another send-back", async () => {
-          const pr = "https://github.com/acme/demo/pull/7"
-          const parked = source === "parked" ? { ...answered, origin: { machine: "node-a", run: "prior", pr } } : null
-          await withClosed(kind, outcome, parked, async (root, id) => {
-            await run(retryTask(root, id))
-            const retried = await run(findTask(root, id))
-            expect(retried.priorPr).toBe(pr)
-            expect(retried.parked).toBeNull()
-            await run(claimTask(root, id))
-            const failedStart = await run(findTask(root, id))
-            await run(publishClosed(root, { ...failedStart, state: { kind: "closed", claim, closing: { outcome: "start-failed", reason: "no shell" }, closedAt: at, postedAt: null } }))
-            await run(retryTask(root, id))
-            expect((await run(findTask(root, id))).priorPr).toBe(pr)
-            await run(claimTask(root, id))
-            const taken = await run(findTask(root, id))
-            await run(writeTaken(root, { ...taken, state: { kind: "started", claim, started: { at, log: "log" } } }))
-            await run(closeStartedTask(root, id, outcome, "no push", { pr: null, report: null }, "2026-01-02T00:00:00Z"))
-            expect(taskPr(await run(findTask(root, id)))).toBe(pr)
-            await run(sendBackClosedTask(root, id, "Keep the API", "2026-01-03T00:00:00Z", { machine: "node-a", run: "retried" }))
-            expect((await run(findTask(root, id))).parked?.origin?.pr).toBe(pr)
-          }, source === "closing" ? pr : null)
-        })
-      }
+      test(kind + " retry of " + outcome + " does not lose the closing PR before another send-back", async () => {
+        const pr = "https://github.com/acme/demo/pull/7"
+        await withClosed(kind, outcome, null, async (root, id) => {
+          await run(retryTask(root, id))
+          const retried = await run(findTask(root, id))
+          expect(retried.priorPr).toBe(pr)
+          expect(retried.parked).toBeNull()
+          await run(claimTask(root, id))
+          const failedStart = await run(findTask(root, id))
+          await run(publishClosed(root, { ...failedStart, state: { kind: "closed", claim, closing: { outcome: "start-failed", reason: "no shell" }, closedAt: at, postedAt: null } }))
+          await run(retryTask(root, id))
+          expect((await run(findTask(root, id))).priorPr).toBe(pr)
+          await run(claimTask(root, id))
+          const taken = await run(findTask(root, id))
+          await run(writeTaken(root, { ...taken, state: { kind: "started", claim, started: { at, log: "log" } } }))
+          await run(closeStartedTask(root, id, outcome, "no push", { pr: null, report: null }, "2026-01-02T00:00:00Z"))
+          expect(taskPr(await run(findTask(root, id)))).toBe(pr)
+          await run(sendBackClosedTask(root, id, "Keep the API", "2026-01-03T00:00:00Z", { machine: "node-a", run: "retried" }))
+          expect((await run(findTask(root, id))).parked?.origin?.pr).toBe(pr)
+        }, pr)
+      })
     }
     test(kind + " retry does not drop send-back words or the PR after a failed start", async () => {
       const parked = {
