@@ -122,9 +122,9 @@ See [Merging a task's PR](merging-a-tasks-pr.md) for what follows.
 
 ## Model and worktree details
 
-Orc loads the implementer agent from `$ORC_HOME/agents/implementer.md`, then the project's `.orc/agents/implementer.md`, then the bundled file.
+Orc loads the implementer agent from the project's `.orc/agents/implementer.md`, then `$ORC_HOME/agents/implementer.md`, then the bundled file.
 The fixer agent loads the same way from `fixer.md`.
-The reviewer agent file is `$ORC_HOME/agents/reviewer.md`, then the project's `.orc/agents/reviewer.md`, then the bundled `packages/run/agents/reviewer.md`.
+The reviewer agent file is the project's `.orc/agents/reviewer.md`, then `$ORC_HOME/agents/reviewer.md`, then the bundled `packages/run/agents/reviewer.md`.
 The bundled reviewer prints only its findings JSON array, with nothing before or after it and no code fence.
 Each finding has `id`, `file`, `line`, `severity`, `action`, and `description`.
 An implementer or fixer model comes from its file, its role's model flag, or `config.json`, in that order.
