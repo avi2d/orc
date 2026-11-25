@@ -11,6 +11,7 @@ import { decodeShowJson } from "../../packages/run/src/features/seeing-runs/inde
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url))
 const compiledOrc = join(repoRoot, "packages/run/dist/orc")
+const sourceOrc = [process.execPath, join(repoRoot, "packages/run/src/bin.ts")]
 const compileTimeout = 300_000
 
 interface Ran {
@@ -29,19 +30,36 @@ const quotaScript = "console.log(JSON.stringify({ schema: \"orc.quota.v1\", acco
 
 const piScript = "process.exit(Bun.spawnSync([...JSON.parse(process.env.ORC_CHAT_ORC ?? \"[]\"), \"--version\"], { stdout: \"inherit\", stderr: \"inherit\" }).exitCode)"
 
-const fakePi = [
-  "#!/bin/sh",
-  "printf 'ORC_CHAT_ORC=%s\\n' \"$ORC_CHAT_ORC\"",
-  "exec '" + process.execPath + "' -e '" + piScript + "'",
-  ""
-].join("\n")
+const piExec = "exec '" + process.execPath + "' -e '" + piScript + "'"
+
+const fakePi = ["#!/bin/sh", "printf 'ORC_CHAT_ORC=%s\\n' \"$ORC_CHAT_ORC\"", piExec, ""].join("\n")
+
+// ORC_CHAT_ORC names each build's own path, so the pi that compares builds does not print it.
+const quietPi = ["#!/bin/sh", piExec, ""].join("\n")
+
+let compiling: Promise<void> | undefined
+
+const compileOrc = (): Promise<void> => compiling ??= run([process.execPath, "run", "compile"], {}, repoRoot).then((compiled) => {
+  if (compiled.exitCode !== 0) {
+    throw new Error("bun run compile exited " + compiled.exitCode + ": " + compiled.stderr)
+  }
+})
+
+// A beat names itself with a random id and stamps the clock, so only those two fields may differ between builds.
+const unstamped = (ran: Ran): Ran => {
+  const report: unknown = JSON.parse(ran.stdout)
+  if (typeof report !== "object" || report === null) {
+    throw new Error("beat --json printed no object: " + ran.stdout)
+  }
+  return { ...ran, stdout: JSON.stringify(Object.fromEntries(Object.entries(report).filter(([key]) => key !== "beat" && key !== "at"))) }
+}
 
 interface Fixture {
   readonly dir: string
   readonly env: Record<string, string>
 }
 
-const withFixture = async (body: (fixture: Fixture) => Promise<void>): Promise<void> => {
+const withFixture = async (body: (fixture: Fixture) => Promise<void>, pi: string = fakePi): Promise<void> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-compiled-e2e-"))
   try {
     const home = join(dir, "home")
@@ -54,7 +72,7 @@ const withFixture = async (body: (fixture: Fixture) => Promise<void>): Promise<v
     }))
     await writeFile(join(home, "backlog", "projects.json"), JSON.stringify({ projects: [] }))
     await writeFile(join(home, "config.json"), JSON.stringify({ providers: [], models: { orchestrator: "acme/orchestrator-1" } }))
-    await writeFile(join(bin, "pi"), fakePi)
+    await writeFile(join(bin, "pi"), pi)
     await chmod(join(bin, "pi"), 0o755)
     await body({ dir, env: { ORC_HOME: home, PATH: bin + ":" + (process.env.PATH ?? "") } })
   } finally {
@@ -93,10 +111,7 @@ const seedRun = async (home: string): Promise<void> => {
 
 describe("compiled orc", () => {
   test("bun run compile builds one bytecode file that answers help, beat, score, show and chat's self command", async () => {
-    const compiled = await run([process.execPath, "run", "compile"], {}, repoRoot)
-    if (compiled.exitCode !== 0) {
-      throw new Error("bun run compile exited " + compiled.exitCode + ": " + compiled.stderr)
-    }
+    await compileOrc()
     await withFixture(async ({ dir, env }) => {
       const orc = (args: ReadonlyArray<string>) => run([compiledOrc, ...args], env, dir)
 
@@ -124,5 +139,31 @@ describe("compiled orc", () => {
       expect(chat.stdout).toContain("ORC_CHAT_ORC=" + JSON.stringify([await realpath(compiledOrc)]))
       expect(chat.stdout).toContain("orc " + packageJson.version)
     })
+  }, compileTimeout)
+
+  test("the compiled file gives the same exit code and output as the source for help, beat, show and chat", async () => {
+    await compileOrc()
+    await withFixture(async ({ dir, env }) => {
+      await seedRun(env.ORC_HOME)
+      const both = async (args: ReadonlyArray<string>) => ({
+        source: await run([...sourceOrc, ...args], env, dir),
+        compiled: await run([compiledOrc, ...args], env, dir)
+      })
+
+      const help = await both(["--help"])
+      expect(help.compiled).toEqual(help.source)
+
+      const beat = await both(["beat", "--json"])
+      expect(beat.source.exitCode).toBe(0)
+      expect(unstamped(beat.compiled)).toEqual(unstamped(beat.source))
+
+      const show = await both(["show", "compiled-1", "--json"])
+      expect(show.source.exitCode).toBe(0)
+      expect(show.compiled).toEqual(show.source)
+
+      const chat = await both(["chat"])
+      expect(chat.source.exitCode).toBe(0)
+      expect(chat.compiled).toEqual(chat.source)
+    }, quietPi)
   }, compileTimeout)
 })
