@@ -132,6 +132,21 @@ describe("a red check on a ship task's PR", () => {
     })
   })
 
+  test("opens the red item instead of aborting when the rerun marker cannot be written", async () => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      const task = await run(findTask(root, "orc-1"))
+      for (const file of await readdir(join(root, "closed"))) {
+        await rm(join(root, "closed", file))
+      }
+      const asked: Array<ReadonlyArray<string>> = []
+      await Effect.runPromise(routePullRequestWithRetry(root, task, pr, red, "2026-10-27T12:00:00.000Z").pipe(Effect.provide(Layer.merge(BunServices.layer, recording(asked)))))
+      expect(asked).toEqual([])
+      expect((await run(openItems(root)))[0]?.item.text).toContain(details)
+      expect((await run(unpostedEvents(root)))[0]?.text).toContain("could not record")
+    })
+  })
+
   test("does not report an old failure while its queued rerun has no start time", async () => {
     await withBacklog(async (root) => {
       await closeWithPr(root)
