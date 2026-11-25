@@ -9,6 +9,7 @@ export default defineConfig({
       "packages/run/src/entities/heavy-queue/heavy-runner-entry.ts",
       "packages/run/src/entities/heavy-queue/heavy-pueue-task.ts",
       "packages/run/src/entities/heavy-queue/heavy-standin-exec.ts",
+      "packages/run/src/entities/heavy-queue/heavy-standin-main.ts",
       "packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts"
     ]
   },
