@@ -2,7 +2,7 @@ import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } fro
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
 import { type Account, type ConfigError, type DispatchConfig, isYolo, type Machine, type Project, providerOf, readDispatchConfig, readProjects, type RoutedModels } from "../../shared/config/index"
-import { machineOverfull, type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
+import { machineOverfull, type MachineRoom, type Placed, placeTask, readRoom, startable, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import { selectTaskRoute } from "./beat-route"
 import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
@@ -372,8 +372,7 @@ export const runBeat = (
     yield* routeRunItems(root, started, progress, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
     const { reported, queue, deciderOwns } = yield* attentionActions(root, latest, [...settled.closed, ...relayed.closed, ...settled.asking, ...relayed.asking], at)
-    const retried = new Set(settled.closed.flatMap((action) => action.kind === "retry" ? [action.task] : []))
-    const queued = latest.filter((task) => task.state.kind === "new" && !retried.has(task.spec.id)).toSorted(startOrder)
+    const queued = startable(latest, settled.closed)
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))

@@ -298,6 +298,44 @@ const trackUnreached = (
     }
   })
 
+const deadRunOf = (reading: CloseReading): string | undefined =>
+  reading.kind === "read" && reading.result.status === "failed" && reading.result.reason !== "the run was killed" ? reading.result.run?.id : undefined
+
+const retryDeadRun = (
+  root: string,
+  task: string,
+  machine: string,
+  run: string
+): Effect.Effect<Progress, TaskFileError, FileSystem.FileSystem | Path.Path> =>
+  Effect.gen(function*() {
+    const at = yield* nowIso
+    const retried = yield* retryStartedTask(root, task, machine, run, at).pipe(
+      Effect.catchTag("BacklogError", () => Effect.succeed(null))
+    )
+    if (retried === null) {
+      return { kind: "untracked" } satisfies Progress
+    }
+    yield* recordEvent(root, { key: task + ".retry." + run, at, text: task + " will retry from run " + run + " on its kept branch" }).pipe(
+      Effect.catchTag("BacklogError", () => Effect.void)
+    )
+    return { kind: "ended", action: { kind: "retry", task, machine, run } } satisfies Progress
+  })
+
+const closeOwnLog = (
+  context: CloseContext,
+  task: TaskRecord,
+  machine: string,
+  started: { readonly at: string, readonly log: string }
+): Effect.Effect<Progress, TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const silent = ownLogEndingOf(started.at, yield* logWrittenAt(started.log), Date.parse(yield* nowIso))
+    if (silent === null) {
+      return { kind: "own-log" } satisfies Progress
+    }
+    const ended = yield* endTask(context.root, context.home, task, machine, silent)
+    return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
+  })
+
 // A finished run ends its task here, because no other beat step reads a started task after its run ends.
 export const closeFinished = (
   context: CloseContext,
@@ -315,12 +353,7 @@ export const closeFinished = (
       return { kind: "untracked" } satisfies Progress
     }
     if (!ownedBySweep(machine)) {
-      const silent = ownLogEndingOf(started.at, yield* logWrittenAt(started.log), Date.parse(yield* nowIso))
-      if (silent === null) {
-        return { kind: "own-log" } satisfies Progress
-      }
-      const silentEnded = yield* endTask(context.root, context.home, task, claim.machine, silent)
-      return Option.match(silentEnded, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
+      return yield* closeOwnLog(context, task, claim.machine, started)
     }
     const through = throughFor(machine)
     const reading: CloseReading = yield* readClose(task, context.home, label, through)
@@ -340,19 +373,9 @@ export const closeFinished = (
       const action = yield* serveRunning(context, task, claim.machine, through, label, reading.asking)
       return { kind: "running", outputAt: reading.outputAt, action, failing: reading.failing } satisfies Progress
     }
-    const run = reading.kind === "read" && reading.result.status === "failed" && reading.result.reason !== "the run was killed" ? reading.result.run?.id : undefined
+    const run = deadRunOf(reading)
     if (stale === null && ending.kind === "close" && ending.outcome === "failed" && task.retry === undefined && run !== undefined) {
-      const at = yield* nowIso
-      const retried = yield* retryStartedTask(context.root, task.spec.id, claim.machine, run, at).pipe(
-        Effect.catchTag("BacklogError", () => Effect.succeed(null))
-      )
-      if (retried === null) {
-        return { kind: "untracked" } satisfies Progress
-      }
-      yield* recordEvent(context.root, { key: task.spec.id + ".retry." + run, at, text: task.spec.id + " will retry from run " + run + " on its kept branch" }).pipe(
-        Effect.catchTag("BacklogError", () => Effect.void)
-      )
-      return { kind: "ended", action: { kind: "retry", task: task.spec.id, machine: claim.machine, run } } satisfies Progress
+      return yield* retryDeadRun(context.root, task.spec.id, claim.machine, run)
     }
     const ended = yield* endTask(context.root, context.home, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
