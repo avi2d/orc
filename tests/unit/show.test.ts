@@ -14,6 +14,7 @@ import {
   recordSignal,
   recordStep
 } from "../../packages/run/src/entities/run-history/index"
+import { recordReviewDone, recordReviewStart } from "../../packages/run/src/features/running-a-task/history-write"
 import { decodeRunsJson, decodeShowJson, encodeRunsJson, encodeShowJson, formatShow, InvalidScore, readListedRuns, readRunsJsonRuns, readShow, recordStepScore, runsJson, UnknownRun, UnknownStep } from "../../packages/run/src/features/seeing-runs/index"
 
 const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
@@ -404,6 +405,50 @@ describe("formatShow", () => {
         expect(text).toMatch(/^  agent: file:\/\/\/\S+\/bundled\/implementer\.md$/m)
         expect(text).toContain("  session: file:///tmp/show-home/runs/show-1/sessions/x.jsonl")
         expect(text).toContain("https://github.com/avi2d/orc/pull/7")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a recorded review step prints its result, model, minutes, findings and review file", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await fixture(db)
+        const reviewer = { path: "bundled/reviewer.md", model: "acme/reviewer", thinking: "high" as const }
+        await Effect.runPromise(recordReviewStart(db, "show-1", reviewer, "2026-10-18T10:03:00.000Z"))
+        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, { status: "passed", findings: [], file: "/tmp/show-home/runs/show-1/review.json" }, "2026-10-18T10:03:00.000Z", "2026-10-18T10:05:30.000Z"))
+        const document = await Effect.runPromise(readShow(db, "show-1"))
+        if (document === null) {
+          throw new Error("missing fixture")
+        }
+        const text = formatShow(document)
+        const review = text.split("\n\n").find((block) => block.startsWith("step review #1"))
+        expect(review).toContain("step review #1: passed")
+        expect(review).toContain("  model: acme/reviewer")
+        expect(review).toContain("  minutes: 2.5")
+        expect(review).toContain("  signal review-findings: 0")
+        expect(review).toContain("  evidence out review: file:///tmp/show-home/runs/show-1/review.json")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a failed review step records why it failed", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await fixture(db)
+        const reviewer = { path: "bundled/reviewer.md", model: "acme/reviewer", thinking: "high" as const }
+        await Effect.runPromise(recordReviewStart(db, "show-1", reviewer, "2026-10-18T10:03:00.000Z"))
+        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, { status: "failed", reason: "the reply did not stop cleanly" }, "2026-10-18T10:03:00.000Z", "2026-10-18T10:04:00.000Z"))
+        const document = await Effect.runPromise(readShow(db, "show-1"))
+        const review = document?.steps.find((step) => step.name === "review")
+        expect(review?.status).toBe("failed")
+        expect(review?.model).toBe("acme/reviewer")
+        expect(review?.signals).toEqual([{ name: "review-failure", value: "the reply did not stop cleanly" }])
       } finally {
         db.close()
       }

@@ -209,6 +209,7 @@ export const formatShow = (document: ShowJsonDocument): string => {
     if (step.from !== null) {
       lines.push("  from run " + step.from)
     }
+    lines.push(...timingLines(step))
     lines.push("  agent: " + (step.agentFile === null ? "none" : toFileUrl(step.agentFile)))
     lines.push("  session: " + (step.piSessionFile === null ? "none" : toFileUrl(step.piSessionFile)))
     for (const signal of step.signals) {
@@ -223,6 +224,14 @@ export const formatShow = (document: ShowJsonDocument): string => {
     }
   }
   return lines.join("\n")
+}
+
+const timingLines = (step: Pick<ShowJsonDocument["steps"][number], "model" | "started" | "ended">): ReadonlyArray<string> => {
+  const elapsed = step.ended === null ? Number.NaN : Date.parse(step.ended) - Date.parse(step.started)
+  return [
+    ...(step.model === null ? [] : ["  model: " + step.model]),
+    ...(Number.isFinite(elapsed) && elapsed >= 0 ? ["  minutes: " + (elapsed / 60_000).toFixed(1)] : [])
+  ]
 }
 
 const scoreLine = (score: ShowJsonDocument["steps"][number]["score"]): string =>
