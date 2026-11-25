@@ -54,15 +54,17 @@ const finishRun = (fixture: Fixture): Promise<void> =>
 test("orc delivery sends a red check back once, then asks instead of retrying the same red check", async () => {
   await withFixture(async (fixture) => {
     await fakeQuota(fixture)
+    await captureRunQueue(fixture)
     await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
     await writeFile(join(fixture.home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", mode: "orc", checkouts: { linux: fixture.checkout } }] }))
     await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
-      machines: [{ name: "linux", slots: 4, start: ["true"] }],
+      machines: [{ name: "linux", slots: 4, start: [process.execPath, binPath, "runner", "start"] }],
       quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", kind: "none" }], floorPercent: 15 }
     }))
     await stubOpenPr(fixture)
     await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0"])
     await orcOk(fixture, ["beat"])
+    await queuedRun(fixture)
     await seedDoneRun(fixture)
     await finishRun(fixture)
     await orcOk(fixture, ["beat"])
