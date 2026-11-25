@@ -21,6 +21,11 @@ describe("the Approve card picks its button and notice", () => {
     expect(approvalShown({ kind: "merging" }, { stage: "checks-running", detail: null })).toEqual({ button: "Checks running", notice: null })
   })
 
+  test("a new merge over a conflict an earlier attempt recorded reads Merging instead of the stale conflict", () => {
+    expect(approvalShown({ kind: "merging" }, { stage: "conflicted", detail: "main" })).toEqual({ button: "Merging", notice: null })
+    expect(approvalShown({ kind: "merging" }, { stage: "check-failed", detail: "ci/test" })).toEqual({ button: "Merging", notice: null })
+  })
+
   test("a refused merge on a conflict names the conflict instead of the raw refusal", () => {
     expect(approvalShown(refusal, { stage: "conflicted", detail: "main" })).toEqual({ button: "Approve and merge", notice: "Merge conflict with main" })
   })

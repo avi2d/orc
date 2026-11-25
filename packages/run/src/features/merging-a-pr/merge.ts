@@ -347,7 +347,7 @@ const openPullRequest = (root: string, id: string, basis: MergeBasis) =>
     if (view.state !== "OPEN") {
       return yield* refuse(refusal(id, url, ["is " + view.state.toLowerCase() + ", not open"]))
     }
-    return { url, view }
+    return { record, url, view }
   })
 
 const mergeChecked = (landing: Landing, view: PullRequestView, pending: PendingUpdate | null, noWait: boolean) =>
@@ -383,9 +383,11 @@ export const mergeTask = (
   options: { readonly noWait: boolean; readonly progress?: (message: string) => Effect.Effect<void> } = { noWait: false }
 ): Effect.Effect<MergeOutcome, MergeError, MergeRequirements> =>
   Effect.gen(function*() {
-    const { url, view } = yield* openPullRequest(root, id, basis)
+    const { record, url, view } = yield* openPullRequest(root, id, basis)
     const landing: Landing = { root, id, url, basis, sendBack, progress: options.progress ?? Console.log }
-    yield* writeMergeRecord(landing, null)
+    if (record.merge !== undefined) {
+      yield* writeMergeRecord(landing, null)
+    }
     if (basis === "yolo-green") {
       const waits = ownerWordChanges(yield* readChangedFiles(url))
       if (waits.length > 0) {

@@ -224,7 +224,7 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
       return answerNow(args, place)
     }
     case "SendBack": {
-      return DateTime.now.pipe(Effect.flatMap((now) => sendBack(backlogRoot(place), place.home, args, DateTime.formatIso(now))))
+      return DateTime.now.pipe(Effect.flatMap((now) => sendBack(backlogRoot(place), place.home, args, DateTime.formatIso(now), "cleared")))
     }
     case "NoteTask": {
       return DateTime.now.pipe(Effect.flatMap((now) => noteTask(backlogRoot(place), args.id, args.words, DateTime.formatIso(now))))

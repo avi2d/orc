@@ -23,6 +23,9 @@ export const approvalStage = (stage: MergeStage): string => {
   }
 }
 
+const inProgress = (recorded: RecordedMerge | undefined): string =>
+  recorded?.stage === "updating" || recorded?.stage === "checks-running" || recorded?.stage === "merged" ? approvalStage(recorded.stage) : "Merging"
+
 const failureNotice = (recorded: RecordedMerge | undefined): string | null => {
   if (recorded?.stage === "conflicted") return recorded.detail === null ? "Merge conflict" : `Merge conflict with ${recorded.detail}`
   if (recorded?.stage === "check-failed") return recorded.detail === null ? "Check failed" : `Check failed: ${recorded.detail}`
@@ -30,7 +33,7 @@ const failureNotice = (recorded: RecordedMerge | undefined): string | null => {
 }
 
 export const approvalShown = (attempt: MergeOutcome | null, recorded: RecordedMerge | undefined): ApprovalShown => {
-  if (attempt?.kind === "merging") return { button: recorded === undefined ? "Merging" : approvalStage(recorded.stage), notice: null }
+  if (attempt?.kind === "merging") return { button: inProgress(recorded), notice: null }
   if (attempt?.kind === "failed") return { button: "Approve and merge", notice: failureNotice(recorded) ?? attempt.reason }
   return { button: "Approve and merge", notice: null }
 }

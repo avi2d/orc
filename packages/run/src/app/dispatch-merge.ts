@@ -12,6 +12,6 @@ export const mergeNow = (args: Extract<DispatchArgs, { readonly kind: "MergeTask
     backlogRoot(home),
     args.id,
     args.basis,
-    (words) => DateTime.now.pipe(Effect.flatMap((now) => sendBack(backlogRoot(home), home, { kind: "SendBack", id: args.id, words }, DateTime.formatIso(now)))),
+    (words) => DateTime.now.pipe(Effect.flatMap((now) => sendBack(backlogRoot(home), home, { kind: "SendBack", id: args.id, words }, DateTime.formatIso(now), "kept"))),
     { noWait: args.noWait }
   ).pipe(Effect.map((outcome) => outcome.message))

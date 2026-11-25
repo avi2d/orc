@@ -200,6 +200,22 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
     })
   }, 60_000)
 
+  test("a captain's send-back after a conflicted re-close drops the conflict instead of labelling the review a merge conflict", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added orc-1 for orc")
+      await closeTask(fixture, "orc-1", [...ranClosing("done", "", prUrl), "merge: { basis: captain-word, head: " + head + ", green: [lint], stage: conflicted, detail: main }"])
+      await stubRunner(fixture)
+      await stubGh(fixture, {})
+      const sent = await runOrc(fixture, ["backlog", "send-back", "orc-1", "rename", "the", "flag"])
+      expect(sent.stderr).toBe("")
+      expect(sent.exitCode).toBe(0)
+      const text = await sentBackTask(fixture)
+      expect(text).toContain("rename the flag")
+      const front: unknown = Bun.YAML.parse(text.split("---\n")[1])
+      expect(front).not.toHaveProperty("merge")
+    })
+  }, 60_000)
+
   test("a later refusal clears the red check an earlier attempt recorded instead of keeping the stale stage", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await closedWithPr(fixture)
