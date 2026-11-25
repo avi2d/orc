@@ -9,6 +9,7 @@ import { openItems } from "../../../packages/run/src/entities/attention/attentio
 import { unpostedEvents } from "../../../packages/run/src/entities/events/index"
 import { insertRun, openDatabase } from "../../../packages/run/src/entities/run-history/index"
 import { closeFinished } from "../../../packages/run/src/widgets/beat/beat-close"
+import { endSplit } from "../../../packages/run/src/widgets/beat/beat-split"
 import { claim, config, pueueDone, run, startTaskOne, withBacklog } from "../../lib/dispatch-beat"
 
 const sweepConfig = { ...config, machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start"] }] }
@@ -20,6 +21,22 @@ const failedRun = (root: string) => run(Effect.acquireUseRelease(
 ))
 
 describe("a failed run", () => {
+  test("a failed split closes instead of retrying and duplicating partial writes", async () => {
+    await withBacklog(async (root) => {
+      await startTaskOne(root, ["orc", "runner", "start"], null)
+      const task = (await run(listTasks(root)))[0]
+      if (task === undefined) throw new Error("missing task")
+      const child = { ...task, spec: { ...task.spec, parent: "orc-99" } }
+      await run(writeTaken(root, child))
+      const result = await run(endSplit(root, child, "mac", { kind: "split", plan: {
+        schema: "orc.split.v1", plan: "split", reason: "split the work", done: ["work is complete"],
+        children: [{ title: "First", body: "First work", after: [] }, { title: "Second", body: "Second work", after: [] }]
+      } }))
+      expect(result).toMatchObject({ _tag: "Some", value: { kind: "closed", outcome: "failed" } })
+      expect((await run(listTasks(root)))[0]?.state.kind).toBe("closed")
+    })
+  })
+
   test("a failed runner without a run ID closes instead of retrying without an origin", async () => {
     await withBacklog(async (root) => {
       await startTaskOne(root, ["orc", "runner", "start"], null)
