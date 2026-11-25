@@ -174,7 +174,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/updating-orc/update.ts` | The registry read and the choice of installer for `orc update` |
-| `packages/run/src/features/updating-orc/launcher-release.ts` | The preparation and selection of a versioned launcher checkout |
+| `packages/run/src/features/updating-orc/launcher-release.ts` | The preparation and selection of a versioned launcher release, a source checkout or an unpacked compiled archive |
 
 ## entities/agent
 
