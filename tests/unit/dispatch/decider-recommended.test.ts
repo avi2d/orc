@@ -135,7 +135,7 @@ describe("a review question with a Recommended: line", () => {
   })
 
   test("on the never list reaches the owner with no decider call, instead of being answered with its recommended option", async () => {
-    const pushing = { id: "r2", text: "Should the run push the branch itself?\nRecommended: yes" }
+    const pushing = { id: "question-2", text: "Should the run push the branch itself?\nRecommended: yes" }
     const heard: Array<DeciderRequest> = []
     await withAskingTask([pushing], async (root) => {
       await decide(root, replying(escalateOn(escalationBullet("You are not sure")), heard))
