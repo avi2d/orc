@@ -1,9 +1,9 @@
 import { type AsyncContext, type Context, type Element, type FocusHandle, View, div } from "gpui-kit"
 import { ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { closeOverlay, exec, hc, home, nextCommand, openOverlay, props, readTextFile, run, writeTextFile } from "herdr"
+import { closeOverlay, exec, hc, home, nextCommand, openOverlay, props, readTextFile, run, setShared, shared, writeTextFile } from "herdr"
 import { fields } from "../../src/guard"
 import { DrawerController, type DrawerChat, type DrawerPane as Pane } from "../../src/drawer-controller"
-import { drawerTerminal } from "../../src/drawer-terminal"
+import { drawerTerminal, endPreviousReleaseChat, previousReleaseChatKey } from "../../src/drawer-terminal"
 import type { Reading } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { type Turn, sessionTurns } from "../../src/turns"
@@ -60,6 +60,13 @@ export default class OrcDrawer extends View {
         hide: closeOverlay
       })
       cx.spawn((task) => this.listen(task))
+      cx.spawn((task) => endPreviousReleaseChat(hc, shared(previousReleaseChatKey)).then(
+        () => { setShared(previousReleaseChatKey, null) },
+        (error: unknown) => {
+          this.problem = error instanceof Error ? error.message : "Cannot end the chat an earlier Orc release left running"
+          task.notify()
+        }
+      ))
     }
     if (this.role.role === "turns") {
       this.focusHandle.focus()

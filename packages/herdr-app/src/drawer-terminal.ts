@@ -18,6 +18,32 @@ const output = (result: Result): string => {
   return result.stdout
 }
 
+const terminalLive = (hc: TerminalHost["hc"], terminal: string): Promise<boolean> => hc(["get", terminal, "--json"]).then((result) => {
+  const live = guardJson(result.stdout || result.stderr, (value, at) => {
+    const record = fields(value, at)
+    if (record.kind === "refused") return record
+    const error = fields(record.value["error"], "error")
+    if (error.kind === "ok" && error.value["kind"] === "not_found") return ok(false)
+    output(result)
+    const state = string(record.value, "state", at)
+    return state.kind === "refused" ? state : ok(state.value === "live")
+  })
+  if (live.kind === "refused") throw new Error(live.reason)
+  return live.value
+})
+
+export const previousReleaseChatKey = "orc-drawer.chat"
+const previousReleaseChatName = "orc-chat"
+
+export const endPreviousReleaseChat = (hc: TerminalHost["hc"], held: unknown): Promise<void> => {
+  const record = fields(held, "")
+  const address = record.kind === "ok" ? record.value["address"] : undefined
+  const terminals = typeof address === "string" ? [address, previousReleaseChatName] : [previousReleaseChatName]
+  return terminals.reduce<Promise<void>>((ended, terminal) => ended
+    .then(() => terminalLive(hc, terminal))
+    .then((live) => live ? hc(["kill", terminal, "--json"]).then(output).then(() => undefined) : undefined), Promise.resolve())
+}
+
 const savedSession = /^drawer-(\d+)\.jsonl$/
 
 const newestSaved = (listing: string): string | null => {
@@ -71,18 +97,6 @@ export const drawerTerminal = (host: TerminalHost, home: string): DrawerTerminal
         }))
     },
     stop: (chat: DrawerChat): Promise<void> => release(chat.lease).then(() => undefined),
-    live: (chat: DrawerChat): Promise<boolean> => host.hc(["get", chat.address, "--json"]).then((result) => {
-      const live = guardJson(result.stdout || result.stderr, (value, at) => {
-        const record = fields(value, at)
-        if (record.kind === "refused") return record
-        const error = fields(record.value["error"], "error")
-        if (error.kind === "ok" && error.value["kind"] === "not_found") return ok(false)
-        output(result)
-        const state = string(record.value, "state", at)
-        return state.kind === "refused" ? state : ok(state.value === "live")
-      })
-      if (live.kind === "refused") throw new Error(live.reason)
-      return live.value
-    })
+    live: (chat: DrawerChat): Promise<boolean> => terminalLive(host.hc, chat.address)
   }
 }

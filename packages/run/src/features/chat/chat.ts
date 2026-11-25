@@ -1,7 +1,7 @@
 import { Console, Data, Effect, FileSystem, Path } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { boardsVar } from "./chat-board"
-import { untilHangup, whileSessionExists } from "./chat-lifetime"
+import { untilHangup, whileDrawerOpen } from "./chat-lifetime"
 import { orcCommandVar } from "./chat-run"
 import { chatToolNames } from "./chat-tools"
 import { chatToolsBundle } from "./chat-tools-bundle"
@@ -93,10 +93,11 @@ export const runChat = (
     const [program, ...args] = launch.command
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     // extendEnv lays this over the shell's environment, so the provider's env wins over an exported variable.
+    // Detached, Pi would lead its own session, and a hangup of the chat's terminal would never reach it.
     const pi = spawner.exitCode(ChildProcess.make(program, args, {
       env: { ...providerEnvOf(config, model), ...launch.env }, extendEnv: true, detached: false, stdin: "inherit", stdout: "inherit", stderr: "inherit", forceKillAfter: "1 second"
     }))
-    return yield* Effect.raceFirst(whileSessionExists(pi, absoluteSession, drawerLease), untilHangup)
+    return yield* Effect.raceFirst(whileDrawerOpen(pi, drawerLease === null || absoluteSession === null ? null : { session: absoluteSession, lease: drawerLease }), untilHangup)
   }).pipe(
     Effect.catchTag("PlatformError", (error) => Effect.fail(new ChatError({ message: "orc chat: " + error.message })))
   )

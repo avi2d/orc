@@ -4,13 +4,13 @@ import { ByteSize, Deferred, Effect, FileSystem, Layer, Option, PlatformError } 
 import { TestClock } from "effect/testing"
 import { DrawerController } from "../../../packages/herdr-app/src/drawer-controller"
 import { drawerTerminal } from "../../../packages/herdr-app/src/drawer-terminal"
-import { whileSessionExists } from "../../../packages/run/src/features/chat/chat-lifetime"
+import { whileDrawerOpen } from "../../../packages/run/src/features/chat/chat-lifetime"
 
 const absent = Option.none()
-const fileInfo = (ino: number): FileSystem.File.Info => ({
-  type: "File", mtime: absent, atime: absent, birthtime: absent, dev: 1, ino: Option.some(ino),
+const fileInfo: FileSystem.File.Info = {
+  type: "File", mtime: absent, atime: absent, birthtime: absent, dev: 1, ino: absent,
   mode: 0o600, nlink: absent, uid: absent, gid: absent, rdev: absent, size: ByteSize.bytes(0), blksize: absent, blocks: absent
-})
+}
 const ok = { code: 0, stdout: "", stderr: "" }
 const appPid = 4242
 const home = "/home/example"
@@ -23,12 +23,15 @@ interface Stored {
 
 const notFound = (method: string) => Effect.fail(PlatformError.systemError({ _tag: "NotFound", module: "FileSystem", method }))
 
-const fakeHerdr = (saved: ReadonlyArray<string> = []) => {
+const notFoundTerminal = { code: 1, stdout: "", stderr: '{"error":{"kind":"not_found"}}' }
+
+const fakeHerdr = (saved: ReadonlyArray<string> = [], earlierLive: ReadonlyArray<string> = []) => {
   const files = new Map<string, Stored>()
-  let inode = 40
   const store = (path: string, text: string) => {
-    files.set(path, { info: fileInfo(++inode), text })
+    files.set(path, { info: fileInfo, text })
   }
+  const live = new Set(earlierLive)
+  const kills: Array<string> = []
   for (const name of saved) store(folder + "/" + name, "")
   const launches: Array<ReadonlyArray<string>> = []
   const removals: Array<Promise<typeof ok>> = []
@@ -36,6 +39,7 @@ const fakeHerdr = (saved: ReadonlyArray<string> = []) => {
   return {
     files,
     launches,
+    kills,
     removals,
     quitApp: () => { appRunning = false },
     ownerRunning: (pid: number) => Effect.sync(() => appRunning && pid === appPid),
@@ -58,9 +62,17 @@ const fakeHerdr = (saved: ReadonlyArray<string> = []) => {
       return Promise.resolve(ok)
     },
     hc: (args: ReadonlyArray<string>) => {
-      if (args[0] === "get") return Promise.resolve({ ...ok, stdout: '{"state":"live"}' })
+      const [command, terminal = ""] = args
+      if (command === "get") return Promise.resolve(live.has(terminal) ? { ...ok, stdout: '{"state":"live"}' } : notFoundTerminal)
+      if (command === "kill") {
+        kills.push(terminal)
+        live.delete(terminal)
+        return Promise.resolve(ok)
+      }
       launches.push(args)
-      return Promise.resolve({ ...ok, stdout: '{"address":"terminal-' + String(launches.length) + '"}' })
+      const address = "terminal-" + String(launches.length)
+      live.add(address)
+      return Promise.resolve({ ...ok, stdout: '{"address":"' + address + '"}' })
     },
     fs: FileSystem.layerNoop({
       stat: (path) => Effect.suspend(() => {
@@ -95,8 +107,8 @@ const launchOf = (args: ReadonlyArray<string> | undefined) => {
   return { session, lease: binding.slice(key.length), cwd: all[all.indexOf("--cwd") + 1] }
 }
 
-type End = "close" | "toggle" | "gone:1" | "dispose" | "unlink" | "replace" | "quit app"
-type Supervisor = typeof whileSessionExists
+type End = "close" | "toggle" | "gone:1" | "dispose" | "unlink" | "quit app"
+type Supervisor = typeof whileDrawerOpen
 
 const afterDrawerEnds = async (end: End, supervise: Supervisor) => {
   const host = drawer()
@@ -110,10 +122,9 @@ const afterDrawerEnds = async (end: End, supervise: Supervisor) => {
       yield* Deferred.succeed(started, undefined)
       return yield* Effect.never
     }).pipe(Effect.ensuring(Effect.sync(() => { piRunning = false })))
-    const terminal = yield* supervise(pi, session, lease, host.ownerRunning).pipe(Effect.forkScoped)
+    const terminal = yield* supervise(pi, { session, lease }, host.ownerRunning).pipe(Effect.forkScoped)
     yield* Deferred.await(started)
     if (end === "unlink") host.files.delete(session)
-    else if (end === "replace") host.files.set(session, { info: fileInfo(999), text: "" })
     else if (end === "quit app") host.quitApp()
     else if (end === "dispose") yield* Effect.promise(() => host.controller.dispose())
     else yield* Effect.promise(() => host.controller.obey(end))
@@ -122,9 +133,9 @@ const afterDrawerEnds = async (end: End, supervise: Supervisor) => {
   }).pipe(Effect.scoped, Effect.provide(Layer.merge(host.fs, TestClock.layer()))))
 }
 
-for (const end of ["close", "toggle", "gone:1", "dispose", "unlink", "replace", "quit app"] as const) {
+for (const end of ["close", "toggle", "gone:1", "dispose", "unlink", "quit app"] as const) {
   test(end + " does not leave the chat terminal or Pi running", async () => {
-    expect(await afterDrawerEnds(end, whileSessionExists)).toEqual({ terminalRunning: false, piRunning: false })
+    expect(await afterDrawerEnds(end, whileDrawerOpen)).toEqual({ terminalRunning: false, piRunning: false })
   })
 }
 
@@ -178,7 +189,7 @@ const startsPi = async (ended: (host: ReturnType<typeof drawer>) => Promise<void
   const { session, lease } = launchOf(host.launches[0])
   await ended(host)
   const pi = Effect.die("spawned Pi")
-  return Effect.runPromise(whileSessionExists(pi, session, lease, host.ownerRunning).pipe(Effect.provide(host.fs)))
+  return Effect.runPromise(whileDrawerOpen(pi, { session, lease }, host.ownerRunning).pipe(Effect.provide(host.fs)))
 }
 
 test("an already closed drawer does not spawn Pi against a missing lease", async () => {
@@ -194,6 +205,7 @@ test("a lease left by a Herdr App that has quit does not spawn Pi", async () => 
 })
 
 let app = fakeHerdr()
+let sharedValues = new Map<string, unknown>()
 const listeners: Array<(command: string) => void> = []
 let listening: Array<() => void> = []
 const nextListen = () => new Promise<void>((resolve) => { listening.push(resolve) })
@@ -206,6 +218,11 @@ void mock.module("herdr", () => ({
   hc: (args: ReadonlyArray<string>) => app.hc(args),
   writeTextFile: (path: string, text: string) => app.write(path, text).then(() => null),
   home: () => home,
+  shared: (key: string) => sharedValues.get(key),
+  setShared: (key: string, value: unknown) => {
+    sharedValues.set(key, value)
+    return null
+  },
   props: () => undefined,
   nextCommand: () => new Promise<string>((resolve) => {
     listeners.push(resolve)
@@ -238,8 +255,9 @@ const cx: Context = Object.assign(IdleEntity, {
   timer: { after: unused, every: unused }
 }) satisfies Context
 
-const installDrawer = async () => {
-  app = fakeHerdr()
+const installDrawer = async (earlierLive: ReadonlyArray<string> = [], shared: ReadonlyMap<string, unknown> = new Map()) => {
+  app = fakeHerdr([], earlierLive)
+  sharedValues = new Map(shared)
   listeners.length = 0
   const { default: OrcDrawer } = await import("../../../packages/herdr-app/mods/orc-drawer/main")
   const view = new OrcDrawer()
@@ -258,6 +276,25 @@ test("installing the drawer does not launch Pi while the drawer is closed", asyn
   await installDrawer()
   await Bun.sleep(0)
   expect(app.launches).toEqual([])
+})
+
+test("installing the drawer ends the live orc-chat terminal an earlier release left instead of leaving it running", async () => {
+  await installDrawer(["orc-chat"])
+  await Bun.sleep(0)
+  expect(app.kills).toEqual(["orc-chat"])
+})
+
+test("installing the drawer ends the earlier release's chat at its shared address once rather than on every install", async () => {
+  await installDrawer(["t9"], new Map([["orc-drawer.chat", { address: "t9", session: folder + "/drawer-1.jsonl" }]]))
+  await Bun.sleep(0)
+  expect(app.kills).toEqual(["t9"])
+  expect(sharedValues.get("orc-drawer.chat")).toBeNull()
+})
+
+test("installing the drawer kills no terminal when no earlier release's chat is live", async () => {
+  await installDrawer([], new Map([["orc-drawer.chat", { address: "t9", session: folder + "/drawer-1.jsonl" }]]))
+  await Bun.sleep(0)
+  expect(app.kills).toEqual([])
 })
 
 test("opening the installed drawer launches one chat rather than none", async () => {

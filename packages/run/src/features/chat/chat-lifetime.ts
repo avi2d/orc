@@ -1,7 +1,5 @@
-import { Effect, Equal, FileSystem } from "effect"
+import { Effect, FileSystem } from "effect"
 import { isRunning } from "../../shared/lib/index"
-
-const sameFile = (a: FileSystem.File.Info, b: FileSystem.File.Info): boolean => a.dev === b.dev && Equal.equals(a.ino, b.ino)
 
 const hangupExitCode = 129
 
@@ -13,31 +11,33 @@ export const untilHangup: Effect.Effect<number> = Effect.callback<number>((resum
   })
 })
 
-export const whileSessionExists = Effect.fnUntraced(function*<E, R>(
+export interface DrawerChat {
+  readonly session: string
+  readonly lease: string
+}
+
+export const whileDrawerOpen = Effect.fnUntraced(function*<E, R>(
   pi: Effect.Effect<number, E, R>,
-  session: string | null,
-  drawerLease: string | null,
+  drawer: DrawerChat | null,
   ownerRunning: (pid: number) => Effect.Effect<boolean> = isRunning
 ) {
-  if (session === null && drawerLease === null) return yield* pi
+  if (drawer === null) return yield* pi
   const fs = yield* FileSystem.FileSystem
-  const stat = (path: string) => fs.stat(path).pipe(Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)))
-  const leaseHeld = drawerLease === null ? Effect.succeed(true) : fs.readFileString(drawerLease).pipe(
+  const missing = () => Effect.succeed(false)
+  const leaseHeld = fs.readFileString(drawer.lease).pipe(
     Effect.flatMap((owner) => /^\d+$/.test(owner.trim()) ? ownerRunning(Number(owner.trim())) : Effect.succeed(false)),
-    Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(false))
+    Effect.catchReason("PlatformError", "NotFound", missing)
   )
-  if (!(yield* leaseHeld)) return 0
-  let original = session === null ? null : yield* stat(session)
-  if (drawerLease !== null && original === null) return 0
-  const untilEnded = Effect.gen(function*() {
+  const sessionPresent = fs.stat(drawer.session).pipe(Effect.map(() => true), Effect.catchReason("PlatformError", "NotFound", missing))
+  const open = Effect.gen(function*() {
+    return (yield* leaseHeld) && (yield* sessionPresent)
+  })
+  if (!(yield* open)) return 0
+  const untilClosed = Effect.gen(function*() {
     while (true) {
       yield* Effect.sleep("1 second")
-      if (!(yield* leaseHeld)) return 0
-      if (session === null) continue
-      const present = yield* stat(session)
-      if (original !== null && (present === null || !sameFile(original, present))) return 0
-      original ??= present
+      if (!(yield* open)) return 0
     }
   })
-  return yield* Effect.raceFirst(pi, untilEnded)
+  return yield* Effect.raceFirst(pi, untilClosed)
 })

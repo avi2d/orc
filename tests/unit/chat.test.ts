@@ -96,5 +96,4 @@ describe("runChat", () => {
   test("an orchestrator model whose provider is not in config.json leaves the shell's account in place", async () => {
     expect(await piSeesAccount([packageProvider], "other/model", "/accounts/main")).toBe("/accounts/main")
   })
-
 })

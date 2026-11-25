@@ -243,40 +243,51 @@ describe("orc chat tools", () => {
   }, 60_000)
 })
 
+const processGroup = async (pid: number): Promise<number> => Number((await Bun.$`ps -o pgid= -p ${pid}`.text()).trim())
+
+const hangUpChat = async () => {
+  const home = await mkdtemp(join(tmpdir(), "orc-chat-"))
+  try {
+    await writeFile(join(home, "config.json"), JSON.stringify({ providers: [loginProvider], models: { orchestrator: "opencode-go/model" } }))
+    return await Effect.runPromise(Effect.gen(function*() {
+      const spawned = yield* Deferred.make<number>()
+      const spawner = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
+        const real = yield* ChildProcessSpawner.ChildProcessSpawner
+        return ChildProcessSpawner.make((command) =>
+          ChildProcess.isStandardCommand(command) && command.command === "pi"
+            ? real.spawn(ChildProcess.make("sleep", ["30"], command.options)).pipe(
+              Effect.tap((handle) => Deferred.succeed(spawned, handle.pid))
+            )
+            : real.spawn(command)
+        )
+      })).pipe(Layer.provide(BunServices.layer))
+      const chat = yield* runChat(home, ["orc"], null).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner)), Effect.forkChild)
+      const pid = yield* Deferred.await(spawned)
+      const piGroup = yield* Effect.promise(() => processGroup(pid))
+      process.emit("SIGHUP")
+      const exit = yield* Fiber.join(chat)
+      const piRunning = yield* Effect.sync(() => {
+        try {
+          return process.kill(pid, 0)
+        } catch {
+          return false
+        }
+      })
+      return { exit, piRunning, piGroup }
+    }))
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+}
+
 describe("runChat", () => {
-  test("a hangup of orc chat stops Pi rather than leaving it running detached from the terminal", async () => {
-    const home = await mkdtemp(join(tmpdir(), "orc-chat-"))
-    try {
-      await writeFile(join(home, "config.json"), JSON.stringify({ providers: [loginProvider], models: { orchestrator: "opencode-go/model" } }))
-      const outcome = await Effect.runPromise(Effect.gen(function*() {
-        const spawned = yield* Deferred.make<number>()
-        const spawner = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
-          const real = yield* ChildProcessSpawner.ChildProcessSpawner
-          return ChildProcessSpawner.make((command) =>
-            ChildProcess.isStandardCommand(command) && command.command === "pi"
-              ? real.spawn(ChildProcess.make("sleep", ["30"], command.options)).pipe(
-                Effect.tap((handle) => Deferred.succeed(spawned, handle.pid))
-              )
-              : real.spawn(command)
-          )
-        })).pipe(Layer.provide(BunServices.layer))
-        const chat = yield* runChat(home, ["orc"], null).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner)), Effect.forkChild)
-        const pid = yield* Deferred.await(spawned)
-        const group = yield* Effect.promise(() => Bun.$`ps -o pgid= -p ${pid}`.text())
-        process.emit("SIGHUP")
-        const exit = yield* Fiber.join(chat)
-        const piRunning = yield* Effect.sync(() => {
-          try {
-            return process.kill(pid, 0)
-          } catch {
-            return false
-          }
-        })
-        return { exit, piRunning, piGroup: Number(group.trim()) }
-      }))
-      expect(outcome).toEqual({ exit: 129, piRunning: false, piGroup: Number((await Bun.$`ps -o pgid= -p ${process.pid}`.text()).trim()) })
-    } finally {
-      await rm(home, { recursive: true, force: true })
-    }
+  test("chat spawns Pi in the chat's process group rather than a detached session the terminal's hangup misses", async () => {
+    const { piGroup } = await hangUpChat()
+    expect(piGroup).toBe(await processGroup(process.pid))
+  })
+
+  test("a hangup of orc chat stops Pi rather than leaving it running", async () => {
+    const { exit, piRunning } = await hangUpChat()
+    expect({ exit, piRunning }).toEqual({ exit: 129, piRunning: false })
   })
 })
