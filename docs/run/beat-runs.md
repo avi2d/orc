@@ -55,6 +55,25 @@ A runner task with no new output for 30 minutes reports a stall.
 Run `orc beat --json` for the `orc.beat.v1` action document.
 It reports starts, closures, parked questions, stalls, upstream changes, attention items, and the PRs the beat merged, is updating or did not merge, as `yolo-merged`, `yolo-updating` and `merge-refused`.
 
+## Updating Orc on dispatch machines
+
+After dispatching tasks, the beat runs [`orc update --json`](updating-orc.md) on the machine the beat runs on and through each `orc runner start -- <command>` in `dispatch.json`.
+The beat names its own machine after the `dispatch.json` entry whose start runs `orc runner start` with no `--` command, and calls it `a dispatch machine` when no entry does.
+The beat records the check time under `ORC_HOME` and checks again no sooner than an hour later.
+Set `ORC_BEAT_UPDATE=off` on the beat process to skip the update check.
+
+Each check adds an `update` action to `orc.beat.v1` with the machine name and the `orc.update.v1` result.
+If the update command does not return a result, the action reports `unread` and names the reason.
+When Orc moves to a new version, the chat posts a line such as `orc on a dispatch machine moved from 1.2.3 to 1.2.4`.
+If an update fails, `orc attention` shows one `update-failed` item for that machine with the installer's error.
+A failure that can be retried goes to the decider, so it stays out of your Awaiting you list, and no one decides it.
+The beat retries it on the next hourly check, and the next successful check withdraws the item.
+A failure that cannot be retried, such as a release that reports the wrong version, goes to you.
+
+The beat that checked for the update and any runs already underway keep their running version.
+The next scheduled beat uses the new version if its launcher reads the selected release or its path resolves to the updated Bun installation.
+Start each machine on a release that supports its install method before relying on the beat to maintain it.
+
 ## Merging a task's PR
 
 On a project with `"yolo": true`, the beat merges, through `orc merge` with `yolo-green`, the green PR of a ship task that closed done.

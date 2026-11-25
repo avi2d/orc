@@ -95,9 +95,17 @@ The beat opens an item for each run event, owned by the user:
   Merging the PR closes it with the answer `merged`.
   Closing the PR without merging closes it with the answer `closed without merging`.
 
+A failed [update check](beat-runs.md#updating-orc-on-dispatch-machines) opens an `update-failed` item for a dispatch machine.
+A retry that fails for the same version updates the open item without replacing any answer.
+A successful check withdraws the open item.
+Use `orc attention answer <item-id> <words>` to record an acknowledgement.
+A retry that fails again before a check succeeds leaves the answered item closed.
+After a successful check, the next failure opens a new item and the answered item keeps its answer.
+
 ## Recording a choice
 
-Each item the beat opens names its `subject` and lists its `options`, each with the `outcome` it leads to, and its `recommendation` names one of them:
+The following items name a `subject` and list `options`, each with the `outcome` it leads to.
+The `recommendation` names one option:
 
 - A `run-died` item offers `rerun` or `close`, and recommends `rerun`.
 - A `check-red` item offers `send back` or `close`, and recommends `send back`.

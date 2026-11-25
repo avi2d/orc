@@ -1,9 +1,9 @@
 import { Effect, type FileSystem } from "effect"
 import type { BacklogError } from "../backlog/index"
 import { checkRefusals, greenChecks, type PullRequestView, redChecks } from "../pull-request/index"
-import type { Asked, AttentionItem } from "./attention-item"
+import type { AttentionItem } from "./attention-item"
 import type { BeatAction } from "./beat-action"
-import { choice, closeItem, itemId, openItem, openItems, readItem, withdrawItem, writeItem } from "./attention"
+import { choice, closeItem, itemId, openItem, openItems, readItem, withdrawItem, openOrRefreshItem } from "./attention"
 
 export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.forEach(actions, (action) =>
@@ -21,18 +21,6 @@ export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, 
         owner: "user"
       }))
       : Effect.void, { discard: true })
-
-const openOrReopenPrItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const item = yield* readItem(root, id)
-    if (item === null) {
-      yield* Effect.asVoid(openItem(root, id, asked))
-    } else if (item.state.kind === "withdrawn") {
-      yield* writeItem(root, id, { ...asked, state: { kind: "open" } })
-    } else if (item.state.kind === "open" && item.text !== asked.text) {
-      yield* writeItem(root, id, { ...asked, asked: item.asked, state: { kind: "open" } })
-    }
-  })
 
 export const pullRequestHeld = (root: string, task: string, head: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   Effect.map(readItem(root, itemId(task, "pr-ready", head)), (item) => item?.state.kind === "closed" && item.state.answer.words.trim().toLowerCase().startsWith("hold"))
@@ -56,7 +44,7 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
       return
     }
     if (red.length > 0) {
-      yield* openOrReopenPrItem(root, itemId(task, "check-red", view.headRefOid), {
+      yield* openOrRefreshItem(root, itemId(task, "check-red", view.headRefOid), {
         kind: "check-red",
         task,
         text: pr + ": the check " + red.join(", ") + " is red",
@@ -69,7 +57,7 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
         owner: "user"
       })
     } else if (refusals.length === 0) {
-      yield* openOrReopenPrItem(root, itemId(task, "pr-ready", view.headRefOid), {
+      yield* openOrRefreshItem(root, itemId(task, "pr-ready", view.headRefOid), {
         kind: "pr-ready",
         task,
         text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", ") + waits.map((wait) => "; it " + wait).join(""),

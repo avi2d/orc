@@ -1,4 +1,5 @@
 import type { FailingMark } from "../agent/index"
+import type { UpdateDocument } from "../orc-update/index"
 
 export type Progress =
   | { readonly kind: "ended"; readonly action: BeatAction }
@@ -8,7 +9,14 @@ export type Progress =
 
 export type StalledAction = { readonly kind: "stalled"; readonly task: string; readonly machine: string; readonly since: string }
 
+export interface UpdateAction {
+  readonly kind: "update"
+  readonly machine: string
+  readonly result: UpdateDocument | { readonly outcome: "unread"; readonly detail: string; readonly retryable: boolean }
+}
+
 export type BeatAction =
+  | UpdateAction
   | { readonly kind: "started"; readonly task: string; readonly machine: string; readonly account: string; readonly log: string }
   | { readonly kind: "start-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | { readonly kind: "lost"; readonly task: string }
