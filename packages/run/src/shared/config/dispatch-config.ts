@@ -2,6 +2,7 @@ import { Effect, FileSystem, Path, Result, Schema } from "effect"
 import { AbsolutePath, ConfigError, duplicateOf, readJsonFile, readJsonFileIfPresent } from "./json-file"
 import { ModelRef, ProviderId } from "./orc-config"
 import { providerOfModel } from "./model-route"
+import { DispatchRouting } from "./dispatch-routing"
 import { type DeliveryMode, isDeliveryMode, unknownMode } from "./delivery"
 import { ownedBySweep } from "./machine-reach"
 
@@ -86,6 +87,7 @@ const tagAccount = (account: RawAccount): Account =>
       : { ...account, kind: "token-command" as const }
 
 const DispatchEnvelope = Schema.Struct({
+  routing: Schema.optionalKey(Schema.Unknown),
   machines: Schema.Array(RawMachine),
   quota: Schema.Struct({
     provider: ProviderId,
@@ -95,7 +97,8 @@ const DispatchEnvelope = Schema.Struct({
   })
 })
 
-export type DispatchConfig = Omit<typeof DispatchEnvelope.Type, "machines" | "quota"> & {
+export type DispatchConfig = {
+  readonly routing?: DispatchRouting
   readonly machines: ReadonlyArray<Machine>
   readonly quota: Omit<typeof DispatchEnvelope.Type["quota"], "accounts" | "floorPercent"> & {
     readonly floorPercent: number
@@ -316,7 +319,14 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
         if (single !== undefined && renewed !== undefined) {
           return yield* new ConfigError({ file, detail: "the account " + single.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes" })
         }
-        return { machines, quota: { ...config.quota, floorPercent: config.quota.floorPercent ?? 0, accounts } }
+        const quota = { ...config.quota, floorPercent: config.quota.floorPercent ?? 0, accounts }
+        if (config.routing === undefined) {
+          return { machines, quota }
+        }
+        const routing = yield* Schema.decodeUnknownEffect(DispatchRouting)(config.routing, { onExcessProperty: "error" }).pipe(
+          Effect.mapError((error) => new ConfigError({ file, detail: "routing: " + error.message }))
+        )
+        return { machines, quota, routing }
       })
     )
   )
