@@ -1,4 +1,3 @@
-import { dirname, join } from "node:path"
 import { Effect } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { alertsFile } from "../../entities/events/index"
@@ -7,9 +6,8 @@ import { pueueDone } from "./runner"
 import { type RunnerError } from "../../shared/process/index"
 import { type Command, ensureGroup, decodeJson, pueue } from "../../shared/process/index"
 
-export const liveAlertStream = (self: Command): Command | null => {
-  const sibling = self.length === 1 ? Bun.which(join(dirname(self[0]), "orc-dash")) : null
-  const dash = sibling ?? Bun.which("orc-dash")
+export const liveAlertStream = (): Command | null => {
+  const dash = Bun.which("orc-dash")
   return dash === null ? null : [dash, "alerts", "--json"]
 }
 

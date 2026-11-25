@@ -54,7 +54,7 @@ describe("compiled launcher updates", () => {
 
   const checksummedAssets = (archive: Uint8Array<ArrayBuffer>): Assets => {
     const digest = new Bun.CryptoHasher("sha256").update(archive).digest("hex")
-    return new Map([
+    return new Map<string, Uint8Array<ArrayBuffer> | string>([
       ["/releases/v99.0.0/" + archiveName, archive],
       ["/releases/v99.0.0/" + archiveName + ".sha256", digest + "  " + archiveName + "\n"]
     ])
