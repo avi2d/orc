@@ -154,6 +154,7 @@ describe("the decider guard", () => {
       "Should the loader drop rows with empty names?",
       "Should the decoder discard data that fails the schema?",
       "Should I remove logs from the test output?",
+      "Should both maps share the key?",
       "Should the Map key be a string?",
       "The Record key is path; ok?",
       "Should the cache store the key with each entry?",
@@ -163,7 +164,29 @@ describe("the decider guard", () => {
       "Should the parser store tokens in an array?"
     ]
     for (const question of questions) expect(neverDecidedReason(question)).toBeNull()
-    expect(neverDecidedReason("Should both maps share the key?")).toContain("about going public")
+  })
+
+  test("public, share, post and upstream in a code question reach the decider, instead of being escalated as going public", () => {
+    const questions = [
+      "Should the helper be exported as part of the public API?",
+      "Should `parseRecord` stay public or become internal to the slice?",
+      "Should the public field be readonly?",
+      "Should the two features share one parser in entities?",
+      "Should I share the fixture between the two tests?",
+      "Should the shared helper move to the shared layer?",
+      "Should the helper move into `shared`?",
+      "The new endpoint handles a POST request without validation. Add a schema?",
+      "Should the run keep the upstream exit code when it retries?"
+    ]
+    for (const question of questions) expect(neverDecidedReason(question)).toBeNull()
+  })
+
+  test("a report of what a commit or a change removed reaches the decider, instead of being escalated as discarding work", () => {
+    const questions = [
+      "This commit dropped the null check in run.ts:40. Restore it?",
+      "The changes removed the retry loop. Should it come back?"
+    ]
+    for (const question of questions) expect(neverDecidedReason(question)).toBeNull()
   })
 
   test("deleting listed work, handling secrets and choosing a site's look are not decided by the decider", () => {

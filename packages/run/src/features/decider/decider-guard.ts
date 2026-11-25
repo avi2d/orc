@@ -16,7 +16,8 @@ const computeMeasure = "time|times|timing|loops?|cpu|memory|ram|performance|runt
 
 const deletingWork = new RegExp(
   "\\b(?:" + deletingVerbs + ")" + between + "\\s+(?:" + work + ")\\b" + notAName
-    + "|\\b(?:" + work + "|" + ownWork + ")\\b(?:\\s+\\w+){0,3}?\\s+(?:" + deletedVerbs + ")\\b"
+    + "|\\b(?:" + work + ")\\b(?:\\s+\\w+){0,3}?\\s+(?:" + deletedVerbs + ")\\b"
+    + "|\\b(?:" + ownWork + ")\\b(?:\\s+\\w+){0,3}?\\s+(?:will|would|should|could|may|might|must|is|are|was|were|has|have|had|gets?|got)\\s+(?:been\\s+|be\\s+|get\\s+)?(?:" + deletedVerbs + ")\\b"
     + "|\\b(?:" + deletingVerbs + ")" + between + "\\s+[a-z][a-z0-9]*-\\d+\\b" + notAName
     + "|\\b(?:" + deletingVerbs + ")" + between + "\\s+(?:" + ownWork + ")\\b"
     + "|\\breset\\s+--hard|\\bhard[- ]reset|\\bbranch\\s+-D\\b|\\bstash\\s+(?:drop|clear)\\b|\\bclean\\s+-\\w*f|\\bcheckout\\s+--\\s+\\.|\\brestore\\s+\\.",
@@ -39,7 +40,7 @@ const neverDecided: ReadonlyArray<NeverDecided> = [
   { topic: "merging", asks: /\bmerg\w*/i },
   { topic: "pushing", asks: /\bpush\w*\b/i },
   { topic: "releasing", asks: /\b(releas\w*|publish\w*|deploy\w*)/i },
-  { topic: "going public", asks: /(?<![\w/.-])(public|publicly|publiciz\w*|post|posts|posted|posting|announc\w*|e-?mail\w*|shar(?:e|es|ed|ing)|upstream|github issues?|gists?|discord|slack|twitter|tweet\w*|reddit|hacker news|mailing lists?)(?![\w/-])/i },
+  { topic: "going public", asks: /\bmak(?:e|es|ing)\b[^.?!\n]{0,40}\bpublic\b|\bpublicly\b|\bpubliciz\w*|\b(?:post|posts|posted|posting|announc\w*|e-?mail\w*|shar(?:e|es|ed|ing))\b[^.?!\n]{0,60}?\b(?:to|on|with|in)\s+(?:the\s+|a\s+|an\s+|our\s+)?(?:clients?|customers?|users?|public|world|upstream|github|gists?|discord|slack|twitter|x|reddit|hacker news|mailing lists?|forums?|channels?|blogs?|issues?|newsletters?)\b|\bupstream\s+(?:\S+\s+)?(?:repo\w*|issues?|projects?|maintainers?)\b|\b(?:github issues?|gists?|discord|slack|twitter|tweet\w*|reddit|hacker news|mailing lists?)\b(?![\w/-])/i },
   { topic: "spending", asks: /\b(pay|pays|paying|paid|payments?|billing|purchas\w*|buy\w*|budget\w*|money|dollars?)\b|\$\s?\d+/i },
   { topic: "spending", asks: new RegExp("(?<!\\b(?:" + computeMeasure + ")\\b[^.?!]*)\\b(?:spend\\w*|spent|costs?|costing)\\b(?![^.?!]*\\b(?:" + computeMeasure + ")\\b)", "i") },
   { topic: "anything that cannot be undone", asks: /\b(irreversib\w*|irrevocab\w*|permanent\w*|undoable|(cannot|can't|can not) be (undone|reversed)|force[- ]push\w*)/i },

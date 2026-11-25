@@ -33,10 +33,13 @@ A question that names `unknown` or no action goes through a topic check instead.
 Orc sends questions about deletion, security, credentials, merging, pushing, releasing, going public, spending, irreversible actions, site appearance, legal text, and logins to you.
 The topic check reads the whole question, context included, so a question that says a step pushes a tag goes to you even when it only asks whether to continue.
 A question that only reports a merge or a release, such as one that names `merge conflicts`, also goes to you.
-Going public means words such as public, post, announce, email, share or upstream, or an outside service such as a gist, Discord, Slack or Reddit, outside a file path.
+Going public means making something public, doing it publicly, or posting, announcing, emailing or sharing to an outside place such as a client, a channel or an issue.
+An upstream repository, issue or project, or a service such as a gist, Discord, Slack or Reddit, counts on its own.
+The word public or share alone, as in `public API`, does not count.
 Dropping, discarding, resetting, reverting, restoring, or throwing away or out commits, changes, edits, modifications, diffs, work, a stash or what you changed counts as deleting work.
 The noun counts within three words after such a verb with no joining word such as `in` or `that` between, or within three words before a past form such as `discarded`.
-So do a hard reset, `git reset --hard`, `git branch -D`, `git stash drop` or `clear`, `git clean -f`, `git checkout -- .` and `git restore .`.
+For own work such as commits or changes, the past form needs a helper verb, as in `will be discarded`.
+A hard reset, `git reset --hard`, `git branch -D`, `git stash drop` or `clear`, `git clean -f`, `git checkout -- .` and `git restore .` also count.
 The name `test runs` never counts as deleting work.
 A question with no words at all goes to you.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
