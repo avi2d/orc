@@ -16,10 +16,11 @@ export const retryStartedTask = (
         return yield* new BacklogError({ detail: id + " is no longer eligible for retry" })
       }
       const branch = record.parked?.branch ?? (record.spec.kind === "parent" ? parentBranch(id) : taskBranch(id))
+      const sentPr = record.parked?.origin?.pr
       const retried: TaskRecord = {
         ...record,
         retry: { run, at },
-        parked: { ...record.parked, branch, questions: record.parked?.questions ?? [], origin: { machine, run }, at },
+        parked: { ...record.parked, branch, questions: record.parked?.questions ?? [], origin: { machine, run, ...(sentPr === undefined ? {} : { pr: sentPr }) }, at },
         state: { kind: "new" }
       }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(retried)))) {

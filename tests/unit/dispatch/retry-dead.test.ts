@@ -69,7 +69,7 @@ describe("a failed run", () => {
     })
   })
 
-  test("a send-back restores the retry allowance instead of reusing the spent retry", async () => {
+  test("a send-back neither reuses a spent retry nor drops its PR", async () => {
     await withBacklog(async (root) => {
       await startTaskOne(root, ["orc", "runner", "start"], null)
       await failedRun(root)
@@ -92,10 +92,18 @@ describe("a failed run", () => {
       await restart()
       await failedRun(root, "run-2")
       expect(await sweep()).toMatchObject({ kind: "ended", action: { kind: "retry", run: "run-2" } })
-      expect((await run(listTasks(root)))[0]?.retry?.run).toBe("run-2")
+      expect((await run(listTasks(root)))[0]).toMatchObject({
+        retry: { run: "run-2" },
+        parked: { origin: { machine: "mac", run: "run-2", pr: "https://github.com/acme/orc/pull/8" } }
+      })
       const events = await run(unpostedEvents(root))
       expect(events).toHaveLength(2)
       expect(events.map((event) => event.text)).toEqual(expect.arrayContaining([expect.stringContaining("run-1"), expect.stringContaining("run-2")]))
+      await restart()
+      expect(await sweep()).toMatchObject({ kind: "ended", action: { kind: "closed", outcome: "failed" } })
+      expect((await run(listTasks(root)))[0]?.state).toMatchObject({
+        kind: "closed", closing: { outcome: "failed", pr: "https://github.com/acme/orc/pull/8" }
+      })
     })
   })
 
