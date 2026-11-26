@@ -81,6 +81,13 @@ Each agent answer shows its basis, or `Not recorded` when the item holds none.
 An agent decision with no agent answer, such as an escalation you then answered, also lists under the agent group with its basis.
 Where you replaced an agent's answer, your answer sits under the owner group and the replaced one under the agent group.
 
+## Holds that wait on tasks
+
+A hold without questions on a task that waits on other tasks has no Inbox card, because an answer would not start it.
+Its Agents card and task panel read **Waits on** and those task IDs instead.
+The hold returns once those tasks are done, merged where they ship, or closed without being done, since no beat reopens them.
+A dated hold also returns as an overdue card once its date passes.
+
 ## Tab guides
 
 <div id="read-the-board-tab"><span id="read-a-task"></span><span id="read-the-resources-tab"></span></div>

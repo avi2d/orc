@@ -46,6 +46,7 @@ export interface TaskDetail {
   readonly body: string
   readonly created: string
   readonly priority: number | null
+  readonly parent: string | null
   readonly dependsOn: ReadonlyArray<string>
   readonly prState: BoardTask["prState"]
   readonly hold: TaskHold | null

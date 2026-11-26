@@ -9,6 +9,8 @@ Press `cmd-k` to open or close the chat drawer.
 ## Follow a run in the Agents tab
 
 The list shows runs and queued tasks, grouped by status.
+A queued task whose hold waits on other tasks reads **Waits on** and their IDs.
+Those tasks are its open children and dependencies, its children done as ship tasks whose PR is not merged, the same kind of dependency when the held task is a ship task, and a dependency the backlog does not hold.
 The **Project** select shows runs for configured projects by default.
 Choose **All runs** in it to include runs from other projects.
 Opening a run of another project from the Inbox switches the **Project** select to **All runs**.

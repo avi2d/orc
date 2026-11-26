@@ -84,9 +84,35 @@ const attentionCard = (item: AttentionItem, task: TaskDetail | undefined): Inbox
   return { ...base, kind: "event", action: { kind: "event", id: item.id } }
 }
 
-const holdCards = (task: TaskDetail, overdue: boolean): ReadonlyArray<InboxAnswer> => {
+const unmergedShip = (other: TaskDetail): boolean =>
+  other.kind === "ship" && other.state.status === "closed" && other.state.outcome === "done" && other.state.pr !== null && other.prState !== "merged"
+
+const childAwaited = (child: TaskDetail): boolean => child.state.status !== "closed" || unmergedShip(child)
+
+const dependencyAwaited = (task: TaskDetail, dependency: TaskDetail | undefined): boolean =>
+  dependency === undefined || dependency.state.status !== "closed" || (task.kind === "ship" && unmergedShip(dependency))
+
+const tasksAwaited = (task: TaskDetail, backlog: ReadonlyArray<TaskDetail>): ReadonlyArray<string> => {
+  const byId = new Map(backlog.map((other) => [other.id, other]))
+  const children = backlog.filter((other) => other.parent === task.id && childAwaited(other)).map((child) => child.id)
+  const dependencies = task.dependsOn.filter((id) => dependencyAwaited(task, byId.get(id)))
+  return [...new Set([...children, ...dependencies])]
+}
+
+export const waitsOnLabel = (awaited: ReadonlyArray<string>): string => `Waits on ${awaited.join(", ")}`
+
+// A bare hold only keeps its task from starting. While orc's scheduler still waits on other tasks, an answer would not start it either.
+export const holdsOnTasks = (backlog: ReadonlyArray<TaskDetail>): ReadonlyMap<string, ReadonlyArray<string>> =>
+  new Map(backlog.flatMap((task) => {
+    const hold = task.hold
+    if (task.state.status === "closed" || hold === null || hold.answer !== null || hold.questions.length > 0) return []
+    const awaited = tasksAwaited(task, backlog)
+    return awaited.length === 0 ? [] : [[task.id, awaited] as const]
+  }))
+
+const holdCards = (task: TaskDetail, overdue: boolean, onTasks: boolean): ReadonlyArray<InboxAnswer> => {
   const hold = task.hold
-  if (task.state.status === "closed" || hold === null || hold.answer !== null) return []
+  if (task.state.status === "closed" || hold === null || hold.answer !== null || onTasks) return []
   const base = { task: task.id, title: task.title, who: "user", asked: hold.at, recommendation: null } as const
   if (hold.questions.length > 0) return hold.questions.filter((question) => question.answer === null).map((question) => ({
     ...base, key: `${task.id}/hold/${hold.at}/${question.id}`, kind: "hold", ask: askText(question.text),
@@ -105,9 +131,10 @@ export const inboxItems = (backlog: ReadonlyArray<TaskDetail>, items: ReadonlyAr
   const tasks = new Map(backlog.map((task) => [task.id, task]))
   const userItems = items.filter((item) => item.owner === "user")
   const overdue = new Set(userItems.filter((item) => item.kind === "overdue-wait").map((item) => item.task))
+  const onTasks = holdsOnTasks(backlog)
   return [
     ...userItems.map((item) => attentionCard(item, tasks.get(item.task))).filter((item) => item !== null),
-    ...backlog.flatMap((task) => holdCards(task, overdue.has(task.id)))
+    ...backlog.flatMap((task) => holdCards(task, overdue.has(task.id), onTasks.has(task.id)))
   ].sort((left, right) => millisOf(left) - millisOf(right))
 }
 

@@ -130,7 +130,7 @@ void mock.module("herdr", () => ({
 
 const openTask = (id: string) => ({
   id, title: "Update the report", project: "garden", kind: "ship", body: "", created: "2026-11-24T08:00:00Z",
-  priority: null, dependsOn: [], prState: null, status: "new", hold: null, parked: null
+  priority: null, parent: null, dependsOn: [], prState: null, status: "new", hold: null, parked: null
 })
 
 const loadAttention = async () => {
@@ -324,6 +324,60 @@ test("the Board's Awaiting you lane lists the tasks the Inbox lists instead of a
   expect(idsIn(find(element, "cards-Awaiting you"))).toEqual(userOwned.map((id) => `card-${id}`))
   expect(find(element, "inbox-count")?.kids).toEqual(["4"])
   expect(idsIn(find(element, "cards-Planned"))).toEqual(["card-garden-9"])
+})
+
+test("a hold kept until a parked child closes shows what it waits on across the Inbox, Agents and Board instead of an Awaiting you answer box", async () => {
+  const { default: OrcBoard } = await import("../../../packages/herdr-app/mods/orc-board/main")
+  const { readAgents } = await import("../../../packages/herdr-app/src/agents-read")
+  const { readInbox } = await import("../../../packages/herdr-app/src/inbox-read")
+  const reason = "Done by a firstmate worker in https://github.com/avi2d/orc/pull/317; held until its parked child orc-78 is closed, then dropped"
+  const held = { ...openTask("orc-74"), project: "orc", kind: "parent", hold: { reason, until: null, at: "2026-11-25T10:00:00Z", questions: [], answer: null } }
+  const child = {
+    ...openTask("orc-78"), project: "orc", parent: "orc-74",
+    parked: { branch: "orc/orc-78", questions: [{ id: "R4", text: "Should approval badges also derive from the PR item?", asked: "2026-11-25T09:00:00Z", answer: null }] }
+  }
+  documents.set("orc backlog --json", { schema: "orc.backlog.v1", projects: [{ name: "orc" }], tasks: [held, child] })
+  documents.set("orc attention --json", { ...fixture, items: [], decided: [] })
+  documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [] })
+  const board = new OrcBoard()
+  const [reading, inbox, agents] = await Promise.all([board.load(), readInbox(), readAgents()]).finally(() => documents.clear())
+  if (inbox.kind !== "ok") throw new Error(inbox.kind === "failed" ? inbox.reason : inbox.kind)
+  if (agents.kind !== "ok") throw new Error(agents.kind === "failed" ? agents.reason : agents.kind)
+  expect(inbox.value.items.filter((item) => item.task === held.id)).toEqual([])
+  expect(agents.value.cards.find((card) => card.id === held.id)).toMatchObject({ standing: { status: "Queued" }, where: "Waits on orc-78" })
+  board.reading = reading
+  expect(idsIn(find(board.render(), "cards-Planned"))).toEqual(["card-orc-74", "card-orc-78"])
+})
+
+test("a hold on a parent whose ship child closed with its PR still open names the child in the task panel instead of an answer box", async () => {
+  const { default: OrcTask } = await import("../../../packages/herdr-app/mods/orc-task/main")
+  const { readInbox } = await import("../../../packages/herdr-app/src/inbox-read")
+  const { guardJson } = await import("../../../packages/herdr-app/src/guard")
+  const { taskDetails } = await import("../../../packages/herdr-app/src/task-guard")
+  const { palette } = await import("../../../packages/herdr-app/src/palette")
+  const reason = "held until its child orc-78 merges"
+  const held = { ...openTask("orc-74"), project: "orc", kind: "parent", hold: { reason, until: null, at: "2026-11-25T10:00:00Z", questions: [], answer: null } }
+  const child = {
+    ...openTask("orc-78"), project: "orc", parent: "orc-74", prState: "open", status: "closed", claim: null, started: null, outcome: "done",
+    pr: "https://github.com/avi2d/orc/pull/317", report: null, closedAt: "2026-11-25T11:00:00Z"
+  }
+  const backlog = { schema: "orc.backlog.v1", projects: [{ name: "orc" }], tasks: [held, child] }
+  documents.set("orc backlog --json", backlog)
+  documents.set("orc attention --json", { ...fixture, items: [], decided: [] })
+  const inbox = await readInbox().finally(() => documents.clear())
+  if (inbox.kind !== "ok") throw new Error(inbox.kind === "failed" ? inbox.reason : inbox.kind)
+  expect(inbox.value.items.filter((item) => item.task === held.id)).toEqual([])
+  const parsed = guardJson(JSON.stringify(backlog), taskDetails)
+  if (parsed.kind !== "ok") throw new Error(parsed.reason)
+  const detail = parsed.value.find((other) => other.id === held.id)
+  if (detail === undefined) throw new Error("Missing orc-74")
+  const hold = { at: "2026-11-25T10:00:00Z", who: "user" as const, kind: "hold" as const, id: null, text: reason }
+  const panel = new OrcTask()
+  panel.reading = { kind: "ok", value: { tasks: parsed.value, runs: [], queued: [], local: [], thread: { kind: "ok", value: { task: held.id, entries: [hold] } } } }
+  expect(panel.makeBoxes(detail)).toBe(false)
+  const thread = panel.tabBody(palette(), detail, [])
+  expect(wordsOf(thread)).toContain("Waits on orc-78")
+  expect(find(thread, `send-hold-${hold.at}`)).toBeNull()
 })
 
 test("a PR with no recorded state remains actionable across the Inbox, Board and task panel instead of losing its merge button", async () => {

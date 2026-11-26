@@ -124,6 +124,8 @@ const taskDetail: Guard<TaskDetail> = (value, at) => {
   if (named.kind === "refused") return named
   const ranked = priority(record.value, at)
   if (ranked.kind === "refused") return ranked
+  const parent = nullableString(record.value, "parent", at)
+  if (parent.kind === "refused") return parent
   const dependsOn = arrayOf(record.value, "dependsOn", at, words)
   if (dependsOn.kind === "refused") return dependsOn
   const prState = record.value["prState"] === null ? ok(null) : oneOf(record.value, "prState", at, prStates)
@@ -134,7 +136,7 @@ const taskDetail: Guard<TaskDetail> = (value, at) => {
   if (waiting.kind === "refused") return waiting
   const state = taskState(record.value, at)
   if (state.kind === "refused") return state
-  return ok({ ...named.value, priority: ranked.value, dependsOn: dependsOn.value, prState: prState.value, hold: held.value, parked: waiting.value, state: state.value })
+  return ok({ ...named.value, priority: ranked.value, parent: parent.value, dependsOn: dependsOn.value, prState: prState.value, hold: held.value, parked: waiting.value, state: state.value })
 }
 
 export const taskDetails: Guard<ReadonlyArray<TaskDetail>> = (value, at) => {

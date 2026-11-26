@@ -1,6 +1,7 @@
 import { type Card, buildCards } from "./agents"
 import { type Backlog, type Guard, type Runs, backlog, ok, runs } from "./guard"
 import { type AttentionQueue, attention } from "./guard-attention"
+import { holdsOnTasks } from "./inbox"
 import { type AgentAttention, inboxDocuments } from "./inbox-read"
 import { type Reading, readJson } from "./orc-read"
 import type { TaskDetail } from "./task"
@@ -39,7 +40,7 @@ export const readAgentQuestions = (): Promise<Reading<AttentionQueue>> =>
 
 export const agentsDocuments = (local: LocalAgents, queue: AttentionQueue): AgentsDocuments => {
   const { items, agent } = inboxDocuments(local.details, queue)
-  return { cards: buildCards(local.runs, local.backlog, items), agent }
+  return { cards: buildCards(local.runs, local.backlog, items, holdsOnTasks(local.details)), agent }
 }
 
 export const readAgents = (): Promise<Reading<AgentsDocuments>> =>

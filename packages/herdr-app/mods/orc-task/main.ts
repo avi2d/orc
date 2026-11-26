@@ -9,6 +9,7 @@ import { type AnswerTarget, type TaskDetail, type TaskRun, answerArgv, descripti
 import { taskDetails, taskRuns, taskRunsAndQueue, thread } from "../../src/task-guard"
 import { type AgentDecidedLine, type AskOption, type DecidedLine, type Thread, type ThreadCard, type ThreadLine, lineLabel, threadCards, threadDecisions, whoLabel } from "../../src/thread"
 import { linkedText } from "../../src/links-view"
+import { holdsOnTasks, waitsOnLabel } from "../../src/inbox"
 import { agentsOpenKey, selectedTaskKey, viewsStack, refreshWhenShown, reloadNow } from "../../src/views"
 
 type Palette = ReturnType<typeof palette>
@@ -80,8 +81,9 @@ export default class OrcTask extends View {
   }
 
   cards(task: TaskDetail): ReadonlyArray<ThreadCard> | null {
-    const told = this.reading.kind === "ok" ? this.reading.value.thread : null
-    return told?.kind === "ok" && told.value.task === task.id ? threadCards(told.value, task) : null
+    if (this.reading.kind !== "ok") return null
+    const told = this.reading.value.thread
+    return told?.kind === "ok" && told.value.task === task.id ? threadCards(told.value, task, holdsOnTasks(this.reading.value.tasks).get(task.id)) : null
   }
 
   askMerge(task: string): void {
@@ -247,7 +249,9 @@ export default class OrcTask extends View {
     const answers = card.answers.map((line, index) => this.answerLine(t, `answer-${card.key}-${index}`, line, card.delivered && index === card.answers.length - 1))
     const shown = v_flex().id(`entry-${card.key}`).gap(6).p(10).rounded(6).bg(t.raised)
       .child(this.lineHeader(t, card.line, card.what)).children(this.askBody(t, task, card)).children(answers)
-      .children(this.replyBox(t, task, card)).children(failureLine(t, this.sent.get(card.key)))
+      .children(this.replyBox(t, task, card))
+      .children(card.waitsOn.length === 0 ? [] : [div().text_color(t.muted).child(waitsOnLabel(card.waitsOn))])
+      .children(failureLine(t, this.sent.get(card.key)))
     const notes = card.notes.map((line, index) => v_flex().ml(24).gap(4).p(8).rounded(6).border_l(2).border_color(t.border).bg(t.surface)
       .child(this.lineHeader(t, line, lineLabel(line))).child(linkedText(`note-${card.key}-${index}`, line.text)))
     return v_flex().gap(6).child(shown).children(notes)

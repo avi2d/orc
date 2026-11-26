@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { buildCards } from "../../../packages/herdr-app/src/agents"
-import { textParts } from "../../../packages/herdr-app/src/links"
+import { lineWords, textParts } from "../../../packages/herdr-app/src/links"
 import { type TaskDetail, infoRows } from "../../../packages/herdr-app/src/task"
 
 const address = "https://github.com/avi2d/orc/pull/219"
@@ -12,6 +12,7 @@ const closed: TaskDetail = {
   body: "",
   created: "2026-11-13T10:00:00.000Z",
   priority: null,
+  parent: null,
   dependsOn: [],
   prState: "open",
   hold: null,
@@ -56,4 +57,14 @@ test("draws the Approve step's PR address with an open action instead of plain t
   )
   const waiting = card.standing.status === "Awaiting you" ? card.standing.waiting : null
   expect(waiting?.on === "approval" ? textParts(waiting.item.link) : []).toEqual([{ text: address, opens: address }])
+})
+
+test("wraps a sentence with a link word by word instead of splitting it into blocks around the link", () => {
+  const link = "https://github.com/avi2d/orc/pull/317"
+  const sentence = `Done by a firstmate worker in ${link}; held until its parked child orc-78 is closed, then dropped`
+  const words = lineWords(sentence)
+  expect(words.map((word) => word.map((part) => part.text).join(""))).toEqual([
+    "Done ", "by ", "a ", "firstmate ", "worker ", "in ", `${link}; `, "held ", "until ", "its ", "parked ", "child ", "orc-78 ", "is ", "closed, ", "then ", "dropped"
+  ])
+  expect(words[6]).toEqual([{ text: link, opens: link }, { text: "; ", opens: null }])
 })
