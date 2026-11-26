@@ -17,7 +17,7 @@ One chat to run your AI agent work on all your machines and models, with a backl
 ## Before you begin
 
 - Git 2.48 or later.
-- Node, which the agent runs on.
+- Node, which orc's npm launcher and the agent both run on.
 - nono from https://nono.sh, for a hand-typed `orc run` unless you pass `--sandbox none`.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
 - no-mistakes v1.90.0 or later, installed as [Installing no-mistakes](docs/run/installing-no-mistakes.md) says, for every run except `direct-PR` and `orc`.

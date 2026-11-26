@@ -160,7 +160,7 @@
       "name": "@avi2dg/orc",
       "version": "0.24.0",
       "bin": {
-        "orc": "dist/launch.js",
+        "orc": "dist/launch",
       },
       "dependencies": {
         "@effect/platform-bun": "4.1.4",

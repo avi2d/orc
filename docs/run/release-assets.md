@@ -6,12 +6,6 @@ kind: reference
 Each Orc release on [GitHub](https://github.com) carries an archive with `orc`, `orc-dash`, `orc-dash-capture`, and the heavy tool stand-in.
 The executables are [Bun](https://bun.com) bytecode builds that run without Bun installed.
 The archive also holds the bundled [Herdr App](https://herdr.dev), which Herdr loads as mods.
-The `assets` job of `.github/workflows/main.yml` runs after the `release` job has written the GitHub release.
-Both the `binaries` and `assets` jobs run `bun run release:assets` on macOS arm64 and Linux x64.
-The `binaries` job runs before `release` so [npm](https://www.npmjs.com) can publish the platform packages before `@avi2dg/orc`.
-The `assets` job attaches the files to the GitHub release.
-The build runs both dashboard executables with `--help`.
-The `@avi2dg/checks` kit writes these jobs from the release settings in `checks.config.ts`.
 
 ## Asset names
 
@@ -46,6 +40,15 @@ Unpack it into one folder, such as `tar -xzf orc-0.21.0-linux-x64.tar.gz -C ~/.o
 
 Each `.sha256` file holds one line in the `sha256sum` format: the SHA-256 of the file it names in lowercase hex, two spaces and that file's name.
 Check a downloaded file in its folder with `sha256sum -c orc-0.21.0-linux-x64.tar.gz.sha256`, or with `shasum -a 256 -c` on macOS.
+
+## How CI builds the assets
+
+The `assets` job of `.github/workflows/main.yml` runs after the `release` job has written the GitHub release.
+Both the `binaries` and `assets` jobs run `bun run release:assets` on macOS arm64 and Linux x64.
+The `binaries` job runs before `release` so [npm](https://www.npmjs.com) can publish the platform packages before `@avi2dg/orc`.
+The `assets` job attaches the files to the GitHub release.
+The build runs both dashboard executables with `--help`.
+The `@avi2dg/checks` kit writes these jobs from the release settings in `checks.config.ts`.
 
 ## Build the assets by hand
 

@@ -99,7 +99,12 @@ export const runUpdate = (inputs: UpdateInputs): Effect.Effect<UpdateDocument, n
         )
       }
     }
-    const command = installCommand(configured, found, env.ORC_NPM_GLOBAL_PREFIX)
+    const npmPrefix = (env.ORC_LAUNCHED_BINARY === undefined
+      ? env.ORC_LAUNCHED_MAIN === main
+      : env.ORC_LAUNCHED_BINARY === executable)
+      ? env.ORC_NPM_GLOBAL_PREFIX
+      : undefined
+    const command = installCommand(configured, found, npmPrefix)
     return yield* capture(command, null).pipe(
       Effect.map((result) => {
         const output = (result.stdout + result.stderr).trim()

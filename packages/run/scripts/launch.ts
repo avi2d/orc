@@ -24,6 +24,8 @@ for (const key of restore?.trim().split(" ") ?? []) {
 const npmGlobalSuffix = join("lib", "node_modules", name, "/")
 if (packageRoot.endsWith("/" + npmGlobalSuffix)) {
   env.ORC_NPM_GLOBAL_PREFIX = packageRoot.slice(0, -npmGlobalSuffix.length)
+} else {
+  delete env.ORC_NPM_GLOBAL_PREFIX
 }
 
 const codeOf = (error: unknown): unknown =>

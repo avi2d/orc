@@ -6,8 +6,12 @@ case "$0" in
   *) entry=$PWD/$0 ;;
 esac
 script=$entry
+readlink=readlink
+if [ -x /usr/bin/readlink ]; then
+  readlink=/usr/bin/readlink
+fi
 while [ -L "$script" ]; do
-  target=$(/usr/bin/readlink "$script") || exit 1
+  target=$("$readlink" "$script") || exit 1
   case "$target" in
     /*) script=$target ;;
     *) script=${script%/*}/$target ;;
