@@ -8,7 +8,6 @@ import {
   answerForGate,
   answeredAskUser,
   askUserFindings,
-  canDeferFindings,
   findingsTable,
   isUnknownAction,
   omittedQuestionIds,
@@ -25,6 +24,7 @@ import {
 } from "./no-mistakes-gate"
 import { appendGate, openDriveLog, type DriveLog, type Ending, type NoMistakesRecord } from "./no-mistakes-drive-log"
 import { settleFixResponse, type NoMistakesReply } from "./no-mistakes-response"
+import { approveFollowUps, canDeferFindings } from "./deferred-approval"
 import { hasTable, scalar } from "../../shared/lib/index"
 export { answerArgsFor, answerForGate, askUserWord, omittedQuestionIds, parseRun } from "./no-mistakes-gate"
 export type { AllowWord, NoMistakesFinding, QuestionAnswer } from "./no-mistakes-gate"
@@ -242,19 +242,6 @@ type ParkedAdvance =
   | { readonly kind: "ending"; readonly ending: Ending }
   | { readonly kind: "next"; readonly current: NoMistakesReply; readonly sent: Sent }
 
-const approveFollowUps = (
-  input: NoMistakesInput,
-  log: DriveLog,
-  supplied: Map<string, string>,
-  parsed: ParsedRun,
-  gate: ParkedGate
-): Effect.Effect<ParkedAdvance, never, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const current = yield* input.runner.respond({ kind: "approve", followUps: parsed.findings.map((finding) => finding.id) })
-    yield* settleFixResponse(input.runDir, log, supplied, [], current)
-    return { kind: "next", current, sent: { kind: "respond", gate } }
-  })
-
 const advanceParked = (
   input: NoMistakesInput,
   log: DriveLog,
@@ -274,7 +261,8 @@ const advanceParked = (
       log.liftCap()
     }
     if (canDeferFindings(gate, parsed, stdout)) {
-      return yield* approveFollowUps(input, log, supplied, parsed, gate)
+      const current = yield* approveFollowUps(input, log, supplied, parsed)
+      return { kind: "next", current, sent: { kind: "respond", gate } }
     }
     const open = openQuestionsIn(parsed.findings, omittedQuestionIds(stdout))
     const questions = [...open, ...askUserFindings(parsed.findings, input.allow ?? [])].map((finding): PendingFinding =>
