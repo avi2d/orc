@@ -15,7 +15,9 @@ import {
   orcMachinesLayer,
   orcQuotaSourceLayer,
   quotaFeedLayer,
-  quotaSourceLayer,
+  quotaSourceLayerWithMappings,
+  readConfig,
+  subquoProgram,
   remoteTaskHistoryLayer,
   remoteTaskLiveLayer,
   resourceMachinesLayer,
@@ -43,7 +45,7 @@ const tasksTimeout = Duration.minutes(2);
 const runnerSources = Layer.mergeAll(ciRunsLayer, machineSchedulesLayer(onMac ? "mac" : "linux")).pipe(Layer.provideMerge(runnerReposLayer));
 
 const commandSources = Layer.mergeAll(
-  quotaSourceLayer,
+  quotaSourceLayerWithMappings(Effect.map(readConfig, ({ config }) => config.subquoAccounts ?? []), subquoProgram).pipe(Layer.provide(BunFileSystem.layer)),
   orcQuotaSourceLayer,
   attentionSourceLayer,
   hostSourcesLayer,

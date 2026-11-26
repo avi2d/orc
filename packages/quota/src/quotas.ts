@@ -214,7 +214,7 @@ const joinOf = (window: SourcedWindow): ReadonlyArray<AccountJoin> => {
 
 const harvestedFirst = (windows: ReadonlyArray<SourcedWindow>): ReadonlyArray<SourcedWindow> => [
   ...windows.filter((window) => window.source.kind === "harvested"),
-  ...windows.filter((window) => window.source.kind === "quota-axi"),
+  ...windows.filter((window) => window.source.kind !== "harvested"),
 ];
 
 const sourceGroups = (windows: ReadonlyArray<SourcedWindow>, now: DateTime.Utc): ReadonlyArray<SourceGroup> => {

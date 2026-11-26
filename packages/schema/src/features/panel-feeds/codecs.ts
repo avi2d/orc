@@ -28,7 +28,7 @@ const AccountJoin = Schema.Union([
 const harvested = { kind: Schema.Literal("harvested"), observedAt: Instant, file: Schema.String, join: AccountJoin };
 
 const WindowSource = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("quota-axi"), readAt: Instant }),
+  Schema.Struct({ kind: Schema.Literals(["quota-axi", "subquo"]), readAt: Instant }),
   Schema.Struct({ ...harvested, harness: Schema.Literal("codex"), via: Schema.Literal("log") }),
   Schema.Struct({ ...harvested, harness: Schema.Literal("claude-code"), via: Schema.Literals(["log", "statusline", "headless"]) }),
 ]);

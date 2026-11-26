@@ -33,6 +33,8 @@ export {
   QuotaSource,
   QuotaWindow,
   quotaSourceLayer,
+  quotaSourceLayerWithMappings,
+  subquoProgram,
   shownQuotaProviders,
 } from "./entities/session-quota";
 export { logFreshMillis, type QuotaRead, readQuota, savedAgeSeconds, staleSourceAgeSeconds } from "./entities/session-quota";

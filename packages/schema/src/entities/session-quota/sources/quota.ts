@@ -1,8 +1,9 @@
-import { Context, Duration, Effect, Layer, Schema } from "effect";
+import { Context, DateTime, Duration, Effect, Layer, Schema } from "effect";
+import { overlaySubquo, standaloneSubquo, type SubquoMapping } from "./subquo";
 import { CommandRunner } from "../../../shared/lib";
 import { type Decoded, decodeJson, decodeValue, decoded, flatMapDecoded, rejected } from "../../../shared/lib";
 import type { Failed, Reading } from "../../../shared/lib";
-import { runDecoded, stamped } from "../../../shared/lib";
+import { failureOf, runDecoded, stamped } from "../../../shared/lib";
 
 const Instant = Schema.DateTimeUtcFromString;
 const Confidence = Schema.Literals(["early", "established"]);
@@ -89,9 +90,9 @@ const Envelope = Schema.Struct({
   providers: Schema.Array(Schema.Unknown),
 });
 
-export type QuotaWindow = typeof QuotaWindow.Type;
+export type QuotaWindow = typeof QuotaWindow.Type & { readonly subquoReadAt?: DateTime.Utc };
 export type QuotaAvailability = typeof QuotaAvailability.Type;
-export type QuotaProvider = typeof ShownProvider.Type;
+export type QuotaProvider = Omit<typeof ShownProvider.Type, "windows"> & { readonly windows: ReadonlyArray<QuotaWindow> };
 
 export type FailedQuotaEntry = { readonly provider: typeof ShownProviderId.Type; readonly accountKey: string | undefined } & Failed;
 
@@ -152,13 +153,42 @@ export class QuotaSource extends Context.Service<
   { readonly read: (providers: ReadonlyArray<QuotaProviderId>) => Effect.Effect<Reading<QuotaReport>> }
 >()("orc-dash/QuotaSource") {}
 
-export const quotaSourceLayer = Layer.effect(
+export const quotaSourceLayerWithMappings = <E, R>(
+  mappings: Effect.Effect<ReadonlyArray<SubquoMapping>, E, R>,
+  subquoProgram: () => string = () => "subquo",
+) => Layer.effect(
   QuotaSource,
   Effect.gen(function* () {
     const runner = yield* CommandRunner;
+    const configured = yield* mappings;
     return {
-      read: (providers: ReadonlyArray<QuotaProviderId>) =>
-        Effect.provideService(stamped(runDecoded(quotaCommand(providers), decodeQuota)), CommandRunner, runner),
+      read: (providers: ReadonlyArray<QuotaProviderId>) => Effect.gen(function* () {
+        const quota = Effect.provideService(stamped(runDecoded(quotaCommand(providers), decodeQuota)), CommandRunner, runner);
+        const relevant = configured.filter((mapping) => providers.includes(mapping.provider));
+        if (relevant.length === 0) return yield* quota;
+        const subquo = Effect.provideService(
+          runDecoded({ argv: [subquoProgram(), "read", "--json"], timeout: Duration.seconds(15) }, decodeJson(Schema.Unknown)),
+          CommandRunner,
+          runner,
+        );
+        const [report, snapshot] = yield* Effect.all([quota, subquo], { concurrency: "unbounded" });
+        if (snapshot.kind !== "ok") return report;
+        const now = yield* DateTime.now;
+        if (report.kind === "ok") return { ...report, value: overlaySubquo(report.value, snapshot.value, relevant, now) };
+        const found = standaloneSubquo(snapshot.value, relevant, now);
+        if (found.length === 0) return report;
+        return {
+          kind: "ok" as const,
+          capturedAt: report.capturedAt,
+          value: {
+            generatedAt: now,
+            providers: [...found, ...providers.map((provider) => ({ provider, accountKey: undefined, ...failureOf(report) }))],
+            notSetUp: [],
+          },
+        };
+      }),
     };
   }),
 );
+
+export const quotaSourceLayer = quotaSourceLayerWithMappings(Effect.succeed([]));

@@ -165,6 +165,7 @@
         "orc": "dist/launch",
       },
       "dependencies": {
+        "@avi2dg/subquo": "0.1.0",
         "@effect/platform-bun": "4.1.4",
         "@effect/platform-node-shared": "4.1.4",
         "effect": "4.1.4",
@@ -310,6 +311,12 @@
     "@avi2dg/orc-tasks": ["@avi2dg/orc-tasks@workspace:packages/tasks"],
 
     "@avi2dg/orc-ui": ["@avi2dg/orc-ui@workspace:packages/ui"],
+
+    "@avi2dg/subquo": ["@avi2dg/subquo@0.1.0", "", { "dependencies": { "@effect/platform-bun": "4.0.0", "effect": "4.0.0" }, "optionalDependencies": { "@avi2dg/subquo-darwin-arm64": "0.1.0", "@avi2dg/subquo-linux-x64": "0.1.0" }, "bin": { "subquo": "src/launch.ts" } }, "sha512-Ocne5aUfYdWdtYO6DqQuiByHtmpbzBb4FTfX1WYgGo6wQLp0n99T9FBqwQLZyWOUpH8u4E+8SgTGHcvsSS4XqQ=="],
+
+    "@avi2dg/subquo-darwin-arm64": ["@avi2dg/subquo-darwin-arm64@0.1.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-Sdg+rC6ZqeEvsnryWHaMzb+Gvl7+IUeTTVjO9pg7XEtFoBOWVqNvWKw/DMDpToh4WcrQYcXKdGS21C8AA/hnYw=="],
+
+    "@avi2dg/subquo-linux-x64": ["@avi2dg/subquo-linux-x64@0.1.0", "", { "os": "linux", "cpu": "x64" }, "sha512-WDvX8TZF3dTLb+a6oozD1ujMwhFDGyvKgWoDJOayIaHwAmR+zKZVWx0aFRC5fpL00+rcykYimdOvn/Z5rBXp5Q=="],
 
     "@babel/code-frame": ["@babel/code-frame@8.0.6", "", { "dependencies": { "@babel/helper-validator-identifier": "^8.0.6", "js-tokens": "^10.0.0" } }, "sha512-uMHhvmDmwFiLuiozaoRYTZHqMFuu3fem/X9JY78lohAuLoh8LSGGC8JqUzo2cVuBsBxkjMZNk56CE7ock8Xxkw=="],
 

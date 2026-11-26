@@ -110,7 +110,9 @@ export {
   decodeQuota,
   QuotaSource,
   quotaSourceLayer,
+  quotaSourceLayerWithMappings,
 } from "./sources/quota";
+export { subquoProgram } from "./sources/subquo-program";
 export {
   type OrcQuota,
   type OrcQuotaAccount,

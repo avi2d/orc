@@ -93,15 +93,15 @@ const rowsOf = (
         });
   });
 
-const originOf = (source: Exclude<WindowJson["source"], undefined | { readonly kind: "quota-axi" }>): HarvestOrigin =>
+const originOf = (source: Extract<WindowJson["source"], { readonly kind: "harvested" }>): HarvestOrigin =>
   source.harness === "codex" ? { harness: "codex", via: "log" } : { harness: "claude-code", via: source.via ?? "log" };
 
 // A report with no window source predates log harvesting, when every window came from the quota-axi read its report made.
 const sourceOf = (window: WindowJson, where: string, reportedAt: DateTime.Utc): Decoded<WindowSource> => {
   const source = window.source;
   if (source === undefined) return decoded({ kind: "quota-axi", readAt: reportedAt });
-  if (source.kind === "quota-axi") {
-    return mapDecoded(instantOf(source.readAt, `${where}.source.readAt`), (readAt) => ({ kind: "quota-axi", readAt }));
+  if (source.kind !== "harvested") {
+    return mapDecoded(instantOf(source.readAt, `${where}.source.readAt`), (readAt) => ({ kind: source.kind, readAt }));
   }
   return mapDecoded(instantOf(source.observedAt, `${where}.source.observedAt`), (observedAt) => ({
     kind: "harvested",

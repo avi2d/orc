@@ -56,7 +56,7 @@ const accountWindows = {
 export const logFreshMillis = 3_600_000;
 
 export const staleSourceAgeSeconds = (source: WindowSource, now: DateTime.Utc): number | undefined => {
-  const readAt = source.kind === "quota-axi" ? source.readAt : source.observedAt;
+  const readAt = source.kind === "harvested" ? source.observedAt : source.readAt;
   const ageMillis = DateTime.toEpochMillis(now) - DateTime.toEpochMillis(readAt);
   return ageMillis >= logFreshMillis ? Math.floor(ageMillis / 1000) : undefined;
 };

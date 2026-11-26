@@ -123,7 +123,7 @@ interface HeadContext {
 
 // A window quota-axi read reads as the quota panel above it, so only a harvested window names where its used points came from.
 const sourceParts = (window: WindowView, { now, accountJoin }: HeadContext): ReadonlyArray<string> => {
-  if (window.source.kind === "quota-axi") return [];
+  if (window.source.kind !== "harvested") return [];
   const join = joinWords([window.source.join]);
   return [`from ${sourceWords(window.source, now)}`, ...(join === undefined || join === accountJoin ? [] : [join])];
 };
