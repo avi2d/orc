@@ -1,12 +1,12 @@
 import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
-import { type Account, type ConfigError, type DispatchConfig, isYolo, modeOf, type Machine, type Project, providerOf, readDispatchConfig, readProjects, type RoutedModels } from "../../shared/config/index"
+import { type Account, type ConfigError, type DispatchConfig, isYolo, modeOf, type Machine, type Project, readDispatchConfig, readProjects, type RoutedModels } from "../../shared/config/index"
 import { machineOverfull, type MachinePlacement, type MachineRoom, type Placed, placeTask, readRoom, startable, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import { selectTaskRoute } from "./beat-route"
-import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
-import { checkToken, type TokenCache } from "./beat-token"
+import { encodeRenewal, encodeToken } from "../../entities/token/index"
+import { checkToken, type Credential, credentialFor, type TokenCache } from "./beat-token"
 import { closeFinished } from "./beat-close"
 import { checkStalledRuns } from "./retry-stall"
 import { parkedResumeWait } from "./beat-resume"
@@ -48,12 +48,6 @@ type BeatRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.
 const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
 type StartResult = { readonly kind: "started" } | { readonly kind: "failed"; readonly reason: string }
-
-type Credential =
-  | { readonly kind: "file"; readonly provider: string; readonly tokenFile: string }
-  | { readonly kind: "token"; readonly provider: string; readonly token: RunToken }
-  | { readonly kind: "none"; readonly provider: string }
-  | { readonly kind: "claude-config"; readonly provider: string; readonly configDirs: Readonly<Record<string, string>> }
 
 // Effect's spawner takes no file for stdio, so a shell sends the start command's output to the task's log.
 const logToTaskLog = ["sh", "-c", "exec \"$@\" >> \"$ORC_TASK_LOG\" 2>&1", "orc-start"] as const
@@ -158,29 +152,6 @@ interface BeatContext {
   readonly tokens: TokenCache
 }
 
-const credentialFor = (
-  context: BeatContext,
-  account: Account
-): Effect.Effect<Credential | { readonly kind: "waits"; readonly reason: string }, never, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function*() {
-    const provider = providerOf(context.config.quota, account)
-    switch (account.kind) {
-      case "token-file": {
-        return { kind: "file", provider, tokenFile: account.tokenFile }
-      }
-      case "claude-config": {
-        return { kind: "claude-config", provider, configDirs: account.configDirs }
-      }
-      case "none": {
-        return { kind: "none", provider }
-      }
-      case "token-command": {
-        const check = yield* checkToken(context.tokens, account)
-        return check.kind === "waits" ? check : { kind: "token", provider, token: check.token }
-      }
-    }
-  })
-
 const waitForTask = (task: string, reason: string): BeatAction => ({ kind: "waits", task, reason })
 
 const dispatchPlacedTask = Effect.fnUntraced(function*(
@@ -194,7 +165,7 @@ const dispatchPlacedTask = Effect.fnUntraced(function*(
   if (route.kind === "waits") {
     return waits(route.reason)
   }
-  const credential = yield* credentialFor(context, route.account)
+  const credential = yield* credentialFor(context.tokens, context.config.quota, route.account)
   if (credential.kind === "waits") {
     return waits(credential.reason)
   }
@@ -396,9 +367,12 @@ export const runBeat = (
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
-    const considered = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task))
-    const actions = considered.map(({ action }) => action)
-    const placements = considered.flatMap(({ placement }) => placement === null ? [] : [placement])
+    const { actions, placements } = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task)).pipe(
+      Effect.map((considered) => ({
+        actions: considered.map(({ action }) => action),
+        placements: considered.flatMap(({ placement }) => placement === null ? [] : [placement])
+      }))
+    )
     yield* openRunDeaths(root, actions, at).pipe(Effect.andThen(writeBeatWaits(root, at, roomWaits(queued, actions, fresh.tasks, fresh.merged, deciderOwns))))
     const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at, yoloTask(projects, task), home, projects.some((project) => project.name === task.spec.project && modeOf(project) === "orc"))).pipe(
       Effect.tap(() => pollBaseCi(root, sources.readBaseCi, projects, latest.map(taskPr).filter((url) => url !== null), at))
