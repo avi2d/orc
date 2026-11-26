@@ -211,7 +211,7 @@ describe("a pull request of a task the chat did not add", () => {
       let reads = 0
       const merged = () => {
         reads += 1
-        return { ...green, state: "MERGED" }
+        return { ...green, state: "MERGED", mergeCommit: { oid: "1".repeat(40) }, mergedAt: "2026-10-27T11:59:00.000Z" }
       }
       await beat(root, merged)
       await beat(root, merged)

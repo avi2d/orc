@@ -69,6 +69,15 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
         ? Effect.asVoid(closeItem(root, entry.id, { words: ended, at }))
         : Effect.asVoid(withdrawItem(root, entry.id, ended === null ? "head or checks changed" : "PR " + ended, at)), { discard: true })
     if (ended !== null) {
+      if (view.state === "CLOSED") {
+        yield* openOrRefreshItem(root, itemId(task, "pr-closed", pr), {
+          kind: "pr-closed",
+          task,
+          text: pr + " closed without merging. Review the pull request.",
+          asked: at,
+          owner: "user"
+        })
+      }
       return
     }
     if (red.length > 0 && !suppressRed) {

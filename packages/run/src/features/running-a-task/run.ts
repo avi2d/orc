@@ -23,7 +23,7 @@ import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
 import { runDirFor, type ReportKind } from "../../entities/backlog/index"
 import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "../../entities/review-gate/index"
 import { isRunId, newRunId } from "../../shared/lib/index"
-import { dropEndedPiAgentDir, runInstructions } from "./run-folders"
+import { dropEndedPiAgentDir, dropResumedPiAgentDir, runInstructions } from "./run-folders"
 import { prepareAgents } from "./run-prepare"
 import { subprocessDeliverer } from "./run-deliverer"
 import type { RunDelivery } from "../../shared/config/index"
@@ -342,6 +342,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       yield* markRunStopped(db, run.runId, new Date().toISOString(), ended.stopped)
     } else {
       yield* dropEndedPiAgentDir(db, run, report)
+      yield* dropResumedPiAgentDir(db, run, resume.cleanupPriorDir)
     }
     return report
   })

@@ -57,12 +57,14 @@ It also turns yellow when a live task has been in one stage for 2 hours.
 
 ### Keep the task history
 
-Run `bun run tasks-sample` as a long-running service to save CPU, peak memory, spend, and test history.
+To run the sampler from source, [set up a checkout and install its dependencies](contribute.md#run-orc-from-a-checkout).
+Run `bun run tasks-sample` in the checkout as a long-running service to save CPU, peak memory, spend, and test history.
 The sampler writes to `$XDG_STATE_HOME/orc-dash/tasks`, or `~/.local/state/orc-dash/tasks` when unset.
 It keeps eight day files.
 
 Set `ORC_DASH_REMOTE_TASK_HISTORY` to a command that prints the other machine's samples as JSON lines.
 Set `ORC_DASH_REMOTE_TASK_LIVE` to a command that prints its live report, such as `ssh south.example.com 'cd orc && bun run tasks-live-json'`.
+Set up the checkout and dependencies on the other machine too.
 
 ## Read the tasks report
 

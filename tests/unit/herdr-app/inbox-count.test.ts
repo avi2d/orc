@@ -66,7 +66,7 @@ const click = (element: Node | null): void => {
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node }))
 void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Input: { new: () => node() }, Avatar: node, AvatarFallback: node, AvatarImage: node,
+  h_flex: node, v_flex: node, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
   InputState: { new: () => {
     let typed = ""
@@ -233,6 +233,37 @@ test("the Board's Awaiting you lane lists the tasks the Inbox lists instead of a
   expect(idsIn(find(element, "cards-Awaiting you"))).toEqual(userOwned.map((id) => `card-${id}`))
   expect(find(element, "inbox-count")?.kids).toEqual(["4"])
   expect(idsIn(find(element, "cards-Planned"))).toEqual(["card-garden-9"])
+})
+
+test("a PR with no recorded state remains actionable across the Inbox, Board and task panel instead of losing its merge button", async () => {
+  const { default: OrcBoard } = await import("../../../packages/herdr-app/mods/orc-board/main")
+  const { default: OrcTask } = await import("../../../packages/herdr-app/mods/orc-task/main")
+  const { readInbox } = await import("../../../packages/herdr-app/src/inbox-read")
+  const { guardJson } = await import("../../../packages/herdr-app/src/guard")
+  const { taskDetails } = await import("../../../packages/herdr-app/src/task-guard")
+  const { palette } = await import("../../../packages/herdr-app/src/palette")
+  const closed = {
+    ...openTask("garden-3"), status: "closed", prState: null, claim: null, started: null, outcome: "done",
+    pr: "https://github.com/example/garden/pull/3", report: null, closedAt: "2026-11-24T09:00:00Z"
+  }
+  const backlog = { schema: "orc.backlog.v1", projects: [{ name: "garden" }], tasks: [closed] }
+  documents.set("orc backlog --json", backlog)
+  documents.set("orc attention --json", fixture)
+  const board = new OrcBoard()
+  const [reading, inbox] = await Promise.all([board.load(), readInbox()]).finally(() => documents.clear())
+  if (inbox.kind !== "ok") throw new Error(inbox.kind === "failed" ? inbox.reason : inbox.kind)
+  const parsed = guardJson(JSON.stringify(backlog), taskDetails)
+  if (parsed.kind !== "ok") throw new Error(parsed.reason)
+  const detail = parsed.value[0]
+  expect(inbox.value.items.find((item) => item.task === closed.id)).toMatchObject({ kind: "pr", link: closed.pr, action: { kind: "merge" } })
+  board.reading = reading
+  expect(idsIn(find(board.render(), "cards-Awaiting you"))).toEqual(["card-garden-3"])
+  const panel = new OrcTask()
+  panel.tab = "Info"
+  const info = panel.tabBody(palette(), detail, [])
+  expect(wordsOf(info)).toContain(closed.pr)
+  expect(wordsOf(info)).not.toContain(`${closed.pr} (open)`)
+  expect(find(info, "merge")).not.toBeNull()
 })
 
 test("an Inbox question with options also sends a typed answer instead of offering only the option buttons", async () => {

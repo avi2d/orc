@@ -24,4 +24,4 @@ export const closeNewTask = (
     const closed = yield* settle.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
     yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
     return closed
-  })
+  }).pipe(Effect.uninterruptible)
