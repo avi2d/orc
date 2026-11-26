@@ -116,12 +116,15 @@ type TaskState =
   | ClosedState
 
 const Retry = Schema.Struct({ run: Schema.String.check(Schema.isNonEmpty()), at: Schema.String.check(Schema.isNonEmpty()) })
+export const Rebase = Schema.Struct({ pr: Schema.String.check(Schema.isNonEmpty()), head: Schema.String.check(Schema.isPattern(/^[0-9a-f]{40}$/)), at: Schema.String.check(Schema.isNonEmpty()) })
+export type Rebase = typeof Rebase.Type
 
 export interface TaskRecord {
   readonly merge?: MergeRecord
   readonly spec: TaskSpec
   readonly hold: Hold | null
   readonly retry?: typeof Retry.Type
+  readonly rebase?: Rebase
   readonly parked: Parked | null
   readonly priorPr?: string
   readonly state: TaskState
@@ -196,6 +199,7 @@ const Frontmatter = Schema.Struct({
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
   retry: Schema.optional(Retry),
+  rebase: Schema.optional(Rebase),
   parked_branch: Schema.optional(Schema.String),
   parked_origin: Schema.optional(ParkedOrigin),
   parked_at: Schema.optional(Schema.String),
@@ -273,7 +277,7 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (typeof questions === "string") {
     return questions
   }
-  return questions.length > 0 || (front.retry !== undefined && front.parked_origin !== undefined)
+  return questions.length > 0 || ((front.retry !== undefined || front.rebase !== undefined) && front.parked_origin !== undefined)
     ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }), ...(front.parked_at === undefined ? {} : { at: front.parked_at }), ...(front.parked_sent_back_at === undefined ? {} : { sentBackAt: front.parked_sent_back_at }) }
     : "a parked task names no question"
 }
@@ -382,6 +386,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
       },
       hold,
       ...(front.retry === undefined ? {} : { retry: front.retry }),
+      ...(front.rebase === undefined ? {} : { rebase: front.rebase }),
       parked,
       ...(front.merge === undefined ? {} : { merge: front.merge }),
       ...priorPrOf(front.pr, state),

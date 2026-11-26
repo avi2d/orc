@@ -9,6 +9,7 @@ import { checkRefusals, greenChecks, type PullRequestView } from "../../entities
 import type { RunnerError } from "../../shared/process/index"
 import { isPendingUpdateHead, readPendingUpdate } from "../../features/merging-a-pr/index"
 import { ownerWaits, yoloMerge } from "./yolo-merge"
+import { queueRebase } from "./beat-rebase"
 
 export type ReadPullRequest = (url: string) => Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner>
 
@@ -122,6 +123,10 @@ export const prEvents = (
     if (task.spec.kind !== "ship") {
       yield* writePrState(root, id, pr, prState)
       return Option.none()
+    }
+    if (view.success.state === "OPEN" && view.success.mergeable === "CONFLICTING") {
+      const queued = yield* queueRebase(root, home, task, view.success, at)
+      return queued ? Option.some<BeatAction>({ kind: "rebase-queued", task: id, pr }) : Option.none()
     }
     const waits = yield* readWaits(pr, view.success, yolo)
     yield* recordObservation(root, task, pr, view.success, at, waits, prState)

@@ -63,6 +63,7 @@ describe("a rebase-first run", () => {
         "printf '%s\\n' \"$*\" >> " + calls,
         "case \"$1\" in",
         "  branch) echo orc/test ;;",
+        "  rev-parse) echo " + "a".repeat(40) + " ;;",
         "  symbolic-ref) echo refs/remotes/origin/main ;;",
         "  config) exit 1 ;;",
         "esac"
@@ -93,6 +94,7 @@ describe("a rebase-first run", () => {
         "printf '%s\\n' \"$*\" >> " + calls,
         "case \"$1\" in",
         "  branch) echo orc/test ;;",
+        "  rev-parse) echo " + "a".repeat(40) + " ;;",
         "  symbolic-ref) echo refs/remotes/origin/main ;;",
         "  config) exit 1 ;;",
         "  push) echo 'stale info' >&2; exit 1 ;;",

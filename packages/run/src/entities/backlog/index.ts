@@ -83,6 +83,7 @@ export {
   isCalendarDate,
   taskPriorities,
   isTaskPriority,
+  Rebase,
   TaskFileError,
   parseTaskFile,
 } from "./task-record"

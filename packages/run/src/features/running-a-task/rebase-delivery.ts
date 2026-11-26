@@ -43,6 +43,10 @@ export const runRebase = Effect.fnUntraced(function*(run: HistoryRun, rebase: No
   if (run.delivery.kind !== "orc") {
     return yield* new OrcRunError({ message: "orc: a rebase run needs orc delivery" })
   }
+  const current = yield* runGit(run.spawner, run.git, ["rev-parse", "HEAD"], run.worktreeDir)
+  if (current.exitCode !== 0 || current.stdout.trim() !== rebase.head) {
+    return yield* new OrcRunError({ message: "orc: cannot rebase " + run.branch + ": its local head differs from the observed PR head" })
+  }
   yield* rebaseDelivery(run, run.delivery.opener)
   yield* pushRebase(run, rebase.head)
   return { ...failedReport(run, "Rebased and pushed the existing PR branch."), completed: true, prLink: rebase.pr }
