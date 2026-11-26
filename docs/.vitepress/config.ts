@@ -181,7 +181,13 @@ export default defineConfig({
         return image === undefined ? self.renderToken(tokens, index, options) : image(tokens, index, options, env, self)
       }
       // Vue compiles each page as a template, so a placeholder such as <folder> in prose would be read as an unclosed element.
-      md.renderer.rules.html_inline = (tokens, index) => { const markup = tokens.at(index)?.content ?? ""; return markup.startsWith("<") ? md.utils.escapeHtml(markup) : markup }
+      md.renderer.rules.html_inline = (tokens, index) => {
+        const markup = tokens.at(index)?.content ?? ""
+        const anchor = /^<a id="[a-z0-9-]+">$/
+        if (anchor.test(markup) && tokens.at(index + 1)?.content === "</a>") return markup
+        if (markup === "</a>" && anchor.test(tokens.at(index - 1)?.content ?? "")) return markup
+        return markup.startsWith("<") ? md.utils.escapeHtml(markup) : markup
+      }
     }
   },
   themeConfig: {

@@ -5,7 +5,7 @@ import { type Sent, actionButton, failureLine, listenFor, optionView, section, s
 import { type QueuedRun, kindLabel, queueLine } from "../../src/board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
-import { type AnswerTarget, type TaskDetail, type TaskRun, answerArgv, descriptionOf, infoRows, mergeArgv, runToOpen, runsOfTask, shortTime } from "../../src/task"
+import { type AnswerTarget, type TaskDetail, type TaskRun, answerArgv, descriptionOf, infoRows, mergeArgv, mergeablePr, runToOpen, runsOfTask, shortTime } from "../../src/task"
 import { taskDetails, taskRuns, taskRunsAndQueue, thread } from "../../src/task-guard"
 import { type AskOption, type Thread, type ThreadCard, type ThreadLine, lineLabel, threadCards, whoLabel } from "../../src/thread"
 import { linkedText } from "../../src/links-view"
@@ -200,7 +200,7 @@ export default class OrcTask extends View {
           const line = h_flex().gap(12).items_start()
             .child(div().w(96).flex_shrink_0().text_color(t.dim).child(row.label))
             .child(div().flex_1().min_w_0().child(linkedText(`info-${row.label}`, row.value)))
-          return row.label === "PR" && task.prState === "open" ? line.child(this.mergeButton(t, task.id)) : line
+          return row.label === "PR" && mergeablePr(task) !== null ? line.child(this.mergeButton(t, task.id)) : line
         })).children(failureLine(t, this.sent.get("merge")))
     }
   }
