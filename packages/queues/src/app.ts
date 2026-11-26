@@ -114,7 +114,7 @@ export const readQueues: Effect.Effect<QueuesView, never, QueueSources> = Effect
 });
 
 const readRecentNamingCopies = (machine: PueueMachine, now: DateTime.Utc): Effect.Effect<Outcome<PueueStatus>> =>
-  Effect.flatMap(machine.read, (reading) => {
+  Effect.flatMap(machine.read, (reading): Effect.Effect<Outcome<PueueStatus>> => {
     const recent = mapOutcome(reading, (status) => inQueueWindow(status, now));
     return recent.kind === "ok" ? Effect.as(machine.projects.resolve(copyPathsOfStatus(recent.value)), recent) : Effect.succeed(recent);
   });
