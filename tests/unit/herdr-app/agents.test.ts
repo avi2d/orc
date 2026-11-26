@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, cardAnswers, cardPlace, cardStatuses, filterCards, namedModels, openedFilter, opensTurns, projectsOf, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
+import { buildCards, cardAnswers, cardStatuses, filterCards, openedFilter, projectsOf, railLabel, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
+import { cardPlace, namedModels, opensTurns, runAgent } from "../../../packages/herdr-app/src/run-agent"
 import { projectMenu, statusMenu } from "../../../packages/herdr-app/src/run-menus"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 import type { InboxAnswer, InboxApproval } from "../../../packages/herdr-app/src/inbox"
@@ -10,7 +11,7 @@ const run = (id: string, fields: Partial<Run>): Run => ({
 })
 
 const task = (id: string, fields: Partial<Task>): Task => ({
-  id, title: `task ${id}`, project: "orc", kind: "ship", status: "new", hold: null, parked: null, parkedOrigin: null, reason: null, prState: null, ...fields
+  id, title: `task ${id}`, project: "orc", kind: "ship", status: "new", hold: null, parked: null, parkedOrigin: null, retriedRun: null, reason: null, prState: null, ...fields
 })
 
 const runs = (list: ReadonlyArray<Run>): Runs => ({ schema: "orc.runs.v1", runs: list })
@@ -87,6 +88,15 @@ describe("sending a PR back", () => {
     expect(cards.map((card) => [card.id, card.standing.status, card.where, card.sendBack])).toEqual([
       ["orc-48", "Queued", "Waiting to start", null],
       ["orc-48", "Done", "Sent back PR #48", null]
+    ])
+  })
+
+  test("a retried run reads Retried once its resumed run starts, not Sent back as an older run", () => {
+    const resumed = run("20261113-100000-bbbbbb", { branch: "orc/orc-48", step: { id: 1, name: "implement", attempt: 1, status: "running" } })
+    const cards = buildCards(runs([resumed, prRun]), backlog([task("orc-48", { status: "started", parked: 0, parkedOrigin: prRun.id, retriedRun: prRun.id })]))
+    expect(cards.map((card) => [card.runId, card.standing.status, card.where])).toEqual([
+      [resumed.id, "Running", "Agent"],
+      [prRun.id, "Done", "Retried PR #48"]
     ])
   })
 
