@@ -104,6 +104,63 @@ test("orc delivery sends a red check back once, then asks instead of retrying th
   })
 }, runnerTimeout)
 
+test("a different red check after the first send-back is sent back once, not sent to attention", async () => {
+  await withFixture(async (fixture) => {
+    await fakeQuota(fixture)
+    await captureRunQueue(fixture)
+    await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+    await writeFile(join(fixture.home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", mode: "orc", checkouts: { linux: fixture.checkout } }] }))
+    await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
+      machines: [{ name: "linux", slots: 4, start: [process.execPath, binPath, "runner", "start"] }],
+      quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", kind: "none" }], floorPercent: 15 }
+    }))
+    await stubOpenPr(fixture)
+    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0"])
+    await orcOk(fixture, ["beat"])
+    await queuedRun(fixture)
+    await seedDoneRun(fixture)
+    await finishRun(fixture)
+    await orcOk(fixture, ["beat"])
+    const viewFile = join(fixture.dir, "pr-view.json")
+    const gh = join(fixture.dir, "bin", "gh")
+    await writeFile(gh, '#!/bin/sh\nif [ "$1 $2" = "pr view" ]; then cat "$ORC_HOME/../pr-view.json"; exit 0; fi\nexit 1\n')
+    await chmod(gh, 0o755)
+    const logUrl = "https://github.com/acme/orc/actions/runs/123"
+    const setCheck = (conclusion: string, head: string, name = "test") => writeFile(viewFile, JSON.stringify({
+      state: "OPEN", headRefOid: head, baseRefName: "main",
+      statusCheckRollup: [{ workflowName: "ci", name, detailsUrl: logUrl, status: "COMPLETED", conclusion, startedAt: "2026-11-02T10:00:00Z" }]
+    }))
+    const root = join(fixture.home, "backlog")
+    const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> => Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
+    const finishSentBack = async () => {
+      await run(claimTask(root, "orc-1"))
+      const task = await run(findTask(root, "orc-1"))
+      await run(writeTaken(root, { ...task, state: { kind: "started", claim: { beat: "beat-test", machine: "linux", account: "main", takenAt: "2026-11-02T11:00:00Z" }, started: { at: "2026-11-02T11:01:00Z", log: "run.log" } } }))
+      await run(closeStartedTask(root, "orc-1", "done", "", { pr: prUrl, report: null }, "2026-11-02T11:02:00Z"))
+    }
+    await setCheck("FAILURE", "1".repeat(40))
+    await orcOk(fixture, ["beat"])
+    const sent = await run(findTask(root, "orc-1"))
+    expect(sent.state.kind).toBe("new")
+    expect(sent.parked?.questions[0]?.answer?.words).toContain("ci/test")
+    expect(sent.parked?.questions[0]?.answer?.words).toContain(logUrl)
+    await finishSentBack()
+    await setCheck("FAILURE", "2".repeat(40), "lint")
+    await orcOk(fixture, ["beat"])
+    const second = await run(findTask(root, "orc-1"))
+    expect(second.state.kind).toBe("new")
+    expect(second.parked?.questions[0]?.answer?.words).toContain("ci/lint")
+    expect(second.parked?.questions[0]?.answer?.words).toContain(logUrl)
+    await finishSentBack()
+    await setCheck("FAILURE", "3".repeat(40), "lint")
+    await orcOk(fixture, ["beat"])
+    expect((await run(findTask(root, "orc-1"))).state.kind).toBe("closed")
+    const red = (await run(taskItems(root, "orc-1"))).find((entry) => entry.item.kind === "check-red" && entry.item.state.kind === "open")
+    expect(red?.item.text).toContain("ci/lint")
+    expect(red?.item.text).toContain(logUrl)
+  })
+}, runnerTimeout)
+
 test("a task sent back twice restarts its run on orc/<id> with both reviews as answers, instead of starting fresh or keeping only the last", async () => {
   await withFixture(async (fixture) => {
     await fakeQuota(fixture)
