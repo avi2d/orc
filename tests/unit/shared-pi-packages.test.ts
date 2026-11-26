@@ -186,14 +186,13 @@ describe("Pi git packages shared between runs", () => {
           .toBe(join(runDirOf(root, "run-3"), "sessions", sessionFileName))
       })
       expect(await installs(installLog, bridgeDir)).toBe(1)
-      const shared = await realpath(join(agentDirOf(root, "run-1"), bridgeDir))
+      const linked = join(agentDirOf(root, "run-3"), bridgeDir)
+      const shared = await realpath(linked)
       expect(shared.startsWith(await realpath(join(orcHomeOf(root), "pi-packages")))).toBe(true)
-      for (const runId of ["run-1", "run-2", "run-3"]) {
-        const linked = join(agentDirOf(root, runId), bridgeDir)
-        expect((await lstat(linked)).isSymbolicLink()).toBe(true)
-        expect(await realpath(linked)).toBe(shared)
-        expect(await readFile(join(linked, "index.ts"), "utf8")).toBe("bridge\n")
-      }
+      expect((await lstat(linked)).isSymbolicLink()).toBe(true)
+      expect(await readFile(join(linked, "index.ts"), "utf8")).toBe("bridge\n")
+      expect(await exists(agentDirOf(root, "run-1"))).toBe(false)
+      expect(await exists(agentDirOf(root, "run-2"))).toBe(false)
     })
   })
 
@@ -214,7 +213,7 @@ describe("Pi git packages shared between runs", () => {
     })
   })
 
-  test("a run parked with its own copy before sharing resumes, and its copy is left in place instead of moved or deleted", async () => {
+  test("a run parked with its own copy resumes with shared packages and drops its old copy", async () => {
     await withRoot(async (root) => {
       const installLog = await setUp(root, ["git:github.com/acme/bridge@v1"], [{ dir: bridgeDir }])
       const parkedCopy = await copiedBeforeSharing(root, "run-old")
@@ -228,8 +227,7 @@ describe("Pi git packages shared between runs", () => {
       const resumedCopy = join(agentDirOf(root, "run-new"), bridgeDir)
       expect((await lstat(resumedCopy)).isSymbolicLink()).toBe(true)
       expect((await realpath(resumedCopy)).startsWith(await realpath(join(orcHomeOf(root), "pi-packages")))).toBe(true)
-      expect((await lstat(parkedCopy)).isSymbolicLink()).toBe(false)
-      expect(await readFile(join(parkedCopy, "index.ts"), "utf8")).toBe("bridge\n")
+      expect(await exists(parkedCopy)).toBe(false)
     })
   })
 

@@ -40,6 +40,7 @@ export interface ResumePlan {
   readonly fixRunning: boolean
   readonly handover: string | null
   readonly priorDir: string | null
+  readonly cleanupPriorDir: string | null
 }
 
 export interface AgentOutcome {
