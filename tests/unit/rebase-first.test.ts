@@ -30,6 +30,30 @@ const withLoopRun = async (answerWaitSeconds: number, use: (db: Database, run: H
 }
 
 describe("a rebase-first run", () => {
+  test("a stale local branch never replaces the observed PR head", async () => {
+    await withLoopRun(0, async (db, normal) => {
+      const calls = join(normal.runDir, "git-calls")
+      await writeFile(normal.taskPath, "Do the task.\n")
+      await writeFile(normal.git, [
+        "#!/bin/sh",
+        "printf '%s\\n' \"$*\" >> " + calls,
+        "case \"$1\" in",
+        "  branch) echo orc/test ;;",
+        "  rev-parse) echo " + "b".repeat(40) + " ;;",
+        "  symbolic-ref) echo refs/remotes/origin/main ;;",
+        "  config) exit 1 ;;",
+        "esac"
+      ].join("\n") + "\n")
+      const reply = { stdout: "", stderr: "", exitCode: 0 }
+      const opener = { fetch: Effect.succeed(reply), push: Effect.succeed(reply), existing: Effect.succeed(reply), create: () => Effect.succeed(reply) }
+      const run = { ...normal, delivery: { kind: "orc" as const, opener }, rebase: { head: "a".repeat(40), pr: "https://github.com/example/orc/pull/7" } }
+      const ops = fakeOps({ runAgent: async () => ({ commits: [] }), execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 }) }, run.hostSessionsDir)
+      const exit = await Effect.runPromiseExit(runFull(run, ops, freshPlan, runLoopCheckpoints(db, run)))
+      expect(Exit.isFailure(exit)).toBe(true)
+      const commands = await readFile(calls, "utf8")
+      expect(commands.split("\n").some((line) => line.startsWith("push "))).toBe(false)
+    })
+  })
   test("a successful rebase pushes the observed head without running the implement agent", async () => {
     await withLoopRun(0, async (db, normal) => {
       const calls = join(normal.runDir, "git-calls")
