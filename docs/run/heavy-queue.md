@@ -117,6 +117,12 @@ Every other file call is refused, such as `bun run` on a bare path or `bun` on a
 - A runner the list does not name.
 - The [no-mistakes](https://github.com/kunchenguid/no-mistakes) review and fix agents, unless the no-mistakes config starts them through orc's agent wrapper, as the next section says.
 
+## The Pi prompt
+The Pi prompt that orc sends with each task is an instruction the agent reads, not a refusal.
+It says to leave repository tests to GitHub CI, and to run no tests locally.
+It also says: You may run build, lint, or typecheck.
+The stand ins in the section above refuse only test runs, so a build, a lint or a typecheck is never refused by them.
+
 ## The no-mistakes review and fix agents
 The no-mistakes daemon starts its review and fix agents with the daemon's own environment, never with the environment of the shell that runs `no-mistakes axi run`.
 So `HEAVY_TESTS_CI_ONLY=1` and the stand-in folders that `orc run` sets for its own steps never reach those agents.
