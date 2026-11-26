@@ -44,9 +44,15 @@ const cx: Context = Object.assign(IdleEntity, {
   timer: { after: unused, every: unused }
 }) satisfies Context
 
-void mock.module("gpui-kit", () => ({ View: Object, div: node }))
+const everyRow = (_id: unknown, count: number, _key: unknown, row: (index: number, cx: Context) => object): object => {
+  const element = node()
+  kids.get(element)?.push(...Array.from({ length: count }, (_, index) => row(index, cx)))
+  return element
+}
+
+void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow }))
 void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
+  h_flex: node, v_flex: node, Scrollbar: { vertical: node }, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
   InputState: { new: () => ({ value: () => "", set_value: () => undefined, on: () => undefined, focus: () => undefined, release: () => undefined }) }
 }))
