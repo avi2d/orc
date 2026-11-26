@@ -111,6 +111,7 @@ interface FakePi {
   readonly add: (params: unknown) => ReturnType<ChatTool["execute"]> | undefined
   readonly call: (name: string, params: unknown) => Promise<string> | undefined
   readonly sent: Array<{ readonly message: unknown; readonly options: unknown }>
+  readonly polls: () => number
   readonly fire: (event: string, ctx?: { isIdle: () => boolean }) => void
 }
 
@@ -123,10 +124,17 @@ export const piFor = (fixture: Fixture, pollMillis: number): FakePi => {
     on: (event, handler) => handlers.set(event, handler),
     sendMessage: (message, options) => sent.push({ message, options })
   }
-  chatExtension(chatEnv(fixture), pollMillis)(host)
+  let polls = 0
+  chatExtension(chatEnv(fixture), pollMillis, () => { polls += 1 })(host)
   const add = (params: unknown) => tools.get("orc_backlog_add")?.execute("call-1", params)
   const call = (name: string, params: unknown) => tools.get(name)?.execute("call-1", params).then((result) => result.content.map((block) => block.text).join(""))
-  return { add, call, sent, fire: (event: string, ctx?: { isIdle: () => boolean }) => handlers.get(event)?.(event, ctx) }
+  return { add, call, sent, polls: () => polls, fire: (event: string, ctx?: { isIdle: () => boolean }) => handlers.get(event)?.(event, ctx) }
+}
+
+export const waitPolls = async (pi: FakePi, count = 2): Promise<void> => {
+  const target = pi.polls() + count
+  await until(() => pi.polls() >= target, 10_000)
+  if (pi.polls() < target) throw new Error("chat did not finish " + count + " polls")
 }
 
 export const until = async (done: () => boolean, millis: number): Promise<void> => {

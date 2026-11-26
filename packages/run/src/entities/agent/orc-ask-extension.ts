@@ -101,7 +101,7 @@ const pause = (millis: number, signal: AbortSignal | undefined): Promise<void> =
   })
 
 // orc owns the deadline and writes the timeout reply when it passes, so this wait ends only on a reply or an abort.
-const waitForReply = async (dir: string, stem: string, signal: AbortSignal | undefined): Promise<AskReply> => {
+const waitForReply = async (dir: string, stem: string, signal: AbortSignal | undefined, interval: number): Promise<AskReply> => {
   for (;;) {
     const reply = readReply(dir, stem)
     if (reply !== null) {
@@ -110,7 +110,7 @@ const waitForReply = async (dir: string, stem: string, signal: AbortSignal | und
     if (signal?.aborted === true) {
       throw new Error("the wait for the captain's answer was stopped")
     }
-    await pause(pollMillis, signal)
+    await pause(interval, signal)
   }
 }
 
@@ -222,7 +222,7 @@ const normalizeAsk = (params: unknown): AskParams | string => {
   }
 }
 
-export default (pi: AskHost): void => {
+export default (pi: AskHost, interval = pollMillis): void => {
   pi.registerFlag(askDirFlag, { description: "The folder orc and the orc_ask tool trade questions and answers through", type: "string" })
   const waiting = new Set<string>()
   const askDir = (): string | null => {
@@ -250,7 +250,7 @@ export default (pi: AskHost): void => {
       }
       waiting.add(stem)
       try {
-        const reply = await waitForReply(dir, stem, signal)
+        const reply = await waitForReply(dir, stem, signal, interval)
         markDelivered(dir, stem)
         return textResult(replyText(reply))
       } finally {
