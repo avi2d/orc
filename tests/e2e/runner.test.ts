@@ -61,6 +61,15 @@ describe("orc runner start", () => {
     })
   }, runnerTimeout)
 
+  test("an orc project queues orc delivery instead of silently selecting no-mistakes", async () => {
+    await withFixture(async (fixture) => {
+      await writeMode(fixture, "orc")
+      const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start"])
+      const ship = pueueAddFor(fixture.home, fixture.checkout)
+      expect(added).toEqual([...ship.slice(0, -2), "--delivery", "orc", ...ship.slice(-2)])
+    })
+  }, runnerTimeout)
+
   test("a prod-only project's unmarked ship task queues a no-mistakes run instead of a direct PR", async () => {
     await withFixture(async (fixture) => {
       await writeMode(fixture, "no-mistakes-prod-only")
@@ -90,7 +99,7 @@ describe("orc runner start", () => {
       await writeMode(fixture, "yolo")
       const added = await runOrc(fixture, ["backlog", "add", "orc", "task.md"])
       expect(added.exitCode).not.toBe(0)
-      expect(added.stderr).toContain("the project orc names the mode yolo, which is not no-mistakes, direct-PR or no-mistakes-prod-only")
+      expect(added.stderr).toContain("the project orc names the mode yolo, which is not no-mistakes, direct-PR, orc or no-mistakes-prod-only")
     })
   }, runnerTimeout)
 

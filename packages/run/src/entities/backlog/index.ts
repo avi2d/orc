@@ -29,8 +29,10 @@ export {
   closeStartedTask,
   answeredOnly,
   markPosted,
+  markCiRerun,
   rewriteNew,
   rewriteTaken,
+  rewriteClosed,
   findTask,
 } from "./backlog"
 export type {
@@ -74,17 +76,17 @@ export {
   isDeciderAnswer,
   openQuestions,
   taskPr,
-  fullPrUrl,
   ranClosing,
   decisionAnswer,
   landedClosing,
   taskLandedIn,
-  isCalendarDate,
   taskPriorities,
   isTaskPriority,
+  Rebase,
   TaskFileError,
   parseTaskFile,
 } from "./task-record"
+export { fullPrUrl, isCalendarDate } from "./task-record-text"
 export type {
   SplitMark,
   Claim,
@@ -99,6 +101,7 @@ export type {
   TaskRecord,
   TaskPriority,
 } from "./task-record"
+export type { MergeRecord } from "./task-record-merge"
 export { answersAwaited, answerWait, decisionWait, missingOriginWait, type DeciderOwns } from "./task-wait"
 export {
   answerDecision,

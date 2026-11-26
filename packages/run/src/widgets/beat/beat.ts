@@ -1,20 +1,20 @@
 import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
-import { type Account, type ConfigError, type DispatchConfig, isYolo, type Machine, type Project, providerOf, readDispatchConfig, readProjects, type RoutedModels } from "../../shared/config/index"
-import { machineOverfull, type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
+import { type Account, type ConfigError, type DispatchConfig, isYolo, modeOf, type Machine, type Project, providerOf, readDispatchConfig, readProjects, type RoutedModels } from "../../shared/config/index"
+import { machineOverfull, type MachineRoom, type Placed, placeTask, readRoom, startable, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import { selectTaskRoute } from "./beat-route"
 import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
 import { checkToken, type TokenCache } from "./beat-token"
 import { closeFinished } from "./beat-close"
+import { checkStalledRuns } from "./retry-stall"
 import { parkedResumeWait } from "./beat-resume"
 import { type BeatAction, type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems, withdrawTaskItems, type Progress } from "../../entities/attention/index"
 import { attentionActions } from "./beat-attention"
 import { type AskDecider, askDeciderWithPi, decideReviewQuestions } from "../../features/decider/index"
 import { carryRecordedAnswers, handAnswersToResume } from "../../entities/parked-runs/index"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
-import { flagStall } from "./stall"
 import { readPullRequest } from "../../entities/pull-request/index"
 import { prEvents, type ReadPullRequest } from "./task-events"
 import { roomWaits, writeBeatWaits } from "./beat-waits"
@@ -236,7 +236,7 @@ const failingReads = (started: ReadonlyArray<TaskRecord>, progress: ReadonlyArra
     if (entry.kind === "running") {
       return [{ task: task.spec.id, failing: entry.failing }]
     }
-    if (entry.kind === "ended" && (entry.action.kind === "closed" || entry.action.kind === "parked" || entry.action.kind === "held" || entry.action.kind === "split")) {
+    if (entry.kind === "ended" && (entry.action.kind === "retry" || entry.action.kind === "closed" || entry.action.kind === "parked" || entry.action.kind === "held" || entry.action.kind === "split")) {
       return [{ task: task.spec.id, failing: null }]
     }
     return []
@@ -247,7 +247,7 @@ const routeRunItems = (root: string, started: ReadonlyArray<TaskRecord>, progres
 
 const releaseClosedSlots = (live: BeatContext["live"], closed: ReadonlyArray<BeatAction>): void => {
   for (const action of closed) {
-    if (action.kind === "closed" || action.kind === "parked" || action.kind === "held" || action.kind === "split") {
+    if (action.kind === "retry" || action.kind === "closed" || action.kind === "parked" || action.kind === "held" || action.kind === "split") {
       const slot = live.find((entry) => entry.machine === action.machine)
       if (slot !== undefined) {
         slot.busy -= 1
@@ -362,9 +362,8 @@ export const runBeat = (
       tokens: new Map()
     }
     const started = tasks.filter((task) => task.state.kind === "started")
-    const progress = yield* Effect.forEach(started, (task) => closeFinished(context, task))
+    const { progress, stalls } = yield* checkStalledRuns(context, started)
     const settled = settledProgress(progress)
-    const stalls = yield* Effect.forEach(started, (task, index) => flagStall(root, task, progress[index] ?? { kind: "untracked" }))
     releaseClosedSlots(context.live, settled.closed)
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
     const current = yield* carryRecordedAnswers(root, yield* listTasks(root))
@@ -372,13 +371,13 @@ export const runBeat = (
     yield* routeRunItems(root, started, progress, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
     const { reported, queue, deciderOwns } = yield* attentionActions(root, latest, [...settled.closed, ...relayed.closed, ...settled.asking, ...relayed.asking], at)
-    const queued = latest.filter((task) => task.state.kind === "new").toSorted(startOrder)
+    const queued = startable(latest, settled.closed)
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task))
     yield* openRunDeaths(root, actions, at).pipe(Effect.andThen(writeBeatWaits(root, at, roomWaits(queued, actions, fresh.tasks, fresh.merged, deciderOwns))))
-    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at, yoloTask(projects, task), home)).pipe(
+    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at, yoloTask(projects, task), home, projects.some((project) => project.name === task.spec.project && modeOf(project) === "orc"))).pipe(
       Effect.tap(() => pollBaseCi(root, sources.readBaseCi, projects, latest.map(taskPr).filter((url) => url !== null), at))
     )
     const updates = sources.update === null ? [] : yield* runBeatUpdates(root, home, beat, config.machines, sources.update)

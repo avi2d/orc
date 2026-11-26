@@ -28,7 +28,6 @@ export const openAgentExec = (
     ? Effect.gen(function*() {
       const exec = hostExec(copyDir, hostEnv, {
         GIT_CONFIG_GLOBAL: agentGitConfig(folders),
-        HEAVY_TESTS_CI_ONLY: "1",
         BASH_ENV: hostEnv["BASH_ENV"] ?? "",
         // A top-level bash with a socket for stdin reads bashrc instead of BASH_ENV on Debian and Ubuntu; SHLVL 1 makes every bash nested.
         SHLVL: "1",

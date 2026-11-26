@@ -23,7 +23,7 @@ import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
 import { runDirFor, type ReportKind } from "../../entities/backlog/index"
 import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "../../entities/review-gate/index"
 import { isRunId, newRunId } from "../../shared/lib/index"
-import { dropEndedPiAgentDir, runInstructions } from "./run-folders"
+import { dropEndedPiAgentDir, dropResumedPiAgentDir, runInstructions } from "./run-folders"
 import { prepareAgents } from "./run-prepare"
 import { subprocessDeliverer } from "./run-deliverer"
 import type { RunDelivery } from "../../shared/config/index"
@@ -53,6 +53,7 @@ export interface OrcRunRequest {
   readonly homeDir?: string | undefined
   readonly runId?: string | undefined
   readonly resumeRun?: string | undefined
+  readonly rebase?: HistoryRun["rebase"] | undefined
   readonly agentsDir?: string | undefined
 }
 
@@ -208,7 +209,7 @@ export const runAgentStep = (
     const { fs, path, spawner, home, runId, git, checkout, sandboxKind } = opened
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: withHeavyPath(home, hostPath ?? ""), git: checkout.git }
     const { folders, agent, fixer, reviewer, plan } = yield* prepareRunAgents(opened, request).pipe(
-      Effect.tap(() => request.delivery === "direct-PR" ? Effect.void : requireNoMistakes(noMistakes, checkout.projectDir)),
+      Effect.tap(() => request.delivery !== undefined && request.delivery !== "no-mistakes" ? Effect.void : requireNoMistakes(noMistakes, checkout.projectDir)),
       Effect.onError(() => removeRunDir(opened))
     )
     const started = new Date().toISOString()
@@ -234,6 +235,7 @@ export const runAgentStep = (
       allow: request.allow ?? [],
       answers: request.answers ?? [],
       resumeRun: request.resumeRun,
+      rebase: request.rebase,
       answerWaitSeconds
     }
     return yield* Effect.acquireUseRelease(
@@ -277,7 +279,6 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
             tokens: outcome.tokens,
             sessionSize: outcome.sessionSize,
             completed: false,
-            waitingOnCi: false,
             markerVerified: outcome.markerVerified,
             implementPassed: outcome.completed,
             checksRounds: null,
@@ -341,6 +342,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       yield* markRunStopped(db, run.runId, new Date().toISOString(), ended.stopped)
     } else {
       yield* dropEndedPiAgentDir(db, run, report)
+      yield* dropResumedPiAgentDir(db, run, resume.cleanupPriorDir)
     }
     return report
   })

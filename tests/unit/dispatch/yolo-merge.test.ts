@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, Layer, Option } from "effect"
+import { Effect, FileSystem, Layer, Option, PlatformError } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { answerItem, routePullRequest, taskItems } from "../../../packages/run/src/entities/attention/index"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
@@ -14,7 +14,7 @@ import { prEvents } from "../../../packages/run/src/widgets/beat/task-events"
 const check = (conclusion: string) => ({ name: "test", workflowName: "ci", status: "COMPLETED", conclusion, startedAt: "2026-11-18T10:00:00Z" })
 
 const view = (conclusion = "SUCCESS", state = "OPEN"): PullRequestView =>
-  ({ state, headRefOid: "0".repeat(40), baseRefName: "main", statusCheckRollup: [check(conclusion)] })
+  ({ state, headRefOid: "0".repeat(40), baseRefName: "main", statusCheckRollup: [check(conclusion)], mergeCommit: state === "MERGED" ? { oid: "1".repeat(40) } : null, mergedAt: state === "MERGED" ? "2026-11-18T11:09:00Z" : null })
 
 const changed = (path: string, status = "modified", version = false, previous?: string): ChangedFile =>
   previous === undefined ? { status, path, version } : { status, path, previous, version }
@@ -58,6 +58,8 @@ const taskOf = async (root: string) => {
   return task
 }
 
+const forgeView = (current: PullRequestView) => JSON.stringify(current)
+
 const ghLayer = (current: PullRequestView, files: string | null, merges: Array<string>, parent = "0".repeat(40)): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> =>
   Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
     const real = yield* ChildProcessSpawner.ChildProcessSpawner
@@ -70,7 +72,7 @@ const ghLayer = (current: PullRequestView, files: string | null, merges: Array<s
       const args = command.args
       const text = "gh " + args.join(" ")
       if (args[0] === "pr" && args[1] === "view") {
-        return reply(JSON.stringify({ state: current.state, headRefOid: current.headRefOid, baseRefName: current.baseRefName, statusCheckRollup: current.statusCheckRollup }))
+        return reply(forgeView(current))
       }
       if (text.includes("/pulls/") && text.includes("/files")) {
         return files === null ? refusal() : reply(files)
@@ -275,6 +277,51 @@ describe("the beat gate around the merge", () => {
     })
   })
 
+  test("a failed merge-record write does not lose the merge on the next beat", async () => {
+    await withBacklog(true, async (root) => {
+      await closeWith(root, "done")
+      const merges: Array<string> = []
+      const failures: Array<{ readonly from: string; readonly to: string }> = []
+      const failingStore = Layer.effect(FileSystem.FileSystem, Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        return FileSystem.make({
+          ...fs,
+          rename: (from, to) => Effect.suspend(() => {
+            if (failures.length === 0 && merges.length > 0 && from.endsWith(".tmp") && to === join(root, "closed", "task-1.md")) {
+              failures.push({ from, to })
+              return Effect.fail(PlatformError.systemError({ _tag: "Unknown", module: "FileSystem", method: "rename" }))
+            }
+            return fs.rename(from, to)
+          })
+        })
+      })).pipe(Layer.provide(BunServices.layer))
+      const task = await taskOf(root)
+      await Effect.runPromise(prEvents(root, task, () => Effect.succeed(view()), "2026-11-18T11:10:00.000Z", true, dirname(root)).pipe(
+        Effect.provide(Layer.mergeAll(BunServices.layer, ghLayer(view(), noFiles, merges), failingStore))
+      ))
+      expect(failures).toHaveLength(1)
+      expect(failures[0]?.to).toBe(join(root, "closed", "task-1.md"))
+      expect(merges).toHaveLength(1)
+      const afterFailure: unknown = Bun.YAML.parse((await readFile(join(root, "closed", "task-1.md"), "utf8")).split("---\n")[1] ?? "")
+      expect(afterFailure).toMatchObject({ id: "task-1" })
+      await beatAction(root, view("SUCCESS", "MERGED"), true, noFiles, merges)
+      expect(merges).toHaveLength(1)
+      const afterRetry: unknown = Bun.YAML.parse((await readFile(join(root, "closed", "task-1.md"), "utf8")).split("---\n")[1] ?? "")
+      expect(afterRetry).toMatchObject({ merge: { stage: "merged", head: view().headRefOid, mergeCommit: "1".repeat(40), mergedAt: "2026-11-18T11:09:00Z" } })
+    })
+  })
+
+  test("a PR closed without merging opens attention instead of recording a merge", async () => {
+    await withBacklog(true, async (root) => {
+      await closeWith(root, "done")
+      const merges: Array<string> = []
+      await beatAction(root, view("SUCCESS", "CLOSED"), true, noFiles, merges)
+      expect(merges).toHaveLength(0)
+      expect((await taskOf(root)).merge).toBeUndefined()
+      expect((await run(taskItems(root, "task-1"))).some((entry) => entry.item.state.kind === "open" && entry.item.text.includes("closed without merging"))).toBe(true)
+    })
+  })
+
   test("a green yolo PR merges instead of staying open", async () => {
     await withBacklog(true, async (root) => {
       await closeWith(root, "done")
@@ -290,7 +337,7 @@ describe("the beat gate around the merge", () => {
       await closeWith(root, "done")
       const merges: Array<string> = []
       const action = await beatAction(root, view("FAILURE"), true, noFiles, merges)
-      expect(Option.isNone(action)).toBe(true)
+      expect(Option.getOrNull(action)).toMatchObject({ kind: "pr-checks", task: "task-1" })
       expect(merges).toEqual([])
     })
   })

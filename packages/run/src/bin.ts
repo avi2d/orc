@@ -16,7 +16,7 @@ import { isStandinInvocation, runStandinInvocation } from "./entities/heavy-queu
 import { runQuotaCli } from "./app/quota-cli"
 import { decodeJson, pueue, PueueState, queuedTasks, RunnerError, selfCommand } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
-import { backlogPaths, backlogRoot as backlogRootOf, type ReportKind, runDirFor } from "./entities/backlog/index"
+import { backlogPaths, backlogRoot as backlogRootOf, Rebase, type ReportKind, runDirFor } from "./entities/backlog/index"
 import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listAllRuns, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
 import { encodeMachinesJson, encodeRunsJson, encodeShowJson, encodeVersionJson, formatRunsTable, formatShow, readListedRuns, readMachineVersions, readOtherMachinesFrom, readRunsJsonRuns, readShow, readStepLog, recordStepScore, runsJson, withOtherMachines, withQueued } from "./features/seeing-runs/index"
 
@@ -94,7 +94,11 @@ const chat = (sessionFile: string | null) => runChat(orcHomeDir(Bun.env.ORC_HOME
 
 const shipStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>) =>
   Effect.gen(function*() {
-    const report = yield* runAgentStep({ cwd: process.cwd(), taskFile: args.taskFile, delivery: args.delivery, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, implementerModel: args.implementerModel, fixerModel: args.fixerModel, implementerThinking: args.implementerThinking, fixerThinking: args.fixerThinking, instructions: args.instructions, allow: args.allow, answers: args.answers, resumeRun: Bun.env.ORC_DISPATCH_RESUME_RUN, runId: Bun.env.ORC_DISPATCH_RUN_ID }).pipe(
+    const rawRebase = Bun.env.ORC_DISPATCH_REBASE
+    const rebase = rawRebase === undefined ? undefined : yield* decodeJson(rawRebase, Rebase, "ORC_DISPATCH_REBASE").pipe(
+      Effect.catchTag("RunnerError", (error) => Console.error(error.detail).pipe(Effect.andThen(Effect.fail("agent step refused"))))
+    )
+    const report = yield* runAgentStep({ rebase, cwd: process.cwd(), taskFile: args.taskFile, delivery: args.delivery, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, implementerModel: args.implementerModel, fixerModel: args.fixerModel, implementerThinking: args.implementerThinking, fixerThinking: args.fixerThinking, instructions: args.instructions, allow: args.allow, answers: args.answers, resumeRun: Bun.env.ORC_DISPATCH_RESUME_RUN, runId: Bun.env.ORC_DISPATCH_RUN_ID }).pipe(
       Effect.provide(BunServices.layer),
       Effect.catchTag("OrcRunError", (error) =>
         Console.error(error.message).pipe(Effect.andThen(Effect.fail("agent step refused")))

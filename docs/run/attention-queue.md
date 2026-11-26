@@ -58,6 +58,10 @@ The decider can:
   Orc escalates an answer whose quote is no whole clause of them, after whitespace is collapsed and surrounding quotes and a leading list or quote marker are stripped.
   A quote matches a whole line or paragraph, a sentence in a line, or a sentence of a paragraph joined across lines, starting at the start or after a period, exclamation mark, question mark, colon, or semicolon and ending at the end, before a mark, or on a mark.
   Quote marks and clause punctuation may differ, orc records the source wording, and meaning-changing marks stay exact.
+  Orc then asks `models.decider` in a second call whether that rule supports the answer, with the task's intent, the rule, the question and the answer, and without the decider's reason.
+  That call runs under `packages/run/agents/support-check-policy.md`.
+  Orc escalates the answer when the call finds the rule does not support it, gives no verdict orc reads, or fails.
+  An answer on the recommended-option sentence skips this call, because orc answers it with the question's own `Recommended:` option.
 - **Ask back** to a worker question.
   The worker receives the question and the item stays open.
   A review question cannot be asked back and is escalated instead.
@@ -124,20 +128,50 @@ The beat opens an item for each run event, owned by the user:
 
 - A run that died opens a `run-died` item, when its task closes failed or its start fails.
   A run that ends done or that you stop opens none.
-  Two failures retry instead of opening the item.
+  A confirmed failed run [retries once](#retry-a-dead-run-once) first, and the item opens when the task closes after that.
+  Two other failures recover without opening a `run-died` item.
   When no-mistakes refuses to start because the repository is not initialized, the run runs `no-mistakes init --skip-user-skill` and starts no-mistakes again.
   When the command that reaches a dispatch machine exits 255, as [ssh](https://www.openssh.com) does when its connection fails, or its read times out, the task stays started with an unknown state and the next beat reads it again.
 - A dispatch machine that orc has not reached for 10 minutes, counted from the first beat that could not reach it, opens a `machine-unreached` item for each started task on that machine.
   Each item names the machine and the error of the command that reaches it, and the task stays started.
   A beat that reaches the machine again withdraws the item, and so does closing its task.
-- A red check on a closed ship task's PR opens a `check-red` item for the PR's head commit.
+
+### Items for a PR's checks
+
+The beat opens these items for a closed ship task's PR, owned by the user:
+
+- A red GitHub Actions check on the PR makes orc run `gh run rerun <run-id> --failed` once per PR.
+  orc records the rerun in the task file and posts a chat event.
+  While the unfinished checks in a red run are queued or in progress, orc waits and does neither.
+  If a check waits for approval or is pending, orc opens the `check-red` item instead.
+  Sending the task back does not reset the rerun allowance for that PR.
+  If a check is still red after the rerun, or if no red check has an Actions run link, orc opens a `check-red` item with the available failed check links.
+  Within an Actions run, the latest result for each check name determines its state.
+  Checks in different Actions runs stay separate even when their names match.
   Checks that turn green on that commit, or a new commit, withdraw it.
   Merging the PR or closing it without merging withdraws it.
-- A closed ship task's PR with every check reporting green opens a `pr-ready` item for its head commit.
+- A PR with every check reporting green opens a `pr-ready` item for its head commit.
   A red check or a new commit withdraws it.
   On a project with `yolo` true, the item text names each change that waits for your merge word.
   Merging the PR closes it with the answer `merged`.
   Closing the PR without merging closes it with the answer `closed without merging`.
+
+### Retry a dead run once
+
+A run is confirmed failed when pueue reports its task failed, not killed, and the runner holds a run ID for it.
+The beat returns that task to `new` once, keeping its branch and origin run, so the next beat resumes the run.
+It records the `retry` mark in the task file and a chat event `<task-id>.retry.<run-id>`.
+A failure after the retry closes the task and opens a `run-died` item with the task log tail.
+Sending a closed task back clears the retry mark and gives the task another retry.
+A run you stop never retries.
+These endings close the task with no retry:
+
+- A failed run without a run ID.
+- An unread machine, and an own-log machine whose log has been quiet for 30 minutes.
+- A killed run.
+- A failed or partially applied split.
+
+A run whose split proposal orc refused is an ordinary failed run and retries.
 
 ### Items for update failures
 

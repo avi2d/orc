@@ -1,7 +1,7 @@
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { AbsolutePath, readDispatchConfig, readFailure } from "../../shared/config/index"
 import { ModelRef, ProviderId, RoutedModels, RoutedModelsJson } from "../../shared/config/index"
-import { TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type Parked, type TaskRecord, withDecisions } from "../../entities/backlog/index"
+import { Rebase, TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type Parked, type TaskRecord, withDecisions } from "../../entities/backlog/index"
 import { isSendBackQuestion, latestPerId } from "../../entities/parked-runs/index"
 import { carriedHoldReleaseId, holdReleaseId } from "../../entities/review-gate/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
@@ -26,9 +26,10 @@ const taskFields = {
   fixerThinking: Schema.optional(Schema.Literals(piThinkingLevels)),
   body: Schema.String,
   kind: Schema.optional(Schema.Literals(reportKinds)),
-  delivery: Schema.optional(Schema.Literal("direct-PR")),
+  delivery: Schema.optional(Schema.Literals(["direct-PR", "orc"])),
   branch: Schema.optional(Schema.String.check(Schema.isPattern(/^[A-Za-z0-9._/-]+$/))),
   resumeRun: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
+  rebase: Schema.optional(Rebase),
   machine: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   slots: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   answers: Schema.optional(Schema.Array(AnswerArg)),
@@ -131,6 +132,7 @@ const takenResume = (task: string, record: TaskRecord): Effect.Effect<Record<str
     : {
       branch: record.parked.branch,
       resumeRun: record.parked.origin?.run,
+      ...(record.parked.questions.length === 0 && record.rebase !== undefined ? { rebase: record.rebase, delivery: "orc" } : {}),
       answers: [...latestPerId(record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ ...question, answer: question.answer }])).map((question) => ({ question: question.id, answer: question.answer.words })), ...releaseAnswerOf(record.hold, record.parked)]
     })
 }
@@ -172,14 +174,14 @@ const readRequestFields = (
   Effect.gen(function*() {
     const deliveryWord = env["ORC_TASK_DELIVERY"] ?? "no-mistakes"
     if (!isRunDelivery(deliveryWord)) {
-      return yield* refuse("orc runner start reads ORC_TASK_DELIVERY as no-mistakes or direct-PR, not " + deliveryWord)
+      return yield* refuse("orc runner start reads ORC_TASK_DELIVERY as no-mistakes, direct-PR or orc, not " + deliveryWord)
     }
     if (record.spec.kind === "decision") {
       return yield* refuse(task + " is a decision, and a decision never runs")
     }
     const instructions = yield* readInstructions(env["ORC_TASK_INSTRUCTIONS"] ?? "")
     const kind = record.spec.kind === "ship" ? {} : { kind: record.spec.kind }
-    const delivery = record.spec.kind === "ship" && deliveryWord === "direct-PR" ? { delivery: deliveryWord } : {}
+    const delivery = record.spec.kind === "ship" && deliveryWord !== "no-mistakes" ? { delivery: deliveryWord } : {}
     const machineName = env["ORC_RUN_MACHINE"] ?? ""
     const machine = machineName === "" ? {} : { machine: machineName }
     const models = handedModels(env)

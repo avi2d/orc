@@ -111,7 +111,7 @@ export const openDriveLog = (started: string): DriveLog => {
     fail,
     finish: (parsed) =>
       greenOutcomes.has(parsed.outcome) && prLink !== null
-        ? { status: "passed", gate: null, result: "no-mistakes opened " + prLink + " and CI is green.", openQuestions: [] }
+        ? { status: "passed", gate: null, result: "no-mistakes opened " + prLink + ".", openQuestions: [] }
         : fail(endedReason(parsed)),
     close: (ending) => ({
       status: ending.status,

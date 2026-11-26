@@ -94,9 +94,11 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/features/decider/decider.ts` | The decider: one call per open question it owns with the rules it reads, its reply checked as an answer on a quoted rule, an ask back, a duplicate link or an escalation, and that decision recorded on the item |
 | `packages/run/src/features/decider/decider-guard.ts` | The asked actions and the fixed list of topics orc never hands the decider, and the words an ask back hands the worker |
-| `packages/run/src/features/decider/decider-ask.ts` | The decider's call, Pi on `models.decider` with the policy as its system prompt and no tools |
+| `packages/run/src/features/decider/decider-ask.ts` | The decider's call and the support check's call, Pi on `models.decider` with the policy as its system prompt and no tools |
 | `packages/run/src/features/decider/recommended.ts` | The recommended-option override for questions with a `Recommended:` line |
 | `packages/run/src/features/decider/quoted-source.ts` | The check that a quoted rule is a whole clause of a rule the decider read |
+| `packages/run/src/features/decider/support-check.ts` | The prompt and the verdict of the check that a quoted rule supports the decider's answer |
+| `packages/run/src/features/decider/prompt-text.ts` | The prompt sections and the JSON object cut from a model's reply |
 
 ## features/heavy-commands
 
@@ -199,6 +201,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/attention/attention-store.ts` | The item files and their exclusive write claims |
 | `packages/run/src/entities/attention/attention-overdue.ts` | The age of an attention item and whether an open item is overdue |
 | `packages/run/src/entities/attention/attention-item.ts` | The item file shape, the decider's decisions it records and their text |
+| `packages/run/src/entities/attention/pull-request-retry.ts` | The one rerun of a red PR's failed Actions jobs, before the `check-red` item |
 | `packages/run/src/entities/attention/failing-command.ts` | The `failing-command` items of running runs whose command keeps failing |
 | `packages/run/src/entities/attention/update-result.ts` | The update lines and the `update-failed` items for dispatch machines |
 
@@ -220,6 +223,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/backlog/runner-label.ts` | The task branch names, the run labels and the file keys the runner files use |
 | `packages/run/src/entities/backlog/task-kind.ts` | The task, run and report kinds, the agent report file name and the run folder |
 | `packages/run/src/entities/backlog/task-record-render.ts` | The task file rendering from a task record |
+| `packages/run/src/entities/backlog/task-record-text.ts` | The PR URL form a task file keeps and the calendar date check |
 | `packages/run/src/entities/backlog/task-record-answer.ts` | The answer to a parked question: yours or the decider's, and the decider's answer yours replaced |
 | `packages/run/src/entities/backlog/notes.ts` | The task notes under `notes/`: one `<task-id>.jsonl` file per task, each note one appended line with its time, writer and text |
 
@@ -360,6 +364,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/agents` | The bundled agent files |
 | `packages/run/agents/decider-policy.md` | The written policy the decider answers under |
 | `packages/run/agents/reviewer.md` | The bundled reviewer prompt, which the project's `.orc/agents/reviewer.md` and then `$ORC_HOME/agents/reviewer.md` override |
+| `packages/run/agents/support-check-policy.md` | The written policy the check that a rule supports the decider's answer runs under |
 
 ## Tests and workspace
 

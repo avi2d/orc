@@ -49,7 +49,6 @@ export interface OrcRunReport {
   readonly tokens: PiTokenUse | null
   readonly sessionSize: LongSessionCounts | null
   readonly completed: boolean
-  readonly waitingOnCi: boolean
   readonly markerVerified: boolean
   readonly implementPassed: boolean
   readonly checksRounds: ReadonlyArray<ChecksRoundSummary> | null
@@ -199,9 +198,6 @@ export const reportMarkdown = (taskText: string, taskFileUrl: string, reportUrl:
   [...headLines(taskText, taskFileUrl, reportUrl, report), ...tailLines(report)].join("\n") + "\n"
 
 export const runStatus = (report: OrcRunReport): string => {
-  if (report.waitingOnCi) {
-    return "waiting on CI"
-  }
   if (report.completed) {
     return "completed"
   }
@@ -214,9 +210,6 @@ export const runStatus = (report: OrcRunReport): string => {
   const finalRound = report.checksRounds?.at(-1)
   if (finalRound === undefined || (finalRound.checks.length > 0 && !finalRound.passed)) {
     return "checks failed"
-  }
-  if (report.noMistakes === null && report.prLink !== null) {
-    return "CI failed"
   }
   return "no-mistakes " + (report.noMistakes?.status ?? "never ran") + (report.prLink === null ? ", no PR" : ", PR open")
 }

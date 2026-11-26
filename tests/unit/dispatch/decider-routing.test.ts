@@ -6,7 +6,7 @@ describe("review routing boundaries", () => {
     for (const asks of [undefined, "unknown", "none", "merge", "inspect"]) {
       test(kind + " with action " + String(asks) + " cannot receive an answer without words", () => {
         for (const text of ["", " \n\t"]) {
-          expect(guardReason({ text, asks }, kind)).toContain("carries no words")
+          expect(guardReason({ text, asks }, kind)).toContain(kind === "review-question" ? "no-mistakes omitted the question text" : "carries no words")
         }
       })
     }

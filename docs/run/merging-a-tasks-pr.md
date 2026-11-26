@@ -30,6 +30,17 @@ It stops waiting early once a check on the new head is red.
 It reads the new head's parents and treats a head that leaves out the checked head as changed after the approval.
 Once the new head is green and no longer behind, orc runs `gh pr merge <url> --squash --match-head-commit <new sha>`.
 
+## The recorded stage
+
+At each step of an `orc merge`, Orc writes a `merge` record into the closed task file.
+The record holds the basis, the head it checked, the checks that were green on that head, and the current stage.
+The stage is `updating`, `checks-running`, `conflicted`, `check-failed` or `merged`.
+A `conflicted` stage names the base branch as its detail, and a `check-failed` stage names the red checks.
+`orc backlog --json` carries the record as `merge`, and the App's Approve step reads it, as [Approve a run's PR](../herdr-app-agents.md#approve-a-runs-pr) says.
+Each `orc merge` drops the record of an earlier attempt once the PR is open.
+When Orc cannot write the record, it prints the reason and goes on with the merge.
+A merge's own send-back keeps the record on the sent-back task, and `orc backlog send-back` drops it.
+
 ## Return without waiting for CI
 
 For a behind PR, `orc merge <task-id> --no-wait` saves the PR link, the checked head and the checks that were green on it, requests the branch update, and returns without polling the new head or merging.

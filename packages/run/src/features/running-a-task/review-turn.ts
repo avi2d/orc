@@ -4,7 +4,7 @@ import { runGit } from "../../shared/process/index"
 import type { HistoryRun } from "./run-record"
 import { OrcRunError } from "../../shared/lib/index"
 import type { AgentRunResult, SandboxOps } from "./run-ops"
-import { RecordedReview, ReviewFindings, type ReviewFinding, type ReviewOutcome, type ReviewAtHeadOutcome } from "./review-outcome"
+import { decodeOrcReviewFindings, RecordedReview, ReviewFindings, type ReviewFinding, type ReviewOutcome, type ReviewAtHeadOutcome } from "./review-outcome"
 
 const ReviewCheckpoint = Schema.Struct({ head: Schema.String, outcome: RecordedReview })
 const decodeCheckpoint = Schema.decodeUnknownOption(Schema.fromJsonString(ReviewCheckpoint))
@@ -18,9 +18,13 @@ const decodeFindings = Schema.decodeUnknownResult(Schema.fromJsonString(ReviewFi
 
 const readOnlyTools = ["read", "grep", "find", "ls"]
 
-const readFindings = (reply: string | null): Result.Result<ReadonlyArray<ReviewFinding>, string> => {
+const readFindings = (reply: string | null, mode: "direct-PR" | "orc"): Result.Result<ReadonlyArray<ReviewFinding>, string> => {
   if (reply === null) {
     return Result.fail("the reply did not stop cleanly")
+  }
+  if (mode === "orc") {
+    const decoded = decodeOrcReviewFindings(reply.trim())
+    return Result.isFailure(decoded) ? Result.fail(decoded.failure.name + ": " + decoded.failure.message) : Result.succeed(decoded.success)
   }
   const decoded = decodeFindings(reply.trim())
   return Result.isFailure(decoded) ? Result.fail(decoded.failure.message) : Result.succeed(decoded.success)
@@ -72,14 +76,15 @@ const recordReview = (
 export const runReviewTurn = (
   run: Pick<HistoryRun, "fs" | "path" | "runDir" | "piSessionDir" | "spawner" | "git" | "projectDir" | "branch">,
   runAgent: SandboxOps["runAgent"],
-  reviewer: AgentFile
+  reviewer: AgentFile,
+  mode: "direct-PR" | "orc" = "direct-PR"
 ): Effect.Effect<ReviewOutcome> =>
   Effect.gen(function*() {
     const diffed = yield* readDiff(run).pipe(Effect.result)
     if (Result.isFailure(diffed)) {
       return { status: "failed", reason: diffed.failure.message }
     }
-    const first = reviewPrompt(reviewer, run.path.join(run.piSessionDir, "task.md"), diffed.success)
+    const first = reviewPrompt(reviewer, run.path.join(run.piSessionDir, "task.md"), diffed.success) + (mode === "orc" ? "\nFor this review, severity must be error, warning or info, instead of any other severity names." : "")
     let prompt = first
     let resumeSession: string | null = null
     let problem = ""
@@ -88,7 +93,7 @@ export const runReviewTurn = (
       if (Result.isFailure(result)) {
         return { status: "failed", reason: result.failure.message }
       }
-      const findings = readFindings(yield* readReply(run, result.success.sessionFile))
+      const findings = readFindings(yield* readReply(run, result.success.sessionFile), mode)
       if (Result.isSuccess(findings)) {
         return yield* recordReview(run, findings.success)
       }

@@ -7,9 +7,10 @@ import { Effect, Layer, Option } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { TestClock } from "effect/testing"
 import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
+import { openItems } from "../../../packages/run/src/entities/attention/index"
 import { flagStall } from "../../../packages/run/src/widgets/beat/stall"
 import { markEventPosted, unpostedEvents } from "../../../packages/run/src/entities/events/index"
-import { openDatabase, recordRun } from "../../../packages/run/src/entities/run-history/index"
+import { markRunStopped, openDatabase, recordRun } from "../../../packages/run/src/entities/run-history/index"
 import { runBeat } from "../../../packages/run/src/widgets/beat/beat"
 import { quietSources } from "../../lib/beat-sources"
 import { formatBeat } from "../../../packages/run/src/widgets/beat/board"
@@ -44,14 +45,14 @@ type PueueState = { readonly Running: { readonly start: string } } | { readonly 
 
 const running: PueueState = { Running: { start: "2026-10-27T10:02:00.000Z" } }
 
-const pueueWith = (root: string, state: PueueState): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> => {
+const pueueWith = (root: string, state: PueueState, canStop: boolean): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> => {
   const status = JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "task-1"), group: "orc", path: "/checkout", status: state } } })
   return Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
     const real = yield* ChildProcessSpawner.ChildProcessSpawner
     const reply = (text: string) => real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + text + "\nJ"]))
     return ChildProcessSpawner.make((command) =>
       ChildProcess.isStandardCommand(command) && command.command === "pueue"
-        ? reply(status)
+        ? command.args[0] !== "status" && !canStop ? real.spawn(ChildProcess.make("false")) : reply(status)
         : ChildProcess.isStandardCommand(command) && command.command === "orc-quota" ? reply(quotaReply) : real.spawn(command)
     )
   })).pipe(Layer.provide(BunServices.layer))
@@ -82,18 +83,60 @@ const seedRun = async (root: string): Promise<void> => {
   await mkdir(join(root, "runs", "run-1"), { recursive: true })
 }
 
-const beatAt = async (root: string, now: number, state: PueueState = running): Promise<ReadonlyArray<string>> => {
+const beatAt = async (root: string, now: number, state: PueueState = running, canStop = false): Promise<ReadonlyArray<string>> => {
   const beat = Effect.gen(function*() {
     yield* TestClock.setTime(now)
     return yield* runBeat(root, root, quietSources(unreadLoad))
   })
-  const report = await Effect.runPromise(beat.pipe(Effect.provide(Layer.mergeAll(BunServices.layer, pueueWith(root, state), TestClock.layer()))))
+  const report = await Effect.runPromise(beat.pipe(Effect.provide(Layer.mergeAll(BunServices.layer, pueueWith(root, state, canStop), TestClock.layer()))))
   return formatBeat(report).split("\n").filter((line) => line.startsWith("stalled ") || line.startsWith("closed "))
 }
 
 const stalledLine = "stalled task-1 on mac: no output since 2026-10-27T11:00:00.000Z"
 
 describe("a pueue run's stall", () => {
+  test("a stalled run retries on its kept branch instead of remaining started", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await seedRun(root)
+      await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
+      await beatAt(root, minutesAfterWrite(30), running, true)
+      const task = (await run(listTasks(root))).find((entry) => entry.spec.id === "task-1")
+      expect(task).toMatchObject({ state: { kind: "new" }, retry: { run: "run-1" }, parked: { branch: "orc/task-1", origin: { machine: "mac", run: "run-1" } } })
+    })
+  })
+  test("a second stall opens run-died with the log tail instead of retrying again", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await seedRun(root)
+      const task = (await run(listTasks(root))).find((entry) => entry.spec.id === "task-1")
+      if (task === undefined) throw new Error("missing task")
+      await run(writeTaken(root, { ...task, retry: { run: "previous-run", at: "2026-10-27T10:00:00.000Z" } }))
+      await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
+      await writeFile(join(root, "logs", "task-1.log"), "last diagnostic line\n")
+      await beatAt(root, minutesAfterWrite(30), running, true)
+      const closed = (await run(listTasks(root))).find((entry) => entry.spec.id === "task-1")
+      expect(closed).toMatchObject({ state: { kind: "closed", closing: { outcome: "failed" } }, retry: { run: "previous-run" } })
+      expect((await run(openItems(root))).some((entry) => entry.item.kind === "run-died" && entry.item.text.includes("last diagnostic line"))).toBe(true)
+    })
+  })
+  test("an owner-stopped run is closed instead of retried while its queue still reports running", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await seedRun(root)
+      const db = await run(openDatabase(root))
+      try {
+        await run(markRunStopped(db, "run-1", "2026-10-27T11:01:00.000Z", "the run was stopped"))
+      } finally {
+        db.close()
+      }
+      await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
+      await beatAt(root, minutesAfterWrite(30), running, true)
+      const task = (await run(listTasks(root))).find((entry) => entry.spec.id === "task-1")
+      expect(task).toMatchObject({ state: { kind: "closed", closing: { outcome: "stopped" } } })
+      expect(task?.retry).toBeUndefined()
+    })
+  })
   test("output 30 minutes old flags the run instead of waiting longer", async () => {
     await withBacklog(async (root) => {
       await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))

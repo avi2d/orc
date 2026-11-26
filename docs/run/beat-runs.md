@@ -93,6 +93,7 @@ Start each machine on a release that supports its install method before relying 
 On a project with `"yolo": true`, the beat merges, through `orc merge` with `yolo-green`, the green PR of a ship task that closed done.
 The beat leaves a stopped or failed task's PR open.
 A PR with a red check or a check that has not reported stays open.
+While an open ship-task PR has a red check, an unreported check or no check at all, each `orc beat` prints `PR checks for <task-id>:` with the reason.
 The beat also leaves a PR open when you answered `hold` to its `pr-ready` item for the current head commit.
 The hold also covers Orc's pending branch update, but new work on the PR can lift it.
 Releases, deletions, workflow file changes, and secret changes wait for your merge word, and the PR's `pr-ready` item in `orc attention` names the change, as [Merging a task's PR](merging-a-tasks-pr.md#choose-a-merge-basis) describes.

@@ -3,7 +3,7 @@ import type { UpdateDocument } from "../orc-update/index"
 
 export type Progress =
   | { readonly kind: "ended"; readonly action: BeatAction }
-  | { readonly kind: "running"; readonly outputAt: string | null; readonly action: BeatAction | null; readonly failing: FailingMark | null }
+  | { readonly kind: "running"; readonly outputAt: string | null; readonly action: BeatAction | null; readonly failing: FailingMark | null; readonly run?: string }
   | { readonly kind: "unknown" }
   | { readonly kind: "own-log" }
   | { readonly kind: "untracked" }
@@ -34,6 +34,7 @@ export type BeatAction =
     readonly pr: string | null
     readonly report: string | null
   }
+  | { readonly kind: "retry"; readonly task: string; readonly machine: string; readonly run: string }
   | { readonly kind: "split"; readonly task: string; readonly machine: string; readonly children: ReadonlyArray<string>; readonly reason: string }
   | { readonly kind: "close-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | {
@@ -50,6 +51,8 @@ export type BeatAction =
   | { readonly kind: "answer-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | StalledAction
   | { readonly kind: "pr-unread"; readonly task: string; readonly reason: string }
+  | { readonly kind: "pr-checks"; readonly task: string; readonly reason: string }
+  | { readonly kind: "rebase-queued"; readonly task: string; readonly pr: string }
   | { readonly kind: "yolo-merged"; readonly task: string; readonly pr: string }
   | { readonly kind: "yolo-updating"; readonly task: string; readonly pr: string }
   | { readonly kind: "merge-refused"; readonly task: string; readonly reason: string }

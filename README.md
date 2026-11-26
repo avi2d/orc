@@ -21,7 +21,7 @@ One chat to run your AI agent work on all your machines and models, with a backl
 - Node, which the agent runs on.
 - nono from https://nono.sh, for the default sandbox.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
-- no-mistakes v1.90.0 or later, installed as [Installing no-mistakes](docs/run/installing-no-mistakes.md) says, for every run except `direct-PR`.
+- no-mistakes v1.90.0 or later, installed as [Installing no-mistakes](docs/run/installing-no-mistakes.md) says, for every run except `direct-PR` and `orc`.
 - pueue, to queue runs on each machine, with its daemon started by `pueued -d`.
 
 ## Install
