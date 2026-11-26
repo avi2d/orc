@@ -150,6 +150,12 @@ describe("orc help", () => {
     expect(pages).toEqual(invocations.map((invocation) => ({ path: invocation.path.join(" "), usageNamesOnlyIt: true, overview: false })))
   })
 
+  test("run help distinguishes runs you start by hand from queued tasks instead of calling them direct runs", () => {
+    const text = helpText(["run"]).replace(/\s+/g, " ")
+    expect(text).toContain("Runs you start by hand default to nono.")
+    expect(text).toContain("Queued tasks pass none without a per-agent sandbox.")
+  })
+
   test("a wrong subcommand prints only its own command's usage instead of every command", () => {
     const text = usageErrorText("unexpected argument: hodl", ["backlog", "hodl", "orc-9"])
     expect(text).toContain("Usage: orc backlog [--json]")

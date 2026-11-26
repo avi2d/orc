@@ -146,7 +146,7 @@ const reference = [
   page("What the no-mistakes fork adds", "/run/no-mistakes-fork"),
   page("Updating orc", "/run/updating-orc"),
   page("Release assets", "/run/release-assets"),
-  page("Where things are in the run package", "/run/layout")
+  page("Where things are in the run package", "/run/source-map")
 ]
 
 const sessionQuota = [

@@ -74,4 +74,4 @@ The command exits 0 for `installed` and `current`, and non-zero for `failed`.
 - [The beat and task runs](beat-runs.md#updating-orc-on-dispatch-machines)
 - [Configuring providers](configuring-providers.md)
 - [Release assets](release-assets.md)
-- [Where every source file is](layout.md)
+- [Where every source file is](source-map.md)

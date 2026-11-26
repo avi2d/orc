@@ -18,7 +18,7 @@ If the rebase fails, the run does not open a PR.
 After the checks pass, the run pushes the branch and opens or reuses a PR.
 The run does not perform a review or wait for a CI verdict.
 To select this delivery for a project, set its `mode` to `orc` in `projects.json`.
-For a direct run or resume, pass `--delivery orc`.
+For a run or resume you start by hand, pass `--delivery orc`.
 
 ## Review the branch
 Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one [Pi](https://pi.dev) turn with the reviewer agent over that diff and the task file.

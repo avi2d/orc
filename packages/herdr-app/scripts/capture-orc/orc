@@ -1,0 +1,8 @@
+#!/bin/bash
+set -euo pipefail
+reply=$ORC_HOME/replies/$(IFS=_; echo "$*")
+if [ -f "$reply" ]; then
+  sed "s|@ORC_HOME@|$ORC_HOME|g" "$reply"
+else
+  exec "$ORC_CAPTURE_REAL" "$@"
+fi

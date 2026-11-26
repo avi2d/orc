@@ -24,8 +24,15 @@ The script stops if it cannot find herdr-core or its sockets.
 ## Recapture the Board screenshots
 
 With the layout installed in a scratch home, run `packages/herdr-app/scripts/capture-board.sh tests/fixtures/herdr-board <output-png>`.
-Add `orc-resources` or `orc-agents` as a third argument to capture another tab.
+Add `orc-resources`, `orc-agents` or `orc-inbox` as a third argument to capture another tab.
 To show a selected Board task, pass `orc-board` and its task id, such as `garden-6`.
+
+The script copies the fixture into the scratch home and reads orc from there.
+A file under `replies/` in the fixture stands in for one orc command, named by its arguments joined with `_`.
+Every other command runs the installed orc.
+
+- For the Inbox screenshot, run `packages/herdr-app/scripts/capture-board.sh tests/fixtures/herdr-inbox docs/images/herdr-inbox.png orc-inbox`.
+- For the Checks screenshot, run `packages/herdr-app/scripts/capture-board.sh tests/fixtures/herdr-checks docs/images/herdr-agents-checks.png orc-agents`.
 
 ## Change the mods
 

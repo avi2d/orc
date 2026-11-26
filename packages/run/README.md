@@ -9,7 +9,7 @@ It also applies a worker split proposal, as [Task kinds](https://github.com/avi2
 
 - Bun, at the version `.bun-version` pins.
 - Git 2.48 or later, tested on 2.56.0.
-- nono from https://nono.sh, tested on 0.80.0, for a hand-typed `orc run` unless you pass `--sandbox none`.
+- nono from https://nono.sh, tested on 0.80.0, for a run you start by hand with `orc run` unless you pass `--sandbox none`.
 - Node, tested on 24.22.1.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with the login, token file or Pi packages each provider in [Configuring providers](https://github.com/avi2d/orc/blob/main/docs/run/configuring-providers.md) takes.
 - no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](https://github.com/avi2d/orc/blob/main/docs/run/installing-no-mistakes.md) says, for every run except `direct-PR` and `orc`.
@@ -59,7 +59,7 @@ An unknown command or subcommand that is one or two typos away from exactly one 
 | `src/app/dispatch-cli.ts` | The `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
 | `agents` | The bundled agent files |
 
-[Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/layout.md) maps the rest of the package and the tests.
+[Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/source-map.md) maps the rest of the package and the tests.
 
 ## Related topics
 
@@ -83,4 +83,4 @@ An unknown command or subcommand that is one or two typos away from exactly one 
 - [The runner](https://github.com/avi2d/orc/blob/main/docs/run/runner.md)
 - [The heavy queue](https://github.com/avi2d/orc/blob/main/docs/run/heavy-queue.md)
 - [Updating orc](https://github.com/avi2d/orc/blob/main/docs/run/updating-orc.md)
-- [Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/layout.md)
+- [Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/source-map.md)

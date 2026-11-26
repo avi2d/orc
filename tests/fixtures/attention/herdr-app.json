@@ -28,12 +28,12 @@
       "id": "garden-7.question-3.2026-11-25T07_00_00_000Z",
       "kind": "review-question",
       "task": "garden-7",
-      "text": "Which scope should the report cover?",
+      "text": "Where should the bench go?",
       "asked": "2026-11-25T07:00:00.000Z",
       "owner": "user",
       "decision": {
         "kind": "escalated",
-        "reason": "The task does not specify the scope.",
+        "reason": "The task does not say where the bench goes.",
         "at": "2026-11-25T07:01:00.000Z"
       },
       "ageSeconds": 3600,
@@ -43,16 +43,16 @@
       "id": "garden-8.ask-1.2026-11-25T07_48_00_000Z",
       "kind": "worker-question",
       "task": "garden-8",
-      "text": "Which layout should the report use?",
-      "subject": "The layout of the report",
+      "text": "How wide should the herb bed be?",
+      "subject": "The width of the herb bed",
       "options": [
         {
           "text": "Wide",
-          "outcome": "Show both columns side by side."
+          "outcome": "Plant two rows of herbs along the kitchen wall."
         },
         {
           "text": "Narrow",
-          "outcome": "Stack the columns so both fit on narrow screens."
+          "outcome": "Plant one row so the path to the kitchen door stays clear."
         }
       ],
       "recommendation": "Narrow",
@@ -60,7 +60,7 @@
       "owner": "user",
       "decision": {
         "kind": "escalated",
-        "reason": "The task leaves the layout open.",
+        "reason": "The task leaves the bed width open.",
         "at": "2026-11-25T07:49:00.000Z"
       },
       "ageSeconds": 720,
