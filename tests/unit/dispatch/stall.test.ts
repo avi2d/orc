@@ -44,14 +44,14 @@ type PueueState = { readonly Running: { readonly start: string } } | { readonly 
 
 const running: PueueState = { Running: { start: "2026-10-27T10:02:00.000Z" } }
 
-const pueueWith = (root: string, state: PueueState): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> => {
+const pueueWith = (root: string, state: PueueState, canStop: boolean): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> => {
   const status = JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "task-1"), group: "orc", path: "/checkout", status: state } } })
   return Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
     const real = yield* ChildProcessSpawner.ChildProcessSpawner
     const reply = (text: string) => real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + text + "\nJ"]))
     return ChildProcessSpawner.make((command) =>
       ChildProcess.isStandardCommand(command) && command.command === "pueue"
-        ? reply(status)
+        ? command.args[0] !== "status" && !canStop ? real.spawn(ChildProcess.make("false")) : reply(status)
         : ChildProcess.isStandardCommand(command) && command.command === "orc-quota" ? reply(quotaReply) : real.spawn(command)
     )
   })).pipe(Layer.provide(BunServices.layer))
@@ -82,12 +82,12 @@ const seedRun = async (root: string): Promise<void> => {
   await mkdir(join(root, "runs", "run-1"), { recursive: true })
 }
 
-const beatAt = async (root: string, now: number, state: PueueState = running): Promise<ReadonlyArray<string>> => {
+const beatAt = async (root: string, now: number, state: PueueState = running, canStop = false): Promise<ReadonlyArray<string>> => {
   const beat = Effect.gen(function*() {
     yield* TestClock.setTime(now)
     return yield* runBeat(root, root, quietSources(unreadLoad))
   })
-  const report = await Effect.runPromise(beat.pipe(Effect.provide(Layer.mergeAll(BunServices.layer, pueueWith(root, state), TestClock.layer()))))
+  const report = await Effect.runPromise(beat.pipe(Effect.provide(Layer.mergeAll(BunServices.layer, pueueWith(root, state, canStop), TestClock.layer()))))
   return formatBeat(report).split("\n").filter((line) => line.startsWith("stalled ") || line.startsWith("closed "))
 }
 
@@ -99,7 +99,7 @@ describe("a pueue run's stall", () => {
       await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
       await seedRun(root)
       await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
-      await beatAt(root, minutesAfterWrite(30))
+      await beatAt(root, minutesAfterWrite(30), running, true)
       const task = (await run(listTasks(root))).find((entry) => entry.spec.id === "task-1")
       expect(task).toMatchObject({ state: { kind: "new" }, retry: { run: "run-1" }, parked: { branch: "orc/task-1", origin: { machine: "mac", run: "run-1" } } })
     })

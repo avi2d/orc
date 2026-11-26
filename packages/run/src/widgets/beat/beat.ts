@@ -7,9 +7,8 @@ import { type QuotaReading, readQuota } from "./quota"
 import { selectTaskRoute } from "./beat-route"
 import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
 import { checkToken, type TokenCache } from "./beat-token"
-import { closeFinished, retryDeadRun } from "./beat-close"
-import { killHeld, killHeldThrough } from "../../features/queueing-a-task/index"
-import { throughFor } from "../../shared/config/index"
+import { closeFinished } from "./beat-close"
+import { retryStalled } from "./retry-stall"
 import { parkedResumeWait } from "./beat-resume"
 import { type BeatAction, type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems, withdrawTaskItems, type Progress } from "../../entities/attention/index"
 import { attentionActions } from "./beat-attention"
@@ -366,21 +365,7 @@ export const runBeat = (
     const started = tasks.filter((task) => task.state.kind === "started")
     const reads = yield* Effect.forEach(started, (task) => closeFinished(context, task))
     const stalls = yield* Effect.forEach(started, (task, index) => flagStall(root, task, reads[index] ?? { kind: "untracked" }))
-    const progress = yield* Effect.forEach(started, (task, index) => Effect.gen(function*() {
-      const reading = reads[index] ?? { kind: "untracked" }
-      if (Option.isNone(stalls[index]) || reading.kind !== "running" || reading.run === undefined || task.retry !== undefined || task.state.kind !== "started") {
-        return reading
-      }
-      const machine = config.machines.find((entry) => entry.name === task.state.claim.machine)
-      if (machine === undefined) return reading
-      const through = throughFor(machine)
-      const label = runLabel(home, task.spec.id, task.spec.kind)
-      const stopped = yield* (through === null ? killHeld(home, task.spec.id, label) : killHeldThrough(through, task.spec.id, label)).pipe(
-        Effect.as(true),
-        Effect.catchTag("RunnerError", () => Effect.succeed(false))
-      )
-      return stopped ? yield* retryDeadRun(root, task.spec.id, machine.name, reading.run) : reading
-    }))
+    const progress = yield* Effect.forEach(started, (task, index) => retryStalled(root, home, config, task, reads[index] ?? { kind: "untracked" }, stalls[index]))
     const settled = settledProgress(progress)
     releaseClosedSlots(context.live, settled.closed)
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)

@@ -110,6 +110,7 @@ describe("a parked run", () => {
       await startOnLinux(fixture)
       const runDir = await askWhileRunning(fixture)
       await rm(join(runDir, "asking.json"))
+      await writeFile(join(runDir, "agent.log"), "still running\n")
       await writeFile(join(runDir, "failing.json"), JSON.stringify({ label: "bun run test", since: "2026-11-02T10:10:00.000Z" }))
       await orcOk(fixture, ["beat"])
       expect(await openAttention(fixture)).toEqual([expect.objectContaining({
