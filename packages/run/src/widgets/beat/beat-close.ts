@@ -11,8 +11,6 @@ import { type AskedQuestion, parkStartedTask, retryStartedTask } from "../../ent
 import { Asking, askingFileName } from "../../entities/review-gate/index"
 import type { RunEnding } from "../../features/queueing-a-task/index"
 
-export { serveCorrections } from "./beat-close-runner"
-
 export interface CloseContext {
   readonly root: string
   readonly home: string
