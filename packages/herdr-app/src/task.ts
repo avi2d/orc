@@ -105,6 +105,9 @@ const runValue = (runs: ReadonlyArray<TaskRun>): string | null => {
   return runs.length === 1 ? placed : `${placed} (${runs.length - 1} earlier)`
 }
 
+export const mergeablePr = (task: TaskDetail | undefined): string | null =>
+  task?.state.status === "closed" && (task.prState === "open" || task.prState === null) ? task.state.pr : null
+
 const prValue = (task: TaskDetail): string | null => {
   const pr = task.state.status === "closed" ? task.state.pr : null
   if (pr === null) return null

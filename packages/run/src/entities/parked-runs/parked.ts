@@ -141,7 +141,7 @@ export const parkStartedTask = (
     const parked = yield* park.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
     yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
     return parked
-  })
+  }).pipe(Effect.uninterruptible)
 
 export type AnswerOutcome =
   | { readonly kind: "hold"; readonly hold: Hold }

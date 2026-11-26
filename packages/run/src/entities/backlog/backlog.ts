@@ -239,7 +239,7 @@ const settleStarted = (
     yield* fs.remove(paths.unreadFile(id), { force: true }).pipe(Effect.orElseSucceed(() => undefined))
     yield* fs.remove(paths.unreachedFile(id), { force: true }).pipe(Effect.orElseSucceed(() => undefined))
     return settled
-  })
+  }).pipe(Effect.uninterruptible)
 
 export const closeStartedTask = (
   root: string,
@@ -312,7 +312,7 @@ const rewriteIn = (folder: "new" | "taken" | "closed") => <A>(
       yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
     }
     return settled.result
-  })
+  }).pipe(Effect.uninterruptible)
 
 export const rewriteNew = rewriteIn("new")
 

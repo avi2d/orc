@@ -84,7 +84,7 @@ const removeNew = (root: string, child: TaskRecord, parent: string, tasks: Reado
       return yield* new BacklogError({ detail: refused })
     }
     yield* fs.remove(grabbed).pipe(Effect.mapError((error) => new BacklogError({ detail: "cannot remove " + grabbed + ": " + error.message })))
-  })
+  }).pipe(Effect.uninterruptible)
 
 export const dropChild = (root: string, parent: string, child: string, at: string): Effect.Effect<string, BacklogError | TaskFileError, Requirements> =>
   Effect.gen(function*() {

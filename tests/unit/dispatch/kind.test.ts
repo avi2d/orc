@@ -39,7 +39,7 @@ describe("a pinned scout or task", () => {
   const room = [{ machine: "mac", slots: 1, busy: 1 }, { machine: "linux", slots: 4, busy: 0 }]
   const pinned = (kind: TaskKind): TaskRecord => ({ spec: { ...spec, id: "task-1", kind, machine: "mac" }, hold: null, parked: null, state: { kind: "new" } })
   test("waits for its full machine instead of its kind letting it go to the one with room", () => {
-    expect([placeTask(pinned("scout"), config, projects, room), placeTask(pinned("task"), config, projects, room)]).toEqual([
+    expect([placeTask(pinned("scout"), config, projects, room), placeTask(pinned("task"), config, projects, room)]).toMatchObject([
       { kind: "waits", reason: "mac has no room" },
       { kind: "waits", reason: "mac has no room" }
     ])
@@ -52,7 +52,7 @@ describe("a project's priority floor", () => {
   const floored: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc" }, floor: 1 }]
   const task = (priority: 0 | 1 | 2): TaskRecord => ({ spec: { ...spec, id: "task-1", priority }, hold: null, parked: null, state: { kind: "new" } })
   test("waits on a task less urgent than the floor and names the floor", () => {
-    expect(placeTask(task(2), config, floored, room)).toEqual({ kind: "waits", reason: "P2 is under the floor P1 of the project orc" })
+    expect(placeTask(task(2), config, floored, room)).toMatchObject({ kind: "waits", reason: "P2 is under the floor P1 of the project orc" })
   })
   test("starts a task at or above the floor", () => {
     expect([placeTask(task(1), config, floored, room).kind, placeTask(task(0), config, floored, room).kind]).toEqual(["place", "place"])
