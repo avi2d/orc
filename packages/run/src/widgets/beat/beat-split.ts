@@ -18,7 +18,7 @@ const splitFailureText = (id: string, children: ReadonlyArray<string>, detail: s
   "split " + id + " into " + (children.length === 0 ? "no children" : children.join(", ")) + " failed: " + detail
 
 const listTasksOrEmpty = (root: string): Effect.Effect<ReadonlyArray<TaskRecord>, never, FileSystem.FileSystem> =>
-  listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>))
+  listTasks(root).pipe(Effect.catchTag(["BacklogError", "TaskFileError"], () => Effect.succeed([] as ReadonlyArray<TaskRecord>)))
 
 const endSplitParentFailure = (
   root: string,
@@ -40,7 +40,7 @@ const endSplitFailure = (
 ): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const id = task.spec.id
-    const reopened = yield* findTask(root, id).pipe(Effect.orElseSucceed(() => null))
+    const reopened = yield* findTask(root, id).pipe(Effect.catchTag(["BacklogError", "TaskFileError"], () => Effect.succeed(null)))
     if (reopened !== null && reopened.state.kind === "new" && reopened.spec.kind === "parent") {
       return yield* endSplitParentFailure(root, id, machine, detail)
     }

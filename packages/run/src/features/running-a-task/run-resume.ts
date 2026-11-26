@@ -74,8 +74,8 @@ const refuseOnChangedIntent = (
     if (steps.length === 0) {
       return
     }
-    const saved = yield* fs.readFileString(prior.taskFile).pipe(Effect.orElseSucceed(() => null))
-    const current = yield* fs.readFileString(supplied).pipe(Effect.orElseSucceed(() => null))
+    const saved = yield* fs.readFileString(prior.taskFile).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
+    const current = yield* fs.readFileString(supplied).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     if (saved === null || current === null) {
       return yield* refuse("orc: the saved task for branch " + branch + " cannot be read, so resume refuses to reuse its progress with new intent")
     }
@@ -87,7 +87,7 @@ const refuseOnChangedIntent = (
 const sessionFilesIn = (run: HistoryRun, dir: string): Effect.Effect<ReadonlyArray<string>> =>
   run.fs.readDirectory(dir).pipe(
     Effect.map((names) => names.filter((name) => name.endsWith(".jsonl")).map((name) => run.path.join(dir, name))),
-    Effect.orElseSucceed(() => [] as ReadonlyArray<string>)
+    Effect.catchTag("PlatformError", () => Effect.succeed([] as ReadonlyArray<string>))
   )
 
 // A resumed run's session may sit one folder below its sessions folder, so both depths are read.
@@ -95,10 +95,10 @@ const latestSessionFile = (run: HistoryRun, dirs: ReadonlyArray<string>): Effect
   Effect.gen(function*() {
     const found: Array<{ readonly file: string; readonly mtime: number }> = []
     for (const dir of dirs) {
-      const top = yield* run.fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
+      const top = yield* run.fs.readDirectory(dir).pipe(Effect.catchTag("PlatformError", () => Effect.succeed([] as ReadonlyArray<string>)))
       const nested = yield* Effect.forEach(top, (sub) => sessionFilesIn(run, run.path.join(dir, sub)))
       for (const full of [...(yield* sessionFilesIn(run, dir)), ...nested.flat()]) {
-        const info = yield* run.fs.stat(full).pipe(Effect.orElseSucceed(() => null))
+        const info = yield* run.fs.stat(full).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
         found.push({ file: full, mtime: info === null ? 0 : Option.match(info.mtime, { onNone: () => 0, onSome: (at) => at.getTime() }) })
       }
     }
@@ -185,14 +185,14 @@ const carrySession = (run: HistoryRun, source: string | null, sessionId: string 
     if (source === null || sessionId === null) {
       return null
     }
-    const carried = yield* run.fs.readFileString(source).pipe(Effect.orElseSucceed(() => null))
+    const carried = yield* run.fs.readFileString(source).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     if (carried === null) {
       return null
     }
     const target = run.path.join(run.hostSessionsDir, source.slice(source.lastIndexOf("/") + 1))
     yield* run.fs.makeDirectory(run.path.dirname(target), { recursive: true }).pipe(
       Effect.andThen(() => run.fs.writeFileString(target, pointSessionAt(carried, run.worktreeDir))),
-      Effect.orElseSucceed(() => undefined)
+      Effect.catchTag("PlatformError", () => Effect.succeed(undefined))
     )
     return { id: sessionId, file: target }
   })
@@ -205,8 +205,8 @@ const retainedSessionIsSafe = (run: HistoryRun, priorDir: string, source: string
     if (target === null) {
       return false
     }
-    const original = yield* run.fs.readFileString(source).pipe(Effect.orElseSucceed(() => null))
-    const copy = yield* run.fs.readFileString(target).pipe(Effect.orElseSucceed(() => null))
+    const original = yield* run.fs.readFileString(source).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
+    const copy = yield* run.fs.readFileString(target).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     return original !== null && copy === pointSessionAt(original, run.worktreeDir)
   })
 

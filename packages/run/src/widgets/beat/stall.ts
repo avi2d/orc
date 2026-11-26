@@ -9,7 +9,7 @@ export const stallMillis = 30 * 60 * 1000
 export const logWrittenAt = (log: string): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    const info = yield* fs.stat(log).pipe(Effect.orElseSucceed(() => null))
+    const info = yield* fs.stat(log).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     return info === null ? null : Option.match(info.mtime, { onNone: () => null, onSome: (mtime) => mtime.toISOString() })
   })
 

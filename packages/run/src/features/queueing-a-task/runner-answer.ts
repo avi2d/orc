@@ -44,7 +44,7 @@ const correctInto = (home: string, task: string, label: string | null, correctio
       return yield* refuse("no run of " + task + " is running to take a corrected answer")
     }
     const file = runDirFor(home, run.id) + "/" + correctionsFileName
-    const stored = yield* readJsonFileIfPresent(file, CorrectionsFile).pipe(Effect.orElseSucceed(() => null))
+    const stored = yield* readJsonFileIfPresent(file, CorrectionsFile).pipe(Effect.catchTag("ConfigError", () => Effect.succeed(null)))
     const kept = (stored?.corrections ?? []).filter((entry) => !corrections.some((correction) => correction.question === entry.question))
     if (!(yield* writeWhole(file, JSON.stringify({ corrections: [...kept, ...corrections] })))) {
       return yield* refuse("cannot write " + file)

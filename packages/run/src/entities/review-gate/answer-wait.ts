@@ -76,15 +76,15 @@ const dropAnswersFor = (relayed: string, missing: ReadonlyArray<Pick<NoMistakesF
       const kept = stored.answers.filter((entry) => !missing.some((finding) => finding.id === entry.question))
       return kept.length === stored.answers.length
         ? Effect.void
-        : writeWhole(relayed, JSON.stringify({ asking: asked, answers: kept })).pipe(Effect.asVoid, Effect.orElseSucceed(() => undefined))
+        : writeWhole(relayed, JSON.stringify({ asking: asked, answers: kept })).pipe(Effect.asVoid)
     }),
-    Effect.orElseSucceed(() => undefined)
+    Effect.catchTag("ConfigError", () => Effect.succeed(undefined))
   )
 
 const readRelayed = (file: string, asked: string): Effect.Effect<ReadonlyArray<QuestionAnswer>, never, FileSystem.FileSystem> =>
   readJsonFileIfPresent(file, AnswersFile).pipe(
     Effect.map((relayed) => relayed === null || relayed.asking !== asked ? [] : relayed.answers),
-    Effect.orElseSucceed(() => [])
+    Effect.catchTag("ConfigError", () => Effect.succeed([]))
   )
 
 export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: string) =>
@@ -97,7 +97,7 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
         return { asked: null, answers: [], askedAt: [] }
       }
       const now = new Date().toISOString()
-      const previous = yield* readJsonFileIfPresent(asking, Asking).pipe(Effect.orElseSucceed(() => null))
+      const previous = yield* readJsonFileIfPresent(asking, Asking).pipe(Effect.catchTag("ConfigError", () => Effect.succeed(null)))
       yield* dropAnswersFor(relayed, missing, previous?.asked ?? now)
       const asked = previous?.asked ?? now
       const deadline = Date.now() + waitSeconds * 1000
@@ -115,13 +115,13 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
         yield* Effect.sleep(Duration.seconds(Math.min(pollSeconds, Math.max(0, (deadline - Date.now()) / 1000))))
         answered = answeredOf(yield* readRelayed(relayed, asked))
       }
-      const remaining = (yield* readJsonFileIfPresent(asking, Asking).pipe(Effect.orElseSucceed(() => null)))?.questions.filter((question) => !missing.some((finding) => finding.id === question.id)) ?? []
+      const remaining = (yield* readJsonFileIfPresent(asking, Asking).pipe(Effect.catchTag("ConfigError", () => Effect.succeed(null))))?.questions.filter((question) => !missing.some((finding) => finding.id === question.id)) ?? []
       if (remaining.length === 0) {
-        yield* fs.remove(asking, { force: true }).pipe(Effect.orElseSucceed(() => undefined))
-        yield* fs.remove(relayed, { force: true }).pipe(Effect.orElseSucceed(() => undefined))
+        yield* fs.remove(asking, { force: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)))
+        yield* fs.remove(relayed, { force: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)))
       } else {
         const nextUntil = remaining.some(isBlockingQuestion) ? until : asked
-        yield* writeWhole(asking, JSON.stringify({ asked, until: nextUntil, questions: remaining })).pipe(Effect.orElseSucceed(() => false))
+        yield* writeWhole(asking, JSON.stringify({ asked, until: nextUntil, questions: remaining }))
       }
       return { asked, answers: answered, askedAt: merged.map((question) => ({ question: question.id, asked: question.asked ?? asked })) }
     })

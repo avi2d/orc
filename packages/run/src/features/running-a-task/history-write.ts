@@ -212,7 +212,7 @@ export const recordOpenAsks = (
         continue
       }
       seen.add(question.id)
-      const done = yield* questionAsked(step, question).pipe(Effect.as(true), Effect.orElseSucceed(() => false))
+      const done = yield* questionAsked(step, question).pipe(Effect.as(true), Effect.catchTag("OrcRunError", () => Effect.succeed(false)))
       if (done) {
         setup.state.recorded.add(question.id)
       }

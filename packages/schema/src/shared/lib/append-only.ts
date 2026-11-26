@@ -76,4 +76,4 @@ export const grownRecords = <R>(
   entry: Listed,
   cached: Grown<R> | undefined,
   parse: (lines: Uint8Array) => ReadonlyArray<R>,
-): Effect.Effect<Grown<R> | undefined> => readGrown(fs, entry, cached, parse).pipe(Effect.orElseSucceed(() => cached));
+): Effect.Effect<Grown<R> | undefined> => readGrown(fs, entry, cached, parse).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(cached)));

@@ -165,7 +165,7 @@ const matchAnswer = (record: BoardRecord, prompt: BoardPrompt): Effect.Effect<Ma
         ? { kind: "refused", line: unmatchedLine(record, prompt.text) }
         : { kind: "matched", card, answer }
     }),
-    Effect.orElseSucceed((): MatchedAnswer => ({ kind: "refused", line: unmatchedLine(record, prompt.text) }))
+    Effect.catchTag("SchemaError", () => Effect.succeed<MatchedAnswer>(({ kind: "refused", line: unmatchedLine(record, prompt.text) })))
   )
 
 const staleRefusal = (tasks: ReadonlyArray<BacklogTask>, record: BoardRecord, card: BoardCardRecord, text: string): string | null => {

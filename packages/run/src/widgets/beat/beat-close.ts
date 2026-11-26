@@ -88,7 +88,7 @@ const endParked = (
       ? Effect.succeed<ReadonlyArray<AskedQuestion>>([])
       : readJsonFileIfPresent(runDirFor(home, run) + "/" + askingFileName, Asking).pipe(
         Effect.map((asking) => asking === null ? [] as ReadonlyArray<AskedQuestion> : [...asking.questions]),
-        Effect.orElseSucceed(() => [] as ReadonlyArray<AskedQuestion>)
+        Effect.catchTag("ConfigError", () => Effect.succeed([] as ReadonlyArray<AskedQuestion>))
       ))
     const liveById = new Map(live.map((question) => [question.id, question] as const))
     const merged = Arr.map(ending.questions, (question) => {
@@ -292,7 +292,7 @@ const trackUnreached = (
       }
       return
     }
-    if (yield* fs.exists(unreachedFile).pipe(Effect.orElseSucceed(() => false))) {
+    if (yield* fs.exists(unreachedFile).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(false)))) {
       yield* clearSince(fs, unreachedFile)
       yield* withdrawUnreachedMachine(root, task, nowText)
     }

@@ -34,7 +34,7 @@ const toolsRequiringPathAtWrite = new Set(["python", "python3", "uv", "deno", "g
 const isExecutableFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<boolean> =>
   fs.stat(file).pipe(
     Effect.map((info) => info.type === "File" && (info.mode & 0o111) !== 0),
-    Effect.orElseSucceed(() => false)
+    Effect.catchTag("PlatformError", () => Effect.succeed(false))
   )
 
 const isStandinFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<boolean> =>
@@ -47,7 +47,7 @@ const isStandinFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<b
           onSome: (bytes) => new TextDecoder().decode(bytes).includes(standinMarker)
         })
       ),
-      Effect.orElseSucceed(() => false)
+      Effect.catchTag("PlatformError", () => Effect.succeed(false))
     )
   )
 

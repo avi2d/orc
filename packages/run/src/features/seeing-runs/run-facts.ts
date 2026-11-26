@@ -33,7 +33,7 @@ const readTitle = (taskFile: string): Effect.Effect<string | null, never, FileSy
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => fs.readFileString(taskFile)),
     Effect.map(titleOf),
-    Effect.orElseSucceed(() => null)
+    Effect.catchTag("PlatformError", () => Effect.succeed(null))
   )
 
 // Only a running run's asking.json is a question still open: the wait removes the file as it ends.
@@ -42,7 +42,7 @@ const readQuestions = (run: RunRecord): Effect.Effect<number, never, FileSystem.
     ? Effect.succeed(0)
     : readJsonFileIfPresent(runDirOf(run.taskFile) + "/" + askingFileName, Asking).pipe(
       Effect.map((asking) => asking === null ? 0 : asking.questions.filter(isBlockingQuestion).length),
-      Effect.orElseSucceed(() => 0)
+      Effect.catchTag("ConfigError", () => Effect.succeed(0))
     )
 
 const readLatestStep = (db: Database, runId: string): Effect.Effect<LatestStep | null, Schema.SchemaError | SqliteFailure> =>

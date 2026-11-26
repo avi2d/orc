@@ -58,7 +58,7 @@ export const writeWhole = (file: string, text: string): Effect.Effect<boolean, n
     return yield* fs.writeFileString(scratch, text).pipe(
       Effect.andThen(fs.rename(scratch, file)),
       Effect.as(true),
-      Effect.catchTag("PlatformError", () => fs.remove(scratch, { force: true }).pipe(Effect.orElseSucceed(() => undefined), Effect.as(false)))
+      Effect.catchTag("PlatformError", () => fs.remove(scratch, { force: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)), Effect.as(false)))
     )
   })
 

@@ -191,7 +191,7 @@ const missedClose = (
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
     yield* recoverGrabs(root)
-    const takenNames = yield* fs.readDirectory(paths.folder("taken")).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
+    const takenNames = yield* fs.readDirectory(paths.folder("taken")).pipe(Effect.catchTag("PlatformError", () => Effect.succeed([] as ReadonlyArray<string>)))
     if (takenNames.some((name) => name.startsWith("." + id + "."))) {
       return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
     }
@@ -236,8 +236,8 @@ const settleStarted = (
       return yield* new BacklogError({ detail: id + " was " + (folder === "closed" ? "closed" : "given back") + " by another command" })
     }
     yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
-    yield* fs.remove(paths.unreadFile(id), { force: true }).pipe(Effect.orElseSucceed(() => undefined))
-    yield* fs.remove(paths.unreachedFile(id), { force: true }).pipe(Effect.orElseSucceed(() => undefined))
+    yield* fs.remove(paths.unreadFile(id), { force: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)))
+    yield* fs.remove(paths.unreachedFile(id), { force: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)))
     return settled
   }).pipe(Effect.uninterruptible)
 
@@ -296,7 +296,7 @@ const rewriteIn = (folder: "new" | "taken" | "closed") => <A>(
         return { result: rewrite.result, published: false } as const
       }
       const replacement = scratchName(paths.folder(folder), id)
-      const discardReplacement = fs.remove(replacement).pipe(Effect.orElseSucceed(() => undefined))
+      const discardReplacement = fs.remove(replacement).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)))
       yield* fs.writeFileString(replacement, renderTaskFile(rewrite.record)).pipe(
         Effect.mapError(platformFailure("write " + replacement)),
         Effect.catch((error) => discardReplacement.pipe(Effect.andThen(Effect.fail(error))))

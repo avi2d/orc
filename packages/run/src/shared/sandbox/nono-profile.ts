@@ -57,7 +57,7 @@ const certPemIsSymlink: Effect.Effect<boolean, never, FileSystem.FileSystem> = E
   const fs = yield* FileSystem.FileSystem
   return yield* fs.readLink(certPemPath).pipe(
     Effect.as(true),
-    Effect.orElseSucceed(() => false)
+    Effect.catchTag("PlatformError", () => Effect.succeed(false))
   )
 })
 

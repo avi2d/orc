@@ -127,7 +127,7 @@ describe("a token-expiry retry of a pinned run", () => {
       expect(valueOf(seen[1] ?? [], resumePrefix)).toBe(attempt)
       let recorded: string | null = null
       await withDb(home, async (db) => {
-        const found = await Effect.runPromise(Effect.orElseSucceed(runById(db, attempt ?? ""), () => null))
+        const found = await Effect.runPromise(Effect.catchTags(runById(db, attempt ?? ""), { SchemaError: () => Effect.succeed(null), SqliteFailure: () => Effect.succeed(null) }))
         recorded = found === null ? null : found.id
       })
       expect<string | null>(recorded).toBe(attempt)

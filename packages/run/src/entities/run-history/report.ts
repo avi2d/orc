@@ -229,6 +229,6 @@ export const writtenReport = (runDir: string): Effect.Effect<string | null, neve
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const file = reportPathOf(runDir)
-    const info = yield* fs.stat(file).pipe(Effect.orElseSucceed(() => null))
+    const info = yield* fs.stat(file).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     return info?.type === "File" ? file : null
   })

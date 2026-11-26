@@ -197,7 +197,7 @@ export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effe
     const backlog = home + "/backlog"
     const machine = hostname()
     const fs = yield* FileSystem.FileSystem
-    const fired = yield* fs.readFileString(alertsFile(backlog)).pipe(Effect.orElseSucceed(() => ""))
+    const fired = yield* fs.readFileString(alertsFile(backlog)).pipe(Effect.catchTag("PlatformError", () => Effect.succeed("")))
     const state = yield* pueue(["status", "--json"]).pipe(
       Effect.flatMap((text) => decodeJson(text, WatchState, "pueue status --json"))
     )
@@ -208,7 +208,7 @@ export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effe
     const stalls = stallForOldest(old, firedRecently, machine, at)
     const ps = yield* capture(["ps", "-eo", "pid,ppid,command"], null).pipe(
       Effect.map((result) => result.stdout),
-      Effect.orElseSucceed(() => "")
+      Effect.catchTag("RunnerError", () => Effect.succeed(""))
     )
     const alive = Object.values(state.tasks).flatMap((task) => {
       if (task.group !== settings.group) {
@@ -282,7 +282,7 @@ const checkPueueGroup = (home: string, group: string, nowMs: number): Effect.Eff
   Effect.gen(function*() {
     const backlog = home + "/backlog"
     const fs = yield* FileSystem.FileSystem
-    const fired = yield* fs.readFileString(alertsFile(backlog)).pipe(Effect.orElseSucceed(() => ""))
+    const fired = yield* fs.readFileString(alertsFile(backlog)).pipe(Effect.catchTag("PlatformError", () => Effect.succeed("")))
     const bypass = countBypass(fired)
     const bypassWeek = countBypassWeek(fired, nowMs)
     const state = yield* pueue(["status", "--json"]).pipe(

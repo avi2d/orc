@@ -39,7 +39,7 @@ interface Listed extends ListedFile {
 
 const listed = (fs: FileSystem.FileSystem, root: string, harness: Harness, since: number) =>
   fs.readDirectory(root, { recursive: true }).pipe(
-    Effect.orElseSucceed((): ReadonlyArray<string> => []),
+    Effect.catchTag("PlatformError", () => Effect.succeed<ReadonlyArray<string>>([])),
     Effect.map((paths) => paths.filter((relative) => logFiles[harness].test(relative))),
     Effect.flatMap((paths) =>
       Effect.forEach(paths, (relative) =>
@@ -50,7 +50,7 @@ const listed = (fs: FileSystem.FileSystem, root: string, harness: Harness, since
               ? []
               : [{ path: `${root}/${relative}`, harness, size: Number(info.size), modifiedAt }];
           }),
-          Effect.orElseSucceed((): ReadonlyArray<Listed> => []),
+          Effect.catchTag("PlatformError", () => Effect.succeed<ReadonlyArray<Listed>>([])),
         ),
       ),
     ),

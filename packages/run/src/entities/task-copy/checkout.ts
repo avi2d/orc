@@ -46,7 +46,7 @@ export const openCheckout = (
     }
     const listed = yield* runGit(spawner, git, ["worktree", "list", "--porcelain"], projectDir).pipe(
       Effect.map((result) => result.stdout),
-      Effect.orElseSucceed(() => "")
+      Effect.catchTag("OrcRunError", () => Effect.succeed(""))
     )
     const excludes = yield* nestedWorktreeExcludes(fs, projectDir, listed)
     const status = yield* runGit(spawner, git, ["status", "--porcelain", "--", ".", ...excludes], projectDir)

@@ -288,7 +288,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
             noMistakes: null,
             endReason: outcome.endReason
           }
-          yield* writeHandover(run, provisional).pipe(Effect.orElseSucceed(() => null))
+          yield* writeHandover(run, provisional).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed(null)))
         }
       }),
       checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
@@ -304,21 +304,21 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
     }
     const endFailed = (reason: string) =>
       Effect.gen(function*() {
-        const existing = yield* stepsForRun(db, run.runId).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<{ readonly name: string; readonly status: string; readonly attempt: number }>))
+        const existing = yield* stepsForRun(db, run.runId).pipe(Effect.catchTag(["SchemaError", "SqliteFailure"], () => Effect.succeed([] as ReadonlyArray<{ readonly name: string; readonly status: string; readonly attempt: number }>)))
         const now = new Date().toISOString()
         for (const step of existing) {
           if (step.status === "running") {
-            yield* updateStep(db, run.runId, step.name, step.attempt, { status: "failed", ended: now }).pipe(Effect.orElseSucceed(() => false))
+            yield* updateStep(db, run.runId, step.name, step.attempt, { status: "failed", ended: now }).pipe(Effect.catchTag(["SchemaError", "SqliteFailure"], () => Effect.succeed(false)))
           }
         }
         if (!existing.some((step) => step.name === "implement")) {
-          yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: null, tokens: null, commits: null, sessionSize: null, implementPassed: false }, run.started, now).pipe(Effect.orElseSucceed(() => undefined))
+          yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: null, tokens: null, commits: null, sessionSize: null, implementPassed: false }, run.started, now).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed(undefined)))
         }
         const baseFailed = failedReport(run, reason)
         const failed = implementLong === null ? baseFailed : { ...baseFailed, sessionSize: implementLong.counts, commits: implementLong.commits, sessionFile: implementLong.sessionFile }
-        yield* writeEvidence(run, failed).pipe(Effect.orElseSucceed(() => undefined))
-        yield* writeReport(run, failed).pipe(Effect.orElseSucceed(() => undefined))
-        yield* finishRun(db, run.runId, failed, new Date().toISOString()).pipe(Effect.orElseSucceed(() => undefined))
+        yield* writeEvidence(run, failed).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed(undefined)))
+        yield* writeReport(run, failed).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed(undefined)))
+        yield* finishRun(db, run.runId, failed, new Date().toISOString()).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed(undefined)))
         return failed
       })
     const ended = yield* runFull(run, ops, resume, checkpoints).pipe(
@@ -329,13 +329,13 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       }),
       Effect.onInterrupt(() => markRunStopped(db, run.runId, new Date().toISOString(), stoppedEndReason))
     )
-    yield* recordOpenAsks(checkpoints.questionAsked, run.asks, lastStep, []).pipe(Effect.orElseSucceed(() => undefined))
+    yield* recordOpenAsks(checkpoints.questionAsked, run.asks, lastStep, []).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed(undefined)))
     const report = ended.report
     yield* writeEvidence(run, report)
     yield* writeReport(run, report)
     const handover = yield* writeHandover(run, report)
     if (handover !== null) {
-      yield* recordHandoverEvidence(db, run.runId, handover).pipe(Effect.orElseSucceed(() => undefined))
+      yield* recordHandoverEvidence(db, run.runId, handover).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed(undefined)))
     }
     yield* finishRun(db, run.runId, report, new Date().toISOString())
     if (ended.stopped !== null) {

@@ -73,9 +73,9 @@ const openPullRequest = (
     yield* checkpoints.pullRequestStart(new Date().toISOString())
     const head = yield* runGit(run.spawner, run.git, ["log", "-1", "--format=%s", run.branch], run.worktreeDir).pipe(
       Effect.map((logged) => logged.stdout.trim()),
-      Effect.orElseSucceed(() => "")
+      Effect.catchTag("OrcRunError", () => Effect.succeed(""))
     )
-    const listed = yield* branchCommits(run.spawner, run.git, run.branch, run.projectDir).pipe(Effect.orElseSucceed(() => [] as Array<OrcRunCommit>))
+    const listed = yield* branchCommits(run.spawner, run.git, run.branch, run.projectDir).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed([] as Array<OrcRunCommit>)))
     const subjects = listed.map((commit) => commit.subject.trim()).filter((subject) => subject !== "")
     const bodySubjects = subjects.length > 0 ? subjects : (head !== "" ? [head] : [])
     const bodyFile = run.path.join(run.runDir, prBodyFileName)

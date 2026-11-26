@@ -27,7 +27,7 @@ const collectCommits = (
     for (const commit of made) {
       const subject = yield* runGit(run.spawner, run.git, ["log", "-1", "--format=%s", commit.sha], run.projectDir).pipe(
         Effect.map((logged) => logged.exitCode === 0 ? logged.stdout.trim() : ""),
-        Effect.orElseSucceed(() => "")
+        Effect.catchTag("OrcRunError", () => Effect.succeed(""))
       )
       commits.push({ sha: commit.sha, subject })
     }
@@ -61,7 +61,7 @@ const exitNote = (end: PiEnd): string =>
 
 const sessionOf = (run: HistoryRun, result: AgentRunResult): Effect.Effect<CapturedAgentRun, OrcRunError> =>
   Effect.gen(function*() {
-    const jsonl = result.sessionFile === null ? null : yield* run.fs.readFileString(result.sessionFile).pipe(Effect.orElseSucceed(() => null))
+    const jsonl = result.sessionFile === null ? null : yield* run.fs.readFileString(result.sessionFile).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     const commits = yield* collectCommits(run, result.commits)
     return {
       sessionId: result.sessionId,
@@ -378,6 +378,6 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, ch
       }
     }
     const report = yield* runFullReport(run, ops, resume, tracked)
-    yield* recordOpenAsks(tracked.questionAsked, run.asks, lastStep, []).pipe(Effect.orElseSucceed(() => undefined))
+    yield* recordOpenAsks(tracked.questionAsked, run.asks, lastStep, []).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed(undefined)))
     return report
   })

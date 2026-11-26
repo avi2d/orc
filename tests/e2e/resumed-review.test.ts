@@ -63,7 +63,7 @@ const scenario = async (change: Change) => {
       const path = yield* Path.Path
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
       const run = { fs, path, spawner, git: "git", projectDir: project, worktreeDir: project, branch: "orc/test", runDir: first, piSessionDir: join(first, "session") }
-      const checkpoint = (dir: string) => fs.readFileString(join(dir, "review-checkpoint.json")).pipe(Effect.orElseSucceed(() => null))
+      const checkpoint = (dir: string) => fs.readFileString(join(dir, "review-checkpoint.json")).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
       const original = change === "missing" ? null : yield* reviewAtHead(run, agent, reviewer, null)
       const originalCheckpoint = yield* checkpoint(first)
       const before = turns
@@ -82,7 +82,7 @@ const scenario = async (change: Change) => {
       const resumed = yield* reviewAtHead({ ...run, runDir: second, piSessionDir: join(second, "session") }, agent, reviewer, first)
       const resumedTurns = turns - before
       const resumedCheckpoint = yield* checkpoint(second)
-      const resumedSaved = yield* fs.readFileString(join(second, "review.json")).pipe(Effect.orElseSucceed(() => null))
+      const resumedSaved = yield* fs.readFileString(join(second, "review.json")).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
       const carried = change !== "unchanged" ? null : yield* Effect.gen(function*() {
         yield* fs.remove(first, { recursive: true })
         const outcome = yield* reviewAtHead({ ...run, runDir: third, piSessionDir: join(third, "session") }, agent, reviewer, second)

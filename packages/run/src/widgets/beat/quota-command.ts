@@ -28,7 +28,7 @@ export const runQuotaCommand = (
       return failed("exit", named + " exited " + exitCode)
     }
     return yield* Effect.try((): CommandRun => ({ kind: "printed", document: JSON.parse(stdout) })).pipe(
-      Effect.orElseSucceed(() => failed("no-json", named + " printed no JSON"))
+      Effect.catchTag("UnknownError", () => Effect.succeed(failed("no-json", named + " printed no JSON")))
     )
   }).pipe(
     Effect.scoped,

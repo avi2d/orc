@@ -1,7 +1,7 @@
 import { Effect, type FileSystem } from "effect"
 
 const realOrNull = (fs: FileSystem.FileSystem, dir: string): Effect.Effect<string | null> =>
-  fs.realPath(dir).pipe(Effect.orElseSucceed(() => null))
+  fs.realPath(dir).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
 
 // Each pathspec is relative to projectDir, so git status must run with projectDir as its working folder.
 export const nestedWorktreeExcludes = (

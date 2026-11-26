@@ -77,7 +77,7 @@ const decodeData = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unkno
 
 const promptData = (prompt: string): Effect.Effect<unknown> => {
   const cut = prompt.indexOf(contextMarker)
-  return cut === -1 ? Effect.succeed(null) : decodeData(prompt.slice(cut + contextMarker.length)).pipe(Effect.orElseSucceed(() => null))
+  return cut === -1 ? Effect.succeed(null) : decodeData(prompt.slice(cut + contextMarker.length)).pipe(Effect.catchTag("SchemaError", () => Effect.succeed(null)))
 }
 
 const promptsOf = (output: string): Effect.Effect<ReadonlyArray<BoardPrompt>> =>

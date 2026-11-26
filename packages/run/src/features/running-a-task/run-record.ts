@@ -196,11 +196,11 @@ export const writeHandover = (run: HistoryRun, report: OrcRunReport): Effect.Eff
     if (report.sessionSize === null || longSessionWarning(report.sessionSize) === null) {
       return null
     }
-    const taskText = yield* run.fs.readFileString(run.taskPath).pipe(Effect.orElseSucceed(() => ""))
+    const taskText = yield* run.fs.readFileString(run.taskPath).pipe(Effect.catchTag("PlatformError", () => Effect.succeed("")))
     const sessionJsonl = report.sessionFile === null
       ? null
-      : yield* run.fs.readFileString(report.sessionFile).pipe(Effect.map((text) => text as string | null), Effect.orElseSucceed(() => null))
-    const branch = yield* branchCommits(run.spawner, run.git, run.branch, run.projectDir).pipe(Effect.orElseSucceed(() => [] as Array<OrcRunCommit>))
+      : yield* run.fs.readFileString(report.sessionFile).pipe(Effect.map((text) => text as string | null), Effect.catchTag("PlatformError", () => Effect.succeed(null)))
+    const branch = yield* branchCommits(run.spawner, run.git, run.branch, run.projectDir).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed([] as Array<OrcRunCommit>)))
     const seen = new Set((report.commits ?? []).map((commit) => commit.sha))
     const commits = [...(report.commits ?? []), ...branch.filter((commit) => !seen.has(commit.sha))]
     const file = run.path.join(run.runDir, handoverFileName)

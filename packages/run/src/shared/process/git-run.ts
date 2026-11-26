@@ -60,7 +60,7 @@ export const branchCommits = (
         return cut === -1 ? { sha: line.trim(), subject: "" } : { sha: line.slice(0, cut).trim(), subject: line.slice(cut + 1).trim() }
       })
     }),
-    Effect.orElseSucceed(() => [] as Array<OrcRunCommit>)
+    Effect.catchTag("OrcRunError", () => Effect.succeed([] as Array<OrcRunCommit>))
   )
 
 export const runGit = (
