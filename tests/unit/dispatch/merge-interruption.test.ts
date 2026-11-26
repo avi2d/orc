@@ -70,8 +70,9 @@ const forge = (update: "accepted" | "conflict", updates: Array<string>): Layer.L
       if (command.command !== "gh") {
         return real.spawn(command)
       }
-      const text = "gh " + command.args.join(" ")
-      if (command.args[0] === "pr" && command.args[1] === "view") {
+      const args = command.args.filter((word): word is string => typeof word === "string")
+      const text = "gh " + args.join(" ")
+      if (args[0] === "pr" && args[1] === "view") {
         return reply(JSON.stringify(view))
       }
       if (text.includes("/pulls/8/files")) {
