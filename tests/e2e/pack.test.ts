@@ -257,6 +257,7 @@ const expectedFiles = [
   "src/shared/config/model-route.ts",
   "src/entities/review-gate/no-mistakes-drive-log.ts",
   "src/entities/review-gate/no-mistakes-gate.ts",
+  "src/entities/review-gate/no-mistakes-response.ts",
   "src/entities/review-gate/no-mistakes.ts",
   "src/shared/sandbox/nono-exec.ts",
   "src/shared/sandbox/nono-profile.ts",
