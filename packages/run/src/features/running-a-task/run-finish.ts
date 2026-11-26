@@ -42,7 +42,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]) =>
+export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]): Effect.Effect<ReviewOutcome, OrcRunError> =>
   Effect.gen(function*() {
     const started = new Date().toISOString()
     yield* checkpoints.reviewStart(reviewer, started)

@@ -10,10 +10,9 @@ import { askOnLoop, loopAnswerOf, loopContinuePrompt, loopGuidance, loopingNote,
 import { askedNote, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, workerAnswersOf, workerContinuePrompt, workerGuidance } from "./worker-question"
 import { holdReleaseGuidance, holdReleaseWordsOf } from "../../entities/review-gate/index"
 import { freshFixOf, releaseGuidanceOf, resumedFix } from "./fix-guidance"
-import { finishAfterChecks, reviewOrc } from "./run-finish"
+import { finishAfterChecks } from "./run-finish"
 import { rebaseDelivery } from "./rebase-delivery"
-import { runReviewTurn } from "./review-turn"
-import type { AgentFile } from "../../entities/agent/index"
+import { runOrcReviewLoop } from "./review-loop"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
 import type { AgentOutcome, AgentRun, AgentRunResult, AgentStep, ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
@@ -197,7 +196,7 @@ const implement = (
     }
   })
 
-const fixOnce = (
+export const fixOnce = (
   run: HistoryRun,
   runAgent: SandboxOps["runAgent"],
   evidenceFile: string,
@@ -236,7 +235,7 @@ const fixOnce = (
     }
   })
 
-const readProjectChecks = (run: HistoryRun, round: number): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
+export const readProjectChecks = (run: HistoryRun, round: number): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
   Effect.gen(function*() {
     const text = yield* run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the checks config .no-mistakes.yaml: " + readFailure(cause) }))
@@ -267,61 +266,6 @@ const retryParkedFix = (run: HistoryRun, ops: SandboxOps, base: ImplementBase, r
     yield* checkpoints.fixDone(retried.fix)
     commits.push(...retried.commits)
     return retried.paused === null ? null : { ...base, commits, completed: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: retried.paused }
-  })
-
-const runOrcReviewLoop = (
-  run: HistoryRun,
-  ops: SandboxOps,
-  base: ImplementBase,
-  rounds: Array<ChecksRoundSummary>,
-  fixes: Array<RecordedFixAttempt>,
-  commits: Array<OrcRunCommit>,
-  plan: ResumePlan,
-  checkpoints: RunCheckpoints,
-  reviewer: AgentFile
-): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
-  Effect.gen(function*() {
-    let review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent)
-    for (let round = 1; round <= 2 && review.status === "passed"; round += 1) {
-      const selected = round === 1
-        ? (review.findings.some((finding) => finding.severity === "error" || finding.severity === "warning") ? review.findings : [])
-        : review.findings.filter((finding) => finding.severity === "error")
-      if (selected.length === 0) break
-      const evidence = run.path.join(run.runDir, "review-fix-" + round.toString() + ".json")
-      yield* run.fs.writeFileString(evidence, JSON.stringify(selected, null, 2) + "\n").pipe(
-        Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write review findings: " + String(cause) }))
-      )
-      const attempt = fixes.length + 1
-      yield* checkpoints.fixStart(attempt, new Date().toISOString())
-      const fixed = yield* fixOnce(run, ops.runAgent, evidence, attempt, null, checkpoints, null, true)
-      fixes.push(fixed.fix)
-      yield* checkpoints.fixDone(fixed.fix)
-      commits.push(...fixed.commits)
-      if (fixed.paused !== null || fixed.fix.status === "failed") {
-        return { ...base, commits, completed: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: fixed.paused ?? "The review fix did not finish. No PR opens." }
-      }
-      const checkRound = rounds.length + 1
-      const started = new Date().toISOString()
-      yield* checkpoints.checksRoundStart(checkRound, started)
-      const commands = yield* readProjectChecks(run, checkRound)
-      const outcome = yield* runChecksRound(ops.execCheck, run.fs, run.path, run.piSessionDir, checkRound, commands).pipe(
-        Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
-      )
-      const failed = outcome.outcomes.filter((check) => !check.passed).map((check) => check.name)
-      const summary: ChecksRoundSummary = {
-        round: checkRound, file: outcome.file, started, ended: new Date().toISOString(),
-        passed: outcome.outcomes.length > 0 && failed.length === 0, failed,
-        checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed })),
-        refusals: distinctRefusals(outcome.outcomes.flatMap((check) => check.refusals))
-      }
-      rounds.push(summary)
-      yield* checkpoints.checksRoundDone(summary)
-      if (failed.length > 0) {
-        return { ...base, commits, completed: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: "The " + failed.join(", ") + " check failed after the review fix. No PR opens." }
-      }
-      review = yield* runReviewTurn(run, ops.runAgent, reviewer, "orc")
-    }
-    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, review)
   })
 
 const runChecksFixLoop = (
@@ -361,10 +305,9 @@ const runChecksFixLoop = (
       rounds.push(summary)
       yield* checkpoints.checksRoundDone(summary)
       if (failed.length === 0) {
-        if (run.delivery.kind === "orc") {
-          return yield* runOrcReviewLoop(run, ops, base, rounds, fixes, commits, plan, checkpoints, run.delivery.reviewer)
-        }
-        return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
+        return yield* (run.delivery.kind === "orc"
+          ? runOrcReviewLoop(run, ops, base, rounds, fixes, commits, plan, checkpoints, run.delivery.reviewer, fixOnce, readProjectChecks)
+          : finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir))
       }
       if (fixes.length >= maxFixAttempts) {
         return {
