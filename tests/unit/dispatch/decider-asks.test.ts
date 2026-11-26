@@ -253,6 +253,19 @@ describe("the asked action of a no-mistakes review question", () => {
     })
   })
 
+  test("an omitted review question reports missing text instead of inventing why it needs the owner", async () => {
+    await withStartedTask(async (root) => {
+      await parkThroughGate(root, "run:\n  id: 01RUN\n  status: awaiting_approval\nreview-questions-omitted: 1 further review question(s) are open and have no row of their own. Omitted question ids: question-5\ngate: review")
+      const heard: Array<DeciderRequest> = []
+      const decided = await decideAll(root, heard)
+      const verdict = decided.at(0)?.verdict
+      expect(heard).toHaveLength(0)
+      expect(verdict?.kind).toBe("escalated")
+      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("no-mistakes omitted the question text")
+      expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
+    })
+  })
+
   test("an omitted review question reaches the owner instead of receiving an answer without text", async () => {
     await withStartedTask(async (root) => {
       await parkThroughGate(root, "run:\n  id: 01RUN\n  status: awaiting_approval\nreview-questions-omitted: question-5\ngate: review")
