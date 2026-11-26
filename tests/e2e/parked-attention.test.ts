@@ -34,7 +34,7 @@ describe("a parked run", () => {
       expect(await openAttention(fixture)).toMatchObject([asked])
       await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep it"])
       expect(await openAttention(fixture)).toEqual([])
-      expect(await orcOk(fixture, ["attention"])).toContain("Decided by owner:")
+      expect(await orcOk(fixture, ["attention"])).toContain("Decided by the owner:")
     })
   }, runnerTimeout)
 

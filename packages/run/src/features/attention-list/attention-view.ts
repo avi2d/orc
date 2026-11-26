@@ -1,27 +1,15 @@
 import { DateTime, Effect, type FileSystem } from "effect"
-import { ageMillis, answerItem, type Decision, decisionText, type AttentionItem, type DecidedItem, isOverdue, type OpenItem, readAttention } from "../../entities/attention/index"
+import { ageMillis, answerItem, type DecidedEntry, type Decision, decisionGroups, decisionText, deciderHeadings, type AttentionItem, type DecidedItem, isOverdue, type OpenItem, type OwnerDecision, readAttention } from "../../entities/attention/index"
 import { listTasks, BacklogError, backlogPresent, noBacklog, type TaskFileError } from "../../entities/backlog/index"
 import { deciderLabel, formatTable } from "../../shared/lib/index"
 
 const ATTENTION_JSON_SCHEMA = "orc.attention.v1"
 
-interface DecidedJson {
-  readonly id: string
-  readonly kind: AttentionItem["kind"]
-  readonly task: string
-  readonly text: string
-  readonly asked: string
-  readonly owner: AttentionItem["owner"]
-  readonly decision?: Decision
-  readonly answer: Extract<AttentionItem["state"], { kind: "closed" }>["answer"]
-  readonly overturned?: Extract<AttentionItem["state"], { kind: "closed" }>["answer"]
-}
-
 interface AttentionJson {
   readonly schema: typeof ATTENTION_JSON_SCHEMA
   readonly at: string
   readonly items: ReadonlyArray<Omit<AttentionItem, "state"> & { readonly id: string; readonly ageSeconds: number; readonly overdue: boolean }>
-  readonly decided: ReadonlyArray<DecidedJson>
+  readonly decided: ReadonlyArray<DecidedEntry>
 }
 
 export const attentionJson = (items: ReadonlyArray<OpenItem>, at: string, decided: ReadonlyArray<DecidedItem>): AttentionJson => {
@@ -70,6 +58,10 @@ const openText = (item: { readonly text: string; readonly decision?: Decision })
   return item.decision === undefined ? text : text + " (" + deciderLabel(item.decision.decider) + " · " + decisionText(item.decision) + ")"
 }
 
+const decidedLines = (line: OwnerDecision): string =>
+  line.id + ": " + line.words + (line.replaced ? " (replaced)" : "") + (line.inferred ? " (attribution inferred)" : "") +
+  "\n  question: " + line.question.replace(/\s+/g, " ").trim()
+
 const formatAttention = (items: ReadonlyArray<OpenItem>, decided: ReadonlyArray<DecidedItem>, at: string): string => {
   const view = attentionJson(items, at, decided)
   const open = formatTable(
@@ -83,14 +75,11 @@ const formatAttention = (items: ReadonlyArray<OpenItem>, decided: ReadonlyArray<
       ...item.options?.map((option) => "- " + option.text + (option.outcome === undefined ? "" : ": " + option.outcome)) ?? [],
       "Recommended: " + (item.decision?.kind === "escalated" ? item.decision.recommendation ?? item.recommendation : item.recommendation)
     ].join("\n"))
-  const sections = (["owner", "agent"] as const).flatMap((decider) => {
-    const answers = view.decided.flatMap((entry) => [
-      ...(entry.overturned?.decider === decider ? [entry.id + ": " + entry.overturned.words + " (replaced)"] : []),
-      ...(entry.answer.decider === decider ? [entry.id + ": " + entry.answer.words + (entry.answer.inferred === true ? " (attribution inferred)" : "")] : []),
-      ...(entry.decision?.decider === decider ? [entry.id + ": " + decisionText(entry.decision)] : [])
-    ])
-    return answers.length === 0 ? [] : ["Decided by " + decider + ":\n" + answers.join("\n")]
-  })
+  const groups = decisionGroups(view.decided)
+  const sections = [
+    ...(groups.owner.length === 0 ? [] : [deciderHeadings.owner + ":\n" + groups.owner.map(decidedLines).join("\n")]),
+    ...(groups.agent.length === 0 ? [] : [deciderHeadings.agent + ":\n" + groups.agent.map((line) => decidedLines(line) + "\n  basis: " + line.basis).join("\n")])
+  ]
   return [open, ...choices, ...sections].join("\n\n")
 }
 
