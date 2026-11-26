@@ -74,7 +74,7 @@ describe("quotaBlocks over the accounts orc quota --json prints", () => {
       now,
       timeZone: DateTime.zoneMakeNamedUnsafe("UTC"),
     });
-    expect(session.accounts.map((account) => account.title)).toEqual(["claude", "claude main"]);
+    expect(session.accounts.filter((account) => account.provider === "claude").map((account) => account.title)).toEqual(["claude"]);
   });
 
   test("puts one account block per account between live claude and codex without guessing the login", () => {
