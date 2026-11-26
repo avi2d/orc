@@ -33,8 +33,8 @@ export {
   QuotaSource,
   QuotaWindow,
   quotaSourceLayer,
+  overlaySubquo,
   quotaSourceLayerWithMappings,
-  subquoProgram,
   shownQuotaProviders,
 } from "./entities/session-quota";
 export { logFreshMillis, type QuotaRead, readQuota, savedAgeSeconds, staleSourceAgeSeconds } from "./entities/session-quota";
@@ -141,8 +141,9 @@ export { type TaskHistoryMachine, RemoteTaskHistory, remoteTaskHistoryLayer } fr
 export { type TaskLiveMachine, RemoteTaskLive, remoteTaskLiveLayer } from "./entities/task-board";
 export { readBeside } from "./shared/config";
 
-export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./entities/session-quota";
-export { sessionQuotaOf, type SessionQuotaSources, sessionQuotaSourcesLayer, type SessionSources, sessionSourcesLayer } from "./entities/session-quota";
+export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaReadings, type QuotaReadSources, readQuotas } from "./entities/session-quota";
+export { sessionQuotaOf, type SessionQuotaSources, type SessionSources, sessionSourcesLayer } from "./entities/session-quota";
+export { configuredQuotaSourceLayer, quotaReadSourcesLayer, sessionQuotaSourcesLayer } from "./features/quota-sources";
 export { ComposedSessionQuotaReport } from "./entities/session-quota";
 export { composedSessionQuotaReport } from "./entities/session-quota";
 export { sessionQuotaViewOf } from "./entities/session-quota";

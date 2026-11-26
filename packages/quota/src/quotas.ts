@@ -61,7 +61,10 @@ const harvestedVerdict = (window: SourcedWindow): Line => {
 // A window that bounds a scope speaks with that scope's runway, the wording quota-axi prints under its headline.
 const liveVerdict = (window: SourcedWindow, exhaustion: ReadonlyArray<QuotaAvailability>): Line => {
   if (window.source.kind === "harvested") return harvestedVerdict(window);
-  const runway = exhaustion.find((scope) => scope.runway?.limitingWindowId === window.id)?.runway;
+  const runway =
+    window.source.kind === "quota-axi"
+      ? exhaustion.find((scope) => scope.runway?.limitingWindowId === window.id)?.runway
+      : undefined;
   if (runway !== undefined) return runwayVerdict(runway);
   return window.pace === undefined ? [] : paceWords[window.pace.status];
 };

@@ -1,6 +1,6 @@
 import { BunFileSystem } from "@effect/platform-bun";
-import { Effect, Layer } from "effect";
-import { harvestLogSourceLayer, orcQuotaSourceLayer, quotaSourceLayerWithMappings, readClaudeAccounts, readConfig, sessionLogSourceLayer, sessionSourcesLayer, subquoProgram } from "@avi2dg/orc-schema";
+import { Layer } from "effect";
+import { configuredQuotaSourceLayer, harvestLogSourceLayer, orcQuotaSourceLayer, readClaudeAccounts, sessionLogSourceLayer, sessionSourcesLayer } from "@avi2dg/orc-schema";
 import { liveCommandRunner } from "@avi2dg/orc-ui";
 
 const livePlatform = Layer.merge(liveCommandRunner, BunFileSystem.layer);
@@ -12,7 +12,7 @@ export const harvestLogSourceLive = harvestLogSourceLayer(readClaudeAccounts).pi
 export const sessionSourcesLive = sessionSourcesLayer.pipe(Layer.provide(livePlatform));
 
 export const sessionQuotaSourcesLive = Layer.mergeAll(
-  quotaSourceLayerWithMappings(Effect.map(readConfig, ({ config }) => config.subquoAccounts ?? []), subquoProgram),
+  configuredQuotaSourceLayer,
   orcQuotaSourceLayer,
   harvestLogSourceLayer(readClaudeAccounts),
   sessionSourcesLayer,

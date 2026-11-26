@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { decodeQuota } from "@avi2dg/orc-schema";
-import { overlaySubquo } from "../../../packages/schema/src/entities/session-quota/sources/subquo";
+import { decodeQuota, overlaySubquo } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 
 const quota = decodeQuota(fixture("quota-axi/full.json"));

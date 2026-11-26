@@ -110,8 +110,8 @@ export {
   decodeQuota,
   QuotaSource,
   quotaSourceLayer,
-  quotaSourceLayerWithMappings,
 } from "./sources/quota";
+export { overlaySubquo, quotaSourceLayerWithMappings } from "./sources/subquo";
 export { subquoProgram } from "./sources/subquo-program";
 export {
   type OrcQuota,
@@ -170,8 +170,6 @@ export {
   type SessionSources,
   type SessionQuotaSources,
   sessionSourcesLayer,
-  quotaReadSourcesLayer,
-  sessionQuotaSourcesLayer,
   localSessionQuotaOf,
   composedSessionQuotaOf,
   sessionQuotaOf,

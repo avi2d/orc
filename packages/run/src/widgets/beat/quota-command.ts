@@ -2,8 +2,7 @@ import { Duration, Effect, Predicate } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { resolve } from "node:path"
 import { spawnedQuiet } from "../../shared/process/index"
-import manifest from "../../../package.json"
-import { installedSubquo } from "./subquo-program"
+import { subquoProgram } from "./subquo-program"
 
 export type AccountReading =
   | { readonly account: string; readonly kind: "usable"; readonly remainingPercent: number; readonly resetsAt?: string }
@@ -28,12 +27,7 @@ export const runQuotaCommand = (
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const appDir = process.env.ORC_LAUNCHED_BINARY === process.execPath ? process.env.ORC_BUNDLED_APP_DIR : undefined
     const packageManifest = appDir === undefined ? import.meta.path : resolve(appDir, "../..", "package.json")
-    const executable = program === "subquo"
-      ? installedSubquo(packageManifest, process.platform, process.arch, manifest.dependencies["@avi2dg/subquo"])
-        ?? installedSubquo(import.meta.path, process.platform, process.arch, manifest.dependencies["@avi2dg/subquo"])
-        ?? installedSubquo(process.execPath, process.platform, process.arch, manifest.dependencies["@avi2dg/subquo"])
-        ?? program
-      : program
+    const executable = program === "subquo" ? yield* subquoProgram([packageManifest, process.execPath]) : program
     const [stdout, exitCode] = yield* spawnedQuiet(spawner, executable, args)
     if (exitCode !== 0) {
       return failed("exit", named + " exited " + exitCode)

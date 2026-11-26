@@ -28,6 +28,8 @@ When `CLAUDE_CODE_OAUTH_TOKEN` or `CLAUDE_SECURESTORAGE_CONFIG_DIR` selects a Cl
 A fresh Codex rollout suppresses `quota-axi` reads for Codex, so another Codex login appears only after that rollout is an hour old.
 See [Capture usage as it happens](session-quota/capture.md) for Claude statusline readings.
 
+To print one frame, run `orc-dash panel quota --print`.
+
 ### Map accounts to subquo
 
 The panel can read a saved `subquo.v1` snapshot for accounts named in `subquoAccounts` in the dashboard config.
@@ -41,15 +43,13 @@ Each entry names the quota-axi provider, its account key, and the corresponding 
 }
 ```
 
-The panel runs the installed subquo executable with `read --json`.
-If the installed executable is unavailable, the panel looks for `subquo` on its PATH.
+The panel runs the subquo copy installed with Orc's npm package, with `read --json`.
+When that copy is missing, the panel runs `subquo` from its PATH.
 A fresh subquo reading replaces the matching five-hour and weekly windows.
 For OpenCode Go, it also replaces matching rolling and monthly windows.
 A missing, stale, expired, or mismatched reading leaves the quota-axi window in place.
 Windows subquo does not name also keep their quota-axi readings.
 The panel does not infer a mapping from account names.
-
-To print one frame, run `orc-dash panel quota --print`.
 
 ### Show the dispatch accounts
 
