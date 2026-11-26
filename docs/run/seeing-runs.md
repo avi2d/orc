@@ -63,6 +63,7 @@ An implement step beside carried steps gives their run even when its own evidenc
 
 To print one step's output, run `orc log <run-id> <step-id>` with the step's `id` from that JSON.
 An implement step prints `agent.log` and a fix step its `fix-<attempt>.log`, which Pi appends to as it works.
+A review turn writes `review-<n>.log` the same way.
 A checks or [no-mistakes](https://github.com/kunchenguid/no-mistakes) step prints the file it wrote.
 A step whose output is not written yet prints nothing.
 A carried step prints the log from the evidence path it records.

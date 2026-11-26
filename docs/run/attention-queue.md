@@ -58,6 +58,10 @@ The decider can:
   Orc escalates an answer whose quote is no whole clause of them, after whitespace is collapsed and surrounding quotes and a leading list or quote marker are stripped.
   A quote matches a whole line or paragraph, a sentence in a line, or a sentence of a paragraph joined across lines, starting at the start or after a period, exclamation mark, question mark, colon, or semicolon and ending at the end, before a mark, or on a mark.
   Quote marks and clause punctuation may differ, orc records the source wording, and meaning-changing marks stay exact.
+  Orc then asks `models.decider` in a second call whether that rule supports the answer, with the task's intent, the rule, the question and the answer, and without the decider's reason.
+  That call runs under `packages/run/agents/support-check-policy.md`.
+  Orc escalates the answer when the call finds the rule does not support it, gives no verdict orc reads, or fails.
+  An answer on the recommended-option sentence skips this call, because orc answers it with the question's own `Recommended:` option.
 - **Ask back** to a worker question.
   The worker receives the question and the item stays open.
   A review question cannot be asked back and is escalated instead.
