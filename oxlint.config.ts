@@ -4,6 +4,7 @@ import { defineConfig } from "@avi2dg/checks/oxlint";
 export default defineConfig({
   effect: {
     excludeFiles: [
+      "packages/run/scripts/launch.ts",
       "packages/run/src/entities/agent/orc-ask-extension.ts",
       "packages/run/src/entities/heavy-queue/heavy-process-tree.ts",
       "packages/run/src/entities/heavy-queue/heavy-runner-entry.ts",

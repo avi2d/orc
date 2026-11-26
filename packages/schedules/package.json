@@ -14,6 +14,6 @@
   "dependencies": {
     "@avi2dg/orc-schema": "workspace:*",
     "@avi2dg/orc-ui": "workspace:*",
-    "effect": "4.0.0"
+    "effect": "4.1.4"
   }
 }

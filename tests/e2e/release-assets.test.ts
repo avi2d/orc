@@ -24,9 +24,14 @@ describe("release assets", () => {
       const built = await run([process.execPath, "run", "release:assets", out], repoRoot)
       expect(built.exitCode, built.stderr).toBe(0)
 
-      const name = "orc-" + packageJson.version + "-" + process.platform + "-" + process.arch + ".tar.gz"
-      expect((await readdir(out)).toSorted()).toEqual([name, name + ".sha256"])
-      expect(built.stdout.trim().split("\n")).toEqual([join(out, name), join(out, name + ".sha256")])
+      const target = process.platform + "-" + process.arch
+      const binary = "orc-" + target
+      const name = "orc-" + packageJson.version + "-" + target + ".tar.gz"
+      expect((await readdir(out)).toSorted()).toEqual([name, name + ".sha256", binary].toSorted())
+      expect(built.stdout.trim().split("\n")).toEqual([join(out, binary), join(out, name), join(out, name + ".sha256")])
+      const native = await run([join(out, binary), "--version"], dir, { ...process.env, PATH: dir })
+      expect(native.exitCode, native.stderr).toBe(0)
+      expect(native.stdout.trim()).toBe("orc " + packageJson.version)
 
       const digest = createHash("sha256").update(await readFile(join(out, name))).digest("hex")
       expect(await readFile(join(out, name + ".sha256"), "utf8")).toBe(digest + "  " + name + "\n")

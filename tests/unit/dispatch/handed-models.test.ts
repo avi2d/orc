@@ -25,7 +25,7 @@ const recordingPueue = (added: Array<ReadonlyArray<string>>) =>
       if (ChildProcess.isStandardCommand(command) && command.command === "pueue") {
         const verb = command.args[0] ?? ""
         if (verb === "add") {
-          added.push(command.args)
+          added.push(command.args.map(String))
         }
         return real.spawn(ChildProcess.make("sh", ["-c", verb === "group" ? "echo '{\"orc\":{}}'" : verb === "status" ? "echo '{\"tasks\":{}}'" : "echo 77"]))
       }

@@ -59,7 +59,7 @@ const piArgsFor = async (sessionFile: string | null): Promise<ReadonlyArray<stri
       const real = yield* ChildProcessSpawner.ChildProcessSpawner
       return ChildProcessSpawner.make((command) => {
         if (ChildProcess.isStandardCommand(command) && command.command === "pi") {
-          seen.push(command.args)
+          seen.push(command.args.map(String))
           return real.spawn(ChildProcess.make("true", [], command.options))
         }
         return real.spawn(command)

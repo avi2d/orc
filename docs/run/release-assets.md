@@ -7,14 +7,18 @@ Each Orc release on GitHub carries an archive with `orc`, `orc-dash`, `orc-dash-
 The executables are Bun bytecode builds that run without Bun installed.
 The archive also holds the bundled [Herdr App](https://herdr.dev), which Herdr loads as mods.
 The `assets` job of `.github/workflows/main.yml` runs after the `release` job has written the GitHub release.
-The job runs `bun run release:assets` on macOS arm64 and Linux x64.
-The build runs both dashboard executables with `--help` before the job attaches the archives and checksums to the release.
-The `@avi2dg/checks` kit writes that job, because `checks.config.ts` sets `releaseAssets: true`.
+Both the `binaries` and `assets` jobs run `bun run release:assets` on macOS arm64 and Linux x64.
+The `binaries` job runs before `release` so npm can publish the platform packages before `@avi2dg/orc`.
+The `assets` job attaches the files to the GitHub release.
+The build checks `orc --version` and runs both dashboard executables with `--help`.
+The `@avi2dg/checks` kit writes these jobs from the release settings in `checks.config.ts`.
 
 ## Asset names
 
 | File | What it holds |
 | --- | --- |
+| `orc-darwin-arm64` | The macOS executable for the npm platform package |
+| `orc-linux-x64` | The Linux executable for the npm platform package |
 | `orc-<version>-darwin-arm64.tar.gz` | The release archive for macOS on Apple silicon |
 | `orc-<version>-darwin-arm64.tar.gz.sha256` | The SHA-256 checksum of the macOS archive |
 | `orc-<version>-linux-x64.tar.gz` | The release archive for Linux on x64 |
@@ -43,7 +47,7 @@ Check a downloaded archive in its folder with `sha256sum -c orc-0.21.0-linux-x64
 
 ## Build the assets by hand
 
-`bun run release:assets` builds the archive for the platform it runs on and writes both files to `release-assets/` at the repository root.
+`bun run release:assets` writes the executable, archive, and checksum for the current platform to `release-assets/` at the repository root.
 Give it a folder to write them elsewhere, such as `bun run release:assets /tmp/assets`.
 It prints the path of each file it wrote, one per line.
 

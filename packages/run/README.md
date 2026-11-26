@@ -7,7 +7,6 @@ It also applies a worker split proposal, as [Task kinds](https://github.com/avi2
 
 ## Before you begin
 
-- Bun, at the version `.bun-version` pins.
 - Git 2.48 or later, tested on 2.56.0.
 - nono from https://nono.sh, tested on 0.80.0, for the default sandbox.
 - Node, tested on 24.22.1.
@@ -16,13 +15,15 @@ It also applies a worker split proposal, as [Task kinds](https://github.com/avi2
 
 ## Install
 
-Orc runs on Bun, so install it with Bun.
 To install orc:
 
-1. Run `bun add -g @avi2dg/orc` to put the `orc` command on your PATH.
-1. Run `orc --version` to check it.
+1. Run `npm install -g @avi2dg/orc`.
+1. Run `orc --version`.
 
-To upgrade orc, run `bun add -g @avi2dg/orc` again, or run `orc update`, as [Updating orc](https://github.com/avi2d/orc/blob/main/docs/run/updating-orc.md) shows.
+Orc prints its version.
+The npm package runs without Bun on Apple silicon macOS and Linux x64 with glibc.
+If the compiled binary is missing, install Bun to run orc from source.
+To upgrade orc, run the same install command again or follow [Updating orc](https://github.com/avi2d/orc/blob/main/docs/run/updating-orc.md).
 To run orc from a checkout of the repository instead, follow [Contribute](https://github.com/avi2d/orc/blob/main/docs/contribute.md#run-orc-from-a-checkout).
 
 ## Run a task

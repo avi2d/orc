@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { Schema } from "effect"
@@ -63,6 +63,7 @@ const expectedFiles = [
   "dist/herdr-app/mods/orc-tabs/mod.json",
   "dist/herdr-app/mods/orc-task/main.js",
   "dist/herdr-app/mods/orc-task/mod.json",
+  "dist/launch.js",
   "package.json",
   "scripts/patch-knip-jiti.ts",
   "src/shared/sandbox/agent-exec.ts",
@@ -365,6 +366,108 @@ const spawnPassing = (command: ReadonlyArray<string>, cwd: string, env: Record<s
   }
   return result.stdout.toString()
 }
+
+const platformTargets = ["darwin-arm64", "linux-x64"] as const
+
+const pack = (directory: string, output: string): string => {
+  const [packed] = Schema.decodeSync(Schema.fromJsonString(PackReport))(
+    spawnPassing(["npm", "pack", "--json", "--pack-destination", output], directory)
+  )
+  return packed.filename
+}
+
+const releaseFixture = async (dir: string) => {
+  const version = runManifest.version
+  const binary = "orc-" + version
+  const compiled = join(dir, binary)
+  spawnPassing([process.execPath, "run", "compile", compiled], repoRoot)
+  const host = process.platform + "-" + process.arch
+  const tarballs = await Promise.all(platformTargets.map(async (target) => {
+    const [os, cpu] = target.split("-")
+    const cwd = join(dir, target)
+    const manifest = {
+      name: "@avi2dg/orc-" + target,
+      version,
+      os: [os],
+      cpu: [cpu],
+      ...(os === "linux" ? { libc: ["glibc"] } : {}),
+      files: [binary]
+    }
+    await mkdir(cwd)
+    await writeFile(join(cwd, "package.json"), JSON.stringify(manifest))
+    if (target === host) await copyFile(compiled, join(cwd, binary))
+    else await writeFile(join(cwd, binary), "not a binary for this host")
+    return { manifest, tarball: pack(cwd, dir) }
+  }))
+  spawnPassing(["tar", "-xf", join(dir, pack(packageDir, dir))], dir)
+  const main = join(dir, "package")
+  const optionalDependencies = Object.fromEntries(tarballs.map(({ manifest }) => [manifest.name, version]))
+  await writeFile(join(main, "package.json"), JSON.stringify({ ...runManifest, optionalDependencies }))
+  return { mainTarball: join(main, pack(main, main)), tarballs }
+}
+
+describe("the npm release", () => {
+  test("npm selects only the matching platform package and the installed orc runs without Bun", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-npm-release-"))
+    try {
+      const { mainTarball, tarballs } = await releaseFixture(dir)
+      const registry = Bun.serve({
+        hostname: "127.0.0.1",
+        port: 0,
+        fetch(request) {
+          const url = new URL(request.url)
+          const path = decodeURIComponent(url.pathname.slice(1))
+          const asset = tarballs.find(({ tarball }) => tarball === path)
+          if (asset !== undefined) return new Response(Bun.file(join(dir, asset.tarball)))
+          const pkg = tarballs.find(({ manifest }) => manifest.name === path)
+          if (pkg === undefined) return new Response("Not Found", { status: 404 })
+          const version = runManifest.version
+          return Response.json({
+            name: pkg.manifest.name,
+            "dist-tags": { latest: version },
+            versions: {
+              [version]: { ...pkg.manifest, dist: { tarball: new URL(pkg.tarball, url).href } }
+            }
+          })
+        }
+      })
+      const prefix = join(dir, "prefix")
+      const npmrc = join(dir, "npmrc")
+      try {
+        await writeFile(npmrc, `@avi2dg:registry=${registry.url.href}\n`)
+        const install = Bun.spawn(["npm", "install", "-g", "--prefix", prefix,
+          "--userconfig", npmrc, "--ignore-scripts", "--no-audit", "--no-fund", mainTarball], {
+          cwd: dir, stdout: "pipe", stderr: "pipe"
+        })
+        const [stdout, stderr, status] = await Promise.all([
+          new Response(install.stdout).text(), new Response(install.stderr).text(), install.exited
+        ])
+        expect(status, stdout + stderr).toBe(0)
+      } finally {
+        await registry.stop(true)
+      }
+      const node = Bun.which("node")
+      if (node === null) throw new Error("npm consumer test needs Node")
+      const bin = join(dir, "bin")
+      await mkdir(bin)
+      await symlink(node, join(bin, "node"))
+      const scope = join(prefix, "lib/node_modules/@avi2dg")
+      const nested = join(scope, "orc/node_modules/@avi2dg")
+      for (const target of platformTargets) {
+        const locations = [scope, nested].map((directory) => Bun.file(join(directory, "orc-" + target, "package.json")).exists())
+        expect((await Promise.all(locations)).some(Boolean)).toBe(target === process.platform + "-" + process.arch)
+      }
+      const env = { PATH: bin, HOME: dir }
+      const orc = join(prefix, "bin/orc")
+      expect(spawnPassing([orc, "--version"], dir, env)).toBe("orc " + runManifest.version + "\n")
+      const usage = Bun.spawnSync([orc, "not-a-command"], { cwd: dir, env })
+      expect(usage.exitCode).toBe(1)
+      expect(usage.stderr.toString()).toContain("not-a-command")
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 180_000)
+})
 
 describe("the packed tarball installed into an empty project without orc's lockfile", () => {
   let project = ""
