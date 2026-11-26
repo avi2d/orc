@@ -33,7 +33,8 @@ export const sendBack = (
   home: string,
   args: SendBack,
   at: string,
-  mergeRecord: "kept" | "cleared"
+  mergeRecord: "kept" | "cleared",
+  ciChecks: ReadonlyArray<string> = []
 ): Effect.Effect<string, BacklogError | ConfigError | TaskFileError, FileSystem.FileSystem | RunnerRequirements> =>
   Effect.gen(function*() {
     const record = yield* findTask(root, args.id)
@@ -68,6 +69,6 @@ export const sendBack = (
     if (run === null) {
       return yield* refuse("the runner on " + claim.machine + " holds no run of " + args.id + " to resume")
     }
-    yield* sendBackClosedTask(root, args.id, args.words, at, { machine: claim.machine, run }, mergeRecord)
+    yield* sendBackClosedTask(root, args.id, args.words, at, { machine: claim.machine, run }, mergeRecord, ciChecks)
     return "sent " + args.id + " back, so the next beat resumes run " + run + " on " + taskBranch(args.id) + " with the review and its push updates " + url
   })

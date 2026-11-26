@@ -29,6 +29,8 @@ export interface ChecksRound {
 
 export const maxFixAttempts = 3
 
+export const beatReadsChecks = "The orc beat reads the GitHub checks on the PR."
+
 export const checksFileName = (round: number): string => "checks-" + round + ".txt"
 
 const fail = (message: string): Effect.Effect<never, ChecksError> => Effect.fail(new ChecksError({ message }))
@@ -150,7 +152,7 @@ export const runChecksRound = (
       boundaries[boundaries.length - 1] = { ...boundary, result: { outputEnd: outputStart + output.length, passed, seconds: Duration.toSeconds(elapsed) } }
       yield* writeIndex()
     }
-    yield* append(outcomes.length === 0 ? "No local checks ran. GitHub CI decides completion.\n" : "\n")
+    yield* append(outcomes.length === 0 ? "No local checks ran. " + beatReadsChecks + "\n" : "\n")
     return { round, file, outcomes }
   })
 

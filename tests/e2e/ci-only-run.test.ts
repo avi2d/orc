@@ -32,7 +32,7 @@ test.each([
       'case "$2" in',
       "  run)",
       "    " + record("review"),
-      '    case " $* " in *" --skip test,rebase "*) ;; *) fixture-test-runner ;; esac',
+      '    case " $* " in *" --skip test,rebase,ci "*) ;; *) fixture-test-runner ;; esac',
       '    printf "%s\\n" "gate: review" "findings[1]{id,severity,file,line,action,description}:" "  R1,warning,greeting.txt,1,auto-fix,revise greeting"',
       "    ;;",
       "  respond)",
@@ -49,7 +49,7 @@ test.each([
     if (skippedNames.length > 0) {
       expect(result.stderr).toContain("skipped local commands: " + skippedNames.join(", "))
     }
-    expect(result.stderr).toContain("GitHub CI decides completion.")
+    expect(result.stderr).toContain("The orc beat reads the GitHub checks on the PR.")
     const noLocalChecks = !localNames.some((name) => name !== "prepare")
     const orcHome = env["ORC_HOME"] ?? ""
     const db = new Database(join(orcHome, "orc.sqlite"), { readonly: true })
@@ -68,7 +68,7 @@ test.each([
       for (const runId of runIds) {
         const runDir = join(orcHome, "runs", runId)
         expect(await readFile(join(runDir, "report.md"), "utf8")).toContain("checks round 1: skipped, no local checks run")
-        expect(await readFile(join(runDir, "session", "checks-1.txt"), "utf8")).toBe("No local checks ran. GitHub CI decides completion.\n")
+        expect(await readFile(join(runDir, "session", "checks-1.txt"), "utf8")).toBe("No local checks ran. The orc beat reads the GitHub checks on the PR.\n")
       }
     }
   })

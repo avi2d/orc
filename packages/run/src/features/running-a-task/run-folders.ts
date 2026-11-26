@@ -53,7 +53,7 @@ const endsParked = (db: Database, runId: string, report: OrcRunReport): Effect.E
 
 export const dropEndedPiAgentDir = (db: Database, run: Pick<HistoryRun, "fs" | "path" | "runDir" | "runId">, report: OrcRunReport): Effect.Effect<void> =>
   Effect.gen(function*() {
-    if (report.waitingOnCi || (yield* endsParked(db, run.runId, report))) {
+    if (yield* endsParked(db, run.runId, report)) {
       return
     }
     yield* dropPiAgentDir(run.fs, run.path, run.runDir)

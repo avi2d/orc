@@ -353,7 +353,6 @@ const report = (overrides: Partial<OrcRunReport>): OrcRunReport => ({
   tokens: null,
   sessionSize: null,
   completed: false,
-  waitingOnCi: false,
   markerVerified: true,
   implementPassed: true,
   checksRounds: null,

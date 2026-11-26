@@ -3,7 +3,7 @@ import { mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect } from "effect"
+import { Effect, Result } from "effect"
 import { parseDispatchArgs } from "../../../packages/run/src/app/dispatch-args"
 import { addTask, claimTask, closeStartedTask, listTasks, markPosted, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { markEventPosted, recordEvent, unpostedEvents } from "../../../packages/run/src/entities/events/index"
@@ -16,15 +16,20 @@ const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, in
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
 
 describe("marking a close posted", () => {
-  test("concurrent marks all resolve leaving one posted record, and a late mark is a no-op", async () => {
+  test("concurrent marks refuse contention instead of overwriting a posted record", async () => {
     const root = await mkdtemp(join(tmpdir(), "orc-posted-"))
     try {
       const record = await run(addTask(root, spec))
       await run(claimTask(root, record.spec.id))
       await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
       await run(closeStartedTask(root, record.spec.id, "done", "", { pr: null, report: null }, "2026-10-27T11:00:00.000Z"))
-      const marks = await run(Effect.all(Array.from({ length: 8 }, () => markPosted(root, "orc-1", "2026-10-27T11:01:00.000Z")), { concurrency: "unbounded" }))
-      expect(marks).toHaveLength(8)
+      const marks = await run(Effect.all(Array.from({ length: 8 }, () => markPosted(root, "orc-1", "2026-10-27T11:01:00.000Z").pipe(Effect.result)), { concurrency: "unbounded" }))
+      expect(marks.filter((mark) => Result.isSuccess(mark) && mark.success)).toHaveLength(1)
+      for (const mark of marks) {
+        if (Result.isFailure(mark)) {
+          expect(mark.failure).toMatchObject({ _tag: "BacklogError", detail: "orc-1 moved while orc read it, so run the command again" })
+        }
+      }
       expect((await run(listTasks(root))).map((task) => task.state.kind === "closed" ? task.state.postedAt : null)).toEqual(["2026-10-27T11:01:00.000Z"])
       expect(await readdir(join(root, "closed"))).toEqual(["orc-1.md"])
       expect(await run(markPosted(root, "orc-1", "2026-10-27T11:02:00.000Z"))).toBe(false)

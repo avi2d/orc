@@ -130,7 +130,6 @@ export const failedReport = (run: HistoryRun, reason: string): OrcRunReport => (
   tokens: null,
   sessionSize: null,
   completed: false,
-  waitingOnCi: false,
   markerVerified: false,
   implementPassed: false,
   checksRounds: null,
