@@ -47,7 +47,7 @@ test("an unasked-question card sends nothing from the app instead of an orc atte
     id: "garden-9.unasked-question.2026-11-20T22_49_20_578Z", kind: "unasked-question", task: "garden-9", owner: "user" as const,
     text: "garden-9 is parked for the captain's answer to R3, and no open item asks it", asked: "2026-11-21T21:30:00.000Z",
     subject: "the unasked questions of garden-9: R3", recommendation: "answer", decision: null, overdueSeconds: null,
-    options: [{ text: "answer", outcome: "orc backlog answer garden-9 <question-id>=<text>", picture: null }, { text: "drop", outcome: "orc backlog drop garden-9 <reason>", picture: null }]
+    options: [{ text: "answer", outcome: "orc backlog answer garden-9 <question-id>=<text>", picture: null, action: null }, { text: "drop", outcome: "orc backlog drop garden-9 <reason>", picture: null, action: null }]
   }
   const card = inboxItems([], [unasked]).at(0)
   if (card === undefined) throw new Error("Missing unasked-question card")

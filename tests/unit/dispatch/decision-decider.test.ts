@@ -15,7 +15,7 @@ const decisions = [
   { kind: "escalated", reason: "The rule does not apply", at: "2026-11-20T10:00:00Z" },
   { kind: "asked-back", question: "Which rule?", at: "2026-11-20T10:00:00Z" },
   { kind: "duplicate", of: "question-1", at: "2026-11-20T10:00:00Z" }
-]
+] as const
 
 describe("attention decision attribution", () => {
   for (const decision of decisions) {
@@ -49,7 +49,7 @@ test("a closed attention item refuses missing attribution on either answer", () 
 test("a decision-task answer refuses missing attribution instead of assuming who answered", () => {
   const parse = Schema.decodeUnknownSync(Answer)
   expect(() => parse(answer)).toThrow()
-  for (const decider of ["owner", "agent"]) {
+  for (const decider of ["owner", "agent"] as const) {
     expect(parse({ ...answer, decider })).toEqual({ ...answer, decider })
   }
 })
@@ -79,8 +79,8 @@ test("legacy attention decisions migrate as agent actions without assigning the 
 test("legacy merge closures mark inferred attribution without changing an explicit owner answer", async () => {
   for (const words of ["merged", "closed without merging"]) {
     const entry = { ...attention, kind: "pr-ready" }
-    const read = (answer: unknown) => Effect.runPromise(decodeStoredAttention(JSON.stringify({
-      ...entry, state: { kind: "closed", answer }
+    const read = (stored: unknown) => Effect.runPromise(decodeStoredAttention(JSON.stringify({
+      ...entry, state: { kind: "closed", answer: stored }
     })))
     expect((await read({ words, at })).state).toMatchObject({ answer: { decider: "agent", inferred: true } })
     expect((await read({ words, at, decider: "owner" })).state).toEqual({ kind: "closed", answer: { words, at, decider: "owner" } })

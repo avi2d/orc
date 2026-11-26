@@ -2,7 +2,6 @@ import { Array as Arr, Effect, FileSystem, Option, Result, Schema } from "effect
 import type { Database } from "bun:sqlite"
 import type { ChildProcessSpawner } from "effect/process"
 import { latestRunForBranchName, openQuestionsForRun, runsForBranch } from "../../entities/run-history/index"
-import type { OpenQuestion } from "../../entities/review-gate/index"
 import { formatHistoryError, openDatabase, stoppedEndReason, type RunRecord, RunStatusSchema } from "../../entities/run-history/index"
 import { writtenReport } from "../../entities/run-history/index"
 import { gateLogFileName } from "../../entities/review-gate/index"

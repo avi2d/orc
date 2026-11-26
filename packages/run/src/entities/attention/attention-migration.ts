@@ -43,4 +43,4 @@ const migrateItem = (item: StoredItem): AttentionItem => {
   }
 }
 
-export const decodeStoredAttention = (text: string) => decodeStoredItem(text).pipe(Effect.map(migrateItem))
+export const decodeStoredAttention = (text: string): Effect.Effect<AttentionItem, Schema.SchemaError> => decodeStoredItem(text).pipe(Effect.map(migrateItem))

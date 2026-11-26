@@ -110,7 +110,7 @@ describe("orc backlog thread", () => {
     const task: TaskRecord = {
       spec,
       hold: null,
-      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { words: "Three retries", at: overturnedAt, relayedTo: null, overturned: { decider: "agent" as const, words: "Two retries", at: decided, by: "decider", relayedTo: null } } }] },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { words: "Three retries", at: overturnedAt, decider: "owner" as const, relayedTo: null, overturned: { decider: "agent" as const, words: "Two retries", at: decided, by: "decider", relayedTo: null } } }] },
       state: started
     }
     const item = {

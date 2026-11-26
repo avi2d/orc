@@ -272,7 +272,7 @@ describe("the decider", () => {
         decision: { kind: "answered", reason: "the intent says twice" },
         answer: { words: "Two retries" }
       })
-      for (const at of [entry?.decision.at, entry?.answer.at]) {
+      for (const at of [entry?.decision?.at, entry?.answer.at]) {
         expect(at !== undefined && at >= before && at <= after).toBe(true)
       }
       expect(await run(attentionText(false, root))).toContain("Decided by agent:\n" + r2Item + ": Two retries\n" + r2Item + ": the intent says twice, quoting task orc-1: \"Retry a failed upload twice, then give up.\"")

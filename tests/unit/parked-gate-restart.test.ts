@@ -250,7 +250,7 @@ describe("a run parked on a gate orc cannot answer", () => {
         kind: "fix",
         ids: ["r1", "review-1"],
         ignore: [],
-        instructions: "The captain answered these findings; fix each as the answer says:\nreview-1: Keep it"
+        instructions: "These findings were answered; fix each as the answer says:\nreview-1: Keep it"
       }])
       expect(runC.status).toEqual("refused")
       expect(runC.openQuestions).toMatchObject([{ id: "review-1", text: "needs a human", owner: "user" }])
@@ -271,7 +271,7 @@ describe("a run parked on a gate orc cannot answer", () => {
         kind: "fix",
         ids: ["review-1"],
         ignore: [],
-        instructions: "The captain answered these findings; fix each as the answer says:\nreview-1: Keep it"
+        instructions: "These findings were answered; fix each as the answer says:\nreview-1: Keep it"
       }])
       expect(record.status).toEqual("refused")
       expect(record.openQuestions).toMatchObject([{ id: "review-1", text: "needs a human", owner: "user" }])

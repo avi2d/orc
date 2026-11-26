@@ -204,18 +204,18 @@ type OpenOutcome =
   | { readonly kind: "ending"; readonly ending: Ending }
   | { readonly kind: "answered"; readonly command: NoMistakesReply }
 
-const serveOpenQuestions = (input: NoMistakesInput, log: DriveLog, gate: ParkedGate, open: ReadonlyArray<NoMistakesFinding>, supplied: ReadonlyMap<string, string>): Effect.Effect<OpenOutcome> =>
+const serveOpenQuestions = (input: NoMistakesInput, log: DriveLog, gate: ParkedGate, open: ReadonlyArray<NoMistakesFinding>, supplied: ReadonlyMap<string, QuestionAnswer>): Effect.Effect<OpenOutcome> =>
   Effect.gen(function*() {
     for (let index = 0; index < open.length - 1; index += 1) {
       const pending = open[index] ?? { id: "", description: "" }
-      const reply = yield* input.runner.answer({ question: pending.id, answer: supplied.get(pending.id) ?? "" })
+      const reply = yield* input.runner.answer({ question: pending.id, answer: supplied.get(pending.id)?.answer ?? "" })
       if (reply.exitCode !== 0 || scalar(reply.stdout, "error") !== "") {
         const ending = yield* stopOnRejection(input, log, { kind: "answer", gate }, reply)
         return { kind: "ending", ending }
       }
     }
     const last = open[open.length - 1] ?? { id: "", description: "" }
-    const command = yield* input.runner.answer({ question: last.id, answer: supplied.get(last.id) ?? "" })
+    const command = yield* input.runner.answer({ question: last.id, answer: supplied.get(last.id)?.answer ?? "" })
     return { kind: "answered", command }
   })
 
@@ -223,7 +223,7 @@ const serveOpenQuestions = (input: NoMistakesInput, log: DriveLog, gate: ParkedG
 const awaitMissing = (
   input: NoMistakesInput,
   asked: ReadonlyArray<PendingFinding>,
-  supplied: Map<string, string>
+  supplied: Map<string, QuestionAnswer>
 ): Effect.Effect<{ readonly missing: ReadonlyArray<PendingFinding>; readonly asking: string | null; readonly askedAt: ReadonlyArray<AskedAt> }, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const unanswered = () => asked.filter((finding) => !supplied.has(finding.id))
@@ -233,7 +233,7 @@ const awaitMissing = (
     yield* appendGate(input.runDir, "asking")
     const waited = yield* input.waitForAnswers(unanswered())
     for (const entry of waited.answers) {
-      supplied.set(entry.question, entry.answer)
+      supplied.set(entry.question, entry)
     }
     yield* appendGate(input.runDir, "answered")
     return { missing: unanswered(), asking: waited.asked, askedAt: waited.askedAt }
@@ -246,7 +246,7 @@ type ParkedAdvance =
 const advanceParked = (
   input: NoMistakesInput,
   log: DriveLog,
-  supplied: Map<string, string>,
+  supplied: Map<string, QuestionAnswer>,
   parsed: ParsedRun,
   gate: ParkedGate,
   stdout: string
@@ -281,7 +281,7 @@ const advanceParked = (
       }
       return { kind: "next", current: outcome.command, sent: { kind: "answer", gate } }
     }
-    const carried = [...supplied].map(([question, words]) => ({ question, answer: words }))
+    const carried = [...supplied.values()]
     const answer = answerForGate(gate, parsed.findings, input.allow ?? [], carried)
     if (answer.kind === "refuse") {
       return { kind: "ending", ending: log.refuse(gate, answer.reason) }
@@ -319,7 +319,7 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, nev
     let sent: Sent = { kind: "start" }
     yield* appendGate(input.runDir, "start")
     let current = yield* startRun(input)
-    const supplied = new Map((input.answers ?? []).filter((entry) => entry.question !== gateCapQuestionId).map((entry) => [entry.question, entry.answer] as const))
+    const supplied = new Map((input.answers ?? []).filter((entry) => entry.question !== gateCapQuestionId).map((entry) => [entry.question, entry] as const))
     for (;;) {
       const step: CurrentStep = yield* stepCurrent(input, log, sent, current)
       if (step.kind === "stop") {

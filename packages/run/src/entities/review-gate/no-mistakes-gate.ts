@@ -1,4 +1,4 @@
-import { scalar, splitRow, table, trimmedLines, workerCiInstructions } from "../../shared/lib/index"
+import { deciderLabel, scalar, splitRow, table, trimmedLines, workerCiInstructions } from "../../shared/lib/index"
 import type { OpenQuestion, QuestionAnswer } from "./question"
 
 export const askUserWord = "ask-user"
@@ -167,8 +167,11 @@ export const answerArgsFor = (question: string, answer: string): ReadonlyArray<s
   ["axi", "answer", "--question", question, "--answer", answer]
 
 const answeredGuidance = (settled: ReadonlyArray<NoMistakesFinding>, answers: ReadonlyArray<QuestionAnswer>): string =>
-  ["The captain answered these findings; fix each as the answer says:",
-    ...settled.map((finding) => finding.id + ": " + (answers.find((entry) => entry.question === finding.id)?.answer ?? ""))].join("\n")
+  ["These findings were answered; fix each as the answer says:",
+    ...settled.map((finding) => {
+      const given = answers.find((entry) => entry.question === finding.id)
+      return finding.id + (given?.decider === undefined ? "" : " (" + deciderLabel(given.decider) + " answer)") + ": " + (given?.answer ?? "")
+    })].join("\n")
 
 export const answeredAskUser = (
   findings: ReadonlyArray<NoMistakesFinding>,

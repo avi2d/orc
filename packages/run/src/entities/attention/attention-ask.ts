@@ -37,3 +37,9 @@ export const unaskedQuestion = (task: TaskRecord, unasked: ReadonlyArray<ParkedQ
     }
   }
 }
+
+export const writtenAnswerChoice = (task: string, question: string, subject: string, reason: string): Choice => choice(
+  subject,
+  { text: "Write an answer", action: "write-answer", outcome: "Send an answer with orc backlog answer " + task + " " + question + "=<words> so the run can use it." + reason },
+  { text: "Leave open", action: "wait", outcome: "No answer is sent. The run keeps waiting for a decision on this question." }
+)

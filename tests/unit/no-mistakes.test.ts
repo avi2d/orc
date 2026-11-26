@@ -256,11 +256,11 @@ describe("answerForGate refuses only what needs your word", () => {
   })
 
   test("an answered finding with an action orc does not know is fixed with the answer instead of refused", () => {
-    expect(answerForGate(approvalGate, [stubFinding("r1", "manual")], [], [{ question: "r1", answer: "Rename it" }])).toEqual({
+    expect(answerForGate(approvalGate, [stubFinding("r1", "manual")], [], [{ question: "r1", answer: "Rename it", decider: "owner" }])).toEqual({
       kind: "fix",
       ids: ["r1"],
       ignore: [],
-      instructions: "The captain answered these findings; fix each as the answer says:\nr1: Rename it"
+      instructions: "These findings were answered; fix each as the answer says:\nr1 (Owner answer): Rename it"
     })
   })
 
@@ -293,15 +293,15 @@ describe("answerForGate refuses only what needs your word", () => {
   })
 
   test("an answered ask-user finding is fixed with the answer as guidance instead of refused or declined", () => {
-    const answer = answerForGate(approvalGate, parseRun(parked).findings, [], [{ question: "r2", answer: "Keep the old behavior behind a flag" }])
+    const answer = answerForGate(approvalGate, parseRun(parked).findings, [], [{ question: "r2", answer: "Keep the old behavior behind a flag", decider: "agent" }])
     expect(answer).toEqual({
       kind: "fix",
       ids: ["r1", "r2"],
       ignore: [],
-      instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior behind a flag"
+      instructions: "These findings were answered; fix each as the answer says:\nr2 (Agent answer): Keep the old behavior behind a flag"
     })
     if (answer.kind === "fix") {
-      expect(respondArgs(answer).slice(-2)).toEqual(["--instructions", "Leave repository tests to GitHub CI. Do not run them locally. You may run build, lint, or typecheck. If a pull request run exists, do not start or rerun CI by hand. Do not wait for CI in a tool call.\n\nThe captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior behind a flag"])
+      expect(respondArgs(answer).slice(-2)).toEqual(["--instructions", "Leave repository tests to GitHub CI. Do not run them locally. You may run build, lint, or typecheck. If a pull request run exists, do not start or rerun CI by hand. Do not wait for CI in a tool call.\n\nThese findings were answered; fix each as the answer says:\nr2 (Agent answer): Keep the old behavior behind a flag"])
     }
   })
 
@@ -310,7 +310,7 @@ describe("answerForGate refuses only what needs your word", () => {
       kind: "fix",
       ids: ["r2"],
       ignore: [],
-      instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep it"
+      instructions: "These findings were answered; fix each as the answer says:\nr2: Keep it"
     })
   })
 
@@ -332,7 +332,7 @@ describe("answerForGate refuses only what needs your word", () => {
       kind: "fix",
       ids: ["r2"],
       ignore: [],
-      instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep it\nThe captain released the repeat hold with: Fix the lint failure first\nFollow that guidance as you retry the task."
+      instructions: "These findings were answered; fix each as the answer says:\nr2: Keep it\nThe captain released the repeat hold with: Fix the lint failure first\nFollow that guidance as you retry the task."
     })
   })
 

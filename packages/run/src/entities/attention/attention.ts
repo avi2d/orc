@@ -5,10 +5,11 @@ import { isWorkerQuestion, loopQuestionId } from "../agent/index"
 export const deciderTimeoutMillis = 180 * 1000
 const deciderClaimMillis = deciderTimeoutMillis + 60 * 1000
 
-import { type AttentionItem, type AttentionOption, type Asked, type Decision, isQuestionChoice, type ItemAnswer } from "./attention-item"
+import { type AttentionItem, type Asked, type Decision, isQuestionChoice, type ItemAnswer } from "./attention-item"
 import type { AnswerWords } from "../../shared/lib/index"
 import type { OpenQuestion } from "../review-gate/index"
-import { choice, itemId, unaskedQuestion, type Choice } from "./attention-ask"
+import { choice, itemId, unaskedQuestion, writtenAnswerChoice, type Choice } from "./attention-ask"
+import { sameChoice, withChoice } from "./attention-choice"
 import { attentionFolder, encodeItem, fileSuffix, openItem, readExistingItem, readItem, replaceItem, withItemClaim, writeItem } from "./attention-store"
 
 export type { Asked }
@@ -16,34 +17,7 @@ export type { Asked }
 export { openItem, readItem } from "./attention-store"
 export { choice, itemId } from "./attention-ask"
 
-const choiceOf = (asked: Choice): Choice => ({
-  ...(asked.subject === undefined ? {} : { subject: asked.subject }),
-  ...(asked.options === undefined ? {} : { options: asked.options }),
-  ...(asked.recommendation === undefined ? {} : { recommendation: asked.recommendation })
-})
-
-const sameOption = (left: AttentionOption, right: AttentionOption | undefined): boolean =>
-  right !== undefined && left.text === right.text && left.outcome === right.outcome && left.picture === right.picture && left.action === right.action
-
-const sameChoice = (left: Choice, right: Choice): boolean => {
-  const leftOptions = left.options ?? []
-  const rightOptions = right.options ?? []
-  return left.subject === right.subject && left.recommendation === right.recommendation &&
-    leftOptions.length === rightOptions.length && leftOptions.every((option, index) => sameOption(option, rightOptions[index]))
-}
-
-const withChoice = (item: AttentionItem, asked: Asked): AttentionItem => {
-  const { subject: _subject, options: _options, recommendation: _recommendation, ...rest } = item
-  return { ...rest, text: asked.text, owner: asked.owner, ...choiceOf(asked) }
-}
-
 export const reviewQuestionId = (task: string, question: string, asked: string): string => itemId(task, question, asked)
-
-const writtenAnswerChoice = (task: string, question: string, subject: string, reason: string): Choice => choice(
-  subject,
-  { text: "Write an answer", action: "write-answer", outcome: "Send an answer with orc backlog answer " + task + " " + question + "=<words> so the run can use it." + reason },
-  { text: "Leave open", action: "wait", outcome: "No answer is sent. The run keeps waiting for a decision on this question." }
-)
 
 const questionSubject = (task: string, question: OpenQuestion): string =>
   question.subject ?? task + ", " + question.id + ": " + question.text.split("\n", 1)[0]

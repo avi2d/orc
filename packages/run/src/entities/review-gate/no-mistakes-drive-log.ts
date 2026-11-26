@@ -1,8 +1,8 @@
 import { Effect, FileSystem } from "effect"
 import { missingReason, parseRun, type NoMistakesFinding, type ParkedGate, type ParsedRun, type PendingFinding } from "./no-mistakes-gate"
-import { findingContext, type OpenQuestion } from "./question"
+import { findingContext, type OpenQuestion, type QuestionAnswer } from "./question"
 import type { AskedAt } from "./answer-wait"
-import { scalar } from "../../shared/lib/index"
+import { deciderLabel, scalar } from "../../shared/lib/index"
 
 export const gateLogFileName = "gate.log"
 
@@ -40,13 +40,13 @@ export interface Ending {
 interface DeferredGate {
   readonly findingIds: ReadonlyArray<string>
   readonly skippedFixRound: boolean
-  readonly unappliedAnswers: ReadonlyArray<string>
+  readonly unappliedAnswers: ReadonlyArray<QuestionAnswer>
 }
 
 const deferralNote = (gate: DeferredGate): string => [
   "Findings deferred to PR follow-ups: " + gate.findingIds.join(", ") + ".",
   ...(gate.skippedFixRound ? ["no-mistakes ran no fix round at that gate."] : []),
-  ...gate.unappliedAnswers.map((id) => "The captain's answer for " + id + " was not applied.")
+  ...gate.unappliedAnswers.map((answer) => (answer.decider === undefined ? "The recorded answer" : deciderLabel(answer.decider) + "'s answer") + " for " + answer.question + " was not applied.")
 ].join(" ")
 
 export interface DriveLog {

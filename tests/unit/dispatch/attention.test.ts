@@ -65,14 +65,15 @@ describe("the attention queue", () => {
           { subject, options },
           { subject, options, recommendation: "Not an option" }
         ]) {
-          const { subject, options, recommendation } = context
-          await expect(run(openItem(root, kind, {
+          const { subject: said, options: listed, recommendation: advised } = context
+          const failure = await run(Effect.flip(openItem(root, kind, {
             ...bare,
             kind,
-            ...(subject === undefined ? {} : { subject }),
-            ...(options === undefined ? {} : { options }),
-            ...(recommendation === undefined ? {} : { recommendation })
-          }))).rejects.toThrow("cannot open attention item")
+            ...(said === undefined ? {} : { subject: said }),
+            ...(listed === undefined ? {} : { options: listed }),
+            ...(advised === undefined ? {} : { recommendation: advised })
+          })))
+          expect(failure.detail).toContain("cannot open attention item")
         }
       }
       expect(await run(openItems(root))).toEqual([])
