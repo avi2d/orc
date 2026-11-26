@@ -7,12 +7,13 @@ import type { ReadPullRequest } from "../../packages/run/src/widgets/beat/task-e
 import type { ReadUpstream } from "../../packages/run/src/widgets/beat/upstream"
 import type { AskDecider } from "../../packages/run/src/features/decider/index"
 import type { ReadBaseCi } from "../../packages/run/src/features/merging-a-pr/index"
+import { supportsEveryAnswer } from "./support-check"
 
 export const uncheckedOpen: PullRequestView = { state: "OPEN", headRefOid: "0".repeat(40), baseRefName: "main", statusCheckRollup: [] }
 
 const noUpstream: ReadUpstream = (contribution) => Effect.fail(new BacklogError({ detail: "no upstream read for " + contribution.url + " in this test" }))
 
-const escalateAll: AskDecider = { home: "/nonexistent/orc-home", ask: () => Effect.succeed(JSON.stringify({ decision: "escalate", reason: "no decider in this test" })) }
+const escalateAll: AskDecider = { home: "/nonexistent/orc-home", ask: () => Effect.succeed(JSON.stringify({ decision: "escalate", reason: "no decider in this test" })), checkSupport: () => supportsEveryAnswer }
 
 const noBaseCi: ReadBaseCi = { remote: () => Effect.succeed(Option.none()), repositories: () => Effect.succeed(Option.none()) }
 

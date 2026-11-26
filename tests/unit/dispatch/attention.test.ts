@@ -102,6 +102,27 @@ describe("the attention queue", () => {
     })
   })
 
+  test("dropping a task withdraws its PR items instead of leaving them open and preserves other tasks' items", async () => {
+    await withRoot(async (root) => {
+      const at = "2026-11-02T10:40:00.000Z"
+      for (const kind of ["pr-ready", "check-red"] as const) {
+        await run(openItem(root, "orc-1." + kind, { ...asked("2026-11-02T10:20:00.000Z"), kind }))
+        await run(openItem(root, "orc-2." + kind, { ...asked("2026-11-02T10:20:00.000Z", "orc-2"), kind }))
+      }
+      const dropped: TaskRecord = {
+        ...closedTask("orc-1"),
+        state: { kind: "closed", claim: null, closing: { outcome: "dropped", reason: "no longer wanted" }, closedAt: at, postedAt: null }
+      }
+      await run(routeTaskItems(root, [dropped], at))
+      expect((await run(openItems(root))).map((entry) => entry.id).sort()).toEqual(["orc-2.check-red", "orc-2.pr-ready"])
+      for (const kind of ["pr-ready", "check-red"] as const) {
+        expect(JSON.parse(await readFile(join(root, "attention", "orc-1." + kind + ".json"), "utf8"))).toMatchObject({
+          state: { kind: "withdrawn", reason: "task closed", at }
+        })
+      }
+    })
+  })
+
   test("asking a question again withdraws the old item and opens the new asking instead of keeping both", async () => {
     await withRoot(async (root) => {
       await run(routeTaskItems(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))

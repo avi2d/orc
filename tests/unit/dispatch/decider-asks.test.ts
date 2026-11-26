@@ -12,6 +12,7 @@ import { Asking, askingFileName, waitForAnswers } from "../../../packages/run/sr
 import { driveNoMistakes, type NoMistakesRunner } from "../../../packages/run/src/entities/review-gate/no-mistakes"
 import { type AskDecider, type DeciderRequest, decideReviewQuestions } from "../../../packages/run/src/features/decider/index"
 import { openQuestions } from "../../lib/open-questions-2026-11-25"
+import { supportsEveryAnswer } from "../../lib/support-check"
 import { guardReason, neverDecidedReason } from "../../../packages/run/src/features/decider/decider-guard"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
@@ -50,7 +51,8 @@ const listening = (heard: Array<DeciderRequest>): AskDecider => ({
   ask: (request) => {
     heard.push(request)
     return Effect.succeed(answer)
-  }
+  },
+  checkSupport: () => supportsEveryAnswer
 })
 
 const withStartedTask = async (body: (root: string) => Promise<void>): Promise<void> => {

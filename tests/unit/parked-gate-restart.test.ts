@@ -21,6 +21,7 @@ import { runBeat } from "../../packages/run/src/widgets/beat/beat"
 import { taskLabel } from "../../packages/run/src/shared/process/pueue-status"
 import type { DispatchConfig, Project } from "../../packages/run/src/shared/config/dispatch-config"
 import { quietSources } from "../lib/beat-sources"
+import { supportsEveryAnswer } from "../lib/support-check"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -71,7 +72,8 @@ const answeringDecider = (rule: string, heard: Array<DeciderRequest>): AskDecide
   ask: (request) => {
     heard.push(request)
     return Effect.succeed(JSON.stringify({ decision: "answer", answer: "Table B", rule, reason: "the intent names it" }))
-  }
+  },
+  checkSupport: () => supportsEveryAnswer
 })
 
 const beatWith = (root: string, statusJson: string, sources = quietSources()) => {
