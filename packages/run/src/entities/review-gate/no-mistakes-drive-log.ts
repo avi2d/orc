@@ -135,7 +135,7 @@ export const openDriveLog = (started: string): DriveLog => {
         ...refuse(gate, missingReason(missing)),
         openQuestions: missing.map((finding) => {
           const time = at(finding)
-          return { id: finding.id, text: finding.description.trim() === "" ? "No text was supplied for " + finding.id + ". Check the review before answering." : finding.description, ...findingContext(gate.step, finding.id, finding.description), ...(finding.asks === undefined ? {} : { asks: finding.asks }), ...(time === null ? {} : { asked: time }), ...(asked === null ? {} : { asking: asked }), ...(finding.owner === undefined ? {} : { owner: finding.owner }) }
+          return { id: finding.id, text: finding.description, ...findingContext(gate.step, finding.id, finding.description), ...(finding.asks === undefined ? {} : { asks: finding.asks }), ...(time === null ? {} : { asked: time }), ...(asked === null ? {} : { asking: asked }), ...(finding.owner === undefined ? {} : { owner: finding.owner }) }
         })
       }
     },

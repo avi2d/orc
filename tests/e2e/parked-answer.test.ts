@@ -114,7 +114,7 @@ describe("a parked run", () => {
       expect(await orcOk(fixture, ["beat"])).toContain("handed r3 to the run of orc-1 on linux")
       expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({
         asking: firstAsking.asked,
-        answers: [{ question: "r2", answer: "Keep it" }, { question: "r3", answer: "Drop them" }]
+        answers: [{ question: "r2", answer: "Keep it", decider: "owner" }, { question: "r3", answer: "Drop them", decider: "owner" }]
       })
     })
   }, runnerTimeout)
@@ -139,7 +139,7 @@ describe("a parked run", () => {
       if (!isRecord(first.answer)) {
         throw new Error("parked question holds no answer")
       }
-      expect(Object.keys(first.answer).sort()).toEqual(["at", "words"])
+      expect(Object.keys(first.answer).sort()).toEqual(["at", "decider", "words"])
     })
   }, runnerTimeout)
 

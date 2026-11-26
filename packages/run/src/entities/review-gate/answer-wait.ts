@@ -92,7 +92,7 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
         ...(finding.options === undefined ? {} : { options: finding.options }),
         ...(finding.recommendation === undefined ? {} : { recommendation: finding.recommendation }),
         id: finding.id,
-        text: finding.description.trim() === "" ? "No text was supplied for " + finding.id + ". Check the review before answering." : finding.description,
+        text: finding.description,
         ...(finding.asks === undefined ? {} : { asks: finding.asks }),
         blocks: true,
         asked: now,

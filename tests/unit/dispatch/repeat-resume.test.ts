@@ -193,7 +193,7 @@ describe("a resumed run that parks again", () => {
       const after = await queued()
       expect(after.body).toBe(before.body)
       expect(after.body).not.toContain("Held for the captain")
-      expect(after.answers).toEqual([{ question: "r2", answer: "Keep it", decider: "agent" }, { question: "hold-release", answer: "Current guidance: fix the lint finding first", decider: "owner" }])
+      expect(after.answers).toEqual([{ question: "r2", answer: "Keep it", decider: "owner" }, { question: "hold-release", answer: "Current guidance: fix the lint finding first", decider: "owner" }])
     })
   })
   test("a resume after the fixer's question marks the release as carried instead of handing it as new again", async () => {
@@ -210,7 +210,7 @@ describe("a resumed run that parks again", () => {
       expect(answerWait(parked, () => false)).not.toStartWith("held for the captain: ")
       await run(answerTask(root, "orc-1", "ask-1=Pin it", "2026-10-27T11:00:00.000Z"))
       expect((await queued()).answers).toEqual([
-        { question: "r2", answer: "Keep it", decider: "agent" },
+        { question: "r2", answer: "Keep it", decider: "owner" },
         { question: "ask-1", answer: "Pin it", decider: "owner" },
         { question: "hold-release-carried", answer: "Current guidance: fix the lint finding first", decider: "owner" }
       ])
@@ -248,7 +248,7 @@ describe("a resumed run that parks again", () => {
       expect(parked.hold?.answer).not.toBeNull()
       expect(parked.parked?.at).toBe("2026-10-27T10:55:00.000Z")
       expect(await queued()).toEqual([
-        { question: "r2", answer: "Keep it", decider: "agent" },
+        { question: "r2", answer: "Keep it", decider: "owner" },
         { question: "ask-1", answer: "blue", decider: "owner" },
         { question: "hold-release-carried", answer: "Current guidance: fix the lint finding first", decider: "owner" }
       ])

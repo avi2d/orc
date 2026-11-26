@@ -61,7 +61,8 @@
       "decision": {
         "kind": "escalated",
         "reason": "The task leaves the bed width open.",
-        "at": "2026-11-25T07:49:00.000Z"
+        "at": "2026-11-25T07:49:00.000Z",
+        "decider": "agent"
       },
       "ageSeconds": 720,
       "overdue": true
@@ -114,11 +115,13 @@
           "source": "task garden-10",
           "quote": "Retry a failed upload twice."
         },
-        "at": "2026-11-25T07:58:00.000Z"
+        "at": "2026-11-25T07:58:00.000Z",
+        "decider": "agent"
       },
       "answer": {
         "words": "Two retries",
-        "at": "2026-11-25T07:58:00.000Z"
+        "at": "2026-11-25T07:58:00.000Z",
+        "decider": "agent"
       }
     }
   ]

@@ -72,7 +72,7 @@ test("a parked child closed as landed stays visible as done with its landing PR 
     expect(board).toMatchObject({ tasks: expect.arrayContaining([
       expect.objectContaining({
         id: "orc-2", status: "closed", outcome: "done", reason: "work landed in " + mergedPr, landedIn: mergedPr, pr: null,
-        parked: expect.objectContaining({ questions: [expect.objectContaining({ id: "r2", answer: { words: "Keep it", at } })] })
+        parked: expect.objectContaining({ questions: [expect.objectContaining({ id: "r2", answer: { words: "Keep it", at, decider: "owner" } })] })
       })
     ]) })
     expect(await attention(fixture)).toMatchObject({ items: [expect.objectContaining({ task: "orc-1" })] })

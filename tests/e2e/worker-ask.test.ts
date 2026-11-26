@@ -78,7 +78,7 @@ const askedAt = (asking: unknown): string =>
 
 const answerLive = async (fixture: NoSandboxFixture, words: string): Promise<unknown> => {
   const { runDir, asking } = await liveAsking(fixture)
-  await writeFile(join(runDir, "answers.json"), JSON.stringify({ asking: askedAt(asking), answers: [{ question: "ask-1", answer: words }] }))
+  await writeFile(join(runDir, "answers.json"), JSON.stringify({ asking: askedAt(asking), answers: [{ question: "ask-1", answer: words, decider: "owner" }] }))
   return asking
 }
 
@@ -168,7 +168,7 @@ describe("orc run with Pi asking the captain mid-run", () => {
       const asking = await answerLive(fixture, "B")
       expect(asking).toMatchObject({ questions: [{ id: "ask-1", options }] })
       const result = await running
-      expect(JSON.parse(await readFile(join(fixture.fakeBin, "reply"), "utf8"))).toEqual({ kind: "answer", id: "ask-1", question: "Keep the old flag?", words: "B" })
+      expect(JSON.parse(await readFile(join(fixture.fakeBin, "reply"), "utf8"))).toEqual({ kind: "answer", id: "ask-1", question: "Keep the old flag?", words: "B", decider: "owner" })
       expect(result.stdout).not.toContain("came in time")
       expect(await askedInHistory(fixture)).toEqual([])
     })
@@ -180,7 +180,7 @@ describe("orc run with Pi asking the captain mid-run", () => {
       const running = runOrc(runArgs, fixture.repo, { ...fixture.env, ORC_ANSWER_WAIT_SECONDS: "30" })
       await answerLive(fixture, "B")
       await running
-      expect(JSON.parse(await readFile(join(fixture.fakeBin, "reply"), "utf8"))).toEqual({ kind: "answer", id: "ask-1", question: "Keep the old flag?", words: "B" })
+      expect(JSON.parse(await readFile(join(fixture.fakeBin, "reply"), "utf8"))).toEqual({ kind: "answer", id: "ask-1", question: "Keep the old flag?", words: "B", decider: "owner" })
     })
   }, 60_000)
 })
