@@ -37,6 +37,7 @@ describe("orc delivery", () => {
           git(dir, ["push", "-u", "origin", baseBranch])
           git(dir, ["remote", "set-head", "origin", baseBranch])
           const sha = await readyToCheck(dir, home)
+          git(dir, ["checkout", "-q", "orc/test"])
           const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(async (run, sessionsDir) => {
             if (run.agent.kind !== "reviewer") return sandboxResult(sha)(run, sessionsDir)
             const sessionFile = join(sessionsDir, "review-invalid.jsonl")
