@@ -85,7 +85,7 @@ A key the command does not know, or a value out of range, stops the command with
 | `appearance` | The colours of the tones and the providers, as [Set the colours](#set-the-colours) tells |
 | `layout` | Which panels show where, as [Lay out the dashboard](#lay-out-the-dashboard) tells |
 | `panels` | Each panel's own settings under its name |
-| `subquoAccounts` | Which quota-axi accounts read from which subquo account, as [Map accounts to subquo](dash-quota.md#map-accounts-to-subquo) tells |
+| `subquoAccounts` | Which [quota-axi](https://github.com/kunchenguid/quota-axi) accounts read from which subquo account, as [Map accounts to subquo](dash-quota.md#map-accounts-to-subquo) tells |
 
 Each panel reads only its own key under `panels`, the same in the dashboard and opened alone.
 A panel with no settings refuses any key under its name.

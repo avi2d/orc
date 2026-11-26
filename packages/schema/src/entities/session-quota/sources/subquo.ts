@@ -48,14 +48,14 @@ const Snapshot = Schema.Struct({
 
 export type SubquoMapping = NonNullable<DashConfig["subquoAccounts"]>[number];
 
-export type SubquoObservation = typeof Observation.Type;
+type SubquoObservation = typeof Observation.Type;
 
-export interface MatchedSubquo {
+interface MatchedSubquo {
   readonly mapping: SubquoMapping;
   readonly observation: SubquoObservation;
 }
 
-export const matchSubquo = (snapshot: unknown, mappings: ReadonlyArray<SubquoMapping>): ReadonlyArray<MatchedSubquo> => {
+const matchSubquo = (snapshot: unknown, mappings: ReadonlyArray<SubquoMapping>): ReadonlyArray<MatchedSubquo> => {
   const decoded = Schema.decodeUnknownResult(Snapshot)(snapshot);
   if (Result.isFailure(decoded)) return [];
   const accounts = decoded.success.accounts;
@@ -104,7 +104,7 @@ const overlayProvider = (
   return { ...entry, windows };
 };
 
-export const standaloneSubquo = (
+const standaloneSubquo = (
   snapshot: unknown,
   mappings: ReadonlyArray<SubquoMapping>,
   now: DateTime.Utc,
@@ -169,20 +169,18 @@ export const overlaySubquo = (
 
 export const quotaSourceLayerWithMappings = <E, R>(
   mappings: Effect.Effect<ReadonlyArray<SubquoMapping>, E, R>,
-  subquoProgram: Effect.Effect<string> = Effect.succeed("subquo"),
 ): Layer.Layer<QuotaSource, E, CommandRunner | R> => Layer.effect(
   QuotaSource,
   Effect.gen(function* () {
     const runner = yield* CommandRunner;
     const configured = yield* mappings;
-    const program = yield* subquoProgram;
     return {
       read: (providers: ReadonlyArray<QuotaProviderId>) => Effect.gen(function* () {
         const quota = Effect.provideService(readQuotaAxi(providers), CommandRunner, runner);
         const relevant = configured.filter((mapping) => providers.includes(mapping.provider));
         if (relevant.length === 0) return yield* quota;
         const subquo = Effect.provideService(
-          runDecoded({ argv: [program, "read", "--json"], timeout: Duration.seconds(15) }, decodeJson(Schema.Unknown)),
+          runDecoded({ argv: ["subquo", "read", "--json"], timeout: Duration.seconds(15) }, decodeJson(Schema.Unknown)),
           CommandRunner,
           runner,
         );

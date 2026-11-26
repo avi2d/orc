@@ -1,11 +1,14 @@
 import { Effect, Layer } from "effect";
 import { readConfig } from "../../entities/alerts";
-import { harvestLogSourceLayer, orcQuotaSourceLayer, quotaSourceLayerWithMappings, sessionSourcesLayer, subquoProgram } from "../../entities/session-quota";
+import { harvestLogSourceLayer, orcQuotaSourceLayer, quotaSourceLayerWithMappings, sessionSourcesLayer } from "../../entities/session-quota";
 
-export const configuredQuotaSourceLayer = quotaSourceLayerWithMappings(
-  Effect.map(readConfig, ({ config }) => config.subquoAccounts ?? []),
-  subquoProgram,
+const subquoMappings = Effect.map(readConfig, ({ config }) => config.subquoAccounts ?? []).pipe(
+  Effect.catchTag("ConfigRefused", (refused) =>
+    Effect.as(Effect.logError(`The subquo account mappings are not read: ${refused.reason}`), []),
+  ),
 );
+
+export const configuredQuotaSourceLayer = quotaSourceLayerWithMappings(subquoMappings);
 
 export const quotaReadSourcesLayer = Layer.mergeAll(configuredQuotaSourceLayer, orcQuotaSourceLayer, harvestLogSourceLayer(Effect.succeed([])));
 

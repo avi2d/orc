@@ -43,13 +43,14 @@ Each entry names the quota-axi provider, its account key, and the corresponding 
 }
 ```
 
-The panel runs the subquo copy installed with Orc's npm package, with `read --json`.
-When that copy is missing, the panel runs `subquo` from its PATH.
+The panel runs `subquo read --json` from its PATH.
+The subquo copy installed with Orc's [npm](https://www.npmjs.com) package is not used here, so install subquo where the dashboard's PATH finds it.
 A fresh subquo reading replaces the matching five-hour and weekly windows.
 For OpenCode Go, it also replaces matching rolling and monthly windows.
 A missing, stale, expired, or mismatched reading leaves the quota-axi window in place.
 Windows subquo does not name also keep their quota-axi readings.
 The panel does not infer a mapping from account names.
+When the config is refused, the panel logs the refusal and reads quota-axi alone.
 
 ### Show the dispatch accounts
 

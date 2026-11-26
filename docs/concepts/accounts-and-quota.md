@@ -19,7 +19,7 @@ Orc reads three shapes: its own `orc.quota.v1` document, the document `quota-axi
 A command that is not installed, fails, runs past 15 seconds or prints anything else leaves the quota unread, and that beat starts nothing.
 
 To read quota from subquo, set the quota command to `["subquo", "read", "--json"]`.
-Orc runs the subquo copy installed with its npm package, and runs `subquo` from PATH when that copy is missing.
+Orc runs the subquo copy installed with its [npm](https://www.npmjs.com) package, and runs `subquo` from PATH when that copy is missing.
 To go back, set the quota command back to the value it held before, the reader that prints an `orc.quota.v1` or [quota-axi](https://github.com/kunchenguid/quota-axi) document.
 An account's room in a subquo snapshot is the smallest `percentLeft` among its windows with scope `all`.
 A window that covers one model only does not limit the account.
