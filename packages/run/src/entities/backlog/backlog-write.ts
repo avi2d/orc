@@ -259,6 +259,7 @@ type Grabbed = {
   readonly read: Effect.Effect<string, BacklogError>
 }
 
+// The caller runs from the grab to its putBack or remove uninterruptibly: an interrupted grab hides the task from listTasks while this process lives.
 export const grabIn = (
   root: string,
   folder: TaskFolder,
