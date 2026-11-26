@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Array as Arr, Effect } from "effect"
 import { parseDispatchArgs } from "../../../packages/run/src/app/dispatch-args"
-import { type Asked, closeItem, openItem, openItems, readAttention, recordDecision, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
+import { type Asked, closeItem, openItem, openItems, openOrRefreshItem, readAttention, readItem, recordDecision, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
 import { isOverdue } from "../../../packages/run/src/entities/attention/index"
 import { attentionJson, attentionText } from "../../../packages/run/src/features/attention-list/index"
 import { flagQuestion } from "../../lib/attention-question"
@@ -262,6 +262,54 @@ describe("the attention queue", () => {
           { ...flagQuestion, id: "fresh", kind: "review-question", task: "orc-2", text: "Keep the old flag?", asked: "2026-11-02T10:08:00.000Z", owner: "user", ageSeconds: 120, overdue: false }
         ]
       })
+    })
+  })
+
+  test("a parked question stored with options but no outcomes or recommendation opens with a written-answer choice instead of failing the beat", async () => {
+    await withRoot(async (root) => {
+      const storedOptions = [{ text: "Keep it" }, { text: "Remove it", picture: "docs/flag.png" }]
+      const worker = { ...question("ask-1", "Keep the old flag?\nA) Keep it\nB) Remove it (picture: docs/flag.png)", "2026-11-02T10:20:00.000Z", null), options: storedOptions }
+      const review = { ...question("r2", "Drop the old flag?", "2026-11-02T10:21:00.000Z", null), options: storedOptions }
+      await run(routeTaskItems(root, [parkedTask("orc-1", worker, [review], { kind: "new" })], "2026-11-02T10:22:00.000Z"))
+      const items = (await run(openItems(root))).map((entry) => entry.item)
+      expect(items.map((item) => ({ text: item.text, options: item.options?.map((option) => option.text), recommendation: item.recommendation }))).toEqual([
+        { text: worker.text, options: ["Write an answer", "Leave open"], recommendation: "Write an answer" },
+        { text: expect.stringContaining("Remove it (picture: docs/flag.png)"), options: ["Write an answer", "Leave open"], recommendation: "Write an answer" }
+      ])
+      expect(items[1]?.text).toStartWith("Drop the old flag?")
+      expect(items[1]?.text).toContain("Keep it")
+    })
+  })
+
+  test("an open legacy item whose options lack outcomes takes the written-answer choice on the next beat instead of refusing it", async () => {
+    await withRoot(async (root) => {
+      const stored = { ...question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), options: [{ text: "Keep it" }, { text: "Remove it" }] }
+      const id = "orc-1.r2.2026-11-02T10_20_00_000Z"
+      await mkdir(join(root, "attention"), { recursive: true })
+      await writeFile(join(root, "attention", id + ".json"), JSON.stringify({
+        kind: "review-question", task: "orc-1", text: "Keep the old flag?", options: [{ text: "Keep it" }, { text: "Remove it" }], asked: "2026-11-02T10:20:00.000Z", owner: "decider", state: { kind: "open" }
+      }))
+      await run(routeTaskItems(root, [parkedTask("orc-1", stored, [], { kind: "new" })], "2026-11-02T10:22:00.000Z"))
+      expect(await run(readItem(root, id))).toMatchObject({ state: { kind: "open" }, recommendation: "Write an answer", options: [{ text: "Write an answer" }, { text: "Leave open" }] })
+    })
+  })
+
+  test("refreshing an open item with the same text and a new recommendation stores the new one instead of keeping the old", async () => {
+    await withRoot(async (root) => {
+      const first = asked("2026-11-02T10:20:00.000Z")
+      await run(openOrRefreshItem(root, "orc-1.r2.a", first))
+      await run(openOrRefreshItem(root, "orc-1.r2.a", { ...first, recommendation: "Remove it" }))
+      expect(await run(readItem(root, "orc-1.r2.a"))).toMatchObject({ text: first.text, recommendation: "Remove it", state: { kind: "open" } })
+    })
+  })
+
+  test("routing a parked question again with the same text and a changed outcome stores the new outcome instead of keeping the old", async () => {
+    await withRoot(async (root) => {
+      const parked = { ...question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), ...flagQuestion }
+      await run(routeTaskItems(root, [parkedTask("orc-1", parked, [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
+      const changed = { ...parked, options: [{ text: "Keep it", outcome: "Existing callers keep working." }, { text: "Remove it", outcome: "Callers get a warning first." }] }
+      await run(routeTaskItems(root, [parkedTask("orc-1", changed, [], { kind: "new" })], "2026-11-02T10:21:00.000Z"))
+      expect(await run(readItem(root, "orc-1.r2.2026-11-02T10_20_00_000Z"))).toMatchObject({ options: changed.options, state: { kind: "open" } })
     })
   })
 

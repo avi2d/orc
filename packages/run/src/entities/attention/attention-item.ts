@@ -80,6 +80,8 @@ const questionChoiceFields = {
 const recommendsOption = Schema.makeFilter(({ options, recommendation }: { readonly options: ReadonlyArray<{ readonly text: string }>; readonly recommendation: string }) =>
   options.some((option) => option.text === recommendation) || "recommendation must name a listed option")
 
+export const isQuestionChoice = Schema.is(Schema.Struct(questionChoiceFields).check(recommendsOption))
+
 export const NewItem = Schema.Union([
   Schema.Struct({ ...askedFields, ...questionChoiceFields, kind: QuestionKind, task: NonBlank, text: NonBlank }).check(recommendsOption),
   Schema.Struct({ ...askedFields, kind: EventKind })

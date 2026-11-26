@@ -211,7 +211,7 @@ The text view separates decisions made by the owner from those made by the agent
 Run `orc attention --json` for an `orc.attention.v1` document with `at`, `items`, and `decided`.
 Each decision and answer carries a `decider` of `owner` or `agent`.
 A new question needs a subject, the outcome of each option, and a recommendation that names one of the options.
-Questions already stored before this rule may lack those fields.
+A question a task file stored before this rule, without an outcome for each option or a recommendation, opens with its options listed in its text and the choices Write an answer or Leave open.
 A legacy PR closure whose author cannot be recovered carries `decider: "agent"` and `inferred: true`.
 The output shape is in `packages/run/src/features/attention-list/attention-view.ts`.
 Closing a task withdraws the items open at the time of the close.

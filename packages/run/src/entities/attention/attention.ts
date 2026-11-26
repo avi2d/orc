@@ -5,7 +5,7 @@ import { isWorkerQuestion, loopQuestionId } from "../agent/index"
 export const deciderTimeoutMillis = 180 * 1000
 const deciderClaimMillis = deciderTimeoutMillis + 60 * 1000
 
-import { type AttentionItem, type Asked, type Decision, type ItemAnswer } from "./attention-item"
+import { type AttentionItem, type AttentionOption, type Asked, type Decision, isQuestionChoice, type ItemAnswer } from "./attention-item"
 import type { AnswerWords } from "../../shared/lib/index"
 import type { OpenQuestion } from "../review-gate/index"
 import { choice, itemId, unaskedQuestion, type Choice } from "./attention-ask"
@@ -16,16 +16,40 @@ export type { Asked }
 export { openItem, readItem } from "./attention-store"
 export { choice, itemId } from "./attention-ask"
 
-const choiceOf = (asked: Asked): Choice => ({
+const choiceOf = (asked: Choice): Choice => ({
   ...(asked.subject === undefined ? {} : { subject: asked.subject }),
   ...(asked.options === undefined ? {} : { options: asked.options }),
   ...(asked.recommendation === undefined ? {} : { recommendation: asked.recommendation })
 })
 
+const sameOption = (left: AttentionOption, right: AttentionOption | undefined): boolean =>
+  right !== undefined && left.text === right.text && left.outcome === right.outcome && left.picture === right.picture && left.action === right.action
+
+const sameChoice = (left: Choice, right: Choice): boolean => {
+  const leftOptions = left.options ?? []
+  const rightOptions = right.options ?? []
+  return left.subject === right.subject && left.recommendation === right.recommendation &&
+    leftOptions.length === rightOptions.length && leftOptions.every((option, index) => sameOption(option, rightOptions[index]))
+}
+
+const withChoice = (item: AttentionItem, asked: Asked): AttentionItem => {
+  const { subject: _subject, options: _options, recommendation: _recommendation, ...rest } = item
+  return { ...rest, text: asked.text, owner: asked.owner, ...choiceOf(asked) }
+}
+
 export const reviewQuestionId = (task: string, question: string, asked: string): string => itemId(task, question, asked)
 
+const writtenAnswerChoice = (task: string, question: string, subject: string, reason: string): Choice => choice(
+  subject,
+  { text: "Write an answer", action: "write-answer", outcome: "Send an answer with orc backlog answer " + task + " " + question + "=<words> so the run can use it." + reason },
+  { text: "Leave open", action: "wait", outcome: "No answer is sent. The run keeps waiting for a decision on this question." }
+)
+
+const questionSubject = (task: string, question: OpenQuestion): string =>
+  question.subject ?? task + ", " + question.id + ": " + question.text.split("\n", 1)[0]
+
 const reviewChoices = (task: string, question: OpenQuestion): Choice => {
-  const subject = question.subject ?? task + ", " + question.id + ": " + question.text.split("\n", 1)[0]
+  const subject = questionSubject(task, question)
   if (question.options !== undefined || question.recommendation !== undefined) {
     return {
       subject,
@@ -38,11 +62,7 @@ const reviewChoices = (task: string, question: OpenQuestion): Choice => {
       ...(question.recommendation === undefined ? {} : { recommendation: question.recommendation })
     }
   }
-  return choice(
-    subject,
-    { text: "Write an answer", action: "write-answer", outcome: "Send an answer with orc backlog answer " + task + " " + question.id + "=<words> so the run can use it." },
-    { text: "Leave open", action: "wait", outcome: "No answer is sent. The run keeps waiting for a decision on this question." }
-  )
+  return writtenAnswerChoice(task, question.id, subject, "")
 }
 
 const reviewQuestionItem = (
@@ -59,6 +79,22 @@ const reviewQuestionItem = (
     owner: question.owner ?? (question.id === loopQuestionId ? "user" : "decider")
   }
 })
+
+const storedOptionLine = (option: Pick<ParkedQuestionOption, "text" | "outcome" | "picture">): string =>
+  "- " + option.text + (option.picture === undefined ? "" : " (picture: " + option.picture + ")") + (option.outcome === undefined ? "" : ", leads to: " + option.outcome)
+
+type ParkedQuestionOption = NonNullable<ParkedQuestion["options"]>[number]
+
+const storedQuestionItem = (task: string, question: ParkedQuestion): { readonly id: string; readonly asked: Asked } => {
+  const item = reviewQuestionItem(task, question)
+  if (isQuestionChoice(item.asked)) {
+    return item
+  }
+  const unlisted = (question.options ?? []).filter((option) => !item.asked.text.includes(option.text)).map(storedOptionLine)
+  const text = unlisted.length === 0 ? item.asked.text : [item.asked.text, "Options stored with this question:", ...unlisted].join("\n")
+  const reason = " orc stored this question before each option needed an outcome and a recommendation, so it recommends none of the options its text lists."
+  return { id: item.id, asked: { ...item.asked, text, ...writtenAnswerChoice(task, question.id, questionSubject(task, question), reason) } }
+}
 
 export const openReviewQuestions = (
   root: string,
@@ -78,12 +114,12 @@ const whenAlreadyOpened = (onExisting: ItemWrite): ItemWrite => (root, id, asked
 export const openOrRefreshItem: ItemWrite = whenAlreadyOpened((root, id, asked) =>
   withItemClaim(root, id, Effect.gen(function*() {
     const item = yield* readItem(root, id)
-    if (item === null || item.state.kind === "closed" || (item.state.kind === "open" && item.text === asked.text && item.owner === asked.owner)) {
+    if (item === null || item.state.kind === "closed" || (item.state.kind === "open" && item.text === asked.text && item.owner === asked.owner && sameChoice(item, asked))) {
       return
     }
     const next: AttentionItem = item.state.kind === "withdrawn"
       ? { ...asked, state: { kind: "open" } }
-      : { ...item, text: asked.text, owner: asked.owner, ...choiceOf(asked) }
+      : withChoice(item, asked)
     yield* writeItem(root, id, yield* encodeItem(id, next))
   })))
 
@@ -232,10 +268,10 @@ const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Ef
     if (existing === null || existing.item.state.kind === "closed") {
       return false
     }
-    if (existing.item.state.kind === "open" && existing.item.text === asked.text) {
+    if (existing.item.state.kind === "open" && existing.item.text === asked.text && sameChoice(existing.item, asked)) {
       return true
     }
-    if (yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, ...choiceOf(asked), state: { kind: "open" } }))) {
+    if (yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...withChoice(existing.item, { ...asked, owner: existing.item.owner }), state: { kind: "open" } }))) {
       return true
     }
     return (yield* readItem(root, id))?.state.kind === "open"
@@ -278,7 +314,7 @@ const routeOne = (root: string, id: string, asked: Asked | null, answer: ItemAns
 }
 
 const routeQuestion = (root: string, task: string, question: ParkedQuestion): Effect.Effect<string | null, BacklogError, FileSystem.FileSystem> => {
-  const item = reviewQuestionItem(task, question)
+  const item = storedQuestionItem(task, question)
   const answer = question.answer
   // An ask back hands the worker a question of its own, so its item waits on in the queue.
   const closing = answer === null || answer.by === "asked-back" ? null : answer

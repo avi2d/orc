@@ -41,6 +41,9 @@ const latestAskings = (open: Arr.NonEmptyReadonlyArray<AskedQuestion>): Arr.NonE
     (left, right) => left.id === right.id
   )
 
+const newlyAsked = (questions: ReadonlyArray<ParkedQuestion>, known: ReadonlyArray<ParkedQuestion>): ReadonlyArray<ParkedQuestion> =>
+  questions.filter((question) => question.answer === null && !known.includes(question))
+
 const sameQuestions = (left: ReadonlyArray<ParkedQuestion>, right: ReadonlyArray<ParkedQuestion>): boolean =>
   left.length === right.length && left.every((question, index) => question === right[index])
 
@@ -65,7 +68,7 @@ export const askStartedTask = (
       if (sameQuestions(questions, known)) {
         return { kind: "keep", result: false } as const
       }
-      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null))
+      yield* openReviewQuestions(root, id, newlyAsked(questions, known))
       const parked: Parked = { ...fresh.parked, branch: fresh.parked?.branch ?? taskBranch(id), questions }
       return { kind: "write", record: { ...fresh, parked }, result: true } as const
     }))
@@ -123,8 +126,9 @@ export const parkStartedTask = (
         return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task parks" })
       }
       const lastAsking = asked.find((question) => question.asking !== undefined)?.asking ?? asked.find((question) => question.asked !== undefined)?.asked ?? null
-      const questions = parkedQuestions(open, record.parked?.questions ?? [], lastAsking, (question) => question.asked ?? at)
-      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null))
+      const known = record.parked?.questions ?? []
+      const questions = parkedQuestions(open, known, lastAsking, (question) => question.asked ?? at)
+      yield* openReviewQuestions(root, id, newlyAsked(questions, known))
       const sentPr = record.parked?.origin?.pr
       const origin = run === undefined ? record.parked?.origin : { machine: record.state.claim.machine, run, ...(sentPr === undefined ? {} : { pr: sentPr }) }
       const hold = repeatsResume(record, questions) ? repeatHold(record, run, ended, at) : record.hold
