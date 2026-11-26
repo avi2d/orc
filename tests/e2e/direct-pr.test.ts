@@ -29,6 +29,28 @@ const lintPasses = async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 })
 const callLines = (calls: string): ReadonlyArray<string> => calls.split("\n").filter((line) => line !== "")
 
 describe("orc delivery", () => {
+  test("malformed reviewer output fails the review step by name instead of opening a PR", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        await withOrigin(dir, async () => {
+          const baseBranch = git(dir, ["branch", "--show-current"])
+          git(dir, ["push", "-u", "origin", baseBranch])
+          git(dir, ["remote", "set-head", "origin", baseBranch])
+          const sha = await readyToCheck(dir, home)
+          const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(async (run, sessionsDir) => {
+            if (run.agent.kind !== "reviewer") return sandboxResult(sha)(run, sessionsDir)
+            const sessionFile = join(sessionsDir, "review-invalid.jsonl")
+            await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: "[{}]" }], stopReason: "stop", usage: { input: 1, output: 1 } }))
+            return { sessionFile, commits: [] }
+          }, []), lintPasses)
+          expect(outcome.steps).toContainEqual({ name: "review", status: "failed" })
+          expect(outcome.report.endReason).toContain("OrcReviewOutputError")
+          expect(outcome.ghCalls).toBe("")
+        })
+      })
+    })
+  })
+
   test("rebases before checks and records the reviewer findings instead of skipping review", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
@@ -51,7 +73,7 @@ describe("orc delivery", () => {
             const sessionFile = join(sessionsDir, "review.jsonl")
             await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: JSON.stringify([finding]) }], stopReason: "stop", usage: { input: 1, output: 1 } }))
             expect(checkedBase).not.toBe("")
-            return { sessionId: null, sessionFile, commits: [] }
+            return { sessionFile, commits: [] }
           }, kinds), async () => {
             checkedBase = git(dir, ["rev-parse", "HEAD^"])
             return lintPasses()
