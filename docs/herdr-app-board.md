@@ -61,6 +61,6 @@ Orc runs counts running [pueue](https://github.com/Nukesor/pueue) tasks in the `
 An unreadable machine shows dashes and a reason below the table.
 
 Subscriptions and Machines read separately, so machines show before the slower quota read ends.
-Both refresh every minute while another tab is open.
+Both refresh every minute, whichever tab is open.
 
 ![Resources tab with the second machine unreachable](images/herdr-resources-unreachable.png)

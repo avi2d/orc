@@ -80,7 +80,7 @@ const quotaWindow: Guard<QuotaWindow> = (value, at) => {
   })
 }
 
-export interface QuotaAccount {
+interface QuotaAccount {
   readonly title: string
   readonly unread: string | null
 }
