@@ -12,7 +12,7 @@ const root = mkdtempSync(join(tmpdir(), "orc-dash-subquo-refused-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 describe("the configured quota source", () => {
-  test("starts and reads quota-axi instead of failing when the config is refused", () => {
+  test("starts and reads quota-axi instead of failing when the config is refused", async () => {
     const config = join(root, "config.json");
     writeFileSync(config, "{ not json");
     const asked: Array<ReadonlyArray<string>> = [];
@@ -30,7 +30,7 @@ describe("the configured quota source", () => {
         ),
       ),
     );
-    const reading = Effect.runSync(Effect.flatMap(QuotaSource, (source) => source.read(["claude"])).pipe(Effect.provide(layer)));
+    const reading = await Effect.runPromise(Effect.flatMap(QuotaSource, (source) => source.read(["claude"])).pipe(Effect.provide(layer)));
     expect(reading.kind).toBe("ok");
     expect(asked.some((argv) => argv[0] === "subquo")).toBe(false);
   });
