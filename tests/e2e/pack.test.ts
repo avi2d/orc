@@ -162,6 +162,8 @@ const expectedFiles = [
   "src/features/decider/decider-guard.ts",
   "src/features/decider/recommended.ts",
   "src/features/decider/quoted-source.ts",
+  "src/features/decider/prompt-text.ts",
+  "src/features/decider/support-check.ts",
   "src/entities/attention/attention-item.ts",
   "src/entities/attention/failing-command.ts",
   "src/entities/backlog/task-record-answer.ts",
