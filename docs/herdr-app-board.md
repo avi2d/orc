@@ -51,6 +51,7 @@ For an open PR, select **Merge** and confirm to run `orc merge <task> --basis ca
 ![Resources tab with example quota windows for two accounts and two machines](images/herdr-resources.png)
 
 Subscriptions shows each account's quota windows.
+An account with no window shows the reason the quota report gives in place of its windows.
 The Used bar compares usage with elapsed time and turns red when usage is ahead.
 Runs out shows an estimate only when the quota will run out before reset.
 
@@ -58,5 +59,8 @@ Machines shows local and configured remote resources.
 Load turns red above the machine's core count.
 Orc runs counts running [pueue](https://github.com/Nukesor/pueue) tasks in the `orc` group.
 An unreadable machine shows dashes and a reason below the table.
+
+Subscriptions and Machines read separately, so machines show before the slower quota read ends.
+Both refresh every minute while another tab is open.
 
 ![Resources tab with the second machine unreachable](images/herdr-resources-unreachable.png)
