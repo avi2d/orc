@@ -1,7 +1,7 @@
 import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
-import { type Account, type ConfigError, type DispatchConfig, isYolo, type Machine, type Project, providerOf, readDispatchConfig, readProjects, type RoutedModels } from "../../shared/config/index"
+import { type Account, type ConfigError, type DispatchConfig, isYolo, modeOf, type Machine, type Project, providerOf, readDispatchConfig, readProjects, type RoutedModels } from "../../shared/config/index"
 import { machineOverfull, type MachineRoom, type Placed, placeTask, readRoom, startable, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import { selectTaskRoute } from "./beat-route"
@@ -377,7 +377,7 @@ export const runBeat = (
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task))
     yield* openRunDeaths(root, actions, at).pipe(Effect.andThen(writeBeatWaits(root, at, roomWaits(queued, actions, fresh.tasks, fresh.merged, deciderOwns))))
-    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at, yoloTask(projects, task), home)).pipe(
+    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at, yoloTask(projects, task), home, projects.some((project) => project.name === task.spec.project && modeOf(project) === "orc"))).pipe(
       Effect.tap(() => pollBaseCi(root, sources.readBaseCi, projects, latest.map(taskPr).filter((url) => url !== null), at))
     )
     const updates = sources.update === null ? [] : yield* runBeatUpdates(root, home, beat, config.machines, sources.update)

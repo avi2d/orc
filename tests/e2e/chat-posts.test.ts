@@ -122,7 +122,7 @@ describe("orc chat tools", () => {
       const postedFile = join(fixture.home, "backlog", "closed", "orc-1.md")
       await until(() => Bun.file(postedFile).size > 0, 1_000).catch(() => undefined)
       for (let attempt = 0; attempt < 200; attempt += 1) {
-        if ((await readFile(postedFile, "utf8")).includes("posted_at")) {
+        if ((await readFile(postedFile, "utf8").catch(() => "")).includes("posted_at")) {
           break
         }
         await Bun.sleep(20)
@@ -196,7 +196,7 @@ describe("orc chat tools", () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Fix the typo\n" })
       const result = await runOrc(fixture, ["backlog", "posted", "orc-1"])
-      expect([result.exitCode, result.stderr.trim()]).toEqual([1, "orc: the backlog holds no closed orc-1"])
+      expect([result.exitCode, result.stderr.trim()]).toEqual([1, "orc: orc-1 moved while orc read it, so run the command again"])
     })
   }, 60_000)
 
