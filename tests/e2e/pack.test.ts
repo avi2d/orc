@@ -199,6 +199,7 @@ const expectedFiles = [
   "src/features/merging-a-pr/base-ci.ts",
   "src/features/merging-a-pr/branch-update.ts",
   "src/features/merging-a-pr/landing.ts",
+  "src/features/merging-a-pr/merge-poll.ts",
   "src/features/merging-a-pr/merge.ts",
   "src/features/merging-a-pr/pending-update.ts",
   "src/entities/parked-runs/item-answers.ts",
