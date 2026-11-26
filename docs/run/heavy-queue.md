@@ -151,7 +151,7 @@ Every review and fix agent it starts then refuses a test run as the list above s
 Run `orc heavy path` once before the next no-mistakes run, so the wrapper exists.
 
 ## Sandboxed runs
-Under the default nono sandbox, orc puts `~/.orc/heavy/ci-only` and `~/.orc/heavy/bin` first on the agent's `PATH`, ahead of the runtime folders.
+Under the nono sandbox, orc puts `~/.orc/heavy/ci-only` and `~/.orc/heavy/bin` first on the agent's `PATH`, ahead of the runtime folders.
 The nono profile grants read and no write of both folders, the helper's folder and the bun file that starts the helper.
 The sandbox grants no pueue socket, so it also sets `HEAVY_QUEUE_UNREACHABLE=1`, and under that variable a call that is not refused runs at once.
 

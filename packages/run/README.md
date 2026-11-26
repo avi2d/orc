@@ -9,7 +9,7 @@ It also applies a worker split proposal, as [Task kinds](https://github.com/avi2
 
 - Bun, at the version `.bun-version` pins.
 - Git 2.48 or later, tested on 2.56.0.
-- nono from https://nono.sh, tested on 0.80.0, for the default sandbox.
+- nono from https://nono.sh, tested on 0.80.0, for a hand-typed `orc run` unless you pass `--sandbox none`.
 - Node, tested on 24.22.1.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with the login, token file or Pi packages each provider in [Configuring providers](https://github.com/avi2d/orc/blob/main/docs/run/configuring-providers.md) takes.
 - no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](https://github.com/avi2d/orc/blob/main/docs/run/installing-no-mistakes.md) says, for every run except `direct-PR` and `orc`.
@@ -28,6 +28,7 @@ To run orc from a checkout of the repository instead, follow [Contribute](https:
 ## Run a task
 
 To run one task, enter a clean checkout of the target project and run `orc run <task-file>`.
+Queued tasks run without a per-agent sandbox, inside the isolated space around the whole agent system, as [Running without a sandbox](https://github.com/avi2d/orc/blob/main/docs/run/running-without-a-sandbox.md) describes.
 [Running a task](https://github.com/avi2d/orc/blob/main/docs/run/running-a-task.md) names every flag and resume option.
 
 ## Print the version

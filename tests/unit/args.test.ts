@@ -232,7 +232,7 @@ describe("parseArgs run flags", () => {
   test("run takes --sandbox none instead of the nono default", () => {
     expect(parseArgs(["run", "task.md", "--sandbox", "none"])).toEqual({ kind: "RunAgent", taskFile: "task.md", taskKind: "ship", delivery: "no-mistakes", branch: undefined, sandbox: "none", tokenFile: undefined, provider: undefined, implementerModel: undefined, fixerModel: undefined, implementerThinking: undefined, fixerThinking: undefined, instructions: undefined, allow: [], answers: [] })
   })
-  test("run takes --sandbox nono by name, not only as the default", () => {
+  test("run preserves explicit --sandbox nono instead of dropping the flag", () => {
     expect(parseArgs(["run", "--sandbox", "nono", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: null, taskKind: "ship", delivery: "no-mistakes", branch: "orc/demo", sandbox: "nono", tokenFile: undefined, provider: undefined, implementerModel: undefined, fixerModel: undefined, implementerThinking: undefined, fixerThinking: undefined, instructions: undefined, allow: [], answers: [] })
   })
   test("run rejects a sandbox kind it does not know instead of falling back to nono", () => {
