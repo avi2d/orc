@@ -2,3 +2,4 @@ export { answersFor, answerTask, askStartedTask, correctionsDue, markCorrections
 export { carryRecordedAnswers } from "./item-answers"
 export { addSendBackWords, isSendBackQuestion, sendBackClosedTask } from "./send-back"
 export { retryStartedTask } from "./retry"
+export { rebaseClosedTask } from "./rebase"

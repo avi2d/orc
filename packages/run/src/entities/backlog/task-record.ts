@@ -119,6 +119,8 @@ type TaskState =
 const CiRerun = Schema.Struct({ pr: Schema.String, runs: Schema.Array(Schema.String), at: Schema.String })
 export type CiRerun = typeof CiRerun.Type
 const Retry = Schema.Struct({ run: Schema.String.check(Schema.isNonEmpty()), at: Schema.String.check(Schema.isNonEmpty()) })
+export const Rebase = Schema.Struct({ pr: Schema.String.check(Schema.isNonEmpty()), head: Schema.String.check(Schema.isPattern(/^[0-9a-f]{40}$/)), at: Schema.String.check(Schema.isNonEmpty()) })
+export type Rebase = typeof Rebase.Type
 
 export interface TaskRecord {
   readonly ciReruns?: ReadonlyArray<CiRerun>
@@ -126,6 +128,7 @@ export interface TaskRecord {
   readonly spec: TaskSpec
   readonly hold: Hold | null
   readonly retry?: typeof Retry.Type
+  readonly rebase?: Rebase
   readonly ciSentBack?: ReadonlyArray<string>
   readonly parked: Parked | null
   readonly priorPr?: string
@@ -192,6 +195,7 @@ const Frontmatter = Schema.Struct({
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
   retry: Schema.optional(Retry),
+  rebase: Schema.optional(Rebase),
   ci_sent_back: Schema.optional(Schema.Array(Schema.String)),
   parked_branch: Schema.optional(Schema.String),
   parked_origin: Schema.optional(ParkedOrigin),
@@ -271,7 +275,7 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (typeof questions === "string") {
     return questions
   }
-  return questions.length > 0 || (front.retry !== undefined && front.parked_origin !== undefined)
+  return questions.length > 0 || ((front.retry !== undefined || front.rebase !== undefined) && front.parked_origin !== undefined)
     ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }), ...(front.parked_at === undefined ? {} : { at: front.parked_at }), ...(front.parked_sent_back_at === undefined ? {} : { sentBackAt: front.parked_sent_back_at }) }
     : "a parked task names no question"
 }
@@ -381,6 +385,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
       },
       hold,
       ...(front.retry === undefined ? {} : { retry: front.retry }),
+      ...(front.rebase === undefined ? {} : { rebase: front.rebase }),
       ...(front.ci_sent_back === undefined ? {} : { ciSentBack: front.ci_sent_back }),
       parked,
       ...(front.merge === undefined ? {} : { merge: front.merge }),

@@ -29,6 +29,7 @@ export interface HistoryRun {
   readonly projectDir: string
   readonly runId: string
   readonly resumeRun?: string | undefined
+  readonly rebase?: { readonly head: string; readonly pr: string } | undefined
   readonly runDir: string
   readonly piSessionDir: string
   readonly hostSessionsDir: string
