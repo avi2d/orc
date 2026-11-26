@@ -38,6 +38,34 @@ const find = (element: object | string, id: string): Node | null => {
   return null
 }
 
+const paths = (element: object | string, parents: ReadonlyArray<Node> = []): ReadonlyArray<ReadonlyArray<Node>> => {
+  const made = typeof element === "string" ? undefined : nodes.get(element)
+  if (made === undefined) return []
+  const path = [...parents, made]
+  return [path, ...made.kids.flatMap((kid) => paths(kid, path))]
+}
+
+const press = (view: { render(cx: Context): object }, target: string): void => {
+  const rendered = paths(view.render(cx))
+  const under = rendered.find((path) => path.at(-1)?.calls.some((call) => call.name === "id" && call.args[0] === target))
+  if (under === undefined) throw new Error(`No element ${target}`)
+  for (const path of rendered) {
+    const made = path.at(-1)
+    if (made === undefined || under.includes(made)) continue
+    for (const call of made.calls) {
+      const handler = call.args[0]
+      if (call.name === "on_mouse_down_out" && typeof handler === "function") handler({}, cx)
+    }
+  }
+  for (const made of [...under].reverse()) {
+    for (const call of made.calls) {
+      const handler = call.args[1]
+      if (call.name === "on_mouse_down" && call.args[0] === "left" && typeof handler === "function") handler({}, cx)
+    }
+  }
+  click(find(view.render(cx), target))
+}
+
 const documents = new Map<string, unknown>()
 let attentionPending: Promise<{ code: number; stdout: string; stderr: string }> | null = null
 const executed: Array<string> = []
@@ -131,6 +159,30 @@ test("a stalled remote question request does not hold back local steps and log r
     attentionPending = null
     documents.clear()
   }
+})
+
+test("pressing the open Project trigger closes its list instead of reopening it after repaint", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const agents = new OrcAgents()
+  agents.menu = "project"
+  press(agents, "filter-project")
+  expect(agents.menu).toBeNull()
+})
+
+test("pressing the open Status trigger closes its list instead of reopening it after repaint", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const agents = new OrcAgents()
+  agents.menu = "status"
+  press(agents, "filter-status")
+  expect(agents.menu).toBeNull()
+})
+
+test("pressing Status while Project is open switches lists instead of closing both", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const agents = new OrcAgents()
+  agents.menu = "project"
+  press(agents, "filter-status")
+  expect(agents.menu).toBe("status")
 })
 
 const cmd4 = { name: "layout.select", args: { stack: "orc-views", child: "orc-inbox" } }
