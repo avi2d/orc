@@ -8,7 +8,10 @@ export class AppInstallError extends Data.TaggedError("AppInstallError")<{
 }> {}
 
 export const bundledAppDir = (): string =>
-  Bun.isStandaloneExecutable ? process.execPath.replace(/[\\/][^\\/]*$/, "/herdr-app") : import.meta.dir + "/../../../dist/herdr-app"
+  Bun.isStandaloneExecutable
+    ? (Bun.env.ORC_LAUNCHED_BINARY === process.execPath ? Bun.env.ORC_BUNDLED_APP_DIR : undefined)
+      ?? process.execPath.replace(/[\\/][^\\/]*$/, "/herdr-app")
+    : import.meta.dir + "/../../../dist/herdr-app"
 
 export const herdrAppSourceDir = (): string => import.meta.dir + "/../../../../herdr-app"
 

@@ -7,7 +7,6 @@ Run one task by hand, to see a run from the task file to its pull request before
 
 ## Before you begin
 
-- [Bun](https://bun.com), at the version `.bun-version` pins.
 - [Git](https://git-scm.com) 2.48 or later, and [Node.js](https://nodejs.org).
 - [Pi](https://pi.dev), the `@earendil-works/pi-coding-agent` [npm](https://www.npmjs.com) package, logged in to a model provider.
 - [no-mistakes](https://github.com/kunchenguid/no-mistakes), installed as [Installing no-mistakes](../run/installing-no-mistakes.md) says.
@@ -17,11 +16,13 @@ Run one task by hand, to see a run from the task file to its pull request before
 
 To put the `orc` command on your PATH:
 
-1. Run `bun add -g @avi2dg/orc` to install the npm package.
+1. Run `npm install -g @avi2dg/orc`.
 1. Run `orc --version` to check it.
 
 Orc prints `orc` and its version.
-To upgrade orc later, run `bun add -g @avi2dg/orc` again.
+The npm package runs without Bun on Apple silicon macOS and Linux x64 with glibc.
+If the compiled binary is missing, install [Bun](https://bun.com) to run orc from source.
+To upgrade orc later, run the same install command again.
 
 ## Name a provider and its models
 

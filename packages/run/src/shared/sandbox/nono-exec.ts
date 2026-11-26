@@ -23,7 +23,7 @@ export interface NonoExecOptions {
 
 interface StandinHelper {
   readonly runtime: string
-  readonly folder: string
+  readonly folders: ReadonlyArray<string>
 }
 
 const existingRealPaths = (fs: FileSystem.FileSystem, paths: ReadonlyArray<string>) =>
@@ -34,7 +34,7 @@ const existingRealPaths = (fs: FileSystem.FileSystem, paths: ReadonlyArray<strin
 // A stand-in the sandbox cannot read or a helper it cannot start falls back to the real tool, so the test refusal would not apply.
 const standinReads = (fs: FileSystem.FileSystem, searchPath: string | undefined, helper: StandinHelper) =>
   Effect.gen(function*() {
-    const standinFolders = yield* existingRealPaths(fs, [...standinDirsOf(searchPath), helper.folder])
+    const standinFolders = yield* existingRealPaths(fs, [...standinDirsOf(searchPath), ...helper.folders])
     const standinFiles = yield* existingRealPaths(fs, [helper.runtime])
     return { standinFolders, standinFiles }
   })

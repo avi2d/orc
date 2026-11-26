@@ -7,7 +7,6 @@ It also applies a worker split proposal, as [Task kinds](https://github.com/avi2
 
 ## Before you begin
 
-- Bun, at the version `.bun-version` pins.
 - Git 2.48 or later, tested on 2.56.0.
 - nono from https://nono.sh, tested on 0.80.0, for a run you start by hand with `orc run` unless you pass `--sandbox none`.
 - Node, tested on 24.22.1.
@@ -16,13 +15,15 @@ It also applies a worker split proposal, as [Task kinds](https://github.com/avi2
 
 ## Install
 
-Orc runs on Bun, so install it with Bun.
 To install orc:
 
-1. Run `bun add -g @avi2dg/orc` to put the `orc` command on your PATH.
-1. Run `orc --version` to check it.
+1. Run `npm install -g @avi2dg/orc`.
+1. Run `orc --version`.
 
-To upgrade orc, run `bun add -g @avi2dg/orc` again, or run `orc update`, as [Updating orc](https://github.com/avi2d/orc/blob/main/docs/run/updating-orc.md) shows.
+Orc prints its version.
+The npm package runs without Bun on Apple silicon macOS and Linux x64 with glibc.
+If the compiled binary is missing, install Bun to run orc from source.
+To upgrade orc, run the same install command again or follow [Updating orc](https://github.com/avi2d/orc/blob/main/docs/run/updating-orc.md).
 To run orc from a checkout of the repository instead, follow [Contribute](https://github.com/avi2d/orc/blob/main/docs/contribute.md#run-orc-from-a-checkout).
 
 ## Run a task
@@ -61,26 +62,4 @@ An unknown command or subcommand that is one or two typos away from exactly one 
 
 [Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/source-map.md) maps the rest of the package and the tests.
 
-## Related topics
-
-- [Running a task](https://github.com/avi2d/orc/blob/main/docs/run/running-a-task.md)
-- [Running without a sandbox](https://github.com/avi2d/orc/blob/main/docs/run/running-without-a-sandbox.md)
-- [Configuring providers](https://github.com/avi2d/orc/blob/main/docs/run/configuring-providers.md)
-- [Account folders and orc login](https://github.com/avi2d/orc/blob/main/docs/run/accounts.md)
-- [Installing no-mistakes](https://github.com/avi2d/orc/blob/main/docs/run/installing-no-mistakes.md)
-- [Choosing the no-mistakes binary](https://github.com/avi2d/orc/blob/main/docs/run/choosing-the-no-mistakes-binary.md)
-- [What the no-mistakes fork adds](https://github.com/avi2d/orc/blob/main/docs/run/no-mistakes-fork.md)
-- [Granting toolchain folders to the sandbox](https://github.com/avi2d/orc/blob/main/docs/run/toolchain-folders.md)
-- [How orc runs Pi](https://github.com/avi2d/orc/blob/main/docs/run/how-orc-runs-pi.md)
-- [Seeing runs](https://github.com/avi2d/orc/blob/main/docs/run/seeing-runs.md)
-- [The backlog and the beat](https://github.com/avi2d/orc/blob/main/docs/run/backlog-and-beat.md)
-- [Parked runs](https://github.com/avi2d/orc/blob/main/docs/run/parked-runs.md)
-- [The attention queue](https://github.com/avi2d/orc/blob/main/docs/run/attention-queue.md)
-- [Task kinds](https://github.com/avi2d/orc/blob/main/docs/run/task-kinds.md)
-- [Delivery modes](https://github.com/avi2d/orc/blob/main/docs/run/delivery-modes.md)
-- [Merging a task's PR](https://github.com/avi2d/orc/blob/main/docs/run/merging-a-tasks-pr.md)
-- [Adding tasks from a chat](https://github.com/avi2d/orc/blob/main/docs/run/chat.md)
-- [The runner](https://github.com/avi2d/orc/blob/main/docs/run/runner.md)
-- [The heavy queue](https://github.com/avi2d/orc/blob/main/docs/run/heavy-queue.md)
-- [Updating orc](https://github.com/avi2d/orc/blob/main/docs/run/updating-orc.md)
-- [Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/source-map.md)
+[Run package topics](https://github.com/avi2d/orc/blob/main/docs/run/topics.md) lists every page about the orc command.

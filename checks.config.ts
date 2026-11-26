@@ -112,4 +112,5 @@ export default defineConfig({
     "tests/e2e/update.test.ts": 1.551,
     "tests/e2e/worker-ask.test.ts": 17.615,
   },
+  platformPackages: { binary: "orc", platforms: ["darwin-arm64", "linux-x64"] },
 });

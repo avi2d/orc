@@ -57,8 +57,12 @@ describe("installCommand", () => {
     expect(installCommand(undefined, "0.18.0")).toEqual(["bun", "add", "-g", "@avi2dg/orc@0.18.0"])
   })
 
-  test("update.command runs as given, with {version} replaced by the found version", () => {
-    expect(installCommand(["sh", "-c", "cd ~/orc && git pull", "v{version}"], "0.18.0")).toEqual(["sh", "-c", "cd ~/orc && git pull", "v0.18.0"])
+  test("an npm global install updates with npm in its own prefix instead of installing a second copy with Bun", () => {
+    expect(installCommand(undefined, "0.18.0", "/opt/cli")).toEqual(["npm", "install", "-g", "--prefix", "/opt/cli", "@avi2dg/orc@0.18.0"])
+  })
+
+  test("update.command overrides the npm installer and expands {version}", () => {
+    expect(installCommand(["sh", "-c", "cd ~/orc && git pull", "v{version}"], "0.18.0", "/opt/cli")).toEqual(["sh", "-c", "cd ~/orc && git pull", "v0.18.0"])
   })
 })
 
