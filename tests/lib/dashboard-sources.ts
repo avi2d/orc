@@ -1,6 +1,5 @@
 import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
-import { createTestRenderer, type TestRendererSetup } from "@opentui/core/testing";
 import { Clock, type Config, ConfigProvider, Effect, Fiber, type FileSystem, Layer } from "effect";
 import { type ModuleSources, moduleFeeds, modules } from "@avi2dg/orc-cli";
 import type { CliRenderer } from "@opentui/core";
@@ -53,6 +52,7 @@ import {
 import { liveScreen, type PanelError, type PanelModule, type PrintFrame } from "@avi2dg/orc-ui";
 import { type ConversationReader, ConversationSource, conversationSourceLive } from "@avi2dg/orc-ledger";
 import { fixture } from "./fixtures";
+import { createLiveTestRenderer } from "./live-screen";
 import { fixtureActionsRepo, queueAnswers } from "./queues-fixture";
 import { fixtureHomeEnvironment } from "./session-fixture";
 import { orcQuotaText, recordedOrcQuota } from "./orc-quota";
@@ -184,16 +184,6 @@ const recordedSources = (
     ),
   );
 
-export const frameWhere = async (setup: TestRendererSetup, matches: (frame: string) => boolean): Promise<string> => {
-  for (let attempt = 0; attempt < 400; attempt += 1) {
-    await Bun.sleep(25);
-    await setup.renderOnce();
-    const frame = setup.captureCharFrame();
-    if (matches(frame)) return frame;
-  }
-  throw new Error(`no frame matched, last was:\n${setup.captureCharFrame()}`);
-};
-
 // Feeds choose live or print reads as they are built, so the read mode is provided outside the sources.
 type DashboardError = PanelError | ConfigRefused | Config.ConfigError;
 
@@ -221,12 +211,12 @@ export const printedPanel = (
 export const withLivePanel = async <A>(
   size: { readonly width: number; readonly height: number },
   sources: Layer.Layer<ModuleSources, Config.ConfigError | ConfigRefused>,
-  body: (setup: TestRendererSetup) => Promise<A>,
+  body: (setup: Awaited<ReturnType<typeof createLiveTestRenderer>>) => Promise<A>,
   clock?: Clock.Clock,
 ): Promise<A> => {
-  const setup = await createTestRenderer(size);
-  const dashboard = liveDashboard(setup.renderer, sources);
-  const fiber = Effect.runFork(clock === undefined ? dashboard : dashboard.pipe(Effect.provideService(Clock.Clock, clock)));
+  const setup = await createLiveTestRenderer(size);
+  const live = liveDashboard(setup.renderer, sources);
+  const fiber = setup.start(clock === undefined ? live : live.pipe(Effect.provideService(Clock.Clock, clock)));
   try {
     return await body(setup);
   } finally {

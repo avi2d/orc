@@ -6,7 +6,7 @@ import { BunFileSystem } from "@effect/platform-bun";
 import { ConfigProvider, Effect, Layer } from "effect";
 import { TestClock } from "effect/testing";
 import { savedReadingsLayer } from "@avi2dg/orc-schema";
-import { dashboardSources, frameWhere, recordedAnswer, tasksCommand, withLivePanel } from "../../lib/dashboard-sources";
+import { dashboardSources, recordedAnswer, tasksCommand, withLivePanel } from "../../lib/dashboard-sources";
 import { boxText } from "../../lib/host-fixture";
 
 const remoteResourcesCommand = "ssh south.example.com orc-dash-resources --json";
@@ -133,10 +133,10 @@ describe("the live dashboard's saved readings", () => {
         );
         const size = { width: 240, height: 60 };
         await withLivePanel(size, dashboardSources({ env, saved, run: (command) => Effect.sync(() => recordedAnswer(command)) }), (setup) =>
-          frameWhere(setup, (frame) => frame.includes("harbor") && frame.includes("\u25cf claude main \u00b7 max") && frame.includes("pueue") && !frame.includes("reading") && !frame.includes("checking")),
+          setup.frameWhere((frame) => frame.includes("harbor") && frame.includes("\u25cf claude main \u00b7 max") && frame.includes("pueue") && !frame.includes("reading") && !frame.includes("checking")),
         );
         const frame = await withLivePanel(size, dashboardSources({ env, saved, run: () => Effect.never }), (setup) =>
-          frameWhere(setup, (text) => text.includes("harbor") && text.includes("\u25cf claude main \u00b7 max") && text.includes("pueue")),
+          setup.frameWhere((text) => text.includes("harbor") && text.includes("\u25cf claude main \u00b7 max") && text.includes("pueue")),
         );
         const titles = frame
           .split("\n")
@@ -181,10 +181,10 @@ describe("the live dashboard's hanging readings", () => {
     "keep the machines' last reading on show and say its growing age while the next read hangs",
     () =>
       withClock((clock) => withLivePanel({ width: 240, height: 60 }, answeringOnce(), async (setup) => {
-        const fresh = boxText(await frameWhere(setup, (frame) => boxText(frame, "machines").includes(localCpu)), "machines");
+        const fresh = boxText(await setup.frameWhere((frame) => boxText(frame, "machines").includes(localCpu)), "machines");
         expect(fresh).toMatch(/read 0s ago/u);
         await Effect.runPromise(clock.adjust("20 seconds"));
-        const late = boxText(await frameWhere(setup, (frame) => /read 2\ds ago \u00b7 reading\u2026/u.test(boxText(frame, "machines"))), "machines");
+        const late = boxText(await setup.frameWhere((frame) => /read 2\ds ago \u00b7 reading\u2026/u.test(boxText(frame, "machines"))), "machines");
         expect(late).toContain(localCpu);
       }, clock)),
     40_000,
