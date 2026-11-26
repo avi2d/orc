@@ -86,6 +86,10 @@ A test run is one of these calls, watch and UI runs included:
 Under `--sandbox none` every other call, such as a build, a lint or a typecheck, queues as it does without the variable.
 Under the nono sandbox it runs at once, as the next section says.
 The checks of a run go through the same stand ins, so a check command that starts a test run fails.
+The Pi prompt that orc sends with each task is an instruction the agent reads, not a refusal.
+It says to leave repository tests to GitHub CI, and to run no tests locally.
+It also says: You may run build, lint, or typecheck.
+The stand ins above refuse only test runs, so a build, a lint or a typecheck is never refused by them.
 
 ### Runners behind a package manager
 A package manager puts `node_modules/.bin` ahead of every stand in, so a script body that names a runner skips the runner's own stand in.
