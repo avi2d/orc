@@ -43,6 +43,9 @@ The tabs refresh while visible and show a reason when a command fails.
 ## Answer in the Inbox
 
 Select **Inbox** or press `cmd-4` to see everything Orc assigns to you in one list, oldest first.
+
+![Inbox tab with an event and questions assigned across tasks](images/herdr-inbox.png)
+
 Each card shows the task ID and title, who asks, the subject, each option with its outcome, and the recommendation.
 An option with a picture shows as a tile, and any other option shows as a button.
 The Inbox outlines the recommended option.
@@ -105,6 +108,8 @@ Select the row to fold or reopen it.
 For a failed `bun test` check, **Summary** shows the failed test names, their errors, and the pass and fail counts.
 For other failed checks, it shows the last 20 lines before the exit.
 If the step ended before a check reported its result, the row says **Interrupted**.
+
+![Agents tab with a Checks step in Summary, showing passed typecheck and unit checks and a failed e2e check](images/herdr-agents-checks.png)
 
 Select **Raw** in the step bar to see the full log.
 The tab keeps **Raw** selected when you move between steps or runs.
