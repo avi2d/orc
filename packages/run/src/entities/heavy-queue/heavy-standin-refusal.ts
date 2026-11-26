@@ -40,22 +40,56 @@ const launcherOperands: ReadonlyMap<string, number> = new Map([
 ])
 const projectRunner = /(?:^|\/)node_modules\/\.bin\/([^/]+)$/
 
-const commandStart = (words: ReadonlyArray<string>, index: number): number => {
+const shellWords = (command: string): Array<string> =>
+  (command.match(/(?:[^\s;&|"'\\]+|\\.|'[^']*'|"[^"]*")+|&&|\|\||[;|&]/g) ?? [])
+    .map((word) => word.replace(/'([^']*)'|"([^"]*)"|\\(.)/g, (_match, single: string | undefined, double: string | undefined, escaped: string | undefined) =>
+      single ?? double ?? escaped ?? ""))
+
+const launcherStart = (words: ReadonlyArray<string>, index: number, launcher: string): number => {
+  let next = index + 1
+  while (optionWord.test(words[next] ?? "")) {
+    const option = words[next++]
+    if (option === "--") {
+      break
+    }
+    if (launcher === "command" && (option === "-v" || option === "-V")) {
+      return words.length
+    }
+    if (launcher === "nice" && (option === "-n" || option === "--adjustment")) {
+      next++
+    }
+  }
+  return next + (launcherOperands.get(launcher) ?? 0)
+}
+
+const refusedWords = (words: ReadonlyArray<string>, index: number, cwd: string): boolean => {
   const word = words[index] ?? ""
   if (assignmentWord.test(word)) {
-    return commandStart(words, index + 1)
+    return refusedWords(words, index + 1, cwd)
   }
-  const operands = launcherOperands.get(word.slice(word.lastIndexOf("/") + 1))
-  if (operands === undefined) {
-    return index
+  const name = word.slice(word.lastIndexOf("/") + 1)
+  if ((name === "sh" || name === "bash") && words[index + 1] === "-c") {
+    return refusedPathCall(words[index + 2] ?? "", cwd)
   }
-  const operand = words.findIndex((next, at) => at > index && !optionWord.test(next))
-  return operand === -1 ? words.length : commandStart(words, operand + operands)
+  if (launcherOperands.has(name)) {
+    const next = launcherStart(words, index, name)
+    return next < words.length && refusedWords(words, next, cwd)
+  }
+  const tool = projectRunner.exec(word)?.[1]
+  return tool !== undefined && refusedTest(tool, words.slice(index + 1), cwd)
 }
 
 export const refusedPathCall = (command: string, cwd: string): boolean => {
-  const words = command.trim().split(/\s+/).map((word) => word.replaceAll(/["'\\]/g, ""))
-  const start = commandStart(words, 0)
-  const tool = projectRunner.exec(words[start] ?? "")?.[1]
-  return tool !== undefined && refusedTest(tool, words.slice(start + 1), cwd)
+  const words = shellWords(command)
+  const separator = /^(?:&&|\|\||[;|&])$/
+  let start = 0
+  for (let index = 0; index <= words.length; index++) {
+    if (index === words.length || separator.test(words[index] ?? "")) {
+      if (refusedWords(words.slice(start, index), 0, cwd)) {
+        return true
+      }
+      start = index + 1
+    }
+  }
+  return false
 }

@@ -22,17 +22,15 @@ import {
   type PendingFinding,
   type QuestionAnswer
 } from "./no-mistakes-gate"
-import { openDriveLog, type DriveLog, type Ending, type NoMistakesRecord } from "./no-mistakes-drive-log"
+import { appendGate, openDriveLog, type DriveLog, type Ending, type NoMistakesRecord } from "./no-mistakes-drive-log"
+import { settleFixResponse, type NoMistakesReply } from "./no-mistakes-response"
 import { hasTable, scalar } from "../../shared/lib/index"
 export { answerArgsFor, answerForGate, askUserWord, omittedQuestionIds, parseRun } from "./no-mistakes-gate"
 export type { AllowWord, NoMistakesFinding, QuestionAnswer } from "./no-mistakes-gate"
 export type { NoMistakesRecord } from "./no-mistakes-drive-log"
 
-export interface NoMistakesReply {
-  readonly stdout: string
-  readonly stderr: string
-  readonly exitCode: number
-}
+export { gateLogFileName } from "./no-mistakes-drive-log"
+export type { NoMistakesReply } from "./no-mistakes-response"
 
 // A runner that cannot reach no-mistakes resolves with a nonzero exit code, so the driver records why the step stopped.
 export interface NoMistakesRunner {
@@ -44,8 +42,6 @@ export interface NoMistakesRunner {
   readonly status: (runId: string | null) => Effect.Effect<NoMistakesReply>
   readonly logs: (runId: string, step: string) => Effect.Effect<NoMistakesReply>
 }
-
-export const gateLogFileName = "gate.log"
 
 export interface NoMistakesInput {
   readonly runner: NoMistakesRunner
@@ -221,14 +217,6 @@ const serveOpenQuestions = (input: NoMistakesInput, log: DriveLog, gate: ParkedG
     return { kind: "answered", command }
   })
 
-const appendGate = (runDir: string, step: string): Effect.Effect<void, never, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    yield* fs.writeFileString(runDir + "/" + gateLogFileName, new Date().toISOString() + " " + step + "\n", { flag: "a" }).pipe(
-      Effect.orElseSucceed(() => undefined)
-    )
-  })
-
 // supplied gains every answer the wait brings, so the rest of the gate sends them.
 const awaitMissing = (
   input: NoMistakesInput,
@@ -295,9 +283,8 @@ const advanceParked = (
     }
     const current = yield* input.runner.respond(answer)
     if (answer.kind === "fix") {
-      for (const settled of answeredAskUser(parsed.findings, carried)) {
-        supplied.delete(settled.id)
-      }
+      const answeredIds = answeredAskUser(parsed.findings, carried).map((finding) => finding.id)
+      yield* settleFixResponse(input.runDir, log, supplied, answeredIds, current)
     }
     return { kind: "next", current, sent: { kind: "respond", gate } }
   })

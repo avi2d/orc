@@ -6,7 +6,7 @@ import { orcCompletionLine } from "../../entities/agent/index"
 import type { AllowWord, NoMistakesRecord, NoMistakesRunner, QuestionAnswer } from "../../entities/review-gate/index"
 import { OrcRunError } from "../../shared/lib/index"
 import { toFileUrl } from "../../entities/run-history/index"
-import { findingLine, reportFileName, reportMarkdown, runStatus, type OrcRunCommit, type OrcRunReport } from "../../entities/run-history/index"
+import { noMistakesFindingLines, reportFileName, reportMarkdown, runStatus, type OrcRunCommit, type OrcRunReport } from "../../entities/run-history/index"
 import { handoverFileName, handoverNote, lastAssistantReply, longSessionWarning } from "../../entities/agent/index"
 import { branchCommits } from "../../shared/process/index"
 import { readFailure } from "../../shared/config/index"
@@ -114,7 +114,7 @@ const noMistakesText = (record: NoMistakesRecord): string =>
     "reviewer: " + (record.reviewer ?? "not named"),
     "findings: " + record.findings.length.toString(),
     "gates answered: " + record.gatesAnswered.toString(),
-    ...record.findings.map(findingLine),
+    ...noMistakesFindingLines(record),
     record.result
   ].join("\n") + "\n"
 

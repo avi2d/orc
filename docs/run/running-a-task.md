@@ -97,6 +97,8 @@ If the wait ends without an answer, the task parks.
 
 To resume a refused gate, pass `--answer question-<id>="<text>"`.
 To give no-mistakes guidance for a finding, use `--answer <finding-id>="<text>"`.
+If no-mistakes defers a finding to the PR follow-ups, the run report marks the finding as deferred.
+The report also tells you if no fix round ran at that gate or if no-mistakes did not apply your answer.
 Use `--allow ask-user` to decline findings marked exactly `ask-user`.
 Findings with any other action still wait as questions.
 For another refusal, rerun with `--allow` and the kind named in the report.
