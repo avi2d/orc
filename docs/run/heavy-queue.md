@@ -12,7 +12,8 @@ For `python`, `python3`, `uv`, `deno`, `go`, `cargo`, and `make`, orc writes a s
 Shell probes still find those tools absent when they are missing.
 Other tools get stand ins even without a `PATH` binary, so the helper can run the nearest `node_modules/.bin` copy.
 Each write removes stand ins for commands no longer configured and for those seven tools when they are neither configured nor on `PATH`.
-A stand in is a launcher of three shell lines that starts orc's TypeScript helper through the absolute path of its [bun](https://bun.com).
+A stand in is a launcher of three shell lines that starts orc's helper.
+A source install starts the TypeScript helper through the absolute path of its [bun](https://bun.com), and an [npm](https://www.npmjs.com) install starts it through the `orc` bin link with `--orc-standin`.
 `orc run` puts that folder on `PATH` for the agent it starts, after only `~/.orc/heavy/ci-only`.
 A stand in queues the call with `pueue add` into the `heavy` group, or hands it to the `through` command when one is set, and waits for its turn, then prints the call output and exits with its exit code.
 Without `through` set, the wait message names how many queued calls stand ahead, counting higher priority calls and earlier calls at the same priority.
@@ -26,7 +27,8 @@ The helper runs the real tool once the queue hands it the turn.
 The helper finds the tool, decides whether the call queues, and runs, queues or waits for it, and never decides through itself.
 The helper stays the caller's process for the whole call, passes the tool's exit code back, and passes on a stop or hangup signal to the tool.
 It reads no `.env` or `bunfig.toml` from the caller's folder.
-If the bun or helper is gone, the launcher warns once on stderr to rerun orc and runs the recorded tool with no queue, or the nearest node_modules/.bin copy above the working folder when orc recorded no path.
+For an npm install, the launcher keeps the caller's `NODE_OPTIONS`, `NODE_PATH` and the other Node settings it names from its own Node start, then passes them on to the helper.
+If the runtime or helper is gone, the launcher warns once on stderr to rerun orc and runs the recorded tool with no queue, or the nearest node_modules/.bin copy above the working folder when orc recorded no path.
 A queued call runs under the same helper in its pueue task, which stops the call once the stand in that queued it is gone.
 A stand in runs the first copy of the tool on its caller's PATH that is not an orc stand in, then the absolute path recorded when orc wrote it, then the nearest node_modules/.bin copy above the working folder that is not an orc stand in, and refuses with exit 127 when none exists.
 Without `through` set, a call that a queued call starts runs at once instead of queuing again.
@@ -152,7 +154,7 @@ Run `orc heavy path` once before the next no-mistakes run, so the wrapper exists
 
 ## Sandboxed runs
 Under the nono sandbox, orc puts `~/.orc/heavy/ci-only` and `~/.orc/heavy/bin` first on the agent's `PATH`, ahead of the runtime folders.
-The nono profile grants read and no write of both folders, the helper's folder and the bun file that starts the helper.
+The nono profile grants read and no write of both folders, the helper's folders and the runtime file that starts the helper.
 The sandbox grants no pueue socket, so it also sets `HEAVY_QUEUE_UNREACHABLE=1`, and under that variable a call that is not refused runs at once.
 
 ## Watch the queue
