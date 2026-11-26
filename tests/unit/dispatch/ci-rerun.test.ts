@@ -22,7 +22,7 @@ const recording = (asked: Array<ReadonlyArray<string>>) =>
     const real = yield* ChildProcessSpawner.ChildProcessSpawner
     return ChildProcessSpawner.make((command) => {
       if (ChildProcess.isStandardCommand(command) && command.command === "gh") {
-        asked.push(command.args.filter((word): word is string => typeof word === "string"))
+        asked.push(command.args.map(String))
         return real.spawn(ChildProcess.make("true", []))
       }
       return real.spawn(command)
