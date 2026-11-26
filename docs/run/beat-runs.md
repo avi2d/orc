@@ -88,7 +88,9 @@ The beat that checked for the update and any runs already underway keep their ru
 The next scheduled beat uses the new version if its launcher reads the selected release or its path resolves to the updated Bun installation.
 Start each machine on a release that supports its install method before relying on the beat to maintain it.
 
-## Merging a task's PR
+<a id="merging-a-tasks-pr"></a>
+
+## Automatic PR merges
 
 On a project with `"yolo": true`, the beat merges, through `orc merge` with `yolo-green`, the green PR of a ship task that closed done.
 The beat leaves a stopped or failed task's PR open.
