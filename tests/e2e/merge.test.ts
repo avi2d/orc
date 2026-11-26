@@ -243,6 +243,30 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
     })
   }, 60_000)
 
+  test("ORC_MERGE_POLL_SECONDS sets the first wait instead of the fixed 1, 2 and 4 seconds", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, afterUpdate: [{ head, checks: [passed("lint"), passed("test")] }, { head: newHead, checks: [passed("lint"), running("test")] }, { head: newHead, checks: [passed("lint"), passed("test")] }] })
+      const started = Date.now()
+      const merged = await runOrc({ ...fixture, env: { ...fixture.env, ORC_MERGE_POLL_SECONDS: "0.05" } }, ["merge", "orc-1"])
+      const elapsed = Date.now() - started
+      expect(merged.stdout.trim()).toEndWith("merged orc-1 " + prUrl)
+      expect(await forgeSteps(fixture)).toEqual(["view", "update", "view", "view", "view", "pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+      expect(elapsed).toBeLessThan(4000)
+    })
+  }, 60_000)
+
+  test("an ORC_MERGE_POLL_SECONDS that is not a number of seconds is refused before the update instead of read as zero", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1 })
+      const merged = await runOrc({ ...fixture, env: { ...fixture.env, ORC_MERGE_POLL_SECONDS: "0" } }, ["merge", "orc-1"])
+      expect(merged.exitCode).not.toBe(0)
+      expect(merged.stderr).toContain("ORC_MERGE_POLL_SECONDS is 0")
+      expect(await forgeSteps(fixture)).toEqual([])
+    })
+  }, 60_000)
+
   test("a PR waits until every checked check is green on the new head", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await closedWithPr(fixture)
