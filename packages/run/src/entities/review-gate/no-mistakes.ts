@@ -8,6 +8,7 @@ import {
   answerForGate,
   answeredAskUser,
   askUserFindings,
+  canDeferFindings,
   findingsTable,
   isUnknownAction,
   omittedQuestionIds,
@@ -240,11 +241,6 @@ const awaitMissing = (
 type ParkedAdvance =
   | { readonly kind: "ending"; readonly ending: Ending }
   | { readonly kind: "next"; readonly current: NoMistakesReply; readonly sent: Sent }
-
-const canDeferFindings = (gate: ParkedGate, parsed: ParsedRun, stdout: string): boolean =>
-  gate.step === "review" && gate.stage === "fix-review" && scalar(stdout, "defer_non_errors") === "true" &&
-  openQuestionsIn(parsed.findings, omittedQuestionIds(stdout)).length === 0 && parsed.findings.length > 0 &&
-  parsed.findings.every((finding) => finding.id !== "" && (finding.severity === "warning" || finding.severity === "info"))
 
 const approveFollowUps = (
   input: NoMistakesInput,

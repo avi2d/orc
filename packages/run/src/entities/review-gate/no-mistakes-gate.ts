@@ -178,6 +178,11 @@ export const openQuestionsIn = (findings: ReadonlyArray<NoMistakesFinding>, omit
   return [...rendered, ...omitted]
 }
 
+export const canDeferFindings = (gate: ParkedGate, parsed: ParsedRun, stdout: string): boolean =>
+  gate.step === "review" && gate.stage === "fix-review" && scalar(stdout, "defer_non_errors") === "true" &&
+  openQuestionsIn(parsed.findings, omittedQuestionIds(stdout)).length === 0 && parsed.findings.length > 0 &&
+  parsed.findings.every((finding) => finding.id !== "" && (finding.severity === "warning" || finding.severity === "info"))
+
 export const answerArgsFor = (question: string, answer: string): ReadonlyArray<string> =>
   ["axi", "answer", "--question", question, "--answer", answer]
 
