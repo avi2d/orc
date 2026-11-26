@@ -261,8 +261,7 @@ const advanceParked = (
       log.liftCap()
     }
     if (canDeferFindings(gate, parsed, stdout)) {
-      const current = yield* approveFollowUps(input, log, supplied, parsed)
-      return { kind: "next", current, sent: { kind: "respond", gate } }
+      return yield* approveFollowUps(input, log, supplied, parsed, gate)
     }
     const open = openQuestionsIn(parsed.findings, omittedQuestionIds(stdout))
     const questions = [...open, ...askUserFindings(parsed.findings, input.allow ?? [])].map((finding): PendingFinding =>

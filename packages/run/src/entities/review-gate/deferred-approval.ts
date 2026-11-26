@@ -13,10 +13,11 @@ export const approveFollowUps = (
   input: { readonly runDir: string; readonly runner: { readonly respond: (response: GateResponse) => Effect.Effect<NoMistakesReply> } },
   log: DriveLog,
   supplied: Map<string, string>,
-  parsed: ParsedRun
-): Effect.Effect<NoMistakesReply, never, FileSystem.FileSystem> =>
+  parsed: ParsedRun,
+  gate: ParkedGate
+): Effect.Effect<{ readonly kind: "next"; readonly current: NoMistakesReply; readonly sent: { readonly kind: "respond"; readonly gate: ParkedGate } }, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const reply = yield* input.runner.respond({ kind: "approve", followUps: parsed.findings.map((finding) => finding.id) })
     yield* settleFixResponse(input.runDir, log, supplied, [], reply)
-    return reply
+    return { kind: "next", current: reply, sent: { kind: "respond", gate } }
   })

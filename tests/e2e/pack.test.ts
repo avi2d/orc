@@ -255,6 +255,7 @@ const expectedFiles = [
   "src/entities/agent/worker-ask.ts",
   "src/entities/agent/markdown.d.ts",
   "src/shared/config/model-route.ts",
+  "src/entities/review-gate/deferred-approval.ts",
   "src/entities/review-gate/no-mistakes-drive-log.ts",
   "src/entities/review-gate/no-mistakes-gate.ts",
   "src/entities/review-gate/no-mistakes-response.ts",
