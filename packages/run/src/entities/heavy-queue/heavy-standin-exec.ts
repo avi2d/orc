@@ -60,7 +60,6 @@ const alive = (pid: number): boolean => {
 
 const stops: ReadonlyArray<NodeJS.Signals> = ["SIGTERM", "SIGINT", "SIGHUP"]
 
-// The queued call reads no input and ends once the stand-in that queued it is gone.
 export const ownerPollMillis = (env: Env): number => {
   const interval = Number(env.ORC_HEAVY_OWNER_POLL_MILLIS)
   return Number.isFinite(interval) && interval > 0 ? interval : 5000

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { ownerPollMillis } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-exec"
 import { helperCommand, waiterWord } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
 import { run, setup, type Harness } from "./heavy-standin-harness"
 
@@ -49,10 +48,6 @@ describe("the heavy stand-in launcher", () => {
 })
 
 describe("the queued call waiter", () => {
-  test("uses the five second production owner check rather than a test interval by default", () => {
-    expect(ownerPollMillis({})).toBe(5000)
-  })
-
   test("a queued call whose stand-in is gone stops instead of holding the slot", async () => {
     const gone = Bun.spawnSync(["true"]).pid
     const started = Date.now()

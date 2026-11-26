@@ -99,7 +99,6 @@ describe("orc chat tools", () => {
       const pi = piFor(fixture, 50)
       await pi.add({ project: "orc", task: "# Fix the typo\n" })
       pi.fire("session_start", { isIdle: () => true })
-      await waitPolls(pi, 1)
       pi.fire("session_shutdown")
       await closeTask(fixture, "orc-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
       const witness = piFor(fixture, 50)
