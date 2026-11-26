@@ -120,7 +120,7 @@ test("a stalled remote question request does not hold back local steps and log r
   let release = (): void => undefined
   attentionPending = new Promise((resolve) => { release = () => resolve({ code: 0, stdout: JSON.stringify(fixture), stderr: "" }) })
   const agents = new OrcAgents()
-  agents.pane = "log"
+  agents.pane = "raw"
   try {
     agents.refresh(cx)
     await new Promise((resolve) => setTimeout(resolve, 50))
