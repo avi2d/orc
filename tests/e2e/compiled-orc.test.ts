@@ -1,17 +1,20 @@
 import { describe, expect, test } from "bun:test"
 import { chmod, exists, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { BunServices } from "@effect/platform-bun"
-import { Effect } from "effect"
+import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
+import { Effect, PlatformError, Result } from "effect"
 import packageJson from "../../packages/run/package.json" with { type: "json" }
 import { openDatabase, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
 import { decodeShowJson } from "../../packages/run/src/features/seeing-runs/index"
+import { withFileClaim } from "../../packages/run/src/shared/lib/file-claim"
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url))
-const compiledOrc = join(repoRoot, "packages/run/dist/orc")
-const sourceOrc = [process.execPath, join(repoRoot, "packages/run/src/bin.ts")]
+const windows = process.platform === "win32"
+const compiledOrc = join(repoRoot, "packages", "run", "dist", windows ? "orc.exe" : "orc")
+const sourceOrc = [process.execPath, join(repoRoot, "packages", "run", "src", "bin.ts")]
 const compileTimeout = 300_000
 
 interface Ran {
@@ -20,22 +23,26 @@ interface Ran {
   readonly stderr: string
 }
 
+// Windows names PATH as Path, and an environment holding both spellings leaves the child either one.
+const overlay = (env: Record<string, string | undefined>): Record<string, string | undefined> => {
+  const replaced = new Set(Object.keys(env).map((key) => key.toUpperCase()))
+  return { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !replaced.has(key.toUpperCase()))), ...env }
+}
+
 const run = async (command: ReadonlyArray<string>, env: Record<string, string | undefined>, cwd: string): Promise<Ran> => {
-  const proc = Bun.spawn([...command], { stdin: "ignore", stdout: "pipe", stderr: "pipe", cwd, env: { ...process.env, ...env } })
+  const proc = Bun.spawn([...command], { stdin: "ignore", stdout: "pipe", stderr: "pipe", cwd, env: overlay(env) })
   const [stdout, stderr, exitCode] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
   return { exitCode, stdout, stderr }
 }
 
 const quotaScript = "console.log(JSON.stringify({ schema: \"orc.quota.v1\", accounts: [{ name: \"main\", remainingPercent: 50 }] }))"
 
-const piScript = "process.exit(Bun.spawnSync([...JSON.parse(process.env.ORC_CHAT_ORC ?? \"[]\"), \"--version\"], { stdout: \"inherit\", stderr: \"inherit\" }).exitCode)"
-
-const piExec = "exec '" + process.execPath + "' -e '" + piScript + "'"
-
-const fakePi = ["#!/bin/sh", "printf 'ORC_CHAT_ORC=%s\\n' \"$ORC_CHAT_ORC\"", piExec, ""].join("\n")
-
 // ORC_CHAT_ORC names each build's own path, so the pi that compares builds does not print it.
-const quietPi = ["#!/bin/sh", piExec, ""].join("\n")
+const piScript = (quiet: boolean): string => [
+  ...(quiet ? [] : ["console.log(\"ORC_CHAT_ORC=\" + process.env.ORC_CHAT_ORC)"]),
+  "process.exit(Bun.spawnSync([...JSON.parse(process.env.ORC_CHAT_ORC ?? \"[]\"), \"--version\"], { stdout: \"inherit\", stderr: \"inherit\" }).exitCode)",
+  ""
+].join("\n")
 
 let compiling: Promise<void> | undefined
 
@@ -54,12 +61,24 @@ const unstamped = (ran: Ran): Ran => {
   return { ...ran, stdout: JSON.stringify(Object.fromEntries(Object.entries(report).filter(([key]) => key !== "beat" && key !== "at"))) }
 }
 
+// Windows starts a fake tool only through an extension it knows, and a .cmd file needs no compiling.
+const writeFakePi = async (bin: string, quiet: boolean): Promise<void> => {
+  const script = join(bin, "pi.js")
+  await writeFile(script, piScript(quiet))
+  if (windows) {
+    await writeFile(join(bin, "pi.cmd"), "@\"" + process.execPath + "\" \"" + script + "\" %*\r\n")
+    return
+  }
+  await writeFile(join(bin, "pi"), "#!/bin/sh\nexec '" + process.execPath + "' '" + script + "' \"$@\"\n")
+  await chmod(join(bin, "pi"), 0o755)
+}
+
 interface Fixture {
   readonly dir: string
   readonly env: Record<string, string>
 }
 
-const withFixture = async (body: (fixture: Fixture) => Promise<void>, pi: string = fakePi): Promise<void> => {
+const withFixture = async (body: (fixture: Fixture) => Promise<void>, quiet = false): Promise<void> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-compiled-e2e-"))
   try {
     const home = join(dir, "home")
@@ -72,9 +91,8 @@ const withFixture = async (body: (fixture: Fixture) => Promise<void>, pi: string
     }))
     await writeFile(join(home, "backlog", "projects.json"), JSON.stringify({ projects: [] }))
     await writeFile(join(home, "config.json"), JSON.stringify({ providers: [], models: { orchestrator: "acme/orchestrator-1" } }))
-    await writeFile(join(bin, "pi"), pi)
-    await chmod(join(bin, "pi"), 0o755)
-    await body({ dir, env: { ORC_HOME: home, PATH: bin + ":" + (process.env.PATH ?? "") } })
+    await writeFakePi(bin, quiet)
+    await body({ dir, env: { ORC_HOME: home, PATH: bin + delimiter + (process.env.PATH ?? "") } })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -133,7 +151,16 @@ const seedRun = async (home: string): Promise<void> => {
 }
 
 describe("compiled orc", () => {
-  test("the python assertion rejects a launcher that drops the first tool argument by omitting its own path", async () => {
+  test.skipIf(!windows)(skipReason("requires Windows", "file claim imports without libc and rejects Windows locking with a typed error"), async () => {
+    const result = await Effect.runPromise(Effect.result(withFileClaim("unused", Effect.void)).pipe(Effect.provide(BunServices.layer)))
+    expect(Result.isFailure(result)).toBe(true)
+    if (Result.isFailure(result)) {
+      expect(result.failure).toBeInstanceOf(PlatformError.PlatformError)
+      expect(String(result.failure)).toContain("file claims are not supported on Windows yet")
+    }
+  })
+
+  test.skipIf(windows)("the python assertion rejects a launcher that drops the first tool argument by omitting its own path", async () => {
     await compileOrc()
     await withFixture(async ({ dir, env }) => {
       const real = join(dir, "bin", "python3")
@@ -156,14 +183,14 @@ describe("compiled orc", () => {
     })
   }, compileTimeout)
 
-  test("a generated python stand-in passes each argument instead of treating its settings as a command", async () => {
+  test.skipIf(windows)("a generated python stand-in passes each argument instead of treating its settings as a command", async () => {
     await compileOrc()
     await withFixture(async (fixture) => {
       expectPythonResult(await pythonStandinResult(compiledOrc, fixture))
     })
   }, compileTimeout)
 
-  test("a compiled stand-in preserves inherited environment without loading caller dotenv files or Bun preloads", async () => {
+  test.skipIf(windows)("a compiled stand-in preserves inherited environment without loading caller dotenv files or Bun preloads", async () => {
     await compileOrc()
     await withFixture(async ({ dir, env }) => {
       await writeFile(join(dir, "bin", "python3"), [
@@ -204,7 +231,7 @@ describe("compiled orc", () => {
     })
   }, compileTimeout)
 
-  test("compiled helper words reach the waiter and CI guards instead of the CLI usage error", async () => {
+  test.skipIf(windows)("compiled helper words reach the waiter and CI guards instead of the CLI usage error", async () => {
     await compileOrc()
     await withFixture(async ({ dir, env }) => {
       const waiter = await run([compiledOrc, "orc-heavy-wait", String(process.pid), "/bin/sh", "-c", 'printf "%s" "$1"', "sh", "a b"], env, dir)
@@ -221,7 +248,7 @@ describe("compiled orc", () => {
     })
   }, compileTimeout)
 
-  test("bun run compile builds one bytecode file that answers help, beat, score, show, chat's self command and reads its embedded agent file", async () => {
+  test("bun run compile builds one bytecode file that answers help, beat, score, show, chat's self command, embeds chat tools, and reads its embedded agent file on POSIX", async () => {
     await compileOrc()
     await withFixture(async ({ dir, env }) => {
       const orc = (args: ReadonlyArray<string>) => run([compiledOrc, ...args], env, dir)
@@ -231,8 +258,7 @@ describe("compiled orc", () => {
       expect(help.stdout).toContain("Usage: orc <command>")
 
       const beat = await orc(["beat", "--json"])
-      expect(beat.stderr).toBe("")
-      expect(beat.exitCode).toBe(0)
+      expect(beat).toMatchObject({ exitCode: 0, stderr: "" })
       expect(JSON.parse(beat.stdout)).toMatchObject({ schema: "orc.beat.v1", quota: { kind: "read", pick: "main" }, room: [], actions: [] })
 
       await seedRun(env.ORC_HOME)
@@ -250,6 +276,11 @@ describe("compiled orc", () => {
       expect(chat.stdout).toContain("ORC_CHAT_ORC=" + JSON.stringify([await realpath(compiledOrc)]))
       expect(chat.stdout).toContain("orc " + packageJson.version)
       expect(await exists(join(env.ORC_HOME, "chat-tools.js"))).toBe(true)
+
+      // orc run starts git through a #!/bin/sh shim that Windows cannot start, so only POSIX reaches the embedded agent file.
+      if (windows) {
+        return
+      }
 
       const repo = join(dir, "repo")
       await mkdir(repo)
@@ -276,7 +307,7 @@ describe("compiled orc", () => {
       expect(help.compiled).toEqual(help.source)
 
       const beat = await both(["beat", "--json"])
-      expect(beat.source.exitCode).toBe(0)
+      expect(beat.source).toMatchObject({ exitCode: 0, stderr: "" })
       expect(unstamped(beat.compiled)).toEqual(unstamped(beat.source))
 
       const show = await both(["show", "compiled-1", "--json"])
@@ -286,6 +317,6 @@ describe("compiled orc", () => {
       const chat = await both(["chat"])
       expect(chat.source.exitCode).toBe(0)
       expect(chat.compiled).toEqual(chat.source)
-    }, quietPi)
+    }, true)
   }, compileTimeout)
 })

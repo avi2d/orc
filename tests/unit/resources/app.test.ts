@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createTestRenderer, type TestRendererSetup } from "@opentui/core/testing";
+import { createLiveTestRenderer } from "../../lib/live-screen";
 import { Effect, Fiber, Layer } from "effect";
 import {
   CommandRunner,
@@ -57,16 +57,6 @@ const rowsOf = (frame: string): ReadonlyArray<string> =>
     .map((row) => row.trimEnd())
     .filter((row) => row !== "");
 
-const frameWhere = async (setup: TestRendererSetup, matches: (frame: string) => boolean): Promise<string> => {
-  for (let attempt = 0; attempt < 200; attempt += 1) {
-    await Bun.sleep(25);
-    await setup.renderOnce();
-    const frame = setup.captureCharFrame();
-    if (matches(frame)) return frame;
-  }
-  throw new Error("no frame matched");
-};
-
 const expected =
   process.platform === "darwin"
     ? { platform: "mac", cores: "10 cores", cpu: "14%" }
@@ -74,13 +64,13 @@ const expected =
 
 describe("the live panel", () => {
   test(`paints its first reading from the canned ${expected.platform} answers, and lays it out again for a narrower terminal`, async () => {
-    const setup = await createTestRenderer({ width: 84, height: 24 });
-    const fiber = Effect.runFork(livePanel(setup.renderer).pipe(Effect.provide(recordedSources)));
+    const setup = await createLiveTestRenderer({ width: 84, height: 24 });
+    const fiber = setup.start(livePanel(setup.renderer).pipe(Effect.provide(recordedSources)));
     try {
-      const wide = rowsOf(await frameWhere(setup, (frame) => frame.includes(expected.cores)));
+      const wide = rowsOf(await setup.frameWhere((frame) => frame.includes(expected.cores)));
       expect(wide.join(divide)).toContain("NVIDIA GeForce RTX 3080 Laptop GPU");
       setup.resize(40, 24);
-      const narrow = rowsOf(await frameWhere(setup, (frame) => frame.split(divide)[0]?.length === 40));
+      const narrow = rowsOf(await setup.frameWhere((frame) => frame.split(divide)[0]?.length === 40));
       expect(narrow).toHaveLength(wide.length);
       expect(narrow.find((row) => row.startsWith("│ cpu "))).toEndWith(` ${expected.cpu} │`);
       expect(narrow.join(divide)).toContain("9%");

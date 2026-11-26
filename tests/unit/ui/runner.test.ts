@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Duration, Effect, Exit } from "effect";
 import { CommandAbsent, CommandRunner, CommandUnreachable } from "@avi2dg/orc-schema";
-import { liveCommandRunner } from "@avi2dg/orc-ui";
+import { commandRunnerWithGrace, liveCommandRunner } from "@avi2dg/orc-ui";
+
+const fastCommandRunner = commandRunnerWithGrace(Duration.millis(200));
 
 const isRunning = (pid: number): boolean => {
   try {
@@ -81,9 +83,9 @@ describe("the live command runner", () => {
       const run = CommandRunner.use((runner) =>
         runner.run({
           argv: ["sh", "-c", `sleep 37 & echo $! > ${pidFile}; wait`],
-          timeout: Duration.seconds(3),
+          timeout: Duration.millis(500),
         }),
-      ).pipe(Effect.provide(liveCommandRunner));
+      ).pipe(Effect.provide(fastCommandRunner));
 
       const exit = await Effect.runPromiseExit(run);
 
@@ -102,11 +104,11 @@ describe("the live command runner", () => {
     try {
       const runThenWatch = Effect.gen(function* () {
         const runner = yield* CommandRunner;
-        const exit = yield* Effect.exit(runner.run({ argv: ["sh", "-c", `trap "" TERM; sleep 38 & echo $! > ${pidFile}; wait`], timeout: Duration.seconds(3) }));
+        const exit = yield* Effect.exit(runner.run({ argv: ["sh", "-c", `trap "" TERM; sleep 38 & echo $! > ${pidFile}; wait`], timeout: Duration.millis(500) }));
         const sleeper = yield* Effect.promise(() => readSleeperPid(pidFile));
         const stillRunning = isRunning(sleeper);
         return { failed: Exit.isFailure(exit), stillRunning, settled: yield* Effect.promise(() => settles(sleeper)) };
-      }).pipe(Effect.provide(liveCommandRunner));
+      }).pipe(Effect.provide(fastCommandRunner));
 
       expect(await Effect.runPromise(runThenWatch)).toEqual({ failed: true, stillRunning: true, settled: true });
     } finally {

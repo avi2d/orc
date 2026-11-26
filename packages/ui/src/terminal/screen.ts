@@ -1,5 +1,5 @@
 import { type CliRenderer, createCliRenderer, type KeyEvent, type MouseEvent, TextRenderable } from "@opentui/core";
-import { Console, Deferred, Effect, Schedule } from "effect";
+import { Console, Context, Deferred, Effect, Schedule } from "effect";
 import type { Block } from "../text/layout";
 import { blockDocument, frameAnsi, frameText } from "./opentui";
 import { Appearance } from "../text/palette";
@@ -68,6 +68,10 @@ const openAddress = (address: string): void => {
   Bun.spawn([opener, address], { detached: true, stdio: ["ignore", "ignore", "ignore"] }).unref();
 };
 
+export const ScreenDrawObserver = Context.Reference<(() => void) | undefined>("@avi2dg/orc-ui/ScreenDrawObserver", {
+  defaultValue: () => undefined,
+});
+
 export const liveScreen = <A, S, R>(
   renderer: CliRenderer,
   screen: Screen<A, S, R>,
@@ -77,6 +81,7 @@ export const liveScreen = <A, S, R>(
     const quit = yield* Deferred.make<void>();
     const services = yield* Effect.context<R>();
     const theme = yield* Appearance;
+    const onDraw = yield* ScreenDrawObserver;
     let latest: A | undefined;
     let state = screen.initial;
     let drawn: Drawn<S> | undefined;
@@ -85,6 +90,7 @@ export const liveScreen = <A, S, R>(
       if (latest === undefined) return;
       drawn = screen.draw(latest, state, renderer.terminalWidth, renderer.terminalHeight);
       text.content = blockDocument(drawn.block, theme);
+      onDraw?.();
     };
     const moveTo = (next: S) => {
       if (next === state) return;

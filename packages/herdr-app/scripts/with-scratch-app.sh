@@ -138,13 +138,15 @@ if [ -e "$HC_SOCKET" ] && ! lsof -t "$HC_SOCKET" >/dev/null 2>&1; then
   rm -f "$HC_SOCKET"
 fi
 "${launch[@]}"
-for attempt in $(seq 1 175); do
+wait_attempts=${HERDR_SCRATCH_WAIT_ATTEMPTS:-175}
+wait_seconds=$(awk -v attempts="$wait_attempts" 'BEGIN { printf "%g", attempts * 0.2 }')
+for attempt in $(seq 1 "$wait_attempts"); do
   [ -n "$pid" ] || find_app_pid || true
   [ -S "$HC_SOCKET" ] && [ -n "$pid" ] && break
   sleep 0.2
 done
 if [ -z "$pid" ]; then
-  echo "timed out waiting 35 seconds for the App socket at $HERDR_APP_HOME/herdr-app.sock" >&2
+  echo "timed out waiting $wait_seconds seconds for the App socket at $HERDR_APP_HOME/herdr-app.sock" >&2
   candidates=""
   for candidate in $(ps -eo pid= 2>/dev/null); do
     if ps eww -p "$candidate" -o command= 2>/dev/null | grep -F "$app" >/dev/null && ps eww -p "$candidate" -o command= 2>/dev/null | tr ' ' '\n' | grep -Fx "HOME=$HOME" >/dev/null; then
@@ -161,7 +163,7 @@ if [ -z "$pid" ]; then
   exit 1
 fi
 if [ ! -S "$HC_SOCKET" ]; then
-  echo "timed out waiting 35 seconds for the herdr-core socket at $HC_SOCKET with HERDR_CORE_DIRS=$HERDR_CORE_DIRS" >&2
+  echo "timed out waiting $wait_seconds seconds for the herdr-core socket at $HC_SOCKET with HERDR_CORE_DIRS=$HERDR_CORE_DIRS" >&2
   kill -TERM "$pid" 2>/dev/null || true
   for attempt in $(seq 1 10); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
   exit 1

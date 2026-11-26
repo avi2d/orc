@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createTestRenderer } from "@opentui/core/testing";
+import { createLiveTestRenderer } from "../../lib/live-screen";
 import { Effect, Fiber, Layer } from "effect";
 import { TestConsole } from "effect/testing";
 import { attentionModule } from "@avi2dg/orc-attention";
@@ -77,16 +77,11 @@ describe("the attention panel", () => {
   });
 
   test("paints the open items live in a terminal of its own", async () => {
-    const setup = await createTestRenderer({ width: 60, height: 12 });
+    const setup = await createLiveTestRenderer({ width: 60, height: 12 });
     const live = Effect.scoped(Effect.flatMap(attentionModule.mount(undefined), (mounted) => liveScreen(setup.renderer, soloScreen(mounted), loopTick)));
-    const fiber = Effect.runFork(live.pipe(Effect.provide(sourcesOf(answering(open))), Effect.provideService(ReadModeReference, "live")));
+    const fiber = setup.start(live.pipe(Effect.provide(sourcesOf(answering(open))), Effect.provideService(ReadModeReference, "live")));
     try {
-      let frame = "";
-      for (let attempt = 0; attempt < 200 && !frame.includes("orc-4"); attempt += 1) {
-        await Bun.sleep(25);
-        await setup.renderOnce();
-        frame = setup.captureCharFrame();
-      }
+      const frame = await setup.frameWhere((text) => text.includes("orc-4"));
       expect(frame).toContain("! orc-1 \u00b7 user \u00b7 10m overdue");
       expect(frame).toContain("\u00b7 orc-4 \u00b7 user \u00b7 2m");
     } finally {
