@@ -7,7 +7,7 @@ export const isSendBackQuestion = (question: string): boolean =>
   question === sendBackQuestionId || question.startsWith(sendBackQuestionId + "-")
 
 const sendBackQuestion = (id: string, words: string, at: string, source: "captain" | "ci" = "captain"): ParkedQuestion =>
-  ({ id, text: source === "ci" ? "A CI check sent the pull request back" : "The captain sent the pull request back", asked: at, blocks: true, answer: { words, at, relayedTo: null } })
+  ({ id, text: source === "ci" ? "A CI check sent the pull request back" : "The captain sent the pull request back", asked: at, blocks: true, answer: { words, at, decider: source === "ci" ? "agent" : "owner", relayedTo: null } })
 
 const notSentBack = (id: string, kind: string) =>
   new BacklogError({ detail: "orc backlog send-back refused: " + id + " is " + kind + ", and only a closed task goes back" })

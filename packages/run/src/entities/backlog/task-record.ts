@@ -1,4 +1,5 @@
 import { Data, Effect, Schema } from "effect"
+import { AnswerWords, Decider } from "../../shared/lib/index"
 import { Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-record-decision"
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 import { deciderAnswerKinds, OverturnedFront, parkedAnswerOf } from "./task-record-answer"
@@ -64,6 +65,21 @@ const AnsweredHold = Schema.Struct({
   answer: Answer,
   at: Schema.optional(Schema.String),
   repeat: Schema.optional(Schema.Boolean)
+})
+
+const StoredHoldAnswer = Schema.Struct({ ...AnswerWords.fields, decider: Schema.optionalKey(Decider) })
+type StoredHoldAnswer = typeof StoredHoldAnswer.Type
+const StoredAnsweredHold = Schema.Struct({
+  ...AnsweredHold.fields,
+  questions: Schema.Array(Schema.Struct({ ...HoldQuestion.fields, answer: Schema.NullOr(StoredHoldAnswer) })),
+  answer: StoredHoldAnswer
+})
+
+const migrateHeldAnswer = (answer: StoredHoldAnswer): Answer => ({ ...answer, decider: answer.decider ?? "owner" })
+const migrateHold = (hold: typeof StoredAnsweredHold.Type): typeof AnsweredHold.Type => ({
+  ...hold,
+  questions: hold.questions.map((question) => ({ ...question, answer: question.answer === null ? null : migrateHeldAnswer(question.answer) })),
+  answer: migrateHeldAnswer(hold.answer)
 })
 
 export interface Hold {
@@ -163,6 +179,7 @@ const QuestionFront = Schema.Struct({
   text: Schema.String,
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
+  decider: Schema.optional(Decider),
   asked_at: Schema.optional(Schema.String),
   blocks: Schema.optional(Schema.Boolean),
   ...ChoicesFront,
@@ -191,9 +208,10 @@ const Frontmatter = Schema.Struct({
   hold_until: Schema.optional(Schema.String),
   held_at: Schema.optional(Schema.String),
   hold_questions: Schema.optional(Schema.Array(QuestionFront)),
-  hold_history: Schema.optional(Schema.Array(AnsweredHold)),
+  hold_history: Schema.optional(Schema.Array(StoredAnsweredHold)),
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
+  decider: Schema.optional(Decider),
   retry: Schema.optional(Retry),
   rebase: Schema.optional(Rebase),
   ci_sent_back: Schema.optional(Schema.Array(Schema.String)),
@@ -238,10 +256,10 @@ const closingOf = (front: Frontmatter, started: Started | null): Closing | null 
   return front.outcome === undefined || front.outcome === "dropped" || started === null ? null : { outcome: front.outcome, started, reason, pr: front.pr ?? null, report: front.report ?? null }
 }
 
-const checkedQuestions = <Q>(fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string, toQuestion: (question: typeof QuestionFront.Type, answer: Answer | null) => Q): Array<Q> | string => {
+const checkedQuestions = <Q>(fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string, legacyDecider: (question: typeof QuestionFront.Type) => Decider, toQuestion: (question: typeof QuestionFront.Type, answer: Answer | null) => Q): Array<Q> | string => {
   const questions: Array<Q> = []
   for (const question of fronts) {
-    const answer = answerOf(question)
+    const answer = answerOf(question, legacyDecider(question))
     if (typeof answer === "string") {
       return "the " + what + " question " + question.id + " names its answer with no words or no time"
     }
@@ -250,8 +268,11 @@ const checkedQuestions = <Q>(fronts: ReadonlyArray<typeof QuestionFront.Type>, w
   return questions
 }
 
+const legacyParkedDecider = (question: typeof QuestionFront.Type): Decider =>
+  question.answered_by !== undefined || (question.id === "send-back" && question.text === "A CI check sent the pull request back") ? "agent" : "owner"
+
 const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<ParkedQuestion> | string =>
-  checkedQuestions(fronts, what, (question, answer) => ({
+  checkedQuestions(fronts, what, legacyParkedDecider, (question, answer) => ({
     id: question.id,
     text: question.text,
     asked: question.asked_at ?? "",
@@ -262,7 +283,7 @@ const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: str
   }))
 
 const holdQuestionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<HoldQuestion> | string =>
-  checkedQuestions(fronts, what, (question, answer) => ({ id: question.id, text: question.text, answer }))
+  checkedQuestions(fronts, what, () => "owner", (question, answer) => ({ id: question.id, text: question.text, answer }))
 
 const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (front.parked_branch === undefined && front.parked_questions === undefined && front.parked_origin === undefined) {
@@ -281,7 +302,7 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
 }
 
 const holdOf = (front: Frontmatter): Hold | null | string => {
-  const answer = answerOf(front)
+  const answer = answerOf(front, "owner")
   if (typeof answer === "string") {
     return answer
   }
@@ -301,7 +322,7 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
   if (answer === null && questions.length > 0 && questions.every((question) => question.answer !== null)) {
     return "a hold answers every question and names no answer"
   }
-  return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer, at: front.held_at ?? null, ...(front.hold_repeat === true ? { repeat: true } : {}), ...(front.hold_history === undefined ? {} : { history: front.hold_history }) }
+  return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer, at: front.held_at ?? null, ...(front.hold_repeat === true ? { repeat: true } : {}), ...(front.hold_history === undefined ? {} : { history: front.hold_history.map(migrateHold) }) }
 }
 
 const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {
@@ -359,7 +380,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
       return yield* new TaskFileError({ file, detail: "the frontmatter id " + front.id + " is not the file " + (stem ?? file) })
     }
     const state = yield* unlessRefused(file, kind === "decision" ? decisionStateOf(folder, front, stateOf) : stateOf(folder, front))
-    const hold = yield* unlessRefused(file, kind === "decision" ? holdOf({ ...front, answer: undefined, answered_at: undefined }) : holdOf(front))
+    const hold = yield* unlessRefused(file, kind === "decision" ? holdOf({ ...front, answer: undefined, answered_at: undefined, decider: undefined }) : holdOf(front))
     if (heldWhileActive(hold, state)) {
       return yield* new TaskFileError({ file, detail: "a " + state.kind + " task carries an unanswered hold" })
     }

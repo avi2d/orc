@@ -8,19 +8,20 @@ import { parseDispatchArgs } from "../../../packages/run/src/app/dispatch-args"
 import { type Asked, closeItem, openItem, openItems, readAttention, recordDecision, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
 import { isOverdue } from "../../../packages/run/src/entities/attention/index"
 import { attentionJson, attentionText } from "../../../packages/run/src/features/attention-list/index"
+import { flagQuestion } from "../../lib/attention-question"
 import type { ParkedQuestion, TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
 
-const asked = (at: string, task = "orc-1"): Asked => ({ kind: "review-question", task, text: "Keep the old flag?", asked: at, owner: "user" })
+const asked = (at: string, task = "orc-1"): Asked => ({ ...flagQuestion, kind: "review-question", task, text: "Keep the old flag?", asked: at, owner: "user" })
 
 const question = (id: string, text: string, askedAt: string, answer: { words: string; at: string } | null): ParkedQuestion => ({
   id,
   text,
   asked: askedAt,
   blocks: true,
-  answer: answer === null ? null : { ...answer, relayedTo: null }
+  answer: answer === null ? null : { ...answer, decider: "owner", relayedTo: null }
 })
 
 const parkedTask = (id: string, first: ParkedQuestion, rest: ReadonlyArray<ParkedQuestion>, state: TaskRecord["state"]): TaskRecord => ({
@@ -53,12 +54,37 @@ const withRoot = async (use: (root: string) => Promise<void>): Promise<void> => 
 }
 
 describe("the attention queue", () => {
+  test("openItem refuses a new question missing its subject, options, option outcome, or recommendation", async () => {
+    await withRoot(async (root) => {
+      const { subject, options, recommendation, ...bare } = asked("2026-11-02T10:20:00.000Z")
+      for (const kind of ["review-question", "worker-question", "overdue-wait", "unasked-question"] as const) {
+        for (const context of [
+          { options, recommendation },
+          { subject, recommendation },
+          { subject, recommendation, options: [{ text: "Keep it" }] },
+          { subject, options },
+          { subject, options, recommendation: "Not an option" }
+        ]) {
+          const { subject, options, recommendation } = context
+          await expect(run(openItem(root, kind, {
+            ...bare,
+            kind,
+            ...(subject === undefined ? {} : { subject }),
+            ...(options === undefined ? {} : { options }),
+            ...(recommendation === undefined ? {} : { recommendation })
+          }))).rejects.toThrow("cannot open attention item")
+        }
+      }
+      expect(await run(openItems(root))).toEqual([])
+    })
+  })
+
   test("an open item is one file with kind, task, text, time asked, owner and state, not a line in a shared file", async () => {
     await withRoot(async (root) => {
       expect(await run(openItem(root, "orc-1.r2.a", asked("2026-11-02T10:20:00.000Z")))).toBe(true)
       expect(await readdir(join(root, "attention"))).toEqual(["orc-1.r2.a.json"])
       expect(JSON.parse(await readFile(join(root, "attention", "orc-1.r2.a.json"), "utf8"))).toEqual({
-        kind: "review-question", task: "orc-1", text: "Keep the old flag?", asked: "2026-11-02T10:20:00.000Z", owner: "user", state: { kind: "open" }
+        ...flagQuestion, kind: "review-question", task: "orc-1", text: "Keep the old flag?", asked: "2026-11-02T10:20:00.000Z", owner: "user", state: { kind: "open" }
       })
     })
   })
@@ -139,7 +165,7 @@ describe("the attention queue", () => {
       const asking = parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })
       const id = "orc-1.r2.2026-11-02T10_20_00_000Z"
       await run(routeTaskItems(root, [asking], "2026-11-02T10:20:00.000Z"))
-      await run(recordDecision(root, id, { kind: "escalated", reason: "only the captain merges", at: "2026-11-02T10:21:00.000Z" }))
+      await run(recordDecision(root, id, { kind: "escalated", decider: "agent", reason: "only the captain merges", at: "2026-11-02T10:21:00.000Z" }))
       await run(routeTaskItems(root, [{ ...asking, parked: null }], "2026-11-02T10:22:00.000Z"))
       expect(await run(openItems(root))).toEqual([])
       await run(routeTaskItems(root, [asking], "2026-11-02T10:23:00.000Z"))
@@ -171,7 +197,7 @@ describe("the attention queue", () => {
       await run(routeTaskItems(root, [asking], "2026-11-02T10:20:00.000Z"))
       await run(routeTaskItems(root, [{ ...asking, parked: null }], "2026-11-02T10:22:00.000Z"))
       expect(await run(openItems(root))).toEqual([])
-      await run(recordDecision(root, id, { kind: "answered", reason: "the flag stays", at: "2026-11-02T10:24:00.000Z" }))
+      await run(recordDecision(root, id, { kind: "answered", decider: "agent", reason: "the flag stays", at: "2026-11-02T10:24:00.000Z" }))
       const answered = parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", { words: "Keep it", at: "2026-11-02T10:25:00.000Z" }), [], { kind: "new" })
       await run(routeTaskItems(root, [answered], "2026-11-02T10:25:00.000Z"))
       expect(await run(openItems(root))).toEqual([])
@@ -180,7 +206,7 @@ describe("the attention queue", () => {
         state: { kind: "closed", answer: { words: "Keep it", at: "2026-11-02T10:25:00.000Z" } }
       })
       expect((await run(readAttention(root, [answered]))).decided.map((entry) => entry.id)).toEqual([id])
-      await run(recordDecision(root, id, { kind: "escalated", reason: "only the captain merges", at: "2026-11-02T10:26:00.000Z" }))
+      await run(recordDecision(root, id, { kind: "escalated", decider: "agent", reason: "only the captain merges", at: "2026-11-02T10:26:00.000Z" }))
       expect(JSON.parse(await readFile(join(root, "attention", id + ".json"), "utf8"))).toMatchObject({
         decision: { kind: "answered", reason: "the flag stays" }
       })
@@ -201,17 +227,17 @@ describe("the attention queue", () => {
   test("an answer closes the item and keeps its words, instead of deleting the file", async () => {
     await withRoot(async (root) => {
       await run(openItem(root, "orc-1.r2.a", asked("2026-11-02T10:20:00.000Z")))
-      expect(await run(closeItem(root, "orc-1.r2.a", { words: "Keep it", at: "2026-11-02T10:25:00.000Z" }))).toBe("closed")
+      expect(await run(closeItem(root, "orc-1.r2.a", { decider: "owner", words: "Keep it", at: "2026-11-02T10:25:00.000Z" }))).toBe("closed")
       expect(await run(openItems(root))).toEqual([])
       expect(JSON.parse(await readFile(join(root, "attention", "orc-1.r2.a.json"), "utf8"))).toMatchObject({ state: { kind: "closed", answer: { words: "Keep it", at: "2026-11-02T10:25:00.000Z" } } })
-      expect(await run(closeItem(root, "orc-1.r2.a", { words: "Drop it", at: "2026-11-02T10:26:00.000Z" }))).toBe("already closed")
+      expect(await run(closeItem(root, "orc-1.r2.a", { decider: "owner", words: "Drop it", at: "2026-11-02T10:26:00.000Z" }))).toBe("already closed")
     })
   })
 
   test("opening the same item again keeps it as first asked instead of reopening a closed one", async () => {
     await withRoot(async (root) => {
       await run(openItem(root, "orc-1.r2.a", asked("2026-11-02T10:20:00.000Z")))
-      await run(closeItem(root, "orc-1.r2.a", { words: "Keep it", at: "2026-11-02T10:25:00.000Z" }))
+      await run(closeItem(root, "orc-1.r2.a", { decider: "owner", words: "Keep it", at: "2026-11-02T10:25:00.000Z" }))
       expect(await run(openItem(root, "orc-1.r2.a", asked("2026-11-02T10:20:00.000Z")))).toBe(false)
       expect(await run(openItems(root))).toEqual([])
     })
@@ -232,8 +258,8 @@ describe("the attention queue", () => {
         at: "2026-11-02T10:10:00.000Z",
         decided: [],
         items: [
-          { id: "late", kind: "review-question", task: "orc-1", text: "Keep the old flag?", asked: "2026-11-02T10:00:00.000Z", owner: "user", ageSeconds: 600, overdue: true },
-          { id: "fresh", kind: "review-question", task: "orc-2", text: "Keep the old flag?", asked: "2026-11-02T10:08:00.000Z", owner: "user", ageSeconds: 120, overdue: false }
+          { ...flagQuestion, id: "late", kind: "review-question", task: "orc-1", text: "Keep the old flag?", asked: "2026-11-02T10:00:00.000Z", owner: "user", ageSeconds: 600, overdue: true },
+          { ...flagQuestion, id: "fresh", kind: "review-question", task: "orc-2", text: "Keep the old flag?", asked: "2026-11-02T10:08:00.000Z", owner: "user", ageSeconds: 120, overdue: false }
         ]
       })
     })

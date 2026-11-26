@@ -17,7 +17,7 @@ const answerFronts = (answer: ParkedAnswer) => {
   const overturned = answer.overturned
   return overturned === undefined
     ? {}
-    : { overturned: { answer: overturned.words, answered_at: overturned.at, answered_by: overturned.by, ...(overturned.relayedTo === null ? {} : { relayed_to: overturned.relayedTo }) } }
+    : { overturned: { answer: overturned.words, answered_at: overturned.at, decider: overturned.decider, answered_by: overturned.by, ...(overturned.relayedTo === null ? {} : { relayed_to: overturned.relayedTo }) } }
 }
 
 const questionFronts = (questions: ReadonlyArray<ParkedQuestion>) =>
@@ -27,7 +27,7 @@ const questionFronts = (questions: ReadonlyArray<ParkedQuestion>) =>
     asked_at: question.asked,
     ...(question.blocks ? {} : { blocks: false }),
     ...choicesOf(question),
-    ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at, ...answerFronts(question.answer) }),
+    ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at, decider: question.answer.decider, ...answerFronts(question.answer) }),
     ...(question.answer?.relayedTo == null ? {} : { relayed_to: question.answer.relayedTo }),
     ...(question.answer !== null && !isDeciderAnswer(question.answer) && question.answer.correctionQueued === true ? { correction_queued: true } : {}),
     ...(question.owner === undefined ? {} : { owner: question.owner })
@@ -37,7 +37,7 @@ const holdQuestionFronts = (questions: ReadonlyArray<HoldQuestion>) =>
   questions.map((question) => ({
     id: question.id,
     text: question.text,
-    ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at })
+    ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at, decider: question.answer.decider })
   }))
 
 const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
@@ -50,7 +50,7 @@ const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
       ...(hold.until === null ? [] : [field("hold_until", hold.until)]),
       ...(hold.at === null ? [] : [field("held_at", hold.at)]),
       ...(hold.questions.length === 0 ? [] : [field("hold_questions", holdQuestionFronts(hold.questions))]),
-      ...(hold.answer === null ? [] : [field("answer", hold.answer.words), field("answered_at", hold.answer.at)])
+      ...(hold.answer === null ? [] : [field("answer", hold.answer.words), field("answered_at", hold.answer.at), field("decider", hold.answer.decider)])
     ]
 
 const parkedFields = (parked: Parked | null): ReadonlyArray<string> =>
@@ -90,7 +90,7 @@ const stateFields = (record: TaskRecord): ReadonlyArray<string> => {
         field("closed_at", state.closedAt),
         field("reason", state.closing.reason),
         ...("landedIn" in state.closing ? [field("landed_in", state.closing.landedIn)] : []),
-        ...(answer === null ? [] : [field("answer", answer.words), field("answered_at", answer.at)]),
+        ...(answer === null ? [] : [field("answer", answer.words), field("answered_at", answer.at), field("decider", answer.decider)]),
         ...ran.pr,
         ...(state.postedAt === null ? [] : [field("posted_at", state.postedAt)])
       ]

@@ -3,7 +3,8 @@ import type { Database } from "bun:sqlite"
 import { runMain } from "@effect/platform-bun/BunRuntime"
 import { BunServices } from "@effect/platform-bun"
 import { isatty } from "node:tty"
-import { Config, Console, Effect } from "effect"
+import { Decider } from "./shared/lib/index"
+import { Config, Console, Effect, Schema } from "effect"
 import packageJson from "../package.json" with { type: "json" }
 import { appHomeDir, bundledAppDir, formatAppInstall, herdrAppSourceDir, installApp, readyBundledApp } from "./features/installing-the-app/index"
 import { type OrcArgs, parseArgs } from "./app/args"
@@ -92,13 +93,19 @@ const chat = (sessionFile: string | null) => runChat(orcHomeDir(Bun.env.ORC_HOME
   Effect.flatMap((exitCode) => exitCode === 0 ? Effect.void : Effect.fail("pi exited " + String(exitCode)))
 )
 
+const AnswerDeciders = Schema.Record(Schema.String, Decider)
+
 const shipStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>) =>
   Effect.gen(function*() {
     const rawRebase = Bun.env.ORC_DISPATCH_REBASE
     const rebase = rawRebase === undefined ? undefined : yield* decodeJson(rawRebase, Rebase, "ORC_DISPATCH_REBASE").pipe(
       Effect.catchTag("RunnerError", (error) => Console.error(error.detail).pipe(Effect.andThen(Effect.fail("agent step refused"))))
     )
-    const report = yield* runAgentStep({ rebase, cwd: process.cwd(), taskFile: args.taskFile, delivery: args.delivery, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, implementerModel: args.implementerModel, fixerModel: args.fixerModel, implementerThinking: args.implementerThinking, fixerThinking: args.fixerThinking, instructions: args.instructions, allow: args.allow, answers: args.answers, resumeRun: Bun.env.ORC_DISPATCH_RESUME_RUN, runId: Bun.env.ORC_DISPATCH_RUN_ID }).pipe(
+    const deciders = yield* decodeJson(Bun.env.ORC_DISPATCH_ANSWER_DECIDERS ?? "{}", AnswerDeciders, "ORC_DISPATCH_ANSWER_DECIDERS").pipe(
+      Effect.catchTag("RunnerError", (error) => Console.error(error.detail).pipe(Effect.andThen(Effect.fail("agent step refused"))))
+    )
+    const answers = args.answers.map((answer) => ({ ...answer, decider: (Object.hasOwn(deciders, answer.question) ? deciders[answer.question] : undefined) ?? "owner" as const }))
+    const report = yield* runAgentStep({ rebase, cwd: process.cwd(), taskFile: args.taskFile, delivery: args.delivery, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, implementerModel: args.implementerModel, fixerModel: args.fixerModel, implementerThinking: args.implementerThinking, fixerThinking: args.fixerThinking, instructions: args.instructions, allow: args.allow, answers, resumeRun: Bun.env.ORC_DISPATCH_RESUME_RUN, runId: Bun.env.ORC_DISPATCH_RUN_ID }).pipe(
       Effect.provide(BunServices.layer),
       Effect.catchTag("OrcRunError", (error) =>
         Console.error(error.message).pipe(Effect.andThen(Effect.fail("agent step refused")))

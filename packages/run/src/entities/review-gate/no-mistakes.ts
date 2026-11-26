@@ -19,15 +19,16 @@ import {
   type NoMistakesFinding,
   type ParkedGate,
   type ParsedRun,
-  type PendingFinding,
-  type QuestionAnswer
+  type PendingFinding
 } from "./no-mistakes-gate"
 import { appendGate, openDriveLog, type DriveLog, type Ending, type NoMistakesRecord } from "./no-mistakes-drive-log"
 import { settleFixResponse, type NoMistakesReply } from "./no-mistakes-response"
 import { approveFollowUps, canDeferFindings } from "./deferred-approval"
 import { hasTable, scalar } from "../../shared/lib/index"
 export { answerArgsFor, answerForGate, askUserWord, omittedQuestionIds, parseRun } from "./no-mistakes-gate"
-export type { AllowWord, NoMistakesFinding, QuestionAnswer } from "./no-mistakes-gate"
+import type { QuestionAnswer } from "./question"
+export type { AllowWord, NoMistakesFinding } from "./no-mistakes-gate"
+export type { QuestionAnswer } from "./question"
 export type { NoMistakesRecord } from "./no-mistakes-drive-log"
 
 export { gateLogFileName } from "./no-mistakes-drive-log"

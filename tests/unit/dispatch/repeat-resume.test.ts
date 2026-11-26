@@ -33,7 +33,7 @@ const withResumed = async (body: (root: string) => Promise<void>): Promise<void>
   const root = await mkdtemp(join(tmpdir(), "orc-repeat-"))
   try {
     const added = await run(addTask(root, spec))
-    const answered = { ...r2, asked, blocks: true, answer: { words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: null } }
+    const answered = { ...r2, asked, blocks: true, answer: { decider: "owner" as const, words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: null } }
     await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", origin: { machine: "mac", run: "run-1" }, questions: [answered] } }))
     await run(claimTask(root, "orc-1"))
     await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:10:00.000Z", log: root + "/logs/orc-1.log" } } }))
@@ -168,7 +168,7 @@ describe("a resumed run that parks again", () => {
     const root = await mkdtemp(join(tmpdir(), "orc-repeat-"))
     try {
       const added = await run(addTask(root, spec))
-      const deciderAnswered = { ...r2, asked, blocks: true, answer: { words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: null, by: "decider" as const } }
+      const deciderAnswered = { ...r2, asked, blocks: true, answer: { decider: "agent" as const, words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: null, by: "decider" as const } }
       await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", origin: { machine: "mac", run: "run-1" }, questions: [deciderAnswered] } }))
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:10:00.000Z", log: root + "/logs/orc-1.log" } } }))
@@ -193,7 +193,7 @@ describe("a resumed run that parks again", () => {
       const after = await queued()
       expect(after.body).toBe(before.body)
       expect(after.body).not.toContain("Held for the captain")
-      expect(after.answers).toEqual([{ question: "r2", answer: "Keep it" }, { question: "hold-release", answer: "Current guidance: fix the lint finding first" }])
+      expect(after.answers).toEqual([{ question: "r2", answer: "Keep it", decider: "agent" }, { question: "hold-release", answer: "Current guidance: fix the lint finding first", decider: "owner" }])
     })
   })
   test("a resume after the fixer's question marks the release as carried instead of handing it as new again", async () => {
@@ -202,7 +202,7 @@ describe("a resumed run that parks again", () => {
       await run(answerTask(root, "orc-1", "fix the lint finding first", "2026-10-27T10:40:00.000Z"))
       const file = join(root, "new", "orc-1.md")
       const queued = () => run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: file, ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))
-      expect((await queued()).answers).toContainEqual({ question: "hold-release", answer: "Current guidance: fix the lint finding first" })
+      expect((await queued()).answers).toContainEqual({ question: "hold-release", answer: "Current guidance: fix the lint finding first", decider: "owner" })
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:45:00.000Z", log: root + "/logs/orc-1.log" } } }))
       const fixerAsks = { id: "ask-1", text: "Pin the linter version?", asked: "2026-10-27T10:50:00.000Z", blocks: true }
@@ -210,9 +210,9 @@ describe("a resumed run that parks again", () => {
       expect(answerWait(parked, () => false)).not.toStartWith("held for the captain: ")
       await run(answerTask(root, "orc-1", "ask-1=Pin it", "2026-10-27T11:00:00.000Z"))
       expect((await queued()).answers).toEqual([
-        { question: "r2", answer: "Keep it" },
-        { question: "ask-1", answer: "Pin it" },
-        { question: "hold-release-carried", answer: "Current guidance: fix the lint finding first" }
+        { question: "r2", answer: "Keep it", decider: "agent" },
+        { question: "ask-1", answer: "Pin it", decider: "owner" },
+        { question: "hold-release-carried", answer: "Current guidance: fix the lint finding first", decider: "owner" }
       ])
     })
   })
@@ -220,7 +220,7 @@ describe("a resumed run that parks again", () => {
     const root = await mkdtemp(join(tmpdir(), "orc-repeat-"))
     try {
       const added = await run(addTask(root, spec))
-      const deciderAnswered = { ...r2, asked, blocks: true, answer: { words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: null, by: "decider" as const } }
+      const deciderAnswered = { ...r2, asked, blocks: true, answer: { decider: "agent" as const, words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: null, by: "decider" as const } }
       await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", origin: { machine: "mac", run: "run-1" }, questions: [deciderAnswered] } }))
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:10:00.000Z", log: root + "/logs/orc-1.log" } } }))
@@ -229,7 +229,7 @@ describe("a resumed run that parks again", () => {
       expect(await run(answerTask(root, "orc-1", "r2=Drop it", "2026-10-27T10:45:00.000Z", { kind: "parked" }))).toMatchObject({ kind: "question", question: "r2" })
       const file = join(root, "new", "orc-1.md")
       const queued = await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: file, ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))
-      expect(queued.answers).toEqual([{ question: "r2", answer: "Drop it" }, { question: "hold-release", answer: "Current guidance: fix the lint finding first" }])
+      expect(queued.answers).toEqual([{ question: "r2", answer: "Drop it", decider: "owner" }, { question: "hold-release", answer: "Current guidance: fix the lint finding first", decider: "owner" }])
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -240,7 +240,7 @@ describe("a resumed run that parks again", () => {
       await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }, pickColor], "2026-10-27T10:35:00.000Z", "run-2", lint))
       await run(answerTask(root, "orc-1", "fix the lint finding first", "2026-10-27T10:40:00.000Z"))
       const queued = async () => (await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: join(root, "new", "orc-1.md"), ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))).answers
-      expect(await queued()).toContainEqual({ question: "hold-release", answer: "Current guidance: fix the lint finding first" })
+      expect(await queued()).toContainEqual({ question: "hold-release", answer: "Current guidance: fix the lint finding first", decider: "owner" })
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:45:00.000Z", log: root + "/logs/orc-1.log" } } }))
       await run(answerTask(root, "orc-1", "ask-1=blue", "2026-10-27T10:50:00.000Z"))
@@ -248,9 +248,9 @@ describe("a resumed run that parks again", () => {
       expect(parked.hold?.answer).not.toBeNull()
       expect(parked.parked?.at).toBe("2026-10-27T10:55:00.000Z")
       expect(await queued()).toEqual([
-        { question: "r2", answer: "Keep it" },
-        { question: "ask-1", answer: "blue" },
-        { question: "hold-release-carried", answer: "Current guidance: fix the lint finding first" }
+        { question: "r2", answer: "Keep it", decider: "agent" },
+        { question: "ask-1", answer: "blue", decider: "owner" },
+        { question: "hold-release-carried", answer: "Current guidance: fix the lint finding first", decider: "owner" }
       ])
     })
   })
@@ -264,7 +264,7 @@ describe("a resumed run that parks again", () => {
       await run(sendBackClosedTask(root, "orc-1", "rename the flag", "2026-10-27T12:00:00.000Z", { machine: "mac", run: "run-3" }, "cleared"))
       const file = join(root, "new", "orc-1.md")
       const queued = await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: file, ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))
-      expect(queued.answers).toEqual([{ question: "send-back", answer: "rename the flag" }])
+      expect(queued.answers).toEqual([{ question: "send-back", answer: "rename the flag", decider: "owner" }])
     })
   })
   test.each([false, true])("re-parking a sent-back run excludes old releases without blocking new guidance, with live asking %s", async (liveAsking) => {
@@ -286,14 +286,14 @@ describe("a resumed run that parks again", () => {
       await run(answerTask(root, "orc-1", "ask-1=Rename it", "2026-10-27T12:20:00.000Z"))
       const file = join(root, "new", "orc-1.md")
       const queued = () => run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: file, ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))
-      expect((await queued()).answers).toEqual([{ question: "ask-1", answer: "Rename it" }])
+      expect((await queued()).answers).toEqual([{ question: "ask-1", answer: "Rename it", decider: "owner" }])
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T12:25:00.000Z", log: root + "/logs/orc-1.log" } } }))
       await run(parkStartedTask(root, "orc-1", "orc/orc-1", [question], "2026-10-27T12:30:00.000Z", "run-5", lint))
       expect(await run(answerTask(root, "orc-1", "fix the renamed flag's check", "2026-10-27T12:35:00.000Z"))).toMatchObject({ kind: "hold" })
       expect((await queued()).answers).toEqual([
-        { question: "ask-1", answer: "Rename it" },
-        { question: "hold-release", answer: "Current guidance: fix the renamed flag's check" }
+        { question: "ask-1", answer: "Rename it", decider: "owner" },
+        { question: "hold-release", answer: "Current guidance: fix the renamed flag's check", decider: "owner" }
       ])
     })
   })
@@ -310,8 +310,8 @@ describe("a resumed run that parks again", () => {
       const file = join(root, "new", "orc-1.md")
       const queued = await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: file, ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))
       expect(queued.answers).toEqual([
-        { question: "looping", answer: "continue" },
-        { question: "hold-release-carried", answer: "Current guidance: fix the lint finding first" }
+        { question: "looping", answer: "continue", decider: "owner" },
+        { question: "hold-release-carried", answer: "Current guidance: fix the lint finding first", decider: "owner" }
       ])
     })
   })
@@ -320,7 +320,7 @@ describe("a resumed run that parks again", () => {
     try {
       const added = await run(addTask(root, spec))
       const handed: [ParkedQuestion, ...ParkedQuestion[]] = [
-        { ...r2, asked, blocks: true, answer: { words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: null } },
+        { ...r2, asked, blocks: true, answer: { decider: "owner" as const, words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: null } },
         { id: "ask-1", text: "Pick a color?", asked, blocks: false, answer: null }
       ]
       await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", origin: { machine: "mac", run: "run-1" }, questions: handed } }))
@@ -356,7 +356,7 @@ describe("a resumed run that parks again", () => {
       await run(answerTask(root, "orc-1", "fix the lint finding first", "2026-10-27T10:46:00.000Z"))
       const released = await queued()
       expect(released.body).toBe(first.body)
-      expect(released.answers).toContainEqual({ question: "hold-release", answer: "Current guidance: fix the lint finding first" })
+      expect(released.answers).toContainEqual({ question: "hold-release", answer: "Current guidance: fix the lint finding first", decider: "owner" })
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:47:00.000Z", log: root + "/logs/orc-1.log" } } }))
       await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked, blocks: true }], "2026-10-27T10:55:00.000Z", "run-4", lint))
@@ -364,7 +364,7 @@ describe("a resumed run that parks again", () => {
       const rereleased = await queued()
       expect(rereleased.body).toBe(first.body)
       const guidance = "Earlier repeat hold release: fix the lint finding first\nCurrent guidance: try the other flag instead"
-      expect(rereleased.answers).toEqual([{ question: "r2", answer: "Keep it" }, { question: "hold-release", answer: guidance }])
+      expect(rereleased.answers).toEqual([{ question: "r2", answer: "Keep it", decider: "owner" }, { question: "hold-release", answer: guidance, decider: "owner" }])
       const prompts = await promptsOfResume(root, file, rereleased)
       expect(prompts).toHaveLength(1)
       expect(prompts[0]).toContain(guidance)

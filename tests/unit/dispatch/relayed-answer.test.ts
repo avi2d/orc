@@ -57,8 +57,8 @@ describe("a relayed answer", () => {
       await run(answerTask(root, "orc-1", "r3=Drop them", "2026-10-27T10:09:00.000Z"))
       expect(await relayedIds(root, asking)).toEqual(["r2=Keep it", "r3=Drop them"])
       expect((await current(root)).parked?.questions).toEqual([
-        { ...r2, asked: first, blocks: true, answer: { words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: first } },
-        { ...r3, asked: first, blocks: true, answer: { words: "Drop them", at: "2026-10-27T10:09:00.000Z", relayedTo: first } }
+        { ...r2, asked: first, blocks: true, answer: { decider: "owner" as const, words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: first } },
+        { ...r3, asked: first, blocks: true, answer: { decider: "owner" as const, words: "Drop them", at: "2026-10-27T10:09:00.000Z", relayedTo: first } }
       ])
     })
   })
@@ -110,13 +110,13 @@ describe("a relayed answer", () => {
   test("a parked task holding an answered and an open entry of one id takes the answer on the open entry instead of refusing it", async () => {
     await withBacklog(async (root) => {
       const added = await run(addTask(root, spec))
-      const kept = { ...r2, asked: first, blocks: true, answer: { words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: first } }
+      const kept = { ...r2, asked: first, blocks: true, answer: { decider: "owner" as const, words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: first } }
       const repeated = { ...r2, asked: second, blocks: true, answer: null }
       await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", questions: [kept, repeated] } }))
       expect(answerWait(await current(root), () => false)).toBe("parked on orc/orc-1 for the captain's answer to r2")
       expect(await run(answerTask(root, "orc-1", "r2=drop", "2026-10-27T10:36:00.000Z"))).toMatchObject({ kind: "question", question: "r2", open: [] })
       const answered = await current(root)
-      expect(answered.parked?.questions).toEqual([kept, { ...repeated, answer: { words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }])
+      expect(answered.parked?.questions).toEqual([kept, { ...repeated, answer: { decider: "owner" as const, words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }])
       expect(answerWait(answered, () => false)).toBeNull()
     })
   })
@@ -146,8 +146,8 @@ describe("a relayed answer", () => {
       parked: {
         branch: "orc/orc-1",
         questions: [
-          { ...r2, asked: first, blocks: true, answer: { words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: null } },
-          { ...r3, asked: second, blocks: true, answer: { words: "Drop them", at: "2026-10-27T10:25:00.000Z", relayedTo: second } }
+          { ...r2, asked: first, blocks: true, answer: { decider: "owner" as const, words: "Keep it", at: "2026-10-27T10:05:00.000Z", relayedTo: null } },
+          { ...r3, asked: second, blocks: true, answer: { decider: "owner" as const, words: "Drop them", at: "2026-10-27T10:25:00.000Z", relayedTo: second } }
         ]
       },
       state: { kind: "new" }
@@ -159,13 +159,13 @@ describe("a relayed answer", () => {
   test("a resumed task holding two answered entries of one id sends only the latest answer instead of a duplicate the run refuses", async () => {
     await withBacklog(async (root) => {
       const added = await run(addTask(root, spec))
-      const kept = { ...r2, asked: first, blocks: true, answer: { words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: null } }
-      const repeated = { ...r2, asked: second, blocks: true, answer: { words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }
+      const kept = { ...r2, asked: first, blocks: true, answer: { decider: "owner" as const, words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: null } }
+      const repeated = { ...r2, asked: second, blocks: true, answer: { decider: "owner" as const, words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }
       await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", origin: { machine: "mac", run: "run-1" }, questions: [kept, repeated] } }))
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:40:00.000Z", log: root + "/logs/orc-1.log" } } }))
       const request = await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: join(root, "taken", "orc-1.md"), ORC_TASK_CHECKOUT: "/checkout", ORC_TASK_PROVIDER: "keyed" }, Effect.succeed("")))
-      expect(request.answers).toEqual([{ question: "r2", answer: "drop" }])
+      expect(request.answers).toEqual([{ question: "r2", answer: "drop", decider: "owner" }])
     })
   })
   test("a live asking over two answered entries of one id relays only the latest answer instead of both", () => {
@@ -175,26 +175,26 @@ describe("a relayed answer", () => {
       parked: {
         branch: "orc/orc-1",
         questions: [
-          { ...r2, asked: first, blocks: true, answer: { words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: null } },
-          { ...r2, asked: second, blocks: true, answer: { words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }
+          { ...r2, asked: first, blocks: true, answer: { decider: "owner" as const, words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: null } },
+          { ...r2, asked: second, blocks: true, answer: { decider: "owner" as const, words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }
         ]
       },
       state: { kind: "started", claim, started: { at: "2026-10-27T10:40:00.000Z", log: "/logs/orc-1.log" } }
     }
     expect(answersFor(record, { asked: "2026-10-27T11:00:00.000Z", questions: [r2] })).toEqual([
-      { ...r2, asked: second, blocks: true, answer: { words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }
+      { ...r2, asked: second, blocks: true, answer: { decider: "owner" as const, words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }
     ])
   })
   test("a captain answer to an id holding a captain answer and a later decider answer overturns the decider's instead of refusing it", async () => {
     await withBacklog(async (root) => {
       const added = await run(addTask(root, spec))
-      const captainKept = { ...r2, asked: first, blocks: true, answer: { words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: first } }
-      const deciderDrop = { ...r2, asked: second, blocks: true, answer: { words: "drop", at: "2026-10-27T10:25:00.000Z", relayedTo: second, by: "decider" as const } }
+      const captainKept = { ...r2, asked: first, blocks: true, answer: { decider: "owner" as const, words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: first } }
+      const deciderDrop = { ...r2, asked: second, blocks: true, answer: { decider: "agent" as const, words: "drop", at: "2026-10-27T10:25:00.000Z", relayedTo: second, by: "decider" as const } }
       await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", questions: [captainKept, deciderDrop] } }))
       expect(await run(answerTask(root, "orc-1", "r2=final", "2026-10-27T10:36:00.000Z"))).toMatchObject({ kind: "question", question: "r2", open: [] })
       expect((await current(root)).parked?.questions).toEqual([
         captainKept,
-        { ...deciderDrop, answer: { words: "final", at: "2026-10-27T10:36:00.000Z", relayedTo: null, overturned: deciderDrop.answer } }
+        { ...deciderDrop, answer: { decider: "owner" as const, words: "final", at: "2026-10-27T10:36:00.000Z", relayedTo: null, overturned: deciderDrop.answer } }
       ])
     })
   })

@@ -275,7 +275,7 @@ describe("the decider", () => {
       for (const at of [entry?.decision.at, entry?.answer.at]) {
         expect(at !== undefined && at >= before && at <= after).toBe(true)
       }
-      expect(await run(attentionText(false, root))).toContain("Decided:\nanswered " + r2Item + ": Two retries (the intent says twice, quoting task orc-1: \"Retry a failed upload twice, then give up.\")")
+      expect(await run(attentionText(false, root))).toContain("Decided by agent:\n" + r2Item + ": Two retries\n" + r2Item + ": the intent says twice, quoting task orc-1: \"Retry a failed upload twice, then give up.\"")
       await run(closeStartedTask(root, "orc-1", "done", "the upload retries", { pr: null, report: null }, "2026-11-02T10:40:00.000Z"))
       expect((await run(readAttention(root, await run(listTasks(root))))).decided).toEqual([])
     })

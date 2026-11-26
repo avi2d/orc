@@ -1,7 +1,8 @@
 import { Effect, Schema } from "effect"
+import { DecisionAnswer } from "../../shared/lib/index"
 import { reviewQuestionId } from "../../entities/attention/index"
 
-export const QuestionJson = Schema.Struct({ id: Schema.String, text: Schema.String, answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String })) })
+export const QuestionJson = Schema.Struct({ id: Schema.String, text: Schema.String, answer: Schema.NullOr(DecisionAnswer) })
 
 export const ParkedJson = Schema.Struct({
   branch: Schema.String,
@@ -12,14 +13,14 @@ const HoldHistoryEntry = Schema.Struct({
   reason: Schema.String,
   until: Schema.NullOr(Schema.String),
   questions: Schema.Array(QuestionJson),
-  answer: Schema.Struct({ words: Schema.String, at: Schema.String })
+  answer: DecisionAnswer
 })
 
 export const HoldJson = Schema.Struct({
   reason: Schema.String,
   until: Schema.NullOr(Schema.String),
   questions: Schema.Array(QuestionJson),
-  answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String })),
+  answer: Schema.NullOr(DecisionAnswer),
   history: Schema.optional(Schema.Array(HoldHistoryEntry))
 })
 export type HoldJson = typeof HoldJson.Type

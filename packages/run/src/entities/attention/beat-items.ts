@@ -66,7 +66,7 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
     )
     yield* Effect.forEach(settled, (entry) =>
       entry.item.kind === "pr-ready" && ended !== null
-        ? Effect.asVoid(closeItem(root, entry.id, { words: ended, at }))
+        ? Effect.asVoid(closeItem(root, entry.id, { words: ended, at, decider: "agent" }))
         : Effect.asVoid(withdrawItem(root, entry.id, ended === null ? "head or checks changed" : "PR " + ended, at)), { discard: true })
     if (ended !== null) {
       if (view.state === "CLOSED") {

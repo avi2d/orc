@@ -157,7 +157,7 @@ describe("orc run with Pi asking the captain mid-run", () => {
       await runOrc([...runArgs, "--answer", "ask-1=B"], fixture.repo, { ...fixture.env, ORC_ANSWER_WAIT_SECONDS: "0" })
       expect(await piRuns(fixture)).toBe(2)
       expect(await readFile(join(fixture.fakeBin, "resumed-argv"), "utf8")).toContain(sessionId)
-      expect(await readFile(join(fixture.fakeBin, "resumed-prompt"), "utf8")).toContain("The captain answered your question ask-1: B")
+      expect(await readFile(join(fixture.fakeBin, "resumed-prompt"), "utf8")).toContain("Owner answered your question ask-1: B")
     })
   }, 60_000)
 

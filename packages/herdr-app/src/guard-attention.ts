@@ -6,9 +6,13 @@ interface AttentionOption {
   readonly text: string
   readonly outcome: string | null
   readonly picture: string | null
+  readonly action: "write-answer" | "wait" | null
 }
 
+type Decider = "owner" | "agent"
+
 interface Decision {
+  readonly decider: Decider | null
   readonly kind: "answered" | "escalated" | "asked-back" | "duplicate"
   readonly basis: string
   readonly recommendation: string | null
@@ -31,10 +35,17 @@ export interface AttentionItem extends AttentionEntry {
   readonly overdueSeconds: number | null
 }
 
+interface Answer {
+  readonly words: string
+  readonly at: string
+  readonly decider: Decider | null
+  readonly inferred: boolean
+}
+
 export interface DecidedAttention extends AttentionEntry {
-  readonly decision: Decision
-  readonly answer: string
-  readonly overturned: string | null
+  readonly decision: Decision | null
+  readonly answer: Answer
+  readonly overturned: Answer | null
 }
 
 export interface AttentionQueue {
@@ -70,7 +81,9 @@ const attentionOption: Guard<AttentionOption> = (value, at) => {
   if (outcome.kind === "refused") return outcome
   const picture = absentOrString(record.value, "picture", at)
   if (picture.kind === "refused") return picture
-  return ok({ text: text.value, outcome: outcome.value, picture: picture.value })
+  const action = record.value["action"] === undefined ? ok(null) : oneOf(record.value, "action", at, ["write-answer", "wait"] as const)
+  if (action.kind === "refused") return action
+  return ok({ text: text.value, outcome: outcome.value, picture: picture.value, action: action.value })
 }
 
 const decisionBasis = (record: Fields, at: string, kind: Decision["kind"]): Guarded<string> => {
@@ -90,6 +103,9 @@ const decisionBasis = (record: Fields, at: string, kind: Decision["kind"]): Guar
   return pair(rule.value, ruleAt, "source", "quote", (source, quote) => `${reason.value}\n${source}: “${quote}”`)
 }
 
+const readDecider = (record: Fields, at: string): Guarded<Decider | null> =>
+  record["decider"] === undefined ? ok(null) : oneOf(record, "decider", at, ["owner", "agent"] as const)
+
 const readDecision: Guard<Decision> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
@@ -99,7 +115,8 @@ const readDecision: Guard<Decision> = (value, at) => {
   if (basis.kind === "refused") return basis
   const recommendation = absentOrString(record.value, "recommendation", at)
   if (recommendation.kind === "refused") return recommendation
-  return ok({ kind: kind.value, basis: basis.value, recommendation: recommendation.value })
+  const decider = readDecider(record.value, at)
+  return decider.kind === "refused" ? decider : ok({ kind: kind.value, basis: basis.value, recommendation: recommendation.value, decider: decider.value })
 }
 
 const attentionItem: Guard<AttentionItem> = (value, at) =>
@@ -122,20 +139,27 @@ const readItem = (record: Fields, entry: AttentionEntry, at: string): Guarded<At
   return ok({ ...entry, subject: subject.value, options: options.value, recommendation: recommendation.value, decision: decision.value, overdueSeconds: overdue ? age.value : null })
 }
 
-const answerWords: Guard<string> = (value, at) => {
-  const record = fields(value, at)
-  return record.kind === "ok" ? string(record.value, "words", at) : record
+const readAnswer: Guard<Answer> = (value, path) => {
+  const record = fields(value, path)
+  if (record.kind === "refused") return record
+  const content = pair(record.value, path, "words", "at", (words, at) => ({ words, at }))
+  if (content.kind === "refused") return content
+  const decider = readDecider(record.value, path)
+  if (decider.kind === "refused") return decider
+  const inferred = record.value["inferred"]
+  if (inferred !== undefined && inferred !== true) return refused(child(path, "inferred"), "true", inferred)
+  return ok({ ...content.value, decider: decider.value, inferred: inferred === true })
 }
 
 const decidedItem: Guard<DecidedAttention> = (value, at) =>
   withEntry(value, at, (record, entry) => readDecided(record, entry, at))
 
 const readDecided = (record: Fields, entry: AttentionEntry, at: string): Guarded<DecidedAttention> => {
-  const decision = readDecision(record["decision"], child(at, "decision"))
+  const decision = record["decision"] === undefined ? ok(null) : readDecision(record["decision"], child(at, "decision"))
   if (decision.kind === "refused") return decision
-  const answer = answerWords(record["answer"], child(at, "answer"))
+  const answer = readAnswer(record["answer"], child(at, "answer"))
   if (answer.kind === "refused") return answer
-  const overturned = record["overturned"] === undefined ? ok(null) : answerWords(record["overturned"], child(at, "overturned"))
+  const overturned = record["overturned"] === undefined ? ok(null) : readAnswer(record["overturned"], child(at, "overturned"))
   if (overturned.kind === "refused") return overturned
   return ok({ ...entry, decision: decision.value, answer: answer.value, overturned: overturned.value })
 }

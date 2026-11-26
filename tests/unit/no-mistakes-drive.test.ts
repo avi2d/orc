@@ -170,7 +170,7 @@ describe("driveNoMistakes", () => {
     const asking: NoMistakesRunner = { ...endedFailed, start: () => Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 }) }
     const { record } = await driveIn(asking)
     expect(record.status).toBe("refused")
-    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior" }])
+    expect(record.openQuestions).toMatchObject([{ id: "r2", text: "changes product behavior" }])
     expect(record.result).toContain("--answer r2=")
   })
 
@@ -323,7 +323,7 @@ describe("driveNoMistakes", () => {
     const { record } = await driveIn(answering, [], [], wait)
     expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"] }])
     expect(sent.length).toBe(1)
-    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked: "2026-11-02T10:40:00.000Z", asking: "2026-11-02T10:40:00.000Z" }])
+    expect(record.openQuestions).toMatchObject([{ id: "r2", text: "changes product behavior", asked: "2026-11-02T10:40:00.000Z", asking: "2026-11-02T10:40:00.000Z" }])
   })
 
   test("a wait that runs out unanswered parks the question instead of sending an empty answer", async () => {
@@ -338,7 +338,7 @@ describe("driveNoMistakes", () => {
     }
     const { record } = await driveIn(asking, [], [], () => Effect.succeed({ asked, answers: [], askedAt: [{ question: "r2", asked }] }))
     expect(sent).toEqual([])
-    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked, asking: asked }])
+    expect(record.openQuestions).toMatchObject([{ id: "r2", text: "changes product behavior", asked, asking: asked }])
   })
 
   test("a finding with an action orc does not know parks as an open question instead of failing the run", async () => {
@@ -346,7 +346,7 @@ describe("driveNoMistakes", () => {
     const asking: NoMistakesRunner = { ...endedFailed, start: () => Effect.succeed({ stdout: manual, stderr: "", exitCode: 0 }) }
     const { record } = await driveIn(asking)
     expect(record.status).toBe("refused")
-    expect(record.openQuestions).toEqual([{ id: "r2", text: "needs a human", owner: "user" }])
+    expect(record.openQuestions).toMatchObject([{ id: "r2", text: "needs a human", owner: "user" }])
     expect(record.result).toContain("--answer r2=")
   })
 

@@ -1,4 +1,5 @@
 import { Effect, FileSystem } from "effect"
+import { type Decider, deciderLabel } from "../../shared/lib/index"
 import { decisionAnswer, isHeld, parseTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
 import { answeredReason } from "./task-record-decision"
 import { closeNewTask } from "./close-new"
@@ -12,20 +13,20 @@ export const decisionRefusal = (record: TaskRecord, verb: string): string | null
 export const newTaskRefusal = (record: TaskRecord, id: string, verb: string, action: string): string | null =>
   decisionRefusal(record, verb) ?? (record.state.kind === "new" ? null : id + " is " + record.state.kind + ", and only a new task " + action)
 
-const answeredRecord = (fresh: TaskRecord, words: string, at: string): TaskRecord => ({
+const answeredRecord = (fresh: TaskRecord, words: string, at: string, decider: Decider): TaskRecord => ({
   ...fresh,
   hold: isHeld(fresh) ? null : fresh.hold,
-  state: { kind: "closed", claim: null, closing: { outcome: "done", reason: answeredReason, answer: { words, at } }, closedAt: at, postedAt: null }
+  state: { kind: "closed", claim: null, closing: { outcome: "done", reason: answeredReason, answer: { words, at, decider } }, closedAt: at, postedAt: null }
 })
 
-export const answerDecision = (root: string, id: string, words: string, at: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  closeNewTask(root, id, (fresh) => answeredRecord(fresh, words, at))
+export const answerDecision = (root: string, id: string, words: string, at: string, decider: Decider): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  closeNewTask(root, id, (fresh) => answeredRecord(fresh, words, at, decider))
 
 const decisionNote = (decision: TaskRecord): string => {
   const answer = decisionAnswer(decision)
   return answer === null
     ? ""
-    : "\n\nThe captain's decision " + decision.spec.id + " asked:\n\n" + decision.spec.body.trim() + "\n\nThe captain answered: " + answer.words + "\n"
+    : "\n\nDecision " + decision.spec.id + " asked:\n\n" + decision.spec.body.trim() + "\n\n" + deciderLabel(answer.decider) + " answered: " + answer.words + "\n"
 }
 
 export const withDecisions = (body: string, decisions: ReadonlyArray<TaskRecord>): string => {

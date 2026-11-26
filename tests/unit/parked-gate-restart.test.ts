@@ -176,7 +176,7 @@ describe("a run parked on a gate orc cannot answer", () => {
       expect(priorOpen.map((question) => question.id)).toEqual(["q1"])
       const setup = askSetupFor(runs + "/run-2", runs + "/run-2-session", 30, answersB, priorOpen)
       const runB = await driveGate(runs, "run-2", { start: parkedB, answers: answersB })
-      expect(runB.openQuestions).toEqual([{ id: "review-1", text: "needs a human", owner: "user" }])
+      expect(runB.openQuestions).toMatchObject([{ id: "review-1", text: "needs a human", owner: "user" }])
       await recordGateRun(root, "run-2", "2026-11-18T10:03:00.000Z", runB, runB.result)
       const db = await dbOf(root)
       try {
@@ -253,7 +253,7 @@ describe("a run parked on a gate orc cannot answer", () => {
         instructions: "The captain answered these findings; fix each as the answer says:\nreview-1: Keep it"
       }])
       expect(runC.status).toEqual("refused")
-      expect(runC.openQuestions).toEqual([{ id: "review-1", text: "needs a human", owner: "user" }])
+      expect(runC.openQuestions).toMatchObject([{ id: "review-1", text: "needs a human", owner: "user" }])
     })
   })
 
@@ -274,7 +274,7 @@ describe("a run parked on a gate orc cannot answer", () => {
         instructions: "The captain answered these findings; fix each as the answer says:\nreview-1: Keep it"
       }])
       expect(record.status).toEqual("refused")
-      expect(record.openQuestions).toEqual([{ id: "review-1", text: "needs a human", owner: "user" }])
+      expect(record.openQuestions).toMatchObject([{ id: "review-1", text: "needs a human", owner: "user" }])
     })
   })
 
@@ -300,7 +300,7 @@ describe("a run parked on a gate orc cannot answer", () => {
     }
     await withDirs(async (root, runs) => {
       const runA = await driveGate(runs, "run-1", { start: parkedTable(["review-1,warning,,,manual,needs a human"]), answers: [] })
-      expect(runA.openQuestions).toEqual([{ id: "review-1", text: "needs a human", owner: "user" }])
+      expect(runA.openQuestions).toMatchObject([{ id: "review-1", text: "needs a human", owner: "user" }])
       await recordGateRun(root, "run-1", "2026-11-18T10:00:00.000Z", runA, runA.result)
       await startOrc1(root, "2026-11-18T10:00:00.000Z")
       const parked = await beatWith(root, doneStatus(root, "2026-11-18T10:00:00.000Z", "2026-11-18T10:01:00.000Z"))
@@ -403,7 +403,7 @@ describe("a run parked on a gate orc cannot answer", () => {
         throw new Error("the live asking never carried the gate")
       }
       expect(gated.asked).not.toEqual(batch)
-      expect(runB.openQuestions).toEqual([{ id: "review-1", text: "needs a human", asked: gated.asked, asking: batch, owner: "user" }])
+      expect(runB.openQuestions).toMatchObject([{ id: "review-1", text: "needs a human", asked: gated.asked, asking: batch, owner: "user" }])
       await recordGateRun(root, "run-2", "2026-11-18T10:03:00.000Z", runB, runB.result)
       if (!Arr.isReadonlyArrayNonEmpty(snapshot.questions)) {
         throw new Error("the live asking holds no questions")
@@ -472,7 +472,7 @@ describe("a run parked on a gate orc cannot answer", () => {
         throw new Error("the second r2 asking carries no time")
       }
       expect(second.asked).not.toEqual(batch)
-      expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked: second.asked, asking: batch }])
+      expect(record.openQuestions).toMatchObject([{ id: "r2", text: "changes product behavior", asked: second.asked, asking: batch }])
       await recordGateRun(root, "run-9", "2026-11-18T10:02:00.000Z", record, record.result)
       const heard: Array<DeciderRequest> = []
       const sources = { ...quietSources(), askDecider: answeringDecider("# Fix the thing", heard) }

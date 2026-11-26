@@ -1,3 +1,4 @@
+import { flagQuestion } from "../../lib/attention-question"
 import { describe, expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -75,7 +76,7 @@ const itemFiles = async (root: string): Promise<ReadonlyArray<unknown>> => {
 
 const heldTask = (until: string, answer: { words: string; at: string } | null): TaskRecord => ({
   spec: { ...spec, id: "orc-2", title: "Pick the API" },
-  hold: { reason: "REST or gRPC", until, questions: [], answer, at: null },
+  hold: { reason: "REST or gRPC", until, questions: [], answer: answer === null ? null : { ...answer, decider: "owner" }, at: null },
   parked: null,
   state: { kind: "new" }
 })
@@ -141,7 +142,7 @@ describe("run events in the attention queue", () => {
   test("a run-died item closes on orc attention answer, while a review question is sent to orc backlog answer", async () => {
     await withBacklog(async (root) => {
       await run(openRunDeaths(root, [{ kind: "start-failed", task: "orc-4", machine: "mac", reason: "no shell" }], "2026-10-27T12:00:00.000Z"))
-      await run(openItem(root, "orc-1.r2.a", { kind: "review-question", task: "orc-1", text: "Keep the flag?", asked: "2026-10-27T12:00:00.000Z", owner: "user" }))
+      await run(openItem(root, "orc-1.r2.a", { ...flagQuestion, kind: "review-question", task: "orc-1", text: "Keep the flag?", asked: "2026-10-27T12:00:00.000Z", owner: "user" }))
       expect(await run(answerItem(root, "orc-4.run-died.2026-10-27T12_00_00_000Z", { words: "Requeue it", at: "2026-10-27T12:05:00.000Z" }))).toBe("closed")
       expect(await run(answerItem(root, "orc-1.r2.a", { words: "Keep it", at: "2026-10-27T12:05:00.000Z" }))).toEqual({ kind: "answered elsewhere", task: "orc-1" })
       expect((await run(openItems(root))).map(({ id }) => id)).toEqual(["orc-1.r2.a"])
@@ -284,7 +285,7 @@ describe("overdue waits in the attention queue", () => {
 describe("the beat and the attention queue", () => {
   test("the beat lists open items oldest first before the new tasks it considers, instead of after a launch", async () => {
     await withBacklog(async (root) => {
-      await run(openItem(root, "newer", { kind: "review-question", task: "orc-9", text: "Keep the flag?", asked: "2026-10-27T11:58:00.000Z", owner: "user" }))
+      await run(openItem(root, "newer", { ...flagQuestion, kind: "review-question", task: "orc-9", text: "Keep the flag?", asked: "2026-10-27T11:58:00.000Z", owner: "user" }))
       await run(openItem(root, "older", { kind: "run-died", task: "orc-3", text: "the run died", asked: "2026-10-27T11:50:00.000Z", owner: "user" }))
       await run(addTask(root, spec))
       const lines = (await beat(root, "2026-10-27T12:00:00.000Z")).split("\n")

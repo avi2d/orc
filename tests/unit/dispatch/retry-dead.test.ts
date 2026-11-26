@@ -58,14 +58,14 @@ describe("a failed run", () => {
       await run(writeTaken(root, {
         ...task,
         parked: null,
-        hold: { reason: "the resume parked again", repeat: true, until: null, questions: [], at: "2026-10-27T09:05:00.000Z", answer: { words: "fix the lint finding first", at: "2026-10-27T10:00:00.000Z" } }
+        hold: { reason: "the resume parked again", repeat: true, until: null, questions: [], at: "2026-10-27T09:05:00.000Z", answer: { decider: "owner" as const, words: "fix the lint finding first", at: "2026-10-27T10:00:00.000Z" } }
       }))
       await run(retryStartedTask(root, "orc-1", "mac", "run-1", "2026-10-27T10:05:00.000Z"))
       const retried = (await run(listTasks(root))).at(0)
       expect(retried?.parked?.at).toBe("2026-10-27T10:05:00.000Z")
       await run(claimTask(root, "orc-1"))
       const request = await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: join(root, "taken", "orc-1.md"), ORC_TASK_CHECKOUT: "/checkout", ORC_TASK_PROVIDER: "keyed" }, Effect.succeed("")))
-      expect(request.answers).toEqual([{ question: "hold-release-carried", answer: "Current guidance: fix the lint finding first" }])
+      expect(request.answers).toEqual([{ question: "hold-release-carried", answer: "Current guidance: fix the lint finding first", decider: "owner" }])
     })
   })
 

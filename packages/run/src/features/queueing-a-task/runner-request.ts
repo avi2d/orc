@@ -3,17 +3,12 @@ import { AbsolutePath, readDispatchConfig, readFailure } from "../../shared/conf
 import { ModelRef, ProviderId, RoutedModels, RoutedModelsJson } from "../../shared/config/index"
 import { Rebase, TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type Parked, type TaskRecord, withDecisions } from "../../entities/backlog/index"
 import { isSendBackQuestion, latestPerId } from "../../entities/parked-runs/index"
-import { carriedHoldReleaseId, holdReleaseId } from "../../entities/review-gate/index"
+import { carriedHoldReleaseId, holdReleaseId, QuestionAnswer } from "../../entities/review-gate/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
 import { isRunDelivery } from "../../shared/config/index"
 import { decodeTokenText, LabelArg, tokenDocumentNote, tokenFields } from "../../entities/token/index"
 import { isThinkingLevel, piThinkingLevels } from "../../entities/agent/index"
-
-const AnswerArg = Schema.Struct({
-  question: Schema.String.check(Schema.isPattern(/^[^\s=]+$/)),
-  answer: Schema.String.check(Schema.isNonEmpty())
-})
 
 const taskFields = {
   task: TaskId,
@@ -32,7 +27,7 @@ const taskFields = {
   rebase: Schema.optional(Rebase),
   machine: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   slots: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-  answers: Schema.optional(Schema.Array(AnswerArg)),
+  answers: Schema.optional(Schema.Array(QuestionAnswer)),
   instructions: Schema.optional(TaskInstructions)
 }
 
@@ -87,7 +82,7 @@ const takenBody = (record: TaskRecord): string => {
   const hold = record.hold
   const decisions = hold === null ? [] : [...hold.history ?? [], hold]
   return record.spec.body + decisions.flatMap((decision) => decision.answer === null || decision.repeat === true ? [] : [
-    "\n\nHeld for the captain: " + decision.reason + "\nThe captain answered: " + decision.answer.words
+    "\n\nHeld for the captain: " + decision.reason + "\n" + (decision.answer.decider === "owner" ? "The captain" : "The agent") + " answered: " + decision.answer.words
   ]).join("")
 }
 
@@ -111,7 +106,7 @@ const sentBackAt = (parked: Parked): number => {
 }
 
 // A send-back opens a new park, so a release older than it answered a failure the merged work already resolved.
-const releaseAnswerOf = (hold: TaskRecord["hold"], parked: Parked): ReadonlyArray<typeof AnswerArg.Type> => {
+const releaseAnswerOf = (hold: TaskRecord["hold"], parked: Parked): ReadonlyArray<typeof QuestionAnswer.Type> => {
   const decisions = hold === null ? [] : [...hold.history ?? [], hold]
   const opened = sentBackAt(parked)
   const releases = decisions.flatMap((decision) =>
@@ -119,6 +114,7 @@ const releaseAnswerOf = (hold: TaskRecord["hold"], parked: Parked): ReadonlyArra
   const latest = releases.at(-1)
   return latest === undefined ? [] : [{
     question: timeOf(latest.at) > lastRunEndedAt(decisions, parked) ? holdReleaseId : carriedHoldReleaseId,
+    decider: latest.decider,
     answer: releases.map((release, index) => (index === releases.length - 1 ? "Current guidance: " : "Earlier repeat hold release: ") + release.words).join("\n")
   }]
 }
@@ -133,7 +129,7 @@ const takenResume = (task: string, record: TaskRecord): Effect.Effect<Record<str
       branch: record.parked.branch,
       resumeRun: record.parked.origin?.run,
       ...(record.parked.questions.length === 0 && record.rebase !== undefined ? { rebase: record.rebase, delivery: "orc" } : {}),
-      answers: [...latestPerId(record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ ...question, answer: question.answer }])).map((question) => ({ question: question.id, answer: question.answer.words })), ...releaseAnswerOf(record.hold, record.parked)]
+      answers: [...latestPerId(record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ ...question, answer: question.answer }])).map((question) => ({ question: question.id, answer: question.answer.words, decider: question.answer.decider })), ...releaseAnswerOf(record.hold, record.parked)]
     })
 }
 

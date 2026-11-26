@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { Decider } from "../../shared/lib/index"
 import type { Answer } from "./task-record-decision"
 
 export const deciderAnswerKinds = ["decider", "asked-back"] as const
@@ -25,6 +26,7 @@ export const OverturnedFront = Schema.Struct({
   answer: Schema.String,
   answered_at: Schema.String,
   answered_by: Schema.Literals(deciderAnswerKinds),
+  decider: Schema.optional(Decider),
   relayed_to: Schema.optional(Schema.String)
 })
 
@@ -46,5 +48,5 @@ export const parkedAnswerOf = (question: AnswerFront, answer: Answer): ParkedAns
   const queued = question.correction_queued === true ? { correctionQueued: true as const } : {}
   return overturned === undefined
     ? { ...answer, relayedTo, ...queued }
-    : { ...answer, relayedTo, ...queued, overturned: { words: overturned.answer, at: overturned.answered_at, by: overturned.answered_by, relayedTo: overturned.relayed_to ?? null } }
+    : { ...answer, relayedTo, ...queued, overturned: { words: overturned.answer, at: overturned.answered_at, by: overturned.answered_by, decider: overturned.decider ?? "agent", relayedTo: overturned.relayed_to ?? null } }
 }

@@ -1,5 +1,6 @@
 import { Effect, FileSystem } from "effect"
-import { missingReason, parseRun, type NoMistakesFinding, type OpenQuestion, type ParkedGate, type ParsedRun, type PendingFinding } from "./no-mistakes-gate"
+import { missingReason, parseRun, type NoMistakesFinding, type ParkedGate, type ParsedRun, type PendingFinding } from "./no-mistakes-gate"
+import { findingContext, type OpenQuestion } from "./question"
 import type { AskedAt } from "./answer-wait"
 import { scalar } from "../../shared/lib/index"
 
@@ -134,7 +135,7 @@ export const openDriveLog = (started: string): DriveLog => {
         ...refuse(gate, missingReason(missing)),
         openQuestions: missing.map((finding) => {
           const time = at(finding)
-          return { id: finding.id, text: finding.description, ...(finding.asks === undefined ? {} : { asks: finding.asks }), ...(time === null ? {} : { asked: time }), ...(asked === null ? {} : { asking: asked }), ...(finding.owner === undefined ? {} : { owner: finding.owner }) }
+          return { id: finding.id, text: finding.description.trim() === "" ? "No text was supplied for " + finding.id + ". Check the review before answering." : finding.description, ...findingContext(gate.step, finding.id, finding.description), ...(finding.asks === undefined ? {} : { asks: finding.asks }), ...(time === null ? {} : { asked: time }), ...(asked === null ? {} : { asking: asked }), ...(finding.owner === undefined ? {} : { owner: finding.owner }) }
         })
       }
     },

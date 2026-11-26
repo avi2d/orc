@@ -6,19 +6,17 @@ type Questions = ReadonlyArray<ParkedQuestion>
 
 const questionKinds: ReadonlySet<AttentionItem["kind"]> = new Set<AttentionItem["kind"]>(["review-question", "worker-question"])
 
-const decidedByDecider = (item: AttentionItem, at: string): boolean =>
-  (item.decision?.kind === "answered" || item.decision?.kind === "duplicate") && item.decision.at === at
-
 const recordedAnswer = (item: AttentionItem): ParkedAnswer | null => {
   const state = item.state
   if (state.kind !== "closed" || !questionKinds.has(item.kind)) {
     return null
   }
-  const answer = { words: state.answer.words, at: state.answer.at, relayedTo: null }
-  if (decidedByDecider(item, answer.at)) {
+  const { words, at, decider } = state.answer
+  const answer = { words, at, decider, relayedTo: null }
+  if (decider === "agent") {
     return { ...answer, by: "decider" }
   }
-  return state.overturned === undefined ? answer : { ...answer, overturned: { words: state.overturned.words, at: state.overturned.at, relayedTo: null, by: "decider" } }
+  return state.overturned === undefined ? answer : { ...answer, overturned: { words: state.overturned.words, at: state.overturned.at, decider: state.overturned.decider, relayedTo: null, by: "decider" } }
 }
 
 const itemOf = (task: string, question: ParkedQuestion): string => reviewQuestionId(task, question.id, question.asked)

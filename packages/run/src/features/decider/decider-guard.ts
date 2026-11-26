@@ -85,6 +85,3 @@ export const guardReason = (question: { readonly text: string; readonly asks?: s
   }
   return askedActionReason(question.asks)
 }
-
-export const askBackWords = (question: string): string =>
-  "Before it answers, orc's decider asks you: " + question + "\nPut your reply in a new orc_ask question."

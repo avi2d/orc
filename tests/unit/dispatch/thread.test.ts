@@ -51,16 +51,16 @@ describe("orc backlog thread", () => {
     const decided = "2026-11-02T10:30:00.000Z"
     const task: TaskRecord = {
       spec,
-      hold: { reason: "Wait for the merge", until: null, questions: [], answer: { words: "Merged", at: "2026-11-02T09:10:00.000Z" }, at: "2026-11-02T09:00:00.000Z" },
-      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { words: "Two retries", at: decided, relayedTo: null } }] },
+      hold: { reason: "Wait for the merge", until: null, questions: [], answer: { decider: "owner" as const, words: "Merged", at: "2026-11-02T09:10:00.000Z" }, at: "2026-11-02T09:00:00.000Z" },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { decider: "agent" as const, words: "Two retries", at: decided, relayedTo: null } }] },
       state: started
     }
     const item = {
       id: reviewQuestionId("orc-1", "r2", asked),
       item: {
         kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked, owner: "decider" as const,
-        decision: { kind: "answered" as const, reason: "the intent says twice", rule: { quote: "Retry a failed upload twice, then give up.", source: "task orc-1" }, at: decided },
-        state: { kind: "closed" as const, answer: { words: "Two retries", at: decided } }
+        decision: { kind: "answered" as const, decider: "agent" as const, reason: "the intent says twice", rule: { quote: "Retry a failed upload twice, then give up.", source: "task orc-1" }, at: decided },
+        state: { kind: "closed" as const, answer: { decider: "agent" as const, words: "Two retries", at: decided } }
       }
     }
     const note = { at: "2026-11-02T10:25:00.000Z", who: "captain", text: "the upload server is slow today" }
@@ -87,8 +87,8 @@ describe("orc backlog thread", () => {
       id: reviewQuestionId("orc-1", "r1", earlier),
       item: {
         kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked: earlier, owner: "user" as const,
-        decision: { kind: "escalated" as const, reason: "the intent names no count", at: "2026-11-02T10:05:00.000Z" },
-        state: { kind: "closed" as const, answer: { words: "Two", at: "2026-11-02T10:30:00.000Z" } }
+        decision: { kind: "escalated" as const, decider: "agent" as const, reason: "the intent names no count", at: "2026-11-02T10:05:00.000Z" },
+        state: { kind: "closed" as const, answer: { decider: "owner" as const, words: "Two", at: "2026-11-02T10:30:00.000Z" } }
       }
     }
     const current = {
@@ -110,20 +110,20 @@ describe("orc backlog thread", () => {
     const task: TaskRecord = {
       spec,
       hold: null,
-      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { words: "Three retries", at: overturnedAt, relayedTo: null, overturned: { words: "Two retries", at: decided, by: "decider", relayedTo: null } } }] },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { words: "Three retries", at: overturnedAt, relayedTo: null, overturned: { decider: "agent" as const, words: "Two retries", at: decided, by: "decider", relayedTo: null } } }] },
       state: started
     }
     const item = {
       id: reviewQuestionId("orc-1", "r2", asked),
       item: {
         kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked, owner: "decider" as const,
-        decision: { kind: "answered" as const, reason: "the intent says twice", at: decided },
-        state: { kind: "closed" as const, answer: { words: "Three retries", at: overturnedAt }, overturned: { words: "Two retries", at: decided } }
+        decision: { kind: "answered" as const, decider: "agent" as const, reason: "the intent says twice", at: decided },
+        state: { kind: "closed" as const, answer: { decider: "owner" as const, words: "Three retries", at: overturnedAt }, overturned: { decider: "agent" as const, words: "Two retries", at: decided } }
       }
     }
     expect(threadEntries(task, [item], []).filter((line) => line.kind === "answer").map((line) => [line.who, line.at, line.text])).toEqual([
       ["decider", decided, "Two retries"],
-      ["user", overturnedAt, "Three retries (replaces the decider's answer \"Two retries\")"]
+      ["user", overturnedAt, "Three retries (replaces the agent's answer \"Two retries\")"]
     ])
   })
 
@@ -132,7 +132,7 @@ describe("orc backlog thread", () => {
       spec,
       hold: {
         reason: "Wait for deployment", until: null, questions: [], answer: null, at: "2026-11-02T12:00:00.000Z",
-        history: [{ reason: "Wait for the merge", until: "2026-11-03", questions: [], answer: { words: "Merged", at: "2026-11-02T11:00:00.000Z" } }]
+        history: [{ reason: "Wait for the merge", until: "2026-11-03", questions: [], answer: { decider: "owner" as const, words: "Merged", at: "2026-11-02T11:00:00.000Z" } }]
       },
       parked: null,
       state: { kind: "new" }
@@ -151,9 +151,9 @@ describe("orc backlog thread", () => {
       spec,
       hold: {
         reason: "Wait for the merge", until: null, at: "2026-11-02T11:00:00.000Z",
-        questions: [{ id: "question-1", text: "Which host?", answer: { words: "prod", at: "2026-11-02T11:10:00.000Z" } }],
+        questions: [{ id: "question-1", text: "Which host?", answer: { decider: "owner" as const, words: "prod", at: "2026-11-02T11:10:00.000Z" } }],
         answer: null,
-        history: [{ reason: "Choose the format", until: null, at: "2026-11-02T09:00:00.000Z", questions: [{ id: "question-1", text: "Which format?", answer: { words: "JSON", at: "2026-11-02T09:10:00.000Z" } }], answer: { words: "JSON", at: "2026-11-02T09:10:00.000Z" } }]
+        history: [{ reason: "Choose the format", until: null, at: "2026-11-02T09:00:00.000Z", questions: [{ id: "question-1", text: "Which format?", answer: { decider: "owner" as const, words: "JSON", at: "2026-11-02T09:10:00.000Z" } }], answer: { decider: "owner" as const, words: "JSON", at: "2026-11-02T09:10:00.000Z" } }]
       },
       parked: null,
       state: { kind: "new" }
@@ -221,15 +221,15 @@ describe("orc backlog thread", () => {
     const before: TaskRecord = {
       spec,
       hold: null,
-      parked: { branch: "orc/orc-1", questions: [{ id: "r1", text: "How many retries?", asked: earlier, blocks: true, answer: { words: "Two", at: decided, relayedTo: null } }] },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r1", text: "How many retries?", asked: earlier, blocks: true, answer: { decider: "agent" as const, words: "Two", at: decided, relayedTo: null } }] },
       state: started
     }
     const stored = {
       id: reviewQuestionId("orc-1", "r1", earlier),
       item: {
         kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked: earlier, owner: "decider" as const,
-        decision: { kind: "answered" as const, reason: "the intent says twice", at: decided },
-        state: { kind: "closed" as const, answer: { words: "Two", at: decided } }
+        decision: { kind: "answered" as const, decider: "agent" as const, reason: "the intent says twice", at: decided },
+        state: { kind: "closed" as const, answer: { decider: "agent" as const, words: "Two", at: decided } }
       }
     }
     const beforeIds = threadEntries(before, [stored], []).filter((line) => line.kind !== "delivered").map((line) => line.id)
@@ -258,14 +258,14 @@ describe("orc backlog thread", () => {
     const parked: TaskRecord = {
       spec,
       hold: null,
-      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { words: "Three", at: captainAt, relayedTo: null } }] },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { decider: "owner" as const, words: "Three", at: captainAt, relayedTo: null } }] },
       state: started
     }
     const open = {
       id: reviewQuestionId("orc-1", "r2", asked),
       item: {
         kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked, owner: "decider" as const,
-        decision: { kind: "answered" as const, reason: "the intent says twice", at: deciderAt },
+        decision: { kind: "answered" as const, decider: "agent" as const, reason: "the intent says twice", at: deciderAt },
         state: { kind: "open" as const }
       }
     }
@@ -282,8 +282,8 @@ describe("orc backlog thread", () => {
       id: open.id,
       item: {
         kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked, owner: "decider" as const,
-        decision: { kind: "answered" as const, reason: "the intent says twice", at: deciderAt },
-        state: { kind: "closed" as const, answer: { words: "Three", at: captainAt } }
+        decision: { kind: "answered" as const, decider: "agent" as const, reason: "the intent says twice", at: deciderAt },
+        state: { kind: "closed" as const, answer: { decider: "owner" as const, words: "Three", at: captainAt } }
       }
     }
     expect(threadEntries(replaced, [closed], []).filter((line) => line.kind === "answer")).toEqual([
@@ -297,14 +297,14 @@ describe("orc backlog thread", () => {
     const task: TaskRecord = {
       spec,
       hold: null,
-      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { words: "Two", at: answered, relayedTo: "" } }] },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { decider: "owner" as const, words: "Two", at: answered, relayedTo: "" } }] },
       state: started
     }
     const item = {
       id: reviewQuestionId("orc-1", "r2", asked),
       item: {
         kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked, owner: "decider" as const,
-        decision: { kind: "answered" as const, reason: "the intent says twice", at: answered },
+        decision: { kind: "answered" as const, decider: "agent" as const, reason: "the intent says twice", at: answered },
         state: { kind: "open" as const }
       }
     }
@@ -317,11 +317,11 @@ describe("orc backlog thread", () => {
     const task: TaskRecord = { spec, hold: null, parked: null, state: { kind: "new" } }
     const merged = {
       id: "orc-1.pr-ready.abc123",
-      item: { kind: "pr-ready" as const, task: "orc-1", text: "orc-1 is ready to merge", asked: "2026-11-02T10:00:00.000Z", owner: "user" as const, state: { kind: "closed" as const, answer: { words: "merged", at: "2026-11-02T11:00:00.000Z" } } }
+      item: { kind: "pr-ready" as const, task: "orc-1", text: "orc-1 is ready to merge", asked: "2026-11-02T10:00:00.000Z", owner: "user" as const, state: { kind: "closed" as const, answer: { decider: "owner" as const, words: "merged", at: "2026-11-02T11:00:00.000Z" } } }
     }
     const unmerged = {
       id: "orc-1.pr-ready.def456",
-      item: { kind: "pr-ready" as const, task: "orc-1", text: "orc-1 is ready to merge", asked: "2026-11-02T10:00:00.000Z", owner: "user" as const, state: { kind: "closed" as const, answer: { words: "closed without merging", at: "2026-11-02T11:00:00.000Z" } } }
+      item: { kind: "pr-ready" as const, task: "orc-1", text: "orc-1 is ready to merge", asked: "2026-11-02T10:00:00.000Z", owner: "user" as const, state: { kind: "closed" as const, answer: { decider: "owner" as const, words: "closed without merging", at: "2026-11-02T11:00:00.000Z" } } }
     }
     expect(threadEntries(task, [merged, unmerged], []).filter((line) => line.kind === "answer")).toEqual([
       { at: "2026-11-02T11:00:00.000Z", who: "beat", kind: "answer", id: merged.id, text: "merged" },
