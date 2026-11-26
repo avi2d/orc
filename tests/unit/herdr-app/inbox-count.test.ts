@@ -362,7 +362,7 @@ test("a hold on a parent whose ship child closed with its PR still open names th
   expect(inbox.value.items.filter((item) => item.task === held.id)).toEqual([])
   const parsed = guardJson(JSON.stringify(backlog), taskDetails)
   if (parsed.kind !== "ok") throw new Error(parsed.reason)
-  const detail = parsed.value.find((task) => task.id === held.id)
+  const detail = parsed.value.find((other) => other.id === held.id)
   if (detail === undefined) throw new Error("Missing orc-74")
   const hold = { at: "2026-11-25T10:00:00Z", who: "user" as const, kind: "hold" as const, id: null, text: reason }
   const panel = new OrcTask()

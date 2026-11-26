@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, cardAnswers, cardPlace, cardStatuses, filterCards, namedModels, openedFilter, opensTurns, projectsOf, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
+import { cardPlace, namedModels, opensTurns, runAgent } from "../../../packages/herdr-app/src/agent-label"
+import { buildCards, cardAnswers, cardStatuses, filterCards, openedFilter, projectsOf, railLabel, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
 import { projectMenu, statusMenu } from "../../../packages/herdr-app/src/run-menus"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 import type { InboxAnswer, InboxApproval } from "../../../packages/herdr-app/src/inbox"
