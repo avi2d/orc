@@ -1,6 +1,6 @@
 import { Data, Effect, type FileSystem } from "effect"
 import { loopQuestionId, pauseAfterFailures, type PiEnd } from "../../entities/agent/index"
-import { type OpenQuestion, type QuestionAnswer, waitForAnswers } from "../../entities/review-gate/index"
+import { type OpenQuestion, type QuestionAnswer, type QuestionContext, waitForAnswers } from "../../entities/review-gate/index"
 
 export class RunStopped extends Data.TaggedError("RunStopped")<{
   readonly reason: string
@@ -39,12 +39,21 @@ export const loopAnswerOf = (answers: ReadonlyArray<QuestionAnswer>): LoopAnswer
 export const askOnLoop = (runDir: string, waitSeconds: number, end: Looping): Effect.Effect<LoopVerdict, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const text = loopQuestionText(end.label)
-    const waited = yield* waitForAnswers(runDir, waitSeconds, "the paused run")([{ id: loopQuestionId, description: text, owner: "user" }])
+    const choices = {
+      subject: "Resume or stop the run after " + end.label + " failed",
+      options: [
+        { text: "stop", outcome: "End this run without spending more of the account's quota." },
+        { text: "continue", outcome: "Resume Pi on this task and spend more of the account's quota. You can add guidance after continue." }
+      ],
+      recommendation: "stop"
+    } satisfies QuestionContext
+    const waited = yield* waitForAnswers(runDir, waitSeconds, "the paused run")([{ id: loopQuestionId, description: text, owner: "user", ...choices }])
     return loopAnswerOf(waited.answers) ?? {
       kind: "unanswered",
       question: {
         id: loopQuestionId,
         text,
+        ...choices,
         owner: "user",
         asked: waited.askedAt.find((entry) => entry.question === loopQuestionId)?.asked ?? waited.asked ?? new Date().toISOString(),
         ...(waited.asked === null ? {} : { asking: waited.asked })

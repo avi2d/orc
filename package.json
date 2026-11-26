@@ -1,6 +1,6 @@
 {
   "name": "orc",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "private": true,
   "description": "One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.",
   "license": "MIT",
@@ -11,7 +11,9 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "bun packages/run/scripts/sync-run-version.ts && bun run build:launcher && bun build packages/run/src/bin.ts --outdir packages/run/dist --target bun && bun packages/run/scripts/build-heavy-standin.ts && (cd packages/session-quota && bun run build) && (cd packages/cli && bun run build) && (cd packages/herdr-app && bun run build) && rm -rf packages/run/dist/herdr-app && cp -R packages/herdr-app/dist packages/run/dist/herdr-app && checks-effect-scope && checks-changelog && cp CHANGELOG.md packages/run/CHANGELOG.md && bun scripts/docs-commands.ts && bun scripts/docs-diagrams.ts",
+    "build": "bun run bundle && bun packages/run/scripts/build-heavy-standin.ts && (cd packages/session-quota && bun run build) && (cd packages/cli && bun run build) && checks-effect-scope && checks-changelog && bun run build:pack && bun scripts/docs-commands.ts && bun scripts/docs-diagrams.ts",
+    "bundle": "bun packages/run/scripts/sync-run-version.ts && bun packages/run/scripts/bundle.ts",
+    "build:pack": "bun run build:launcher && (cd packages/herdr-app && bun run build) && rm -rf packages/run/dist/herdr-app && cp -R packages/herdr-app/dist packages/run/dist/herdr-app && cp CHANGELOG.md packages/run/CHANGELOG.md",
     "build:launcher": "bun build packages/run/scripts/launch.ts --target node --outfile packages/run/dist/launch.js && install -m 755 packages/run/scripts/launch.sh packages/run/dist/launch",
     "compile": "bun packages/run/scripts/compile.ts",
     "release:assets": "bun scripts/release-assets.ts",
@@ -19,6 +21,9 @@
     "postinstall": "bun packages/run/scripts/patch-knip-jiti.ts && cp CHANGELOG.md packages/run/CHANGELOG.md",
     "prepare": "checks-vendor --library effect --package effect --repository https://github.com/Effect-TS/effect.git --tag 'effect@{version}' --path packages/effect/package.json",
     "typecheck": "tsc --noEmit && effect-tsgo diagnostics --project tsconfig.json --format text --strict",
+    "pretest": "bun run bundle",
+    "pretest:fast": "bun run bundle",
+    "pretest:e2e": "bun run bundle",
     "test": "checks-test",
     "test:fast": "checks-test --changed",
     "test:unit": "checks-test --tier=unit",

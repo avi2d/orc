@@ -201,7 +201,9 @@ const buildRun = (
     const resume = request.resumeRun === undefined ? [] : ["ORC_DISPATCH_RESUME_RUN=" + request.resumeRun]
     const routed = request.routedModels === undefined ? [] : ["ORC_DISPATCH_ROUTED_MODELS=" + JSON.stringify(request.routedModels)]
     const rebase = request.rebase === undefined ? [] : ["ORC_DISPATCH_REBASE=" + JSON.stringify(request.rebase)]
-    const assigned = [...resume, ...routed, ...rebase, ...withClaimedMachine(request.machine)]
+    const deciders = Object.fromEntries((request.answers ?? []).flatMap((entry) => entry.decider === undefined ? [] : [[entry.question, entry.decider] as const]))
+    const attribution = Object.keys(deciders).length === 0 ? [] : ["ORC_DISPATCH_ANSWER_DECIDERS=" + JSON.stringify(deciders)]
+    const assigned = [...resume, ...routed, ...rebase, ...attribution, ...withClaimedMachine(request.machine)]
     const env = assigned.length === 0 ? [] : ["env", ...assigned]
     return [...env, ...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...models, ...kind, ...delivery, ...instructions, ...answers]
   })

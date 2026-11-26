@@ -41,7 +41,7 @@ const withClosed = async (kind: "ship" | "parent", closing: "failed" | "stopped"
 const answered: NonNullable<TaskRecord["parked"]> = {
   branch: "orc/demo-1",
   origin: { machine: "node-a", run: "prior" },
-  questions: [{ id: "question-1", text: "Choose", asked: at, blocks: true, answer: { words: "Yes", at, relayedTo: null } }]
+  questions: [{ id: "question-1", text: "Choose", asked: at, blocks: true, answer: { decider: "owner" as const, words: "Yes", at, relayedTo: null } }]
 }
 
 describe("backlog retry", () => {
@@ -93,7 +93,7 @@ describe("backlog retry", () => {
           ORC_TASK_PROVIDER: "acme"
         }, Effect.succeed("")))
         expect(request.resumeRun).toBe("prior")
-        expect(request.answers).toEqual([{ question: "question-1", answer: "Yes" }])
+        expect(request.answers).toEqual([{ question: "question-1", answer: "Yes", decider: "owner" }])
       })
     })
     for (const outcome of ["failed", "stopped"] as const) {

@@ -1,5 +1,6 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
-import type { AskOption, OpenQuestion } from "../review-gate/index"
+import { type AnswerWords, type Decider } from "../../shared/lib/index"
+import type { OpenQuestion } from "../review-gate/index"
 import { openReviewQuestions } from "../attention/index"
 import { repeatHold, repeatsResume } from "./repeat-hold"
 import { answerDecision, choicesOf, findTask, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, isDeciderAnswer, openQuestions, type Parked, type CaptainAnswer, type DeciderAnswer, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
@@ -7,7 +8,7 @@ import { answerDecision, choicesOf, findTask, type Rewrite, rewriteNew, rewriteT
 // An answer handed to an asking that ended went into the run, so only one never handed out or handed to this asking still answers it.
 const answersAsking = (answer: ParkedAnswer, asking: string | null): boolean => answer.relayedTo === null || answer.relayedTo === asking
 
-export type AskedQuestion = Omit<OpenQuestion, "options" | "recommendation"> & { readonly options?: ReadonlyArray<AskOption> | undefined; readonly recommendation?: string | undefined }
+export type AskedQuestion = OpenQuestion
 
 const parkedQuestions = (
   open: Arr.NonEmptyReadonlyArray<AskedQuestion>,
@@ -40,6 +41,9 @@ const latestAskings = (open: Arr.NonEmptyReadonlyArray<AskedQuestion>): Arr.NonE
     (left, right) => left.id === right.id
   )
 
+const newlyAsked = (questions: ReadonlyArray<ParkedQuestion>, known: ReadonlyArray<ParkedQuestion>): ReadonlyArray<ParkedQuestion> =>
+  questions.filter((question) => question.answer === null && !known.includes(question))
+
 const sameQuestions = (left: ReadonlyArray<ParkedQuestion>, right: ReadonlyArray<ParkedQuestion>): boolean =>
   left.length === right.length && left.every((question, index) => question === right[index])
 
@@ -64,12 +68,7 @@ export const askStartedTask = (
       if (sameQuestions(questions, known)) {
         return { kind: "keep", result: false } as const
       }
-      const optionsOf = (question: ParkedQuestion) => asking.questions.find((live) => live.id === question.id && (live.asked === undefined || live.asked === question.asked))?.options
-      const waiting = questions.filter((question) => question.answer === null)
-      yield* openReviewQuestions(root, id, waiting.map((question) => {
-        const options = optionsOf(question)
-        return options === undefined ? question : { ...question, options }
-      }))
+      yield* openReviewQuestions(root, id, newlyAsked(questions, known))
       const parked: Parked = { ...fresh.parked, branch: fresh.parked?.branch ?? taskBranch(id), questions }
       return { kind: "write", record: { ...fresh, parked }, result: true } as const
     }))
@@ -127,8 +126,9 @@ export const parkStartedTask = (
         return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task parks" })
       }
       const lastAsking = asked.find((question) => question.asking !== undefined)?.asking ?? asked.find((question) => question.asked !== undefined)?.asked ?? null
-      const questions = parkedQuestions(open, record.parked?.questions ?? [], lastAsking, (question) => question.asked ?? at)
-      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null))
+      const known = record.parked?.questions ?? []
+      const questions = parkedQuestions(open, known, lastAsking, (question) => question.asked ?? at)
+      yield* openReviewQuestions(root, id, newlyAsked(questions, known))
       const sentPr = record.parked?.origin?.pr
       const origin = run === undefined ? record.parked?.origin : { machine: record.state.claim.machine, run, ...(sentPr === undefined ? {} : { pr: sentPr }) }
       const hold = repeatsResume(record, questions) ? repeatHold(record, run, ended, at) : record.hold
@@ -183,11 +183,14 @@ export type AnswerBy = "captain" | "decider" | "asked-back"
 // Only the captain has the last word, so a captain's answer replaces a decider's and nothing replaces a captain's.
 const overturnedBy = (by: AnswerBy) => (answer: ParkedAnswer): boolean => by === "captain" && isDeciderAnswer(answer)
 
-const givenAnswer = (answer: { readonly words: string; readonly at: string }, by: AnswerBy, before: ParkedAnswer | null): ParkedAnswer => {
+const deciderOf = (by: AnswerBy): Decider => by === "captain" ? "owner" : "agent"
+
+const givenAnswer = (answer: typeof AnswerWords.Type, by: AnswerBy, before: ParkedAnswer | null): ParkedAnswer => {
+  const recorded = { ...answer, decider: deciderOf(by), relayedTo: null }
   if (by !== "captain") {
-    return { ...answer, relayedTo: null, by }
+    return { ...recorded, by }
   }
-  return before !== null && isDeciderAnswer(before) ? { ...answer, relayedTo: null, overturned: before } : { ...answer, relayedTo: null }
+  return before !== null && isDeciderAnswer(before) ? { ...recorded, overturned: before } : recorded
 }
 
 const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskRecord & { readonly parked: Parked }, by: AnswerBy): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
@@ -223,9 +226,9 @@ const staleHold = (id: string, fresh: TaskRecord & { readonly hold: Hold }, expe
 
 const answerHeldQuestionOn = (id: string, words: string, at: string, fresh: TaskRecord & { readonly hold: Hold }): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
   return answerOneOf(id, words, at, fresh.hold.questions, "held", fresh).pipe(Effect.map(({ asked, answer }) => {
-    const questions = fresh.hold.questions.map((candidate): HoldQuestion => candidate === asked ? { ...asked, answer } : candidate)
+    const questions = fresh.hold.questions.map((candidate): HoldQuestion => candidate === asked ? { ...asked, answer: { ...answer, decider: "owner" } } : candidate)
     const open = unanswered(questions)
-    const hold: Hold = { ...fresh.hold, questions, answer: open.length === 0 ? { words: releasedWords(questions), at } : null }
+    const hold: Hold = { ...fresh.hold, questions, answer: open.length === 0 ? { words: releasedWords(questions), at, decider: "owner" } : null }
     return { kind: "write", record: { ...fresh, hold }, result: { kind: "held question", question: asked.id, open } }
   }))
 }
@@ -247,7 +250,7 @@ const answerHoldOn = (id: string, words: string, at: string, expected: ExpectedD
   if (fresh.state.kind !== "new") {
     return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
   }
-  const answered: Hold = { ...fresh.hold, answer: { words, at } }
+  const answered: Hold = { ...fresh.hold, answer: { words, at, decider: "owner" } }
   return Effect.succeed({ kind: "write", record: { ...fresh, hold: answered }, result: { kind: "hold", hold: answered } })
 }
 
@@ -345,7 +348,7 @@ export const answerTask = (
       if (record.state.kind === "closed") {
         return yield* new BacklogError({ detail: id + " is a decision already closed " + record.state.closing.outcome + ": " + record.state.closing.reason })
       }
-      yield* answerDecision(root, id, words, at)
+      yield* answerDecision(root, id, words, at, deciderOf(by))
       return { kind: "decision" } as const
     }
     const decide = answerOn(id, words, at, expected, by)

@@ -4,8 +4,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { respondArgs, type GateResponse, type QuestionAnswer } from "../../packages/run/src/entities/review-gate/no-mistakes-gate"
-import { askUserWord, driveNoMistakes, type AllowWord, type NoMistakesFinding, type NoMistakesRecord, type NoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
+import { respondArgs, type GateResponse } from "../../packages/run/src/entities/review-gate/no-mistakes-gate"
+import { askUserWord, driveNoMistakes, type AllowWord, type NoMistakesFinding, type NoMistakesRecord, type NoMistakesRunner, type QuestionAnswer } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import type { WaitResult } from "../../packages/run/src/entities/review-gate/answer-wait"
 import { parked } from "../lib/no-mistakes-fixture"
 
@@ -170,7 +170,7 @@ describe("driveNoMistakes", () => {
     const asking: NoMistakesRunner = { ...endedFailed, start: () => Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 }) }
     const { record } = await driveIn(asking)
     expect(record.status).toBe("refused")
-    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior" }])
+    expect(record.openQuestions).toMatchObject([{ id: "r2", text: "changes product behavior" }])
     expect(record.result).toContain("--answer r2=")
   })
 
@@ -184,9 +184,9 @@ describe("driveNoMistakes", () => {
         return Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 })
       }
     }
-    const { record } = await driveIn(answering, [], [{ question: "r2", answer: "Keep the old behavior" }])
+    const { record } = await driveIn(answering, [], [{ question: "r2", answer: "Keep the old behavior", decider: "owner" }])
     expect(record.openQuestions).toEqual([])
-    expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"], instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior" }])
+    expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"], instructions: "These findings were answered; fix each as the answer says:\nr2 (Owner answer): Keep the old behavior" }])
   })
 
   test("a later warning-only gate with deferral approves follow-ups instead of parking", async () => {
@@ -244,12 +244,12 @@ describe("driveNoMistakes", () => {
       status: () => Effect.succeed({ stdout: skippedPr.replace("review,completed,0", "review,completed,2"), stderr: "", exitCode: 0 }),
       logs: () => Effect.succeed({ stdout: fixReview, stderr: "", exitCode: 0 })
     }
-    const { record, gate } = await driveIn(runner, [], [{ question: "r2", answer: "Keep the old behavior" }])
-    expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"], instructions: expect.stringContaining("r2: Keep the old behavior") }])
+    const { record, gate } = await driveIn(runner, [], [{ question: "r2", answer: "Keep the old behavior", decider: "owner" }])
+    expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"], instructions: expect.stringContaining("r2 (Owner answer): Keep the old behavior") }])
     expect(record).toMatchObject({ deferredFindingIds: ["r1", "r2"] })
     expect(gate).toContain("deferred to PR follow-ups: r1, r2")
     expect(record.result).toContain("no-mistakes ran no fix round at that gate.")
-    expect(record.result).toContain("The captain's answer for r2 was not applied.")
+    expect(record.result).toContain("Owner's answer for r2 was not applied.")
   })
 
   test("a mixed fix keeps the deferred answer without claiming that no fixer ran", async () => {
@@ -267,15 +267,15 @@ describe("driveNoMistakes", () => {
         return Effect.succeed({ stdout, stderr: "", exitCode: 0 })
       }
     }
-    const answers = [{ question: "r1", answer: "Keep the warning visible" }, { question: "r2", answer: "Fix the error" }]
+    const answers: ReadonlyArray<QuestionAnswer> = [{ question: "r1", answer: "Keep the warning visible", decider: "agent" }, { question: "r2", answer: "Fix the error" }]
     const { record } = await driveIn(runner, [], answers)
     expect(sent).toMatchObject([
       { kind: "fix", ids: ["r1", "r2"] },
-      { kind: "fix", ids: ["r1"], instructions: expect.stringContaining("r1: Keep the warning visible") }
+      { kind: "fix", ids: ["r1"], instructions: expect.stringContaining("r1 (Agent answer): Keep the warning visible") }
     ])
     expect(record.openQuestions).toEqual([])
     expect(record.result).not.toContain("no fix round")
-    expect(record.result).toContain("The captain's answer for r1 was not applied.")
+    expect(record.result).toContain("Agent's answer for r1 was not applied.")
     expect(record.result).not.toContain("answer for r2")
   })
 
@@ -297,7 +297,7 @@ describe("driveNoMistakes", () => {
     const { record, gate } = await driveIn(answering, [], [], wait)
     expect(waitedOn).toEqual([["r2"]])
     expect(record.openQuestions).toEqual([])
-    expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"], instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior" }])
+    expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"], instructions: "These findings were answered; fix each as the answer says:\nr2: Keep the old behavior" }])
     expect(gateSteps(gate)).toContain("asking")
   })
 
@@ -323,7 +323,7 @@ describe("driveNoMistakes", () => {
     const { record } = await driveIn(answering, [], [], wait)
     expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"] }])
     expect(sent.length).toBe(1)
-    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked: "2026-11-02T10:40:00.000Z", asking: "2026-11-02T10:40:00.000Z" }])
+    expect(record.openQuestions).toMatchObject([{ id: "r2", text: "changes product behavior", asked: "2026-11-02T10:40:00.000Z", asking: "2026-11-02T10:40:00.000Z" }])
   })
 
   test("a wait that runs out unanswered parks the question instead of sending an empty answer", async () => {
@@ -338,7 +338,7 @@ describe("driveNoMistakes", () => {
     }
     const { record } = await driveIn(asking, [], [], () => Effect.succeed({ asked, answers: [], askedAt: [{ question: "r2", asked }] }))
     expect(sent).toEqual([])
-    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked, asking: asked }])
+    expect(record.openQuestions).toMatchObject([{ id: "r2", text: "changes product behavior", asked, asking: asked }])
   })
 
   test("a finding with an action orc does not know parks as an open question instead of failing the run", async () => {
@@ -346,7 +346,7 @@ describe("driveNoMistakes", () => {
     const asking: NoMistakesRunner = { ...endedFailed, start: () => Effect.succeed({ stdout: manual, stderr: "", exitCode: 0 }) }
     const { record } = await driveIn(asking)
     expect(record.status).toBe("refused")
-    expect(record.openQuestions).toEqual([{ id: "r2", text: "needs a human", owner: "user" }])
+    expect(record.openQuestions).toMatchObject([{ id: "r2", text: "needs a human", owner: "user" }])
     expect(record.result).toContain("--answer r2=")
   })
 

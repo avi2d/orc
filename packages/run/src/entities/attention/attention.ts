@@ -5,9 +5,11 @@ import { isWorkerQuestion, loopQuestionId } from "../agent/index"
 export const deciderTimeoutMillis = 180 * 1000
 const deciderClaimMillis = deciderTimeoutMillis + 60 * 1000
 
-import type { AttentionItem, Asked, Decision, ItemAnswer } from "./attention-item"
-import type { AskOption } from "../review-gate/index"
-import { choice, itemId, unaskedQuestion, type Choice } from "./attention-ask"
+import { type AttentionItem, type Asked, type Decision, isQuestionChoice, type ItemAnswer } from "./attention-item"
+import type { AnswerWords } from "../../shared/lib/index"
+import type { OpenQuestion } from "../review-gate/index"
+import { choice, itemId, unaskedQuestion, writtenAnswerChoice, type Choice } from "./attention-ask"
+import { sameChoice, withChoice } from "./attention-choice"
 import { attentionFolder, encodeItem, fileSuffix, openItem, readExistingItem, readItem, replaceItem, withItemClaim, writeItem } from "./attention-store"
 
 export type { Asked }
@@ -15,50 +17,63 @@ export type { Asked }
 export { openItem, readItem } from "./attention-store"
 export { choice, itemId } from "./attention-ask"
 
-const choiceOf = (asked: Asked): Choice => ({
-  ...(asked.subject === undefined ? {} : { subject: asked.subject }),
-  ...(asked.options === undefined ? {} : { options: asked.options }),
-  ...(asked.recommendation === undefined ? {} : { recommendation: asked.recommendation })
-})
-
 export const reviewQuestionId = (task: string, question: string, asked: string): string => itemId(task, question, asked)
 
-interface AskedQuestion {
-  readonly id: string
-  readonly text: string
-  readonly asked?: string | undefined
-  readonly blocks?: boolean | undefined
-  readonly options?: ReadonlyArray<AskOption> | undefined
-  readonly owner?: "user" | undefined
-}
+const questionSubject = (task: string, question: OpenQuestion): string =>
+  question.subject ?? task + ", " + question.id + ": " + question.text.split("\n", 1)[0]
 
-const toStoredOptions = (options: ReadonlyArray<AskOption>): NonNullable<Asked["options"]> =>
-  options.map((option) => ({
-    text: option.text,
-    ...(option.outcome === undefined ? {} : { outcome: option.outcome }),
-    ...(option.picture === undefined ? {} : { picture: option.picture })
-  }))
+const reviewChoices = (task: string, question: OpenQuestion): Choice => {
+  const subject = questionSubject(task, question)
+  if (question.options !== undefined || question.recommendation !== undefined) {
+    return {
+      subject,
+      ...(question.options === undefined ? {} : { options: question.options.map(({ text, outcome, picture, action }) => ({
+        text,
+        ...(outcome === undefined ? {} : { outcome }),
+        ...(picture === undefined ? {} : { picture }),
+        ...(action === undefined ? {} : { action })
+      })) }),
+      ...(question.recommendation === undefined ? {} : { recommendation: question.recommendation })
+    }
+  }
+  return writtenAnswerChoice(task, question.id, subject, "")
+}
 
 const reviewQuestionItem = (
   task: string,
-  question: AskedQuestion
-): { readonly id: string; readonly asked: Asked } => {
-  const id = reviewQuestionId(task, question.id, question.asked ?? "")
-  const asked: Asked = {
+  question: OpenQuestion
+): { readonly id: string; readonly asked: Asked } => ({
+  id: reviewQuestionId(task, question.id, question.asked ?? ""),
+  asked: {
     kind: isWorkerQuestion(question.id) ? "worker-question" : "review-question",
     task,
-    text: question.text,
-    ...(question.options === undefined ? {} : { options: toStoredOptions(question.options) }),
+    text: question.text.trim() === "" ? "No text was supplied for " + question.id + ". Check the run before answering." : question.text,
+    ...reviewChoices(task, question),
     asked: question.asked ?? "",
     owner: question.owner ?? (question.id === loopQuestionId ? "user" : "decider")
   }
-  return { id, asked }
+})
+
+const storedOptionLine = (option: Pick<ParkedQuestionOption, "text" | "outcome" | "picture">): string =>
+  "- " + option.text + (option.picture === undefined ? "" : " (picture: " + option.picture + ")") + (option.outcome === undefined ? "" : ", leads to: " + option.outcome)
+
+type ParkedQuestionOption = NonNullable<ParkedQuestion["options"]>[number]
+
+const storedQuestionItem = (task: string, question: ParkedQuestion): { readonly id: string; readonly asked: Asked } => {
+  const item = reviewQuestionItem(task, question)
+  if (isQuestionChoice(item.asked)) {
+    return item
+  }
+  const unlisted = (question.options ?? []).filter((option) => !item.asked.text.includes(option.text)).map(storedOptionLine)
+  const text = unlisted.length === 0 ? item.asked.text : [item.asked.text, "Options stored with this question:", ...unlisted].join("\n")
+  const reason = " orc stored this question before each option needed an outcome and a recommendation, so it recommends none of the options its text lists."
+  return { id: item.id, asked: { ...item.asked, text, ...writtenAnswerChoice(task, question.id, questionSubject(task, question), reason) } }
 }
 
 export const openReviewQuestions = (
   root: string,
   task: string,
-  questions: ReadonlyArray<AskedQuestion>
+  questions: ReadonlyArray<OpenQuestion>
 ): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.forEach(questions, (question) => {
     const item = reviewQuestionItem(task, question)
@@ -73,12 +88,12 @@ const whenAlreadyOpened = (onExisting: ItemWrite): ItemWrite => (root, id, asked
 export const openOrRefreshItem: ItemWrite = whenAlreadyOpened((root, id, asked) =>
   withItemClaim(root, id, Effect.gen(function*() {
     const item = yield* readItem(root, id)
-    if (item === null || item.state.kind === "closed" || (item.state.kind === "open" && item.text === asked.text && item.owner === asked.owner)) {
+    if (item === null || item.state.kind === "closed" || (item.state.kind === "open" && item.text === asked.text && item.owner === asked.owner && sameChoice(item, asked))) {
       return
     }
     const next: AttentionItem = item.state.kind === "withdrawn"
       ? { ...asked, state: { kind: "open" } }
-      : { ...item, text: asked.text, owner: asked.owner, ...choiceOf(asked) }
+      : withChoice(item, asked)
     yield* writeItem(root, id, yield* encodeItem(id, next))
   })))
 
@@ -186,7 +201,7 @@ export const readAttention = (root: string, tasks: ReadonlyArray<TaskRecord>): E
     return {
       open: entries.filter((entry) => entry.item.state.kind === "open"),
       decided: entries.filter((entry): entry is DecidedItem =>
-        entry.item.state.kind === "closed" && (entry.item.decision?.kind === "answered" || entry.item.decision?.kind === "duplicate") && !closedTasks.has(entry.item.task))
+        entry.item.state.kind === "closed" && !closedTasks.has(entry.item.task))
     }
   })
 
@@ -227,10 +242,10 @@ const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Ef
     if (existing === null || existing.item.state.kind === "closed") {
       return false
     }
-    if (existing.item.state.kind === "open" && existing.item.text === asked.text) {
+    if (existing.item.state.kind === "open" && existing.item.text === asked.text && sameChoice(existing.item, asked)) {
       return true
     }
-    if (yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, ...choiceOf(asked), state: { kind: "open" } }))) {
+    if (yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...withChoice(existing.item, { ...asked, owner: existing.item.owner }), state: { kind: "open" } }))) {
       return true
     }
     return (yield* readItem(root, id))?.state.kind === "open"
@@ -273,12 +288,12 @@ const routeOne = (root: string, id: string, asked: Asked | null, answer: ItemAns
 }
 
 const routeQuestion = (root: string, task: string, question: ParkedQuestion): Effect.Effect<string | null, BacklogError, FileSystem.FileSystem> => {
-  const item = reviewQuestionItem(task, question)
+  const item = storedQuestionItem(task, question)
   const answer = question.answer
   // An ask back hands the worker a question of its own, so its item waits on in the queue.
   const closing = answer === null || answer.by === "asked-back" ? null : answer
   const overturns = closing !== null && !isDeciderAnswer(closing) && closing.overturned !== undefined
-  return Effect.map(routeOne(root, item.id, item.asked, closing === null ? null : { words: closing.words, at: closing.at }, overturns), (live) => live ? item.id : null)
+  return Effect.map(routeOne(root, item.id, item.asked, closing === null ? null : { words: closing.words, at: closing.at, decider: closing.decider }, overturns), (live) => live ? item.id : null)
 }
 
 const closeAskedBackEarlier = (root: string, task: TaskRecord, asked: string, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
@@ -292,7 +307,7 @@ const closeAskedBackEarlier = (root: string, task: TaskRecord, asked: string, at
       if (stored === null || stored === undefined) {
         continue
       }
-      yield* Effect.asVoid(closeItem(root, entry.id, { words: stored.words, at }))
+      yield* Effect.asVoid(closeItem(root, entry.id, { words: stored.words, at, decider: stored.decider }))
     }
   })
 
@@ -371,11 +386,11 @@ export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, a
 
 export type AnswerItemOutcome = CloseOutcome | { readonly kind: "answered elsewhere"; readonly task: string }
 
-export const answerItem = (root: string, id: string, answer: ItemAnswer): Effect.Effect<AnswerItemOutcome, BacklogError, FileSystem.FileSystem> =>
+export const answerItem = (root: string, id: string, answer: typeof AnswerWords.Type): Effect.Effect<AnswerItemOutcome, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const item = yield* readItem(root, id)
     if (item !== null && taskItemKinds.has(item.kind)) {
       return { kind: "answered elsewhere", task: item.task } as const
     }
-    return yield* closeItem(root, id, answer)
+    return yield* closeItem(root, id, { ...answer, decider: "owner" })
   })

@@ -1,7 +1,7 @@
 import { Effect, type FileSystem } from "effect"
 import { decisionText, reviewQuestionId, taskItems, type Decision, type OpenItem } from "../../entities/attention/index"
-import { findTask, isDeciderAnswer, readNotes, type BacklogError, type Hold, type HoldQuestion, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
-import { formatTable } from "../../shared/lib/index"
+import { decisionAnswer, findTask, isDeciderAnswer, readNotes, type BacklogError, type Hold, type HoldQuestion, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { type Decider, deciderLabel, formatTable } from "../../shared/lib/index"
 
 const THREAD_JSON_SCHEMA = "orc.thread.v1" as const
 
@@ -61,31 +61,28 @@ const holdQuestionId = (generation: number, question: string): string => "hold-"
 const holdExchange = (hold: Pick<Hold, "reason" | "until" | "questions" | "answer" | "at">, generation: number): Exchange => [
   entry(hold.at, "user", "hold", null, holdText(hold)),
   ...hold.questions.map((question) => entry(hold.at, "user", "question", holdQuestionId(generation, question.id), question.text)),
-  ...hold.questions.flatMap((question) => question.answer === null ? [] : [entry(question.answer.at, "user", "answer", holdQuestionId(generation, question.id), question.answer.words)]),
-  ...(hold.answer === null || answeredThroughQuestions(hold.questions) ? [] : [entry(hold.answer.at, "user", "answer", null, hold.answer.words)])
+  ...hold.questions.flatMap((question) => question.answer === null ? [] : [entry(question.answer.at, whoDecided(question.answer.decider), "answer", holdQuestionId(generation, question.id), question.answer.words)]),
+  ...(hold.answer === null || answeredThroughQuestions(hold.questions) ? [] : [entry(hold.answer.at, whoDecided(hold.answer.decider), "answer", null, hold.answer.words)])
 ]
 
 const holdExchanges = (hold: Hold | null): ReadonlyArray<Exchange> =>
   hold === null ? [] : [...(hold.history ?? []).map((past, index) => holdExchange({ ...past, at: past.at ?? null }, index + 1)), holdExchange(hold, (hold.history ?? []).length + 1)]
 
-const answeredByDecider = (item: OpenItem | undefined, answerAt: string): boolean => {
-  const decision = item?.item.decision
-  return (decision?.kind === "answered" || decision?.kind === "duplicate") && decision.at === answerAt
-}
+const whoDecided = (decider: Decider): ThreadWho => decider === "agent" ? "decider" : "user"
 
-const parkedExchange = (task: string, question: ParkedQuestion, items: ReadonlyMap<string, OpenItem>): Exchange => {
+const parkedExchange = (task: string, question: ParkedQuestion): Exchange => {
   const id = reviewQuestionId(task, question.id, question.asked)
   const asked = entry(timeOrNull(question.asked), "worker", "question", id, question.text)
   const answer = question.answer
   if (answer === null) {
     return [asked]
   }
-  const who = isDeciderAnswer(answer) || answeredByDecider(items.get(id), answer.at) ? "decider" : "user"
+  const who = whoDecided(answer.decider)
   const replaced = isDeciderAnswer(answer) ? undefined : answer.overturned
   return [
     asked,
-    ...(replaced === undefined ? [] : [entry(replaced.at, "decider", "answer", id, replaced.words)]),
-    entry(answer.at, who, "answer", id, replaced === undefined ? answer.words : answer.words + " (replaces the decider's answer " + JSON.stringify(replaced.words) + ")"),
+    ...(replaced === undefined ? [] : [entry(replaced.at, whoDecided(replaced.decider), "answer", id, replaced.words)]),
+    entry(answer.at, who, "answer", id, replaced === undefined ? answer.words : answer.words + " (replaces the " + replaced.decider + "'s answer " + JSON.stringify(replaced.words) + ")"),
     ...(answer.relayedTo === null ? [] : [entry(null, "beat", "delivered", id, answer.relayedTo === "" ? "handed to the run that asked" : "handed to the run that asked at " + answer.relayedTo)])
   ]
 }
@@ -93,7 +90,7 @@ const parkedExchange = (task: string, question: ParkedQuestion, items: ReadonlyM
 const askerOf = (item: OpenItem): ThreadWho => item.item.kind === "review-question" || item.item.kind === "worker-question" ? "worker" : "beat"
 
 const decisionEntry = (id: string, decision: Decision): ThreadEntry => ({
-  ...entry(decision.at, "decider", "decision", id, decision.kind + ": " + decisionText(decision)),
+  ...entry(decision.at, whoDecided(decision.decider), "decision", id, decision.kind + ": " + decisionText(decision)),
   ...(decision.kind === "escalated" && decision.recommendation !== undefined ? { recommendation: decision.recommendation } : {})
 })
 
@@ -103,10 +100,12 @@ const itemExchanges = (mirrored: ReadonlySet<string>) => (item: OpenItem): Reado
   const told = mirrored.has(id)
   const asked = told ? [] : [[entry(item.item.asked, askerOf(item), "question", id, item.item.text)]]
   const decided = decision === undefined ? [] : [[decisionEntry(id, decision)]]
-  const beatClosure = item.item.kind === "pr-ready" && state.kind === "closed" && (state.answer.words === "merged" || state.answer.words === "closed without merging")
   const settled = state.kind === "withdrawn"
     ? [[entry(state.at, "beat", "withdrawn", id, state.reason)]]
-    : state.kind === "closed" && !told ? [[entry(state.answer.at, answeredByDecider(item, state.answer.at) ? "decider" : beatClosure ? "beat" : "user", "answer", id, state.answer.words)]] : []
+    : state.kind === "closed" && !told ? [[
+      ...(state.overturned === undefined ? [] : [entry(state.overturned.at, whoDecided(state.overturned.decider), "answer", id, state.overturned.words)]),
+      entry(state.answer.at, whoDecided(state.answer.decider), "answer", id, state.answer.words + (state.answer.inferred === true ? " (attribution inferred)" : ""))
+    ]] : []
   return [...asked, ...decided, ...settled]
 }
 
@@ -124,10 +123,11 @@ export const threadEntries = (
   items: ReadonlyArray<OpenItem>,
   notes: ReadonlyArray<{ readonly at: string; readonly who: string; readonly text: string }>
 ): ReadonlyArray<ThreadEntry> => {
-  const byId = new Map(items.map((item) => [item.id, item] as const))
+  const decision = decisionAnswer(task)
   const exchanges: ReadonlyArray<Exchange> = [
     ...holdExchanges(task.hold),
-    ...(task.parked?.questions ?? []).map((question) => parkedExchange(task.spec.id, question, byId)),
+    ...(decision === null ? [] : [[entry(decision.at, whoDecided(decision.decider), "answer", task.spec.id, decision.words)]]),
+    ...(task.parked?.questions ?? []).map((question) => parkedExchange(task.spec.id, question)),
     ...items.flatMap(itemExchanges(mirroredItems(task, items))),
     ...notes.map((note) => [entry(note.at, noteWho(note.who), "note", null, note.text)])
   ]
@@ -148,7 +148,7 @@ const readThread = (root: string, id: string): Effect.Effect<ThreadJson, Backlog
 const formatThread = (thread: ThreadJson): string =>
   formatTable(
     ["AT", "WHO", "KIND", "ID", "TEXT"],
-    thread.entries.map((line) => [line.at ?? "-", line.who, line.kind, line.id ?? "-", line.text.replace(/\s+/g, " ").trim()]),
+    thread.entries.map((line) => [line.at ?? "-", line.who === "user" ? deciderLabel("owner") : line.who === "decider" ? deciderLabel("agent") : line.who, line.kind, line.id ?? "-", line.text.replace(/\s+/g, " ").trim()]),
     "nothing is said on " + thread.task + " yet"
   )
 

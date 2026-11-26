@@ -63,7 +63,7 @@ const task174 = "orc-174"
 const r3Asked = "2026-11-20T22:49:20.578Z"
 const r3Item = task174 + ".R3.2026-11-20T22_49_20_578Z"
 const r3Text = "Should a decision record name the owner and the agent in one field or two?"
-const ownerAnswer = { words: "Keep both, the owner field and the agent field", at: "2026-11-21T16:53:47.492Z" }
+const ownerAnswer = { decider: "owner" as const, words: "Keep both, the owner field and the agent field", at: "2026-11-21T16:53:47.492Z" }
 
 const parkedTaskFile = [
   "---",
@@ -140,7 +140,7 @@ describe("the beat carrying a recorded owner answer into its task file", () => {
       await run(carryRecordedAnswers(root, await run(listTasks(root))))
       await resumeOnce(root, task174)
       const request = await run(readRequest({ ORC_TASK_ID: task174, ORC_TASK_FILE: join(root, "taken", task174 + ".md"), ORC_TASK_CHECKOUT: "/checkout", ORC_TASK_PROVIDER: "keyed" }, Effect.succeed("")))
-      expect(request.answers).toContainEqual({ question: "R3", answer: ownerAnswer.words })
+      expect(request.answers).toContainEqual({ question: "R3", answer: ownerAnswer.words, decider: "owner" })
     })
   })
 

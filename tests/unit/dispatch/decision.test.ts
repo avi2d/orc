@@ -6,7 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, Layer, Result, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseArgs } from "../../../packages/run/src/app/args"
-import { addTask, decisionAnswer, listTasks } from "../../../packages/run/src/entities/backlog/index"
+import { addTask, answerDecision, decisionAnswer, listTasks, parseTaskFile } from "../../../packages/run/src/entities/backlog/index"
 import { answerTask } from "../../../packages/run/src/entities/parked-runs/index"
 import { holdTask } from "../../../packages/run/src/features/backlog-planning/index"
 import { mergeTask } from "../../../packages/run/src/features/merging-a-pr/index"
@@ -14,7 +14,8 @@ import { readRequest } from "../../../packages/run/src/features/queueing-a-task/
 import { runBeat } from "../../../packages/run/src/widgets/beat/beat"
 import { quietSources } from "../../lib/beat-sources"
 import { realBacklogStdout } from "../../lib/dispatch-fixture"
-import { formatBeat } from "../../../packages/run/src/widgets/beat/board"
+import { Answer } from "../../../packages/run/src/entities/backlog/task-record-decision"
+import { formatBeat, formatBoard } from "../../../packages/run/src/widgets/beat/board"
 import type { DispatchConfig } from "../../../packages/run/src/shared/config/dispatch-config"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
@@ -78,10 +79,26 @@ const failureDetail = async <A, E extends { readonly detail: string }>(effect: E
 }
 
 const ShownBacklog = Schema.Struct({
-  tasks: Schema.Array(Schema.Struct({ id: Schema.String, kind: Schema.String, answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String })) }))
+  tasks: Schema.Array(Schema.Struct({ id: Schema.String, kind: Schema.String, answer: Schema.NullOr(Answer) }))
 })
 
 describe("a decision", () => {
+  test("a long task prefix cannot push owner or agent attribution out of the closed column", async () => {
+    await withBacklog(async (root) => {
+      for (const decider of ["owner", "agent"] as const) {
+        const task = await run(addTask(root, { ...decisionSpec, project: "a-project-with-a-name-that-exceeds-the-board-column" }))
+        await run(answerDecision(root, task.spec.id, "yes", answeredAt, decider))
+      }
+      const board = formatBoard({
+        tasks: await run(listTasks(root)), events: [], projects: { kind: "read", projects: [] },
+        room: { kind: "read", room: [] }, merged: new Set(), prStates: new Map(), beatWaits: null,
+        deciderOwns: () => false
+      })
+      expect(board).toContain("Owner · ")
+      expect(board).toContain("Agent · ")
+    })
+  })
+
   test("the beat leaves a decision new and says it waits for the captain instead of starting it on a free machine", async () => {
     await withBacklog(async (root) => {
       await decisionBacklog(root)
@@ -96,13 +113,16 @@ describe("a decision", () => {
       expect(await run(answerTask(root, "orc-1", "use the left one", answeredAt))).toEqual({ kind: "decision" })
       const closed = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
       expect(closed?.state.kind === "closed" ? [closed.state.closing.outcome, closed.state.closing.reason, closed.state.claim] : []).toEqual(["done", "answered", null])
-      expect(closed === undefined ? null : decisionAnswer(closed)).toEqual({ words: "use the left one", at: answeredAt })
+      expect(closed === undefined ? null : decisionAnswer(closed)).toEqual({ words: "use the left one", at: answeredAt, decider: "owner" })
       const text = await readFile(join(root, "closed", "orc-1.md"), "utf8")
       expect(text).toContain('answer: "use the left one"\n')
+      expect(text).toContain('decider: "owner"\n')
+      const legacy = await run(parseTaskFile("orc-1.md", "closed", text.replace('decider: "owner"\n', "")))
+      expect(decisionAnswer(legacy)?.decider).toBe("owner")
       expect(text).toContain('answered_at: "' + answeredAt + '"\n')
       const shown = Schema.decodeUnknownSync(ShownBacklog)(JSON.parse(await realBacklogStdout(root))).tasks.find((task) => task.id === "orc-1")
       expect(shown?.kind).toBe("decision")
-      expect(shown?.answer).toEqual({ words: "use the left one", at: answeredAt })
+      expect(shown?.answer).toEqual({ words: "use the left one", at: answeredAt, decider: "owner" })
     })
   })
   test("a task waiting on a decision starts after the answer with the question and answer after its own body instead of its body alone", async () => {
@@ -116,7 +136,7 @@ describe("a decision", () => {
       expect(after.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["started:orc-2"])
       const env = { ORC_TASK_ID: "orc-2", ORC_TASK_FILE: join(root, "taken", "orc-2.md"), ORC_TASK_CHECKOUT: "/checkout", ORC_TASK_PROVIDER: "keyed" }
       const request = await run(readRequest(env, Effect.succeed("")))
-      expect(request.body).toBe("# Build the button\n\nThe captain's decision orc-1 asked:\n\n# Which button goes first\n\nThe left one or the right one?\n\nThe captain answered: use the left one\n")
+      expect(request.body).toBe("# Build the button\n\nDecision orc-1 asked:\n\n# Which button goes first\n\nThe left one or the right one?\n\nOwner answered: use the left one\n")
     })
   })
   test("hold and merge refuse a decision instead of holding it or looking for its PR", async () => {

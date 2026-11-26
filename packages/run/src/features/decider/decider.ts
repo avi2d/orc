@@ -7,7 +7,8 @@ import { readInstructions, readOrcRules } from "../../entities/orc-rules/index"
 import { answerTask } from "../../entities/parked-runs/index"
 import { gateCapQuestionId, isQuestion } from "../../entities/review-gate/index"
 import { ciWaitingQuestionId } from "../../entities/pull-request/index"
-import { askBackWords, guardReason } from "./decider-guard"
+import { guardReason } from "./decider-guard"
+import { askBackWords } from "../../shared/lib/index"
 import { objectIn, section } from "./prompt-text"
 import { type Quoted, quotedSource, type RuleSource, spaced, type Verdict } from "./quoted-source"
 import { answerOnRecommendedRule, quotesRecommendedRule, recommendedAnswer } from "./recommended"
@@ -204,20 +205,21 @@ const askOne = (ask: AskDecider, policy: string, supportPolicy: Effect.Effect<st
   })
 
 const decisionOf = (verdict: Exclude<Verdict, { readonly kind: "escalated" }>, at: string) => {
+  const attribution = { at, decider: "agent" } as const
   if (verdict.kind === "asked-back") {
-    return { kind: "asked-back" as const, question: verdict.question, at }
+    return { kind: "asked-back" as const, question: verdict.question, ...attribution }
   }
   const basis = verdict.basis
   return basis.kind === "duplicate"
-    ? { kind: "duplicate" as const, of: basis.of, at }
-    : { kind: "answered" as const, reason: basis.reason, rule: { quote: basis.quote, source: basis.source }, at }
+    ? { kind: "duplicate" as const, of: basis.of, ...attribution }
+    : { kind: "answered" as const, reason: basis.reason, rule: { quote: basis.quote, source: basis.source }, ...attribution }
 }
 
 const settle = (root: string, task: TaskRecord, question: ParkedQuestion, entry: OpenItem, verdict: Verdict, at: string) =>
   Effect.gen(function*() {
     const item = entry.id
     if (verdict.kind === "escalated") {
-      yield* recordDecision(root, item, { kind: "escalated", reason: verdict.reason, ...(verdict.recommendation === undefined ? {} : { recommendation: verdict.recommendation }), at })
+      yield* recordDecision(root, item, { kind: "escalated", reason: verdict.reason, ...(verdict.recommendation === undefined ? {} : { recommendation: verdict.recommendation }), at, decider: "agent" })
       return verdict
     }
     yield* recordDecision(root, item, decisionOf(verdict, at))
@@ -238,7 +240,7 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, entry:
       return verdict
     }
     const escalated: Verdict = { kind: "escalated", reason: "the decider's answer did not reach the task: " + refused }
-    yield* recordDecision(root, item, { kind: "escalated", reason: escalated.reason, at })
+    yield* recordDecision(root, item, { kind: "escalated", reason: escalated.reason, at, decider: "agent" })
     return escalated
   })
 

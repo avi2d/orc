@@ -1,10 +1,12 @@
+import { bundlePath, ensureBundle } from "./bundle"
 import { afterAll, describe, expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import runPackage from "../../packages/run/package.json" with { type: "json" }
 
-const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
+ensureBundle()
+const binPath = bundlePath
 
 const dirs: Array<string> = []
 

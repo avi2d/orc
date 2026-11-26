@@ -1,7 +1,7 @@
 import { DateTime, Effect, type FileSystem } from "effect"
 import { ageMillis, answerItem, type Decision, decisionText, type AttentionItem, type DecidedItem, isOverdue, type OpenItem, readAttention } from "../../entities/attention/index"
 import { listTasks, BacklogError, backlogPresent, noBacklog, type TaskFileError } from "../../entities/backlog/index"
-import { formatTable } from "../../shared/lib/index"
+import { deciderLabel, formatTable } from "../../shared/lib/index"
 
 const ATTENTION_JSON_SCHEMA = "orc.attention.v1"
 
@@ -12,9 +12,9 @@ interface DecidedJson {
   readonly text: string
   readonly asked: string
   readonly owner: AttentionItem["owner"]
-  readonly decision: Decision
-  readonly answer: { readonly words: string; readonly at: string }
-  readonly overturned?: { readonly words: string; readonly at: string }
+  readonly decision?: Decision
+  readonly answer: Extract<AttentionItem["state"], { kind: "closed" }>["answer"]
+  readonly overturned?: Extract<AttentionItem["state"], { kind: "closed" }>["answer"]
 }
 
 interface AttentionJson {
@@ -43,14 +43,14 @@ export const attentionJson = (items: ReadonlyArray<OpenItem>, at: string, decide
       ageSeconds: Math.floor(ageMillis(item, nowMillis) / 1000),
       overdue: isOverdue(item, nowMillis)
     })),
-    decided: decided.flatMap(({ id, item }) => item.state.kind === "closed" && item.decision !== undefined ? [{
+    decided: decided.flatMap(({ id, item }) => item.state.kind === "closed" ? [{
       id,
       kind: item.kind,
       task: item.task,
       text: item.text,
       asked: item.asked,
       owner: item.owner,
-      decision: item.decision,
+      ...(item.decision === undefined ? {} : { decision: item.decision }),
       answer: item.state.answer,
       ...(item.state.overturned === undefined ? {} : { overturned: item.state.overturned })
     }] : [])
@@ -67,7 +67,7 @@ const ageText = (seconds: number): string => {
 
 const openText = (item: { readonly text: string; readonly decision?: Decision }): string => {
   const text = item.text.replace(/\s+/g, " ").trim()
-  return item.decision?.kind === "asked-back" ? text + " (" + decisionText(item.decision) + ")" : text
+  return item.decision === undefined ? text : text + " (" + deciderLabel(item.decision.decider) + " · " + decisionText(item.decision) + ")"
 }
 
 const formatAttention = (items: ReadonlyArray<OpenItem>, decided: ReadonlyArray<DecidedItem>, at: string): string => {
@@ -77,10 +77,21 @@ const formatAttention = (items: ReadonlyArray<OpenItem>, decided: ReadonlyArray<
     view.items.map((item) => [item.id, item.kind, item.task, item.owner, ageText(item.ageSeconds) + (item.overdue ? " overdue" : ""), openText(item)]),
     "nothing needs anyone"
   )
-  const answered = view.decided.map((entry) =>
-    "answered " + entry.id + ": " + entry.answer.words + " (" +
-    (entry.overturned === undefined ? decisionText(entry.decision) : "the captain replaced the decider's answer " + JSON.stringify(entry.overturned.words)) + ")")
-  return answered.length > 0 ? open + "\n\nDecided:\n" + answered.join("\n") : open
+  const choices = view.items.filter((item) => item.subject !== undefined && item.options !== undefined && item.recommendation !== undefined)
+    .map((item) => [
+      item.id + ": " + item.subject,
+      ...item.options?.map((option) => "- " + option.text + (option.outcome === undefined ? "" : ": " + option.outcome)) ?? [],
+      "Recommended: " + (item.decision?.kind === "escalated" ? item.decision.recommendation ?? item.recommendation : item.recommendation)
+    ].join("\n"))
+  const sections = (["owner", "agent"] as const).flatMap((decider) => {
+    const answers = view.decided.flatMap((entry) => [
+      ...(entry.overturned?.decider === decider ? [entry.id + ": " + entry.overturned.words + " (replaced)"] : []),
+      ...(entry.answer.decider === decider ? [entry.id + ": " + entry.answer.words + (entry.answer.inferred === true ? " (attribution inferred)" : "")] : []),
+      ...(entry.decision?.decider === decider ? [entry.id + ": " + decisionText(entry.decision)] : [])
+    ])
+    return answers.length === 0 ? [] : ["Decided by " + decider + ":\n" + answers.join("\n")]
+  })
+  return [open, ...choices, ...sections].join("\n\n")
 }
 
 export const answerItemText = (root: string, id: string, answer: { readonly words: string; readonly at: string }): Effect.Effect<string, BacklogError, FileSystem.FileSystem> =>

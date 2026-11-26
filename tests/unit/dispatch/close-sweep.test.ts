@@ -1,3 +1,4 @@
+import { flagQuestion } from "../../lib/attention-question"
 import { describe, expect, test } from "bun:test"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -17,7 +18,7 @@ describe("the beat's closing sweep", () => {
         throw new Error("the backlog holds no orc-1")
       }
       for (const kind of ["review-question", "pr-ready", "check-red", "run-died", "failing-command"] as const) {
-        await run(openItem(root, "orc-1." + kind, { kind, task: "orc-1", text: "Old request", asked: spec.created, owner: "user" }))
+        await run(openItem(root, "orc-1." + kind, { ...flagQuestion, kind, task: "orc-1", text: "Old request", asked: spec.created, owner: "user" }))
       }
       const progress = await run(closeFinished({ root, home: root, config }, task))
       expect(progress).toMatchObject({ kind: "ended", action: { kind: "closed", task: "orc-1", outcome: "failed" } })
@@ -35,7 +36,7 @@ describe("the beat's closing sweep", () => {
         branch: "orc/orc-1",
         origin: { machine: "mac", run: "run-1" },
         questions: [
-          { id: "r2", text: "Keep the old flag?", asked: spec.created, blocks: true, answer: { words: "Keep it", at: spec.created, relayedTo: null } },
+          { id: "r2", text: "Keep the old flag?", asked: spec.created, blocks: true, answer: { decider: "owner" as const, words: "Keep it", at: spec.created, relayedTo: null } },
           { id: "ask-1", text: "Pick a color?", asked: spec.created, blocks: false, answer: null, owner: "user" as const }
         ]
       }

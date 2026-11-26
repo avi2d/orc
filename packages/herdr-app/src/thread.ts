@@ -21,6 +21,7 @@ export interface AskOption {
   readonly text: string
   readonly picture: string | null
   readonly outcome?: string
+  readonly action?: "write-answer" | "wait"
 }
 
 export interface AskText {

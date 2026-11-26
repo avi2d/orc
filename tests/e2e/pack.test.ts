@@ -26,9 +26,9 @@ let packedFiles: ReadonlyArray<string> = []
 let packedTarballName = ""
 
 beforeAll(() => {
-  const result = Bun.spawnSync([process.execPath, "run", "build"], { cwd: repoRoot })
+  const result = Bun.spawnSync([process.execPath, "run", "build:pack"], { cwd: repoRoot })
   if (result.exitCode !== 0) {
-    throw new Error("bun run build failed: " + result.stdout.toString() + result.stderr.toString())
+    throw new Error("bun run build:pack failed: " + result.stdout.toString() + result.stderr.toString())
   }
   const packed = packedTarball()
   packedFiles = packed.files
@@ -69,6 +69,7 @@ const expectedFiles = [
   "scripts/patch-knip-jiti.ts",
   "src/shared/sandbox/agent-exec.ts",
   "src/entities/agent/agents.ts",
+  "src/entities/agent/asset-path.ts",
   "src/entities/agent/failure-streak.ts",
   "src/entities/review-gate/answer-wait.ts",
   "src/features/installing-the-app/app-install.ts",
@@ -116,6 +117,8 @@ const expectedFiles = [
   "src/features/attention-list/attention-view.ts",
   "src/entities/attention/attention.ts",
   "src/entities/attention/attention-ask.ts",
+  "src/entities/attention/attention-choice.ts",
+  "src/entities/attention/attention-migration.ts",
   "src/entities/attention/attention-overdue.ts",
   "src/entities/attention/attention-store.ts",
   "src/entities/attention/update-result.ts",
@@ -170,6 +173,7 @@ const expectedFiles = [
   "src/entities/attention/attention-item.ts",
   "src/entities/attention/failing-command.ts",
   "src/entities/backlog/task-record-answer.ts",
+  "src/entities/backlog/task-record-hold.ts",
   "src/entities/backlog/task-record-merge.ts",
   "src/entities/backlog/task-record-parts.ts",
   "src/features/queueing-a-task/runner-answer.ts",
@@ -263,6 +267,7 @@ const expectedFiles = [
   "src/entities/review-gate/no-mistakes-gate.ts",
   "src/entities/review-gate/no-mistakes-response.ts",
   "src/entities/review-gate/no-mistakes.ts",
+  "src/entities/review-gate/question.ts",
   "src/shared/sandbox/nono-exec.ts",
   "src/shared/sandbox/nono-profile.ts",
   "src/shared/sandbox/nono.ts",
@@ -283,6 +288,7 @@ const expectedFiles = [
   "src/features/seeing-runs/run-history-view.ts",
   "src/entities/run-history/run-history-read.ts",
   "src/entities/run-history/run-history.ts",
+  "src/shared/lib/decision-answer.ts",
   "src/shared/lib/run-id.ts",
   "src/features/running-a-task/run-loop.ts",
   "src/features/running-a-task/run-ops.ts",

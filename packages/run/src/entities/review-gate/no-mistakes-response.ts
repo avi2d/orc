@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 import { scalar, splitRow } from "../../shared/lib/index"
 import { appendGate, type DriveLog } from "./no-mistakes-drive-log"
+import type { QuestionAnswer } from "./question"
 
 export interface NoMistakesReply {
   readonly stdout: string
@@ -47,7 +48,7 @@ const recordedResponse = (output: string): RecordedResponse => {
 export const settleFixResponse = Effect.fnUntraced(function*(
   runDir: string,
   log: DriveLog,
-  supplied: Map<string, string>,
+  supplied: Map<string, QuestionAnswer>,
   answeredIds: ReadonlyArray<string>,
   reply: NoMistakesReply
 ) {
@@ -56,7 +57,7 @@ export const settleFixResponse = Effect.fnUntraced(function*(
     const note = log.noteDeferrals({
       findingIds: followUps,
       skippedFixRound: sentToFixer?.length === 0,
-      unappliedAnswers: followUps.filter((id) => supplied.has(id))
+      unappliedAnswers: followUps.flatMap((id) => supplied.get(id) ?? [])
     })
     yield* appendGate(runDir, note)
   }

@@ -1,5 +1,6 @@
 import { Data, Effect, FileSystem, Path } from "effect"
 import type { PlatformError } from "effect/PlatformError"
+import { assetPath } from "./asset-path"
 import deciderPolicyFile from "../../../agents/decider-policy.md" with { type: "file" }
 import fixerFile from "../../../agents/fixer.md" with { type: "file" }
 import implementerFile from "../../../agents/implementer.md" with { type: "file" }
@@ -138,14 +139,14 @@ const readIfPresent = (
   )
 
 export const bundledAgentFiles: Readonly<Record<AgentKind, string>> = {
-  implementer: implementerFile,
-  fixer: fixerFile,
-  reviewer: reviewerFile
+  implementer: assetPath(implementerFile),
+  fixer: assetPath(fixerFile),
+  reviewer: assetPath(reviewerFile)
 }
 
-export const bundledDeciderPolicyFile: string = deciderPolicyFile
+export const bundledDeciderPolicyFile: string = assetPath(deciderPolicyFile)
 
-export const bundledSupportCheckPolicyFile: string = supportCheckPolicyFile
+export const bundledSupportCheckPolicyFile: string = assetPath(supportCheckPolicyFile)
 
 export const agentFileCandidates = (
   path: Path.Path,

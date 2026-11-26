@@ -37,8 +37,8 @@ const withAskDir = async (body: (dir: string) => Promise<void>): Promise<void> =
   }
 }
 
-const reply = (dir: string, stem: string, words: string): Promise<void> =>
-  writeFile(join(dir, stem + replySuffix), JSON.stringify({ kind: "answer", id: "ask-1", question: "Which colour?", words }))
+const reply = (dir: string, stem: string, words: string, decider: "owner" | "agent" = "owner"): Promise<void> =>
+  writeFile(join(dir, stem + replySuffix), JSON.stringify({ kind: "answer", id: "ask-1", question: "Which colour?", words, decider }))
 
 const colour = { question: "Which colour?", options: [{ text: "Red", outcome: "The page turns red" }, { text: "Blue", outcome: "The page turns blue" }], recommendation: "Red" }
 
@@ -62,7 +62,7 @@ describe("the orc_ask tool inside Pi", () => {
       expect(settled).toBe(false)
       await reply(dir, "call-1", "B")
       const result = await pending
-      expect(result.content.map((block) => block.text)).toEqual(["The captain answered your question ask-1 (Which colour?): B"])
+      expect(result.content.map((block) => block.text)).toEqual(["The owner answered your question ask-1 (Which colour?): B"])
     })
   }, 10_000)
 
@@ -74,8 +74,8 @@ describe("the orc_ask tool inside Pi", () => {
       expect(Date.now() - started).toBeLessThan(500)
       expect(result.content.map((block) => block.text).join("")).toContain("Carry on with the task")
       expect(afterTool({ content: [{ type: "text", text: "ls output" }] })).toBeUndefined()
-      await reply(dir, "call-1", "B")
-      expect(texts(afterTool({ content: [{ type: "text", text: "ls output" }] }))).toEqual(["ls output", "The captain answered your question ask-1 (Which colour?): B"])
+      await reply(dir, "call-1", "B", "agent")
+      expect(texts(afterTool({ content: [{ type: "text", text: "ls output" }] }))).toEqual(["ls output", "The agent answered your question ask-1 (Which colour?): B"])
       expect(afterTool({ content: [{ type: "text", text: "ls output" }] })).toBeUndefined()
     })
   })
@@ -139,7 +139,7 @@ describe("the orc_ask tool inside Pi", () => {
       await writeFile(join(dir, "correction-ask-1-1" + replySuffix), JSON.stringify({ kind: "correction", id: "ask-1", question: "Which colour?", words: "R" }))
       expect(texts(afterTool({ content: [{ type: "text", text: "ls output" }] }))).toEqual([
         "ls output",
-        "The captain replaced the answer you got to your question ask-1 (Which colour?). Work from this answer instead: R"
+        "The owner replaced the answer you got to your question ask-1 (Which colour?). Work from this answer instead: R"
       ])
       expect(afterTool({ content: [] })).toBeUndefined()
     })

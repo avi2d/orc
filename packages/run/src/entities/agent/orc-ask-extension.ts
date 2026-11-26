@@ -12,8 +12,10 @@ const pollMillis = 1000
 
 const askFileStem = (toolCallId: string): string => toolCallId.replace(/[^A-Za-z0-9_-]/g, "_")
 
+type ReplyDecider = "owner" | "agent" | null
+
 export type AskReply =
-  | { readonly kind: "answer" | "correction"; readonly id: string; readonly question: string; readonly words: string }
+  | { readonly kind: "answer" | "correction"; readonly id: string; readonly question: string; readonly words: string; readonly decider: ReplyDecider }
   | { readonly kind: "timeout"; readonly id: string }
 
 interface TextBlock {
@@ -45,14 +47,21 @@ interface AskHost {
   readonly on: (event: "tool_result", handler: (event: ToolResultEvent) => { readonly content: ReadonlyArray<unknown> } | undefined) => void
 }
 
-const isAskReply = (value: unknown): value is AskReply => {
+const parseReply = (value: unknown): AskReply | null => {
   if (typeof value !== "object" || value === null || !("id" in value) || typeof value.id !== "string" || !("kind" in value)) {
-    return false
+    return null
   }
   if (value.kind === "timeout") {
-    return true
+    return { kind: "timeout", id: value.id }
   }
-  return (value.kind === "answer" || value.kind === "correction") && "question" in value && typeof value.question === "string" && "words" in value && typeof value.words === "string"
+  if ((value.kind !== "answer" && value.kind !== "correction") || !("question" in value) || typeof value.question !== "string" || !("words" in value) || typeof value.words !== "string") {
+    return null
+  }
+  const decider = "decider" in value ? value.decider : value.kind === "correction" ? "owner" : null
+  if (decider !== null && decider !== "owner" && decider !== "agent") {
+    return null
+  }
+  return { kind: value.kind, id: value.id, question: value.question, words: value.words, decider }
 }
 
 const readReply = (dir: string, stem: string): AskReply | null => {
@@ -62,7 +71,7 @@ const readReply = (dir: string, stem: string): AskReply | null => {
   }
   try {
     const parsed: unknown = JSON.parse(readFileSync(file, "utf8"))
-    return isAskReply(parsed) ? parsed : null
+    return parseReply(parsed)
   } catch {
     return null
   }
@@ -75,16 +84,18 @@ const markDelivered = (dir: string, stem: string): void => {
 const questionNamed = (reply: { readonly id: string; readonly question: string }): string =>
   reply.id + (reply.question === "" ? "" : " (" + reply.question + ")")
 
+const replyAuthor = (decider: ReplyDecider): string => decider === "owner" ? "The owner" : decider === "agent" ? "The agent" : "An earlier run"
+
 const replyText = (reply: AskReply): string => {
   switch (reply.kind) {
     case "answer": {
-      return "The captain answered your question " + questionNamed(reply) + ": " + reply.words
+      return (reply.decider === null ? "An answer was recorded for your question " : replyAuthor(reply.decider) + " answered your question ") + questionNamed(reply) + ": " + reply.words
     }
     case "correction": {
-      return "The captain replaced the answer you got to your question " + questionNamed(reply) + ". Work from this answer instead: " + reply.words
+      return replyAuthor(reply.decider) + " replaced the answer you got to your question " + questionNamed(reply) + ". Work from this answer instead: " + reply.words
     }
     case "timeout": {
-      return "No answer to " + reply.id + " came in time. orc stops this session now and resumes it with the captain's answer, so do nothing more."
+      return "No answer to " + reply.id + " came in time. orc stops this session now and resumes it when an answer is recorded, so do nothing more."
     }
   }
 }
@@ -108,7 +119,7 @@ const waitForReply = async (dir: string, stem: string, signal: AbortSignal | und
       return reply
     }
     if (signal?.aborted === true) {
-      throw new Error("the wait for the captain's answer was stopped")
+      throw new Error("the wait for an answer stopped")
     }
     await pause(interval, signal)
   }

@@ -17,7 +17,7 @@ describe("held task files", () => {
   test("a held and answered task survives a write and a read with its words intact instead of losing the hold", async () => {
     const record: TaskRecord = {
       spec: { ...spec, id: "task-4", body: "# Fix the thing\n" },
-      hold: { reason: "which API: REST or \"gRPC\"?", until: "2026-12-01", questions: [], answer: { words: "REST,\n  and keep v1 — for now", at: "2026-11-02T12:00:00.000Z" }, at: "2026-11-01T09:00:00.000Z" },
+      hold: { reason: "which API: REST or \"gRPC\"?", until: "2026-12-01", questions: [], answer: { decider: "owner" as const, words: "REST,\n  and keep v1 — for now", at: "2026-11-02T12:00:00.000Z" }, at: "2026-11-01T09:00:00.000Z" },
       parked: null,
       state: { kind: "new" }
     }
@@ -30,7 +30,7 @@ describe("held task files", () => {
         reason: "two choices",
         until: null,
         questions: [
-          { id: "question-1", text: "REST or \"gRPC\"?", answer: { words: "gRPC, for now", at: "2026-11-02T12:00:00.000Z" } },
+          { id: "question-1", text: "REST or \"gRPC\"?", answer: { decider: "owner" as const, words: "gRPC, for now", at: "2026-11-02T12:00:00.000Z" } },
           { id: "question-2", text: "Which region?", answer: null }
         ],
         answer: null,

@@ -1,10 +1,11 @@
 import { type BeatAction, type BeatReport, type MachineRoom } from "./beat"
 import type { BeatWaits } from "./beat-waits"
 import { type TaskWait, taskWaiting } from "./beat-place"
-import { type ChildCount, childCount, decisionAnswer, dependencyWaits, fullPrUrl, type TaskKind, type TaskPriority, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, ranClosing, taskLandedIn, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
+import { type ChildCount, childCount, decisionAnswer, dependencyWaits, fullPrUrl, type TaskKind, type TaskPriority, answersAwaited, type Claim, type DeciderOwns, type Hold, isDeciderAnswer, isHeld, openQuestions, type Parked, ranClosing, taskLandedIn, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
 import type { Project } from "../../shared/config/index"
 import { describeQuota } from "./quota"
 import type { ChatEvent, PrState } from "../../entities/events/index"
+import { type DecisionAnswer, deciderLabel } from "../../shared/lib/index"
 import { updateLine } from "../../entities/attention/index"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
@@ -39,7 +40,7 @@ type TaskStatusJson =
     readonly landedIn?: string
     readonly pr: string | null
     readonly report: string | null
-    readonly answer: { readonly words: string; readonly at: string } | null
+    readonly answer: typeof DecisionAnswer.Type | null
     readonly closedAt: string
     readonly postedAt: string | null
   }
@@ -68,7 +69,17 @@ type TaskJson = {
 interface ParkedJson {
   readonly origin?: Parked["origin"]
   readonly branch: string
-  readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string; readonly blocks: boolean; readonly deciderOwns: boolean; readonly answer: { readonly words: string; readonly at: string } | null }>
+  readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string; readonly blocks: boolean; readonly deciderOwns: boolean; readonly answer: typeof DecisionAnswer.Type | null; readonly overturned?: typeof DecisionAnswer.Type }>
+}
+
+const parkedAnswers = (answer: Parked["questions"][number]["answer"]) => {
+  if (answer === null) return { answer: null }
+  const { words, at, decider } = answer
+  const replaced = isDeciderAnswer(answer) ? undefined : answer.overturned
+  return {
+    answer: { words, at, decider },
+    ...(replaced === undefined ? {} : { overturned: { words: replaced.words, at: replaced.at, decider: replaced.decider } })
+  }
 }
 
 const parkedJson = (task: string, parked: Parked, deciderOwns: DeciderOwns): ParkedJson => ({
@@ -80,7 +91,7 @@ const parkedJson = (task: string, parked: Parked, deciderOwns: DeciderOwns): Par
     asked: question.asked,
     blocks: question.blocks,
     deciderOwns: deciderOwns(task, question),
-    answer: question.answer === null ? null : { words: question.answer.words, at: question.answer.at }
+    ...parkedAnswers(question.answer)
   }))
 })
 
@@ -221,16 +232,17 @@ const takenCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: R
   return named(record) + doneOf(record, all, merged) + machine + " taken"
 }
 
-const closingOf = (record: TaskRecord, closing: Extract<TaskRecord["state"], { readonly kind: "closed" }>["closing"]): string => {
+const closedCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string => {
+  if (record.state.kind !== "closed") {
+    return record.spec.id
+  }
   const answer = decisionAnswer(record)
   if (answer !== null) {
-    return "answered: " + answer.words
+    return deciderLabel(answer.decider) + " · " + named(record) + " answered: " + answer.words
   }
-  return closing.outcome === "dropped" ? "dropped: " + closing.reason : closing.outcome
+  const { closing } = record.state
+  return named(record) + doneOf(record, all, merged) + " " + (closing.outcome === "dropped" ? "dropped: " + closing.reason : closing.outcome)
 }
-
-const closedCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string =>
-  record.state.kind === "closed" ? named(record) + doneOf(record, all, merged) + " " + closingOf(record, record.state.closing) : record.spec.id
 
 const projectCells = (projects: ProjectList): ReadonlyArray<string> =>
   projects.kind === "unread"

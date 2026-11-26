@@ -6,7 +6,7 @@ import { readPlanDocument, splitReasonPrefix } from "../../entities/backlog/inde
 import { idleSpan, type PiEnd } from "../../entities/agent/index"
 import { OrcRunError } from "../../shared/lib/index"
 import { askOnLoop, loopAnswerOf, loopContinuePrompt, loopGuidance, loopingNote, RunStopped } from "./loop-pause"
-import { askedNote, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, workerAnswersOf, workerContinuePrompt, workerGuidance } from "./worker-question"
+import { askedNote, sentBackAnswersOf, sentBackContinuePrompt, sentBackGuidance, workerAnswersOf, workerContinuePrompt, workerGuidance } from "./worker-question"
 import { holdReleaseGuidance, holdReleaseWordsOf } from "../../entities/review-gate/index"
 import { freshFixOf, releaseGuidanceOf, resumedFix } from "./fix-guidance"
 import { finishAfterChecks } from "./run-finish"
@@ -131,7 +131,7 @@ const resumedOutcome = (run: HistoryRun, sessionId: string | null, sessionFile: 
 const implementPrompt = (run: HistoryRun, plan: Pick<ResumePlan, "handover" | "implementSessionFile" | "answers">): string => {
   const loop = loopAnswerOf(plan.answers)
   const worker = workerAnswersOf(plan.answers)
-  const sentBack = sentBackWordsOf(plan.answers)
+  const sentBack = sentBackAnswersOf(plan.answers)
   const released = holdReleaseWordsOf(plan.answers)
   const releaseSuffix = released.length === 0 ? "" : "\n" + holdReleaseGuidance(released)
   if (sentBack.length > 0 && plan.implementSessionFile !== null) {

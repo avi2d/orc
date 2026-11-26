@@ -2,6 +2,58 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.25.0
+
+Released 2026-11-26.
+
+### Features
+
+- **run:** install compiled Orc through npm [#420](https://github.com/avi2d/orc/pull/420)
+- **run:** report machine placement decisions in each beat [#397](https://github.com/avi2d/orc/pull/397)
+- fix orc review findings in two rounds [#390](https://github.com/avi2d/orc/pull/390)
+- **run:** queue rebases for conflicting pull requests [#383](https://github.com/avi2d/orc/pull/383)
+- **run:** record review findings in orc delivery [#382](https://github.com/avi2d/orc/pull/382)
+- **run:** retry a stalled run once [#381](https://github.com/avi2d/orc/pull/381)
+- **run:** send red CI checks back once [#377](https://github.com/avi2d/orc/pull/377)
+- **run:** end runs at PR open and let the beat read PR checks [#370](https://github.com/avi2d/orc/pull/370)
+- **run:** add orc delivery mode [#373](https://github.com/avi2d/orc/pull/373)
+- **herdr-app:** show merge stages on the Approve button [#374](https://github.com/avi2d/orc/pull/374)
+- **run:** add orc backlog retry to run a failed or stopped task again [#371](https://github.com/avi2d/orc/pull/371)
+- **run:** record the review step in run history and show it in orc show [#361](https://github.com/avi2d/orc/pull/361)
+- ship compiled dashboard commands [#366](https://github.com/avi2d/orc/pull/366)
+
+### Fixes
+
+- **run:** clarify hand-started run terminology in sandbox help [#418](https://github.com/avi2d/orc/pull/418)
+- **run:** state that queued tasks run without a per-agent sandbox [#414](https://github.com/avi2d/orc/pull/414)
+- defer non-error findings at later review gates [#409](https://github.com/avi2d/orc/pull/409)
+- **herdr-app:** toggle runs filters on mouse down [#408](https://github.com/avi2d/orc/pull/408)
+- **run:** report deferred no-mistakes findings [#407](https://github.com/avi2d/orc/pull/407)
+- refuse wrapped path test runs [#406](https://github.com/avi2d/orc/pull/406)
+- **test:** stop detached runner fixture leaks [#404](https://github.com/avi2d/orc/pull/404)
+- **run:** run build and typecheck inside the lint check [#405](https://github.com/avi2d/orc/pull/405)
+- refresh local agent output independently [#403](https://github.com/avi2d/orc/pull/403)
+- **run:** bring the orc merge e2e file under its CI time limit [#398](https://github.com/avi2d/orc/pull/398)
+- allow merging PRs with no recorded state [#402](https://github.com/avi2d/orc/pull/402)
+- **run:** finish a grabbed backlog write when the beat times out [#401](https://github.com/avi2d/orc/pull/401)
+- keep configured Claude account names on their own rows [#394](https://github.com/avi2d/orc/pull/394)
+- **run:** recover merge facts from the forge [#393](https://github.com/avi2d/orc/pull/393)
+- remove retained agent folders after resume [#392](https://github.com/avi2d/orc/pull/392)
+- **run:** explain omitted review question text [#386](https://github.com/avi2d/orc/pull/386)
+- link report runs to agent report [#388](https://github.com/avi2d/orc/pull/388)
+- **run:** release claim locks when their owner dies [#387](https://github.com/avi2d/orc/pull/387)
+- **run:** escalate a decider answer its quoted rule does not support [#384](https://github.com/avi2d/orc/pull/384)
+- **run:** rerun a red PR's failed Actions jobs once before raising check-red [#375](https://github.com/avi2d/orc/pull/375)
+- **run:** remove redundant agent environment flag [#379](https://github.com/avi2d/orc/pull/379)
+- **run:** retry a dead run once before closing its task failed [#376](https://github.com/avi2d/orc/pull/376)
+- **run:** load project agent files before personal ones and extend reviewer prompt [#372](https://github.com/avi2d/orc/pull/372)
+- **run:** stop chat and Pi when the drawer closes or the session file is removed [#368](https://github.com/avi2d/orc/pull/368)
+- **run:** keep a task started when its ssh result read times out [#369](https://github.com/avi2d/orc/pull/369)
+- **run:** route heavy stand-in calls through the compiled orc [#367](https://github.com/avi2d/orc/pull/367)
+- **run:** stop sending review findings to the owner on guarded words [#363](https://github.com/avi2d/orc/pull/363)
+- **run:** carry an owner's answer from its closed item into the task file [#364](https://github.com/avi2d/orc/pull/364)
+- **run:** share pinned Pi git packages between runs instead of copying them [#359](https://github.com/avi2d/orc/pull/359)
+
 ## 0.24.0
 
 Released 2026-11-25.

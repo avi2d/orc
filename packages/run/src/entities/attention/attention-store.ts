@@ -1,9 +1,11 @@
 import { Effect, FileSystem, Option, Schema } from "effect"
 import { withFileClaim } from "../../shared/lib/index"
 import { BacklogError, platformFailure, publishOnce, readIfPresent, scratchName, writeAtomic } from "../backlog/index"
-import { AttentionItem, type Asked } from "./attention-item"
+import { AttentionItem, type Asked, NewItem } from "./attention-item"
+import { decodeStoredAttention } from "./attention-migration"
 
 const ItemFile = Schema.fromJsonString(AttentionItem)
+const decodeNewItem = Schema.decodeUnknownEffect(NewItem)
 
 export const fileSuffix = ".json"
 
@@ -44,10 +46,11 @@ export const replaceItem = (root: string, id: string, before: string, encoded: s
 
 export const openItem = (root: string, id: string, asked: Asked): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
+    const item = yield* decodeNewItem(asked).pipe(Effect.mapError((error) => new BacklogError({ detail: "cannot open attention item " + id + ": " + error.message })))
     const fs = yield* FileSystem.FileSystem
     const folder = attentionFolder(root)
     yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.mapError(platformFailure("make " + folder)))
-    return yield* publishOnce(folder, id + fileSuffix, yield* encodeItem(id, { ...asked, state: { kind: "open" } }))
+    return yield* publishOnce(folder, id + fileSuffix, yield* encodeItem(id, { ...item, state: { kind: "open" } }))
   })
 
 export const readExistingItem = (root: string, id: string): Effect.Effect<{ readonly before: string; readonly item: AttentionItem } | null, BacklogError, FileSystem.FileSystem> =>
@@ -57,7 +60,7 @@ export const readExistingItem = (root: string, id: string): Effect.Effect<{ read
     if (before === null) {
       return null
     }
-    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
+    const item = yield* decodeStoredAttention(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
     return { before, item }
   })
 

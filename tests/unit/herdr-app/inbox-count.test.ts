@@ -382,7 +382,7 @@ test("an answer you gave in place of the agent's stays in the collapsed Agent at
   const { attention } = await import("../../../packages/herdr-app/src/guard-attention")
   const replaced = {
     ...fixture,
-    decided: fixture.decided.map((item) => ({ ...item, answer: { words: "Three retries", at: "2026-11-25T07:59:00.000Z" }, overturned: { words: "Two retries", at: "2026-11-25T07:58:00.000Z" } }))
+    decided: fixture.decided.map((item) => ({ ...item, decision: { ...item.decision, decider: "agent" }, answer: { decider: "owner", words: "Three retries", at: "2026-11-25T07:59:00.000Z" }, overturned: { decider: "agent", words: "Two retries", at: "2026-11-25T07:58:00.000Z" } }))
   }
   const queue = guardJson(JSON.stringify(replaced), attention)
   if (queue.kind !== "ok") throw new Error(queue.reason)

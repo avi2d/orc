@@ -55,7 +55,7 @@ export const refuseOnQuestions = async (fixture: Fixture, questions: ReadonlyArr
   }
 }
 
-export const firstAsking: { readonly asked: string; readonly until: string; readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly options?: ReadonlyArray<{ readonly text: string; readonly picture?: string }> }> } = { asked: "2026-11-02T10:20:00.000Z", until: "2026-11-02T10:50:00.000Z", questions: [{ id: "r2", text: "Keep the old flag?" }] }
+export const firstAsking: { readonly asked: string; readonly until: string; readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly options?: ReadonlyArray<{ readonly text: string; readonly outcome?: string; readonly picture?: string }>; readonly recommendation?: string }> } = { asked: "2026-11-02T10:20:00.000Z", until: "2026-11-02T10:50:00.000Z", questions: [{ id: "r2", text: "Keep the old flag?" }] }
 
 export const askWhileRunning = async (fixture: Fixture, asking: typeof firstAsking = firstAsking): Promise<string> => {
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({
