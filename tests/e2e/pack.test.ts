@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { Schema } from "effect"
@@ -184,6 +184,7 @@ const expectedFiles = [
   "src/entities/heavy-queue/heavy-pueue-task.ts",
   "src/entities/heavy-queue/heavy-runner-entry.ts",
   "src/entities/heavy-queue/heavy-standin-exec.ts",
+  "src/entities/heavy-queue/heavy-standin-helper.ts",
   "src/entities/heavy-queue/heavy-standin-main.ts",
   "src/entities/heavy-queue/heavy-standin-refusal.ts",
   "src/entities/heavy-queue/heavy-standin-runtime.ts",
@@ -407,66 +408,98 @@ const releaseFixture = async (dir: string) => {
 }
 
 describe("the npm release", () => {
-  test("npm selects only the matching platform package and the installed orc runs without Bun", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "orc-npm-release-"))
-    try {
-      const { mainTarball, tarballs } = await releaseFixture(dir)
-      const registry = Bun.serve({
-        hostname: "127.0.0.1",
-        port: 0,
-        fetch(request) {
-          const url = new URL(request.url)
-          const path = decodeURIComponent(url.pathname.slice(1))
-          const asset = tarballs.find(({ tarball }) => tarball === path)
-          if (asset !== undefined) return new Response(Bun.file(join(dir, asset.tarball)))
-          const pkg = tarballs.find(({ manifest }) => manifest.name === path)
-          if (pkg === undefined) return new Response("Not Found", { status: 404 })
-          const version = runManifest.version
-          return Response.json({
-            name: pkg.manifest.name,
-            "dist-tags": { latest: version },
-            versions: {
-              [version]: { ...pkg.manifest, dist: { tarball: new URL(pkg.tarball, url).href } }
-            }
-          })
-        }
-      })
-      const prefix = join(dir, "prefix")
-      const npmrc = join(dir, "npmrc")
-      try {
-        await writeFile(npmrc, `@avi2dg:registry=${registry.url.href}\n`)
-        const install = Bun.spawn(["npm", "install", "-g", "--prefix", prefix,
-          "--userconfig", npmrc, "--ignore-scripts", "--no-audit", "--no-fund", mainTarball], {
-          cwd: dir, stdout: "pipe", stderr: "pipe"
+  let dir = ""
+  let prefix = ""
+  let bin = ""
+  let env: Record<string, string> = {}
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), "orc-npm-release-"))
+    const { mainTarball, tarballs } = await releaseFixture(dir)
+    const registry = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch(request) {
+        const url = new URL(request.url)
+        const path = decodeURIComponent(url.pathname.slice(1))
+        const asset = tarballs.find(({ tarball }) => tarball === path)
+        if (asset !== undefined) return new Response(Bun.file(join(dir, asset.tarball)))
+        const pkg = tarballs.find(({ manifest }) => manifest.name === path)
+        if (pkg === undefined) return new Response("Not Found", { status: 404 })
+        const version = runManifest.version
+        return Response.json({
+          name: pkg.manifest.name,
+          "dist-tags": { latest: version },
+          versions: {
+            [version]: { ...pkg.manifest, dist: { tarball: new URL(pkg.tarball, url).href } }
+          }
         })
-        const [stdout, stderr, status] = await Promise.all([
-          new Response(install.stdout).text(), new Response(install.stderr).text(), install.exited
-        ])
-        expect(status, stdout + stderr).toBe(0)
-      } finally {
-        await registry.stop(true)
       }
-      const node = Bun.which("node")
-      if (node === null) throw new Error("npm consumer test needs Node")
-      const bin = join(dir, "bin")
-      await mkdir(bin)
-      await symlink(node, join(bin, "node"))
-      const scope = join(prefix, "lib/node_modules/@avi2dg")
-      const nested = join(scope, "orc/node_modules/@avi2dg")
-      for (const target of platformTargets) {
-        const locations = [scope, nested].map((directory) => Bun.file(join(directory, "orc-" + target, "package.json")).exists())
-        expect((await Promise.all(locations)).some(Boolean)).toBe(target === process.platform + "-" + process.arch)
-      }
-      const env = { PATH: bin, HOME: dir }
-      const orc = join(prefix, "bin/orc")
-      expect(spawnPassing([orc, "--version"], dir, env)).toBe("orc " + runManifest.version + "\n")
-      const usage = Bun.spawnSync([orc, "not-a-command"], { cwd: dir, env })
-      expect(usage.exitCode).toBe(1)
-      expect(usage.stderr.toString()).toContain("not-a-command")
+    })
+    prefix = join(dir, "prefix")
+    const npmrc = join(dir, "npmrc")
+    try {
+      await writeFile(npmrc, `@avi2dg:registry=${registry.url.href}\n`)
+      const install = Bun.spawn(["npm", "install", "-g", "--prefix", prefix,
+        "--userconfig", npmrc, "--ignore-scripts", "--no-audit", "--no-fund", mainTarball], {
+        cwd: dir, stdout: "pipe", stderr: "pipe"
+      })
+      const [stdout, stderr, status] = await Promise.all([
+        new Response(install.stdout).text(), new Response(install.stderr).text(), install.exited
+      ])
+      if (status !== 0) throw new Error("npm install -g failed: " + stdout + stderr)
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await registry.stop(true)
     }
+    const node = Bun.which("node")
+    if (node === null) throw new Error("npm consumer test needs Node")
+    bin = join(dir, "bin")
+    await mkdir(bin)
+    await symlink(node, join(bin, "node"))
+    env = { PATH: bin, HOME: dir }
   }, 180_000)
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  test("npm selects only the matching platform package and the installed orc runs without Bun", async () => {
+    const scope = join(prefix, "lib/node_modules/@avi2dg")
+    const nested = join(scope, "orc/node_modules/@avi2dg")
+    for (const target of platformTargets) {
+      const locations = [scope, nested].map((directory) => Bun.file(join(directory, "orc-" + target, "package.json")).exists())
+      expect((await Promise.all(locations)).some(Boolean)).toBe(target === process.platform + "-" + process.arch)
+    }
+    const orc = join(prefix, "bin/orc")
+    expect(spawnPassing([orc, "--version"], dir, env)).toBe("orc " + runManifest.version + "\n")
+    const usage = Bun.spawnSync([orc, "not-a-command"], { cwd: dir, env })
+    expect(usage.exitCode).toBe(1)
+    expect(usage.stderr.toString()).toContain("not-a-command")
+  }, 60_000)
+
+  test("a command the installed orc keeps names the launcher npm keeps instead of the version-named binary an update deletes", async () => {
+    const addArgs = join(dir, "pueue-add-args")
+    await writeFile(join(bin, "pueue"), [
+      "#!/bin/sh",
+      "case \"$1\" in",
+      "  group) if [ \"$2\" = \"--json\" ]; then printf '{}'; fi ;;",
+      "  status) printf '{\"tasks\":{},\"groups\":{}}' ;;",
+      "  add) printf '%s\\n' \"$@\" > '" + addArgs + "'; echo 1 ;;",
+      "  *) exit 2 ;;",
+      "esac",
+      ""
+    ].join("\n"), { mode: 0o755 })
+    const orcHome = join(dir, "orc-home")
+    spawnPassing([join(prefix, "bin/orc"), "heavy", "watch"], dir, { ...env, ORC_HOME: orcHome, HEAVY_QUEUE_BYPASS: "npm release test" })
+    const node = spawnPassing([join(bin, "node"), "-p", "process.execPath"], dir, env).trim()
+    const launcher = [node, join(await realpath(prefix), "lib/node_modules/@avi2dg/orc/dist/launch.js")]
+    const queued = (await readFile(addArgs, "utf8")).split("\n")
+    const command = queued.slice(queued.indexOf("orc-heavy-watch") + 2, -1)
+    expect(command).toEqual([...launcher, "heavy", "watch-once"])
+    expect(spawnPassing([...launcher, "--version"], dir, env)).toBe("orc " + runManifest.version + "\n")
+    const helper = launcher.map((part) => "'" + part + "'").join(" ") + " 'orc-ci-only-path'"
+    expect(await readFile(join(orcHome, "heavy/ci-only.bash"), "utf8")).toContain(helper)
+  }, 60_000)
 })
 
 describe("the packed tarball installed into an empty project without orc's lockfile", () => {

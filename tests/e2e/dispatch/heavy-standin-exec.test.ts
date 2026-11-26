@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { helperCommand, waiterWord } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
+import { helperCommand } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-helper"
+import { waiterWord } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
 import { run, setup, type Harness } from "./heavy-standin-harness"
 
 let harnesses: Array<Harness> = []

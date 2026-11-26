@@ -54,7 +54,13 @@ async function launch(): Promise<void> {
   const binary = nativeBinary()
   if (binary !== undefined) {
     try {
-      await run(binary, args, { ...env, ORC_BUNDLED_APP_DIR: join(packageRoot, "dist", "herdr-app") })
+      await run(binary, args, {
+        ...env,
+        ORC_BUNDLED_APP_DIR: join(packageRoot, "dist", "herdr-app"),
+        ORC_LAUNCHER_NODE: process.execPath,
+        ORC_LAUNCHER: fileURLToPath(import.meta.url),
+        ORC_LAUNCHED_BINARY: binary
+      })
       return
     } catch (error) {
       if (codeOf(error) !== "ENOENT") throw error

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { bypassLine, callerTool, helperCommandOf, parseStandinCall, projectTool, standinMarker, type StandinCall } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
+import { helperCommandOf, launcherCommand } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-helper"
+import { bypassLine, callerTool, parseStandinCall, projectTool, standinMarker, type StandinCall } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
 
 const call: StandinCall = {
   tool: "cargo",
@@ -104,6 +105,23 @@ describe("projectTool", () => {
     await writeFile(join(inner, "node_modules", ".bin", "oxlint"), "#!/bin/sh\n# " + standinMarker + ".\n", { mode: 0o755 })
     expect(projectTool("oxlint", join(inner, "src"))).toBe(join(outer, "oxlint"))
     expect(projectTool("tsc", inner)).toBe("")
+  })
+})
+
+describe("launcherCommand", () => {
+  const launcher = { ORC_LAUNCHER_NODE: "/usr/bin/node", ORC_LAUNCHER: "/p/lib/node_modules/@avi2dg/orc/dist/launch.js" }
+  const binary = "/p/lib/node_modules/@avi2dg/orc-linux-x64/orc-0.24.0"
+
+  test("the binary the launcher started names the launcher instead of its own version-named file", () => {
+    expect(launcherCommand({ ...launcher, ORC_LAUNCHED_BINARY: binary }, binary)).toEqual([launcher.ORC_LAUNCHER_NODE, launcher.ORC_LAUNCHER])
+  })
+
+  test.each([
+    ["another binary that inherited the variables", { ...launcher, ORC_LAUNCHED_BINARY: binary }, "/home/u/.orc/releases/0.25.0/orc"],
+    ["a run with no launcher", {}, binary],
+    ["a launcher missing its node", { ORC_LAUNCHER: launcher.ORC_LAUNCHER, ORC_LAUNCHED_BINARY: binary }, binary]
+  ])("%s keeps its own self command instead of an inherited launcher", (_case, env, executable) => {
+    expect(launcherCommand(env, executable)).toBeNull()
   })
 })
 
