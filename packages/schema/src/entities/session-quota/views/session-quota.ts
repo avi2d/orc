@@ -294,7 +294,7 @@ const accountView = (
     accountKey: entry.accountKey,
     credentialKey: credentialKeyOf(entry),
     accountKeys: keysOf(entry),
-    title: accountTitle(entry, inputs.orcQuota, entries),
+    title: accountTitle(entry, inputs.orcQuota, entries, inputs.quota.accounts),
     joins,
   };
   if ("kind" in entry) return { ...head, body: failureOf(entry) };

@@ -50,19 +50,19 @@ const liveBody = (entry: SourcedProvider): QuotaBlockBody => ({
 
 const namedKey = (key: string | undefined): string | undefined => key === "default" ? undefined : key;
 
-const dispatchAccountName = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>, entries: ReadonlyArray<SourcedEntry>): string | undefined => {
+const dispatchAccountName = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>, entries: ReadonlyArray<SourcedEntry>, configured: ReadonlyArray<AccountRead>): string | undefined => {
   if (entry.provider !== "claude" || orcQuota.kind !== "ok" || orcQuota.value.kind !== "read") return undefined;
   const { accounts } = orcQuota.value;
   const keys = keysOf(entry);
   const matches = accounts.filter(({ account }) => keys.includes(account));
   if (matches.length === 1) return matches[0]?.account;
-  return accounts.length === 1 && entries.filter((candidate) => candidate.provider === "claude").length === 1
+  return accounts.length === 1 && !configured.some(({ name }) => name === accounts[0]?.account) && entries.filter((candidate) => candidate.provider === "claude").length === 1
     ? accounts[0]?.account
     : undefined;
 };
 
-export const accountTitle = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>, entries: ReadonlyArray<SourcedEntry>): string => {
-  const name = dispatchAccountName(entry, orcQuota, entries) ?? namedKey(entry.accountKey);
+export const accountTitle = (entry: SourcedEntry, orcQuota: Reading<OrcQuota>, entries: ReadonlyArray<SourcedEntry>, configured: ReadonlyArray<AccountRead>): string => {
+  const name = dispatchAccountName(entry, orcQuota, entries, configured) ?? namedKey(entry.accountKey);
   return name === undefined ? entry.provider : `${entry.provider} ${name}`;
 };
 
@@ -134,7 +134,7 @@ export const quotaBlocks = (
   const context: LiveContext = {
     entries,
     notSetUp: read.quotaAxi.kind === "ok" ? read.quotaAxi.value.notSetUp : [],
-    title: (entry) => accountTitle(entry, orcQuota, entries),
+    title: (entry) => accountTitle(entry, orcQuota, entries, read.accounts),
   };
   return [
     ...liveBlocks("claude", "claude", context),
