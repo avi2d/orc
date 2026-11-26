@@ -59,7 +59,7 @@ An unknown command or subcommand that is one or two typos away from exactly one 
 | `src/app/dispatch-cli.ts` | The `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
 | `agents` | The bundled agent files |
 
-[Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/layout.md) maps the rest of the package and the tests.
+[Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/source-map.md) maps the rest of the package and the tests.
 
 ## Related topics
 
@@ -83,4 +83,4 @@ An unknown command or subcommand that is one or two typos away from exactly one 
 - [The runner](https://github.com/avi2d/orc/blob/main/docs/run/runner.md)
 - [The heavy queue](https://github.com/avi2d/orc/blob/main/docs/run/heavy-queue.md)
 - [Updating orc](https://github.com/avi2d/orc/blob/main/docs/run/updating-orc.md)
-- [Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/layout.md)
+- [Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/source-map.md)
