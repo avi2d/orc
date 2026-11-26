@@ -1,10 +1,12 @@
+import { bundlePath, ensureBundle } from "./bundle"
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 export const beatTimeout = 120_000
 
-export const binPath = new URL("../../packages/run/dist/bin.js", import.meta.url).pathname
+ensureBundle()
+export const binPath = bundlePath
 
 const quotaStatus = {
   schema: "orc.quota.v1",

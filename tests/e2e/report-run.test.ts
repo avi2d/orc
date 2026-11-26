@@ -1,9 +1,11 @@
+import { bundlePath, ensureBundle } from "./bundle"
 import { describe, expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-const binPath = new URL("../../packages/run/dist/bin.js", import.meta.url).pathname
+ensureBundle()
+const binPath = bundlePath
 
 const modelListReply = JSON.stringify({ id: "orc-models", type: "response", command: "get_available_models", success: true, data: { models: [{ provider: "acme-go", id: "coder-1", contextWindow: 262144 }] } })
 

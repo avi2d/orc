@@ -1,9 +1,11 @@
+import { bundlePath, ensureBundle } from "./bundle"
 import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Schema } from "effect"
 
-export const binPath = new URL("../../packages/run/dist/bin.js", import.meta.url).pathname
+ensureBundle()
+export const binPath = bundlePath
 const pueueFixtures = new URL("../fixtures/runner/pueue", import.meta.url).pathname
 
 export const startWaitMillis = 10_000

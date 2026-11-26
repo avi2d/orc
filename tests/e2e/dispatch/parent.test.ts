@@ -1,3 +1,4 @@
+import { bundlePath, ensureBundle } from "../bundle"
 import { describe, expect, test } from "bun:test"
 import { Schema } from "effect"
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
@@ -6,7 +7,8 @@ import { join } from "node:path"
 
 const beatTimeout = 120_000
 const startWaitMillis = 10_000
-const binPath = new URL("../../../packages/run/dist/bin.js", import.meta.url).pathname
+ensureBundle()
+const binPath = bundlePath
 
 interface Fixture {
   readonly dir: string

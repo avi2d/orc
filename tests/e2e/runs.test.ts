@@ -1,3 +1,4 @@
+import { bundlePath, ensureBundle } from "./bundle"
 import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -7,6 +8,8 @@ import { Effect, Schema } from "effect"
 import type { Database } from "bun:sqlite"
 import { openDatabase, recordEvidence, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
 
+ensureBundle()
+
 interface OrcResult {
   readonly exitCode: number
   readonly stdout: string
@@ -14,7 +17,7 @@ interface OrcResult {
 }
 
 const runOrc = async (args: ReadonlyArray<string>, home: string, env: Record<string, string> = {}): Promise<OrcResult> => {
-  const proc = Bun.spawn([process.execPath, "packages/run/dist/bin.js", ...args], {
+  const proc = Bun.spawn([process.execPath, bundlePath, ...args], {
     stdout: "pipe",
     stderr: "pipe",
     env: { ...process.env, HOME: home, ORC_HOME: "", ...env }

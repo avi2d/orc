@@ -1,8 +1,6 @@
 const run = Bun.fileURLToPath(new URL("..", import.meta.url))
 const outdir = run + "dist"
-const placement = { outdir, publicPath: outdir + "/" }
-
-// A bundled module resolves import.meta against dist, so chat.ts and heavy-standin-runtime.ts look there for these files under their source names.
+const placement = { outdir }
 const results = await Promise.all([
   Bun.build({ entrypoints: [run + "src/bin.ts"], ...placement, target: "bun" }),
   Bun.build({ entrypoints: [run + "src/entities/heavy-queue/heavy-standin-main.ts"], ...placement, target: "bun", naming: "[name].ts" }),

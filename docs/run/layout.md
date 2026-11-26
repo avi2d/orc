@@ -373,7 +373,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `tests/unit` | The in-process unit tests at the workspace root |
-| `tests/e2e` | The tests that run `packages/run/src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1`, at the workspace root |
+| `tests/e2e` | Tests that run the `packages/run/dist/bin.js` bundle, git, or nono as a process. Run `bun run bundle` after changing the source. Set `ORC_PI_E2E=1` for the live Pi run. |
 | `tests/fixtures/runner/pueue` | The pueue 4 status JSON the runner tests read |
 | `tests/live` | The tests that run a real nono sandbox with `ORC_NONO_E2E=1` set, or the host's Pi, through the `test:live` script at the workspace root |
 | `.no-mistakes.yaml` | The check commands no-mistakes and CI run at the workspace root |

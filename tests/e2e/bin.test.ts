@@ -1,3 +1,4 @@
+import { bundlePath, ensureBundle } from "./bundle"
 import { describe, expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -8,7 +9,8 @@ import { Effect, Schema } from "effect"
 import packageJson from "../../package.json" with { type: "json" }
 import { openDatabase } from "../../packages/run/src/entities/run-history/index"
 
-const binPath = new URL("../../packages/run/dist/bin.js", import.meta.url).pathname
+ensureBundle()
+const binPath = bundlePath
 
 const resumeTimeout = 30_000
 
