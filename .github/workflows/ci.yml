@@ -146,20 +146,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           DRAFT: ${{ github.event.pull_request.draft }}
         run: bunx checks-ci draft-hold
-      - name: render a panel with the compiled dashboard without Bun
-        run: |
-          home="$(mktemp -d)"
-          mkdir -p "$home/bin"
-          printf '#!/bin/sh\nexec /bin/cat "$ORC_QUEUE"\n' > "$home/bin/orc"
-          chmod +x "$home/bin/orc"
-          export HOME="$home" PATH="$home/bin:/usr/bin:/bin"
-          export ORC_DASH_CONFIG="$home/absent.json" ORC_QUEUE="$GITHUB_WORKSPACE/tests/fixtures/attention/open.json"
-          if command -v bun; then exit 1; fi
-          frame="$("$GITHUB_WORKSPACE/packages/cli/dist/orc-dash" panel attention --print --width 60)"
-          printf '%s\n' "$frame"
-          printf '%s\n' "$frame" | grep -F '╭─ attention '
-          printf '%s\n' "$frame" | grep -F '3 open · 1 overdue'
-          printf '%s\n' "$frame" | grep -F '! orc-1 · user · 10m overdue'
       - id: test
         env:
           CHECK_RELEASE: ${{ needs.changes.outputs.check-release }}

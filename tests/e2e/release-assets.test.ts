@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdir, mkdtemp, readdir, readFile, realpath, rm } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -17,7 +17,7 @@ const run = async (command: ReadonlyArray<string>, cwd: string, env = process.en
 }
 
 describe("release assets", () => {
-  test("the checksummed release runs both dashboard commands without Bun and queues its own orc-dash instead of a PATH copy", async () => {
+  test("the checksummed release renders an attention frame without Bun and queues its own orc-dash instead of a PATH copy", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-release-assets-e2e-"))
     try {
       const out = join(dir, "out")
@@ -46,6 +46,20 @@ describe("release assets", () => {
       const dash = await run([join(unpacked, "orc-dash"), "--help"], dir, noBun)
       expect(dash.exitCode, dash.stderr).toBe(0)
       expect(dash.stdout).toContain("orc-dash <subcommand>")
+
+      const fakeOrc = join(dir, "orc")
+      await writeFile(fakeOrc, '#!/bin/sh\nexec /bin/cat "$ORC_QUEUE"\n')
+      await chmod(fakeOrc, 0o755)
+      const frame = await run([join(unpacked, "orc-dash"), "panel", "attention", "--print", "--width", "60"], dir, {
+        ...noBun,
+        HOME: dir,
+        ORC_DASH_CONFIG: join(dir, "absent.json"),
+        ORC_QUEUE: join(repoRoot, "tests/fixtures/attention/open.json"),
+      })
+      expect(frame.exitCode, frame.stderr).toBe(0)
+      expect(frame.stdout).toContain("╭─ attention ")
+      expect(frame.stdout).toContain("3 open · 1 overdue")
+      expect(frame.stdout).toContain("! orc-1 · user · 10m overdue")
 
       const capture = await run([join(unpacked, "orc-dash-capture"), "--help"], dir, noBun)
       expect(capture.exitCode, capture.stderr).toBe(0)
