@@ -274,7 +274,7 @@ describe("the asked action of a no-mistakes review question", () => {
       const decided = await decideAll(root, heard)
       expect(heard).toHaveLength(0)
       const verdict = decided.at(0)?.verdict
-      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("carries no words")
+      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("no-mistakes omitted the question text")
       expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
     })
   })
