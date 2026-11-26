@@ -1,6 +1,6 @@
 import { bundlePath, ensureBundle } from "./bundle"
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { addTask } from "../../packages/run/src/entities/backlog/index"
@@ -110,7 +110,7 @@ const decidedTaskFile = async (orcHome: string, repo: string): Promise<string> =
   const at = "2026-10-27T10:30:00.000Z"
   await effect(addTask(backlog, { ...decisionSpec, title: "Which button goes first", body: "# Which button goes first\n\nThe left one or the right one?\n" }))
   await effect(addTask(backlog, { ...decisionSpec, title: "Which colour", body: "# Which colour\n\nBlue or green?\n" }))
-  await effect(addTask(backlog, { ...decisionSpec, kind: "scout", priority: 0, title: "Say what the checkout holds", dependsOn: ["orc-1", "orc-2"], body: "Say what the checkout holds.\n" }))
+  await effect(addTask(backlog, { ...decisionSpec, kind: "ship", priority: 0, title: "Say what the checkout holds", dependsOn: ["orc-1", "orc-2"], body: "Say what the checkout holds.\n" }))
   await effect(answerTask(backlog, "orc-1", "use the left one", at))
   await effect(answerTask(backlog, "orc-2", "green", at, undefined, "decider"))
   const taken = await takeTask(backlog, "orc-3")
@@ -141,19 +141,6 @@ describe("orc run --kind scout", () => {
       expect(git(repo, ["status", "--porcelain"], env)).toBe("")
       const runs: unknown = JSON.parse((await runOrc(["runs", "--json"], repo, env)).stdout)
       expect(runs).toMatchObject({ runs: [{ branch: "orc/task-1", status: "succeeded", prLink: null }] })
-    })
-  }, 60_000)
-
-  test("report.md lists the owner decision and the agent decision a task carries under their own Decided by headings, the agent one with its basis, instead of one mixed list", async () => {
-    await withReportFixture(true, async ({ repo, orcHome, fakeBin, env }) => {
-      const taskFile = await decidedTaskFile(orcHome, repo)
-      const result = await runOrc(["run", taskFile, "--kind", "scout", "--branch", "orc/task-1", "--sandbox", "none"], repo, env)
-      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: "" })
-      const runDir = (await readFile(join(fakeBin, "pi-cwd"), "utf8")).trim()
-      const report = await readFile(join(runDir, "report.md"), "utf8")
-      const owner = "Decided by the owner:\n\nDecision orc-1 asked:\n\n# Which button goes first\n\nThe left one or the right one?\n\nOwner answered: use the left one"
-      const agent = "Decided by the agent:\n\nDecision orc-2 asked:\n\n# Which colour\n\nBlue or green?\n\nAgent answered: green\nBasis: not recorded"
-      expect(report).toContain(owner + "\n\n" + agent)
     })
   }, 60_000)
 
@@ -227,6 +214,21 @@ describe("orc run --kind scout", () => {
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toContain("orc: the heavy queue failed to start")
       expect(await Bun.file(join(fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+})
+
+describe("the ship run report", () => {
+  test("lists the owner decision and the agent decision a task carries under their own Decided by headings, the agent one with its basis, instead of one mixed list", async () => {
+    await withReportFixture(true, async ({ repo, orcHome, env }) => {
+      const taskFile = await decidedTaskFile(orcHome, repo)
+      await runOrc(["run", taskFile, "--branch", "orc/task-1", "--sandbox", "none"], repo, env)
+      const runIds = await readdir(join(orcHome, "runs"))
+      expect(runIds).toHaveLength(1)
+      const report = await readFile(join(orcHome, "runs", runIds[0] ?? "", "report.md"), "utf8")
+      const owner = "Decided by the owner:\n\nDecision orc-1 asked:\n\n# Which button goes first\n\nThe left one or the right one?\n\nOwner answered: use the left one"
+      const agent = "Decided by the agent:\n\nDecision orc-2 asked:\n\n# Which colour\n\nBlue or green?\n\nAgent answered: green\nBasis: not recorded"
+      expect(report).toContain(owner + "\n\n" + agent)
     })
   }, 60_000)
 })

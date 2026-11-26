@@ -72,6 +72,8 @@ To merge a PR that waits:
 Click **hold** to leave the PR open, and the Inbox runs `orc attention answer <item> hold`.
 A failed command shows the first line of its error on its card.
 
+## Read agent decisions
+
 Questions the agent owns, and the answered questions, stay in the collapsed **Agent attention** section at the end.
 The answers sit in two groups, **Decided by the owner** and **Decided by the agent**.
 Each agent answer shows its basis, or `Not recorded` when the item holds none.

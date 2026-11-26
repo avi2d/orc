@@ -47,6 +47,8 @@ An agent answer is followed by `basis: not recorded`, because a decision task ke
 `orc backlog --json` gives it `kind: "decision"` and `answer` as its words, time and `decider`.
 Every other closed task carries `null` for `answer`.
 
+## Tasks that wait on a decision
+
 A task added with `--depends-on <decision-id>` waits until you answer the decision, as any dependency does.
 When it starts, the runner appends the decision's question and your answer after the task's own body in the run's task file.
 The run report quotes that file:
