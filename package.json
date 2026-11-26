@@ -20,7 +20,7 @@
     "lint": "bun scripts/check-doc-links.ts && mkdir -p .orc-home && RUNTIME_BINS=\"$(dirname \"$(bun -p process.execPath)\"):$(dirname \"$(node -p process.execPath)\")\" && HOME=$PWD/.orc-home PATH=$PWD/packages/run/scripts:$RUNTIME_BINS:$PATH oxlint && CHECKS_SECRETS_PACK=\"${CHECKS_SECRETS_PACK-$HOME/.config/checks/secrets-pack.json}\" HOME=$PWD/.orc-home PATH=$PWD/packages/run/scripts:$RUNTIME_BINS:$PATH checks-lint",
     "postinstall": "bun packages/run/scripts/patch-knip-jiti.ts && cp CHANGELOG.md packages/run/CHANGELOG.md",
     "prepare": "checks-vendor --library effect --package effect --repository https://github.com/Effect-TS/effect.git --tag 'effect@{version}' --path packages/effect/package.json",
-    "typecheck": "tsc --noEmit && effect-tsgo diagnostics --project tsconfig.json --format text --strict",
+    "typecheck": "tsc --noEmit && effect-tsgo diagnostics --project tsconfig.json --format text --strict && bun scripts/vue-typecheck.ts --noEmit -p tsconfig.vue.json",
     "pretest": "bun run bundle",
     "pretest:fast": "bun run bundle",
     "pretest:e2e": "bun run bundle",
@@ -68,6 +68,7 @@
     "@stryker-mutator/core": "10.0.0",
     "@swc/core": "1.16.2",
     "@types/bun": "^1.3.0",
+    "@typescript/typescript6": "6.0.2",
     "@vue-flow/core": "1.48.2",
     "dependency-cruiser": "18.4.0",
     "effect": "4.1.4",
@@ -77,7 +78,8 @@
     "oxlint-tsgolint": "7.0.2002",
     "typescript": "7.0.2",
     "vitepress": "1.6.4",
-    "vue": "3.5.45"
+    "vue": "3.5.45",
+    "vue-tsc": "3.3.14"
   },
   "overrides": {
     "@effect/platform-node-shared": "4.1.4",
