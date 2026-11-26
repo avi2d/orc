@@ -105,7 +105,7 @@ A run that has not received the decider's answer gets only yours.
 If a run already took the decider's answer, `orc backlog answer` says the next beat queues your answer as a correction and that delivery is not confirmed.
 The next beat writes the correction to `corrections.json`, and that write fails if the run has already ended.
 The task file marks it `correction_queued`, and later beats do not queue it again.
-A Pi worker may receive the correction after its next tool call.
+A [Pi](https://pi.dev) worker may receive the correction after its next tool call.
 No Pi worker reads corrections during a [no-mistakes](https://github.com/kunchenguid/no-mistakes) gate or after the last Pi session ends.
 A closed task refuses the answer, because its run is over.
 A second answer never replaces yours.
@@ -131,7 +131,7 @@ The beat opens an item for each run event, owned by the user:
   A confirmed failed run [retries once](#retry-a-dead-run-once) first, and the item opens when the task closes after that.
   Two other failures recover without opening a `run-died` item.
   When no-mistakes refuses to start because the repository is not initialized, the run runs `no-mistakes init --skip-user-skill` and starts no-mistakes again.
-  When the command that reaches a dispatch machine exits 255, as ssh does when its connection fails, or its read times out, the task stays started with an unknown state and the next beat reads it again.
+  When the command that reaches a dispatch machine exits 255, as [ssh](https://www.openssh.com) does when its connection fails, or its read times out, the task stays started with an unknown state and the next beat reads it again.
 - A dispatch machine that orc has not reached for 10 minutes, counted from the first beat that could not reach it, opens a `machine-unreached` item for each started task on that machine.
   Each item names the machine and the error of the command that reaches it, and the task stays started.
   A beat that reaches the machine again withdraws the item, and so does closing its task.
@@ -140,7 +140,7 @@ The beat opens an item for each run event, owned by the user:
 
 The beat opens these items for a closed ship task's PR, owned by the user:
 
-- A red GitHub Actions check on the PR makes orc run `gh run rerun <run-id> --failed` once per PR.
+- A red [GitHub Actions](https://github.com/features/actions) check on the PR makes orc run `gh run rerun <run-id> --failed` once per PR.
   orc records the rerun in the task file and posts a chat event.
   While the unfinished checks in a red run are queued or in progress, orc waits and does neither.
   If a check waits for approval or is pending, orc opens the `check-red` item instead.
@@ -158,7 +158,7 @@ The beat opens these items for a closed ship task's PR, owned by the user:
 
 ### Retry a dead run once
 
-A run is confirmed failed when pueue reports its task failed, not killed, and the runner holds a run ID for it.
+A run is confirmed failed when [pueue](https://github.com/Nukesor/pueue) reports its task failed, not killed, and the runner holds a run ID for it.
 The beat returns that task to `new` once, keeping its branch and origin run, so the next beat resumes the run.
 It records the `retry` mark in the task file and a chat event `<task-id>.retry.<run-id>`.
 A failure after the retry closes the task and opens a `run-died` item with the task log tail.

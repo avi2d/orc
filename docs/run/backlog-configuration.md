@@ -10,7 +10,7 @@ Both files live in `$ORC_HOME/backlog`, or `~/.orc/backlog` when `ORC_HOME` is u
 
 `dispatch.json` defines machines, their slot limits and commands, and the quota and accounts.
 Its optional [`routing` section](dispatch-rules.md) picks models and quota accounts per task.
-Each slot limit also sets the pueue `orc` group's parallel limit when `orc runner start` queues a task.
+Each slot limit also sets the [pueue](https://github.com/Nukesor/pueue) `orc` group's parallel limit when `orc runner start` queues a task.
 
 Each account has one credential kind:
 
@@ -18,8 +18,8 @@ Each account has one credential kind:
   Each machine needs a start command.
 - `token-command` names a `tokenCommand` for a renewable token on the dispatching machine.
   Each machine needs both start and `renew` commands.
-- `none` supplies no token for a provider or Pi package that handles login itself.
-- `claude-config` names a Claude config directory on each machine.
+- `none` supplies no token for a provider or [Pi](https://pi.dev) package that handles login itself.
+- `claude-config` names a [Claude](https://claude.com) config directory on each machine.
 
 An account with only `tokenFile` or `tokenCommand` is read as the matching kind.
 The optional `floorPercent` sets the minimum remaining quota.
@@ -91,8 +91,8 @@ A model an agent file names still takes precedence, so the agent files of a proj
 
 ### Quota from quota-axi
 
-The quota command may instead print the document of `quota-axi --full --json --provider <id>`, such as `["quota-axi", "--full", "--json", "--provider", "codex"]`.
-Orc matches each account to `accountKey` or `accountKeys` and reads the `effectivePercentRemaining` of the entry's `all_models` scope under `quotaSemantics`, so a Codex code review window does not count.
+The quota command may instead print the document [quota-axi](https://github.com/kunchenguid/quota-axi) prints for `quota-axi --full --json --provider <id>`, such as `["quota-axi", "--full", "--json", "--provider", "codex"]`.
+Orc matches each account to `accountKey` or `accountKeys` and reads the `effectivePercentRemaining` of the entry's `all_models` scope under `quotaSemantics`, so a [Codex](https://github.com/openai/codex) code review window does not count.
 The account's reset time is the `resetsAt` of the scope's limiting window, the latest one when several tie, and the beat line prints it after the room.
 An account without a window or percentage cannot run.
 A document with no windows or duplicate account keys leaves the quota unread.
@@ -152,7 +152,7 @@ The token must be printable ASCII without spaces and must not expire within five
 A failed or malformed command, or one taking more than 15 seconds, leaves the account waiting.
 A later beat can start the task when the command returns a live token.
 
-`orc runner token <claude-credentials.json>` reads a Claude Code access token and expiry into a pipe.
+`orc runner token <claude-credentials.json>` reads a [Claude Code](https://claude.com/product/claude-code) access token and expiry into a pipe.
 It refuses a file containing a refresh token.
 You must keep the file fresh.
 
@@ -181,7 +181,7 @@ A kind `none` account beside a machine `renew` command is refused too, unless a 
 
 ### Subscription logins on other providers
 
-A Pi login names no token, so an account for a subscription Pi signs in to, such as a ChatGPT plan on Pi's `openai` provider or an OpenCode Go plan, takes kind `none` and its own `provider`.
+A Pi login names no token, so an account for a subscription Pi signs in to, such as a ChatGPT plan on Pi's `openai` provider or an [OpenCode](https://opencode.ai) Go plan, takes kind `none` and its own `provider`.
 Sign Pi in to each provider on every machine that runs tasks, and define each one in `config.json` with `credential` `pi-login`.
 Each account sits beside the Claude account the runs already take, and the beat picks among all of them:
 
@@ -257,7 +257,7 @@ Orc refuses a floor that is not a whole number from 0 to 4.
 
 ### Upstream contributions
 
-Add `upstream` to a project to watch GitHub issue and PR URLs.
+Add `upstream` to a project to watch [GitHub](https://github.com) issue and PR URLs.
 The beat reads them with the dispatch machine's `gh` login.
 When a contribution changes after its first read, the beat adds a scout task with no priority.
 Assign a priority to start it.

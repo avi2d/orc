@@ -19,7 +19,7 @@ Orc reads three shapes: its own `orc.quota.v1` document, the document `quota-axi
 A command that is not installed, fails, runs past 15 seconds or prints anything else leaves the quota unread, and that beat starts nothing.
 
 To read quota from subquo, set the quota command to `["subquo", "read", "--json"]`.
-To go back, set the quota command back to the value it held before, the reader that prints an `orc.quota.v1` or quota-axi document.
+To go back, set the quota command back to the value it held before, the reader that prints an `orc.quota.v1` or [quota-axi](https://github.com/kunchenguid/quota-axi) document.
 An account's room in a subquo snapshot is the smallest `percentLeft` among its windows with scope `all`.
 A window that covers one model only does not limit the account.
 An account whose reading is stale, unavailable, past its `validUntil` or has an unknown percent or reset cannot run.
@@ -32,7 +32,7 @@ Without a `floorPercent` there is no floor.
 Among the accounts that can run, the beat picks the one with the most room, and the tasks that beat starts take it.
 An account an `orc.quota.v1` or quota-axi document does not name cannot run.
 
-The quota names a default provider, and an account may name its own, so one quota can hold Claude, OpenAI and OpenCode accounts.
+The quota names a default provider, and an account may name its own, so one quota can hold [Claude](https://claude.com), OpenAI and [OpenCode](https://opencode.ai) accounts.
 The beat compares every account in the quota, whatever its provider, and the run it starts takes the picked account's provider.
 Each provider is one `~/.orc/config.json` defines on each machine that runs tasks.
 An account's provider comes from its `provider` in `dispatch.json`, never from the vendor a `subquo.v1` snapshot names for it.
@@ -50,7 +50,7 @@ The account's kind says where its credential lives.
 | `token-file` | The path of a token file that exists on the machine, never the token |
 | `token-command` | A token the command prints, sent on standard input and renewed each beat |
 | `claude-config` | The path of that account's Claude config directory on the machine |
-| `none` | Nothing, since the provider's Pi login or its own package logs in |
+| `none` | Nothing, since the provider's [Pi](https://pi.dev) login or its own package logs in |
 
 A `none` account spends the one login its provider holds on each machine, so no other account in the quota may run on that provider.
 A Claude account, an OpenAI account and an OpenCode account may each take kind `none` side by side.

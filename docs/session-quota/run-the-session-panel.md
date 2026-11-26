@@ -18,13 +18,13 @@ To print one frame of plain text instead, run `orc-dash panel session-quota --pr
 
 ## Session logs and flags
 
-The session panel reads the Pi logs under `HOME`, the Codex logs under `CODEX_HOME`, or `~/.codex`, and the Claude Code logs under `CLAUDE_CONFIG_DIR`, or `~/.claude`.
+The session panel reads the [Pi](https://pi.dev) logs under `HOME`, the [Codex](https://github.com/openai/codex) logs under `CODEX_HOME`, or `~/.codex`, and the [Claude Code](https://claude.com/product/claude-code) logs under `CLAUDE_CONFIG_DIR`, or `~/.claude`.
 Those are the homes of the logins `quota-axi` reads.
 It counts each model call once.
 It splits a window's used points across the sessions that made those calls.
 It flags each live session spending over its fair share of a window that runs ahead of pace and is past its first tenth.
 It flags only when the window runs out before its reset.
-Quota-axi's runway gives the verdict for a window it names.
+[Quota-axi](https://github.com/kunchenguid/quota-axi)'s runway gives the verdict for a window it names.
 An early or unknown projection leaves the live rate to decide.
 A runway naming another window means this one runs to its reset.
 A harvested window or one with no runway reads its pace from its live sessions' total rate against the sustainable rate.
@@ -37,7 +37,7 @@ The session panel also reads the capture ledger that its writer appends to from 
 The bridge appends headless readings to the same ledger.
 It can merge a second machine's report, so an account both machines spend shows one estimate instead of two upper bounds.
 Each account opens with the assumption that joined its calls to it, such as joined by credential key or assumed the only login.
-The Claude headings use the same [account names](../dash-quota.md) as the dashboard quota panel.
+The [Claude](https://claude.com) headings use the same [account names](../dash-quota.md) as the dashboard quota panel.
 A heading with no such name uses the `quota-axi` account key, or just `claude` for the default login.
 A window is read from a harness log when the log covered its provider within the hour, or read it later than quota-axi did.
 Such a window names that log and the reading's age, such as from codex rollout 38m ago.

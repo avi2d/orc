@@ -29,7 +29,7 @@ Their windows merge when they share the window id and their resets fall within a
 This machine's quota reading supplies the used points, the pace and the gate of a merged window.
 Each session's share is then of the calls both machines observed, so the shares of one window add up to its used points once.
 The live sessions that spent in the trailing hour on either machine split the fair share, and each session over its fair share of a window running out before its reset is flagged.
-Used points neither machine explains stay unattributed, and every share stays an upper bound, since claude.ai and any third machine spend unseen.
+Used points neither machine explains stay unattributed, and every share stays an upper bound, since [claude.ai](https://claude.ai) and any third machine spend unseen.
 An account or window that only one machine reads shows as that machine read it.
 Every flag in the other machine's report is judged again by the fair share rule above.
 So a report flagging by an older rule shows only the sessions over their fair share of a window running out before its reset.
@@ -46,7 +46,7 @@ The caption names the machines whose logs the estimates come from, such as `esti
 When the command fails or its output is not a version 1 report, the panel says so on a warning line with the reason.
 It does the same when the report is more than five minutes old.
 It then shows this machine's shares alone, as upper bounds, under a caption that names only this machine.
-When this machine's quota-axi reading fails, the other machine's accounts and the accounts the harness logs read still show.
+When this machine's [quota-axi](https://github.com/kunchenguid/quota-axi) reading fails, the other machine's accounts and the accounts the harness logs read still show.
 A warning line says that calls on the accounts quota-axi reads are not counted, with the reason.
 When one machine's read of an account fails and the other machine reads its windows, those windows still show.
 A warning line beside them names the machine and the account, with the reason.

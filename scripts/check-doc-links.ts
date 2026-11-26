@@ -21,14 +21,20 @@ const pageOf = (source: string): string => source.replace(/^---\n[\s\S]*?\n---\n
 const targetsOf = (page: string): Set<string> =>
   new Set(targetPatterns.flatMap((pattern) => [...page.matchAll(pattern)].map((match) => bare(match[1]))))
 const proseOf = (page: string): string => proseCuts.reduce((text, cut) => text.replace(cut, " "), page)
-const names = (prose: string, tool: OutsideTool): boolean =>
-  new RegExp("(?<![\\p{L}\\p{N}_./-])" + escaped(tool.name) + "(?![\\p{L}\\p{N}_-])", "iu").test(prose)
+const mention = (name: string): RegExp =>
+  new RegExp("(?<![\\p{L}\\p{N}_./-])" + escaped(name) + "(?![\\p{L}\\p{N}_-])", "giu")
+const names = (prose: string, tool: OutsideTool, registry: ReadonlyArray<OutsideTool>): boolean =>
+  mention(tool.name).test(
+    registry
+      .filter((other) => other.name.length > tool.name.length && mention(tool.name).test(other.name))
+      .reduce((text, other) => text.replace(mention(other.name), " "), prose)
+  )
 
 export const unlinkedTools = (source: string, registry: ReadonlyArray<OutsideTool>): Array<OutsideTool> => {
   const page = pageOf(source)
   const targets = targetsOf(page)
   const prose = proseOf(page)
-  return registry.filter((tool) => names(prose, tool) && !targets.has(bare(tool.url)))
+  return registry.filter((tool) => names(prose, tool, registry) && !targets.has(bare(tool.url)))
 }
 
 const listedOf = (

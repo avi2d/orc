@@ -3,7 +3,7 @@ kind: reference
 ---
 # Adding tasks from a chat
 
-Run `orc chat` to add and manage tasks in a Pi session.
+Run `orc chat` to add and manage tasks in a [Pi](https://pi.dev) session.
 The chat uses `models.orchestrator` from `config.json` and refuses to start if no model is set.
 
 ## Session and instructions
@@ -78,13 +78,13 @@ The board has no login.
 Anyone on the same network with its link can submit answers that orc records as yours.
 The chat opens it with `lavish-axi <board.html> --no-open --reopen` and posts a LAN URL.
 The board is not published through `lavish-axi share`, a third-party host, or a public tunnel.
-The page loads Tailwind and DaisyUI styles from the jsDelivr CDN.
+The page loads [Tailwind](https://tailwindcss.com) and [DaisyUI](https://daisyui.com) styles from the [jsDelivr](https://www.jsdelivr.com) CDN.
 The shell running `orc chat` must have `lavish-axi` on its `PATH`.
 
 ### Board address
 
 Set `ORC_BOARD_HOST` to a hostname or IP address to choose the address.
-Orc passes it as `LAVISH_AXI_HOST`, and Lavish binds that address and loopback and prints the session link.
+Orc passes it as `LAVISH_AXI_HOST`, and [Lavish](https://github.com/kunchenguid/lavish-axi) binds that address and loopback and prints the session link.
 Use `127.0.0.1` to keep the board on this machine.
 
 Without `ORC_BOARD_HOST`, orc selects a private LAN IPv4 address, preferring 192.168.0.0/16, then 10.0.0.0/8, then 172.16.0.0/12.

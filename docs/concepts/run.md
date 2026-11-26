@@ -13,8 +13,8 @@ The beat starts most runs through the runner, and you can start one by hand in a
 ## An isolated copy
 
 Orc refuses a checkout with uncommitted changes.
-A ship run then makes a git worktree of the project on a new branch under `~/.orc/worktrees`, so the agent never touches your own checkout.
-Before Pi starts, a ship run runs the `prepare` command from the project's `.no-mistakes.yaml`, such as an install.
+A ship run then makes a [git](https://git-scm.com) worktree of the project on a new branch under `~/.orc/worktrees`, so the agent never touches your own checkout.
+Before [Pi](https://pi.dev) starts, a ship run runs the `prepare` command from the project's `.no-mistakes.yaml`, such as an install.
 
 ## The agent
 

@@ -3,8 +3,8 @@ kind: reference
 ---
 # Release assets
 
-Each Orc release on GitHub carries an archive with `orc`, `orc-dash`, `orc-dash-capture`, and the heavy tool stand-in.
-The executables are Bun bytecode builds that run without Bun installed.
+Each Orc release on [GitHub](https://github.com) carries an archive with `orc`, `orc-dash`, `orc-dash-capture`, and the heavy tool stand-in.
+The executables are [Bun](https://bun.com) bytecode builds that run without Bun installed.
 The archive also holds the bundled [Herdr App](https://herdr.dev), which Herdr loads as mods.
 The `assets` job of `.github/workflows/main.yml` runs after the `release` job has written the GitHub release.
 The job runs `bun run release:assets` on macOS arm64 and Linux x64.

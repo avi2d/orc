@@ -3,7 +3,7 @@ kind: reference
 ---
 # Run the queues panel
 
-The queues panel shows pueue and GitHub Actions runs.
+The queues panel shows [pueue](https://github.com/Nukesor/pueue) and [GitHub Actions](https://github.com/features/actions) runs.
 
 ## Run the queues tool
 
@@ -27,7 +27,7 @@ To configure the queues, set these variables where the panel runs:
 | `ORC_DASH_REMOTE_PUEUE` | The shell command that prints the other machine's `pueue status --json`, such as `ssh other-host pueue status --json` |
 | `ORC_DASH_REMOTE_MACHINE` | The other machine's name on its panel, `remote` when unset |
 | `ORC_DASH_MACHINE` | This machine's name on its panel, `local` when unset |
-| `ORC_DASH_ACTIONS_REPO` | The repository whose runs the panel lists, such as `example/shop`. When unset, gh lists the runs of the repository the panel runs in, and the panel names it `this repository` |
+| `ORC_DASH_ACTIONS_REPO` | The repository whose runs the panel lists, such as `example/shop`. When unset, [gh](https://cli.github.com) lists the runs of the repository the panel runs in, and the panel names it `this repository` |
 
 With `ORC_DASH_REMOTE_PUEUE` unset or blank, the panel reads this machine's pueue alone.
 The command runs through `sh -c` with a 20 second limit, beside this machine's own read.
