@@ -14,9 +14,9 @@ Each runs inside the run, so a pull request that reaches you has already passed 
 ## The checks
 
 The project names its checks in a `.no-mistakes.yaml` file at its root, under `commands`.
-Orc runs only `build`, `lint`, and `typecheck` as local checks in the run's copy after Pi finishes.
+Orc runs only `build`, `lint`, and `typecheck` as local checks in the run's copy after [Pi](https://pi.dev) finishes.
 It skips every other command except `prepare`, which runs before Pi starts.
-GitHub CI runs repository tests.
+[GitHub](https://github.com) CI runs repository tests.
 When a local check fails, orc starts a fixer Pi with the failing output, then runs the local checks again.
 After 3 fix attempts with a local check still red, the run ends failed and no pull request opens.
 Follow the local check and GitHub CI policy in [Local checks and CI](../run/running-a-task.md#local-checks-and-ci).

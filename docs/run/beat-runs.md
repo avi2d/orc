@@ -33,9 +33,9 @@ See [Parked runs](parked-runs.md) and [A worker split proposal](task-kinds.md#a-
 
 ### Closing runs
 
-A runner task with no pueue record after 10 minutes closes failed.
+A runner task with no [pueue](https://github.com/Nukesor/pueue) record after 10 minutes closes failed.
 A result that remains unreadable for 10 minutes also closes failed.
-A result the beat cannot read because the command that reaches the machine exits 255, as ssh does when its connection fails, or because that read times out after 30 seconds, never closes the task.
+A result the beat cannot read because the command that reaches the machine exits 255, as [ssh](https://www.openssh.com) does when its connection fails, or because that read times out after 30 seconds, never closes the task.
 The task's state stays unknown and the next beat reads it again, so a later read that succeeds restores the real state.
 Such a beat also restarts the 10 minutes of an unreadable result.
 When that command is `ssh`, orc passes it `-o ConnectTimeout=10`, so a machine that never answers usually ends as exit 255 before the read times out.
@@ -93,7 +93,7 @@ The beat retries it on the next hourly check, and the next successful check with
 A failure that cannot be retried, such as a release that reports the wrong version, goes to you.
 
 The beat that checked for the update and any runs already underway keep their running version.
-The next scheduled beat uses the new version if its launcher reads the selected release or its path resolves to the updated Bun installation.
+The next scheduled beat uses the new version if its launcher reads the selected release or its path resolves to the updated [Bun](https://bun.com) installation.
 Start each machine on a release that supports its install method before relying on the beat to maintain it.
 
 <a id="merging-a-tasks-pr"></a>

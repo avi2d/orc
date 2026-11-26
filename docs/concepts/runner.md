@@ -6,7 +6,7 @@ kind: explanation
 # The runner
 
 The runner is the part of orc on each machine that keeps a run alive after the beat has gone.
-`orc runner start` is the start command the beat runs, and it hands the task to pueue, the queue on that machine.
+`orc runner start` is the start command the beat runs, and it hands the task to [pueue](https://github.com/Nukesor/pueue), the queue on that machine.
 
 ![The runner: what keeps a run alive on its machine](../diagrams/runner.svg)
 
@@ -21,7 +21,7 @@ The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run 
 
 To start on another machine, the start command names how to reach orc there after `--`, as in `orc runner start -- ssh linux-box orc`.
 The task then travels as JSON on standard input to `orc runner queue` on the far side, so its text never passes through a remote shell.
-SSH can drop once pueue holds the run, because pueue on that machine owns it.
+[SSH](https://www.openssh.com) can drop once pueue holds the run, because pueue on that machine owns it.
 
 ## A queued run
 

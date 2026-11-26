@@ -21,7 +21,7 @@ To select this delivery for a project, set its `mode` to `orc` in `projects.json
 For a direct run or resume, pass `--delivery orc`.
 
 ## Review the branch
-Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one Pi turn with the reviewer agent over that diff and the task file.
+Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one [Pi](https://pi.dev) turn with the reviewer agent over that diff and the task file.
 Orc decodes the findings JSON array from the reviewer's last reply and writes it to `review.json` in the run folder.
 An unreadable reply gets one rerun on the same session, and a second unreadable reply fails the review turn.
 The run's end reason names the finding count or the review failure.

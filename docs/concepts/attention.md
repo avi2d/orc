@@ -15,7 +15,7 @@ Each item names who must answer it, and a model called the decider takes the rou
 | Kind | What it is | Who owns it |
 | --- | --- | --- |
 | `review-question` | A question the review raised at its gate | The decider first |
-| `worker-question` | A question Pi asked mid-run with `orc_ask` | The decider first |
+| `worker-question` | A question [Pi](https://pi.dev) asked mid-run with `orc_ask` | The decider first |
 | `looping` question | Pi failed one command 6 times in a row | You |
 | `failing-command` | Pi failed one command 3 times in a row, which only tells you | You |
 | `run-died` | A run failed or its start failed | You |

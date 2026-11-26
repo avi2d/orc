@@ -158,8 +158,66 @@ jobs:
           path: artifacts/
           if-no-files-found: ignore
 
+  compiled-macos:
+    needs: changes
+    if: (needs.changes.outputs.release != 'true' || needs.changes.outputs.check-release == 'true') && needs.changes.outputs.docs-only != 'true'
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: cancel the run when a push to a draft pull request started it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+        run: bunx checks-ci draft-hold
+      - id: test
+        run: bun test ./tests/e2e/compiled-orc.test.ts
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: artifacts-${{ job.check_run_id }}
+          path: artifacts/
+          if-no-files-found: ignore
+
+  compiled-windows:
+    needs: changes
+    if: (needs.changes.outputs.release != 'true' || needs.changes.outputs.check-release == 'true') && needs.changes.outputs.docs-only != 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: cancel the run when a push to a draft pull request started it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+        run: bunx checks-ci draft-hold
+      - id: test
+        run: bun test ./tests/e2e/compiled-orc.test.ts
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: artifacts-${{ job.check_run_id }}
+          path: artifacts/
+          if-no-files-found: ignore
+
   checks:
-    needs: [changes, static, docs, unit, e2e]
+    needs: [changes, static, docs, unit, e2e, compiled-macos, compiled-windows]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -176,7 +234,7 @@ jobs:
       - name: require every result to be success
         env:
           RESULTS: ${{ toJSON(needs) }}
-          SKIPS: ${{ needs.changes.outputs.release == 'true' && needs.changes.outputs.check-release != 'true' && 'static docs unit e2e' || needs.changes.outputs.docs-only == 'true' && 'unit e2e' || '' }}
+          SKIPS: ${{ needs.changes.outputs.release == 'true' && needs.changes.outputs.check-release != 'true' && 'static docs unit e2e compiled-macos compiled-windows' || needs.changes.outputs.docs-only == 'true' && 'unit e2e compiled-macos compiled-windows' || '' }}
         run: bunx checks-ci require-success
       # GitHub keeps a dispatched run's checks off the pull request, so the release pull request reads these statuses.
       - if: always() && github.event_name == 'workflow_dispatch'

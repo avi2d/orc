@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Clock, DateTime, type Duration, Effect, Fiber, Layer, Option, Schema } from "effect";
+import { Clock, DateTime, type Duration, Effect, Fiber, FileSystem, Layer, Option, Schema } from "effect";
 import { TestClock, TestConsole } from "effect/testing";
 import { modules } from "@avi2dg/orc-cli";
 import { dashboardScreen } from "@avi2dg/orc-dashboard";
@@ -73,6 +73,13 @@ const ciDelayedRun = () => {
       : Effect.succeed(recordedAnswer(command));
 };
 
+const configPath = "/config.json";
+const configText = fixture("config/config.json");
+const missingFiles = FileSystem.makeNoop({});
+const configOnlyFileSystem = FileSystem.layerNoop({
+  readFileString: (path) => path === configPath ? Effect.succeed(configText) : missingFiles.readFileString(path),
+});
+
 const cachedCiFrame = () =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -88,15 +95,16 @@ const cachedCiFrame = () =>
       yield* screen.read;
       const now = yield* Clock.currentTimeMillis;
       const draw = (columns: number, rows: number): string => screen.draw(now, screen.initial, columns, rows).block.map(plain).join("\n");
-      // The ticks wake each round on the test clock, but the forked reads land it in real time, which no fixed wait bounds on a loaded machine.
-      for (let attempt = 0; attempt < 200 && bottomEdge(boxText(draw(240, 60), "queue | scheduled")).includes("reading\u2026"); attempt += 1) {
-        yield* Effect.promise(() => Bun.sleep(25));
-        yield* screen.read;
-      }
       return { wide: draw(240, 60), glance: draw(84, 40) };
     }),
   ).pipe(
-    Effect.provide(dashboardSources({ env: { ORC_DASH_TASKS: tasksCommand }, run: ciDelayedRun(), repos: stubRepos })),
+    Effect.provide(dashboardSources({
+      config: configPath,
+      fileSystem: configOnlyFileSystem,
+      env: { ORC_DASH_TASKS: tasksCommand },
+      run: ciDelayedRun(),
+      repos: stubRepos,
+    })),
     Effect.provideService(ReadModeReference, "live"),
     Effect.provide(TestClock.layer()),
   );

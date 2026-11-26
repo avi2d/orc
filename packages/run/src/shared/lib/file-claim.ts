@@ -49,14 +49,20 @@ const publishClaim = (fs: FileSystem.FileSystem, file: string, mine: string): Ef
 const dropClaim = (fs: FileSystem.FileSystem, file: string, held: string): Effect.Effect<void, PlatformError.PlatformError> =>
   Effect.flatMap(readClaim(fs, file), (current) => Option.contains(current, held) ? fs.remove(file) : Effect.void)
 
-const libcPath = process.platform === "darwin" ? "/usr/lib/libSystem.B.dylib" : "libc.so.6"
-const libc = dlopen(libcPath, {
-  open: { args: [FFIType.ptr, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-  close: { args: [FFIType.i32], returns: FFIType.i32 },
-  flock: { args: [FFIType.i32, FFIType.i32], returns: FFIType.i32 }
-})
-const errnoName = process.platform === "darwin" ? "__error" : "__errno_location"
-const errno = dlopen(libcPath, { [errnoName]: { args: [], returns: FFIType.ptr } }).symbols[errnoName]
+const loadLibc = () => {
+  const libcPath = process.platform === "darwin" ? "/usr/lib/libSystem.B.dylib" : "libc.so.6"
+  const libc = dlopen(libcPath, {
+    open: { args: [FFIType.ptr, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
+    close: { args: [FFIType.i32], returns: FFIType.i32 },
+    flock: { args: [FFIType.i32, FFIType.i32], returns: FFIType.i32 }
+  })
+  const errnoName = process.platform === "darwin" ? "__error" : "__errno_location"
+  const errno = dlopen(libcPath, { [errnoName]: { args: [], returns: FFIType.ptr } }).symbols[errnoName]
+  return { libc, errno }
+}
+
+let loadedLibc: ReturnType<typeof loadLibc> | undefined
+
 const processStartedAt = Date.now() - process.uptime() * 1000
 
 const lockFailure = (file: string, method: string, cause: unknown): PlatformError.PlatformError =>
@@ -64,7 +70,11 @@ const lockFailure = (file: string, method: string, cause: unknown): PlatformErro
 
 const withKernelLock = <A, E, R>(file: string, use: Effect.Effect<A, E, R>): Effect.Effect<Option.Option<A>, E | PlatformError.PlatformError, R | FileSystem.FileSystem> =>
   Effect.gen(function*() {
+    if (process.platform === "win32") {
+      return yield* Effect.fail(PlatformError.systemError({ _tag: "Unknown", module: "FileSystem", method: "flock", pathOrDescriptor: file, description: "file claims are not supported on Windows yet" }))
+    }
     const fs = yield* FileSystem.FileSystem
+    const { libc, errno } = loadedLibc ??= loadLibc()
     return yield* Effect.acquireUseRelease(
       Effect.flatMap(Effect.sync(() => libc.symbols.open(Buffer.from(file + "\0"), 2 | (process.platform === "darwin" ? 0x1000200 : 0x80040), 0o600)), (fd) =>
         fd < 0 ? Effect.fail(lockFailure(file, "open", "cannot open lock file")) : Effect.succeed(fd)),

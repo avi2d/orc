@@ -1,4 +1,4 @@
-export { liveCommandRunner } from "./lib/runner";
+export { commandRunnerWithGrace, liveCommandRunner } from "./lib/runner";
 export { themeOfSettings } from "./panel/appearance";
 export {
   decodeSettings,
@@ -22,7 +22,7 @@ export { mountPolled, type PolledReading } from "./panel/polled-mount";
 export { leastPanelWidth, type Panel, livePanel, panelWidth, printFrame, printFrameOf, runPanel } from "./panel/panel";
 export { binArgsExit, colorWithoutPrintExit, printBinArgsExit, printColor, printPanelKnown, printPanelUsage, usageText } from "./bin-args";
 export { type Block, bottomEdgeRow, type Frame, panel, panelChrome, panelLine, titleEdge, titleRoom, withinRows, wrapParts } from "./text/layout";
-export { type Drawn, liveScreen, type Move, printBlock, printScreen, runScreen, type Screen, type ScreenSize, type Target, targetAt } from "./terminal/screen";
+export { type Drawn, liveScreen, type Move, printBlock, printScreen, runScreen, type Screen, ScreenDrawObserver, type ScreenSize, type Target, targetAt } from "./terminal/screen";
 export { blockDocument, frameAnsi, frameText, hexOfTone } from "./terminal/opentui";
 export { agoWords, joinWords, sourceWords } from "./readouts/sources";
 export {

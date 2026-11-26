@@ -41,11 +41,11 @@ Each step below is one part of orc, and each has its own page.
    The run takes the account with the most room.
    [Accounts and quota](concepts/accounts-and-quota.md) shows the choice.
 1. **The runner queues the run.**
-   The beat hands the task to `orc runner start`, which queues it in pueue on the chosen machine.
-   From then on the run belongs to that machine and outlives the beat and any SSH link.
+   The beat hands the task to `orc runner start`, which queues it in [pueue](https://github.com/Nukesor/pueue) on the chosen machine.
+   From then on the run belongs to that machine and outlives the beat and any [SSH](https://www.openssh.com) link.
    [The runner](concepts/runner.md) shows what the machine holds.
 1. **The run does the work.**
-   For a ship task, `orc run` makes a copy of the project on a new branch and starts the Pi agent in it.
+   For a ship task, `orc run` makes a copy of the project on a new branch and starts the [Pi](https://pi.dev) agent in it.
    Pi writes the change and commits it, while a scout or task run writes a report instead.
    [A run](concepts/run.md) follows it step by step.
 1. **The checks and the review judge it.**
@@ -95,7 +95,7 @@ Its state is files on disk and queues in pueue, so a restart picks up where it s
 | Pi | The coding agent orc runs, and the only one |
 | no-mistakes | The review tool that takes a checked branch to a pull request |
 | pueue | The queue on each machine that holds the runs |
-| [nono](https://nono.sh) | The sandbox a run you start by hand works in by default |
+| [nono](https://nono.sh) | The default sandbox for a run you start by hand, bypassed with `--sandbox none` |
 | Decider | The model that answers a run's routine questions from written instructions |
 
 ## Related topics

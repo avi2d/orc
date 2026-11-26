@@ -21,7 +21,7 @@ Other `orc backlog` commands except `add` refuse, as does `orc merge`.
 Each beat identifies repositories from task PR links and the origin remotes of reachable checkouts in `projects.json`.
 Task PR links keep identifying the repository after the task merges, including projects with checkouts only on worker machines.
 For each repository, Orc reads push workflow runs on its default branch, regardless of who merged the PR or whether Orc updated it.
-Orc makes one GraphQL call per GitHub host per beat, with a 30-second timeout.
+Orc makes one GraphQL call per [GitHub](https://github.com) host per beat, with a 30-second timeout.
 The query covers the latest 20 commits and at most 100 check suites per commit.
 A repository the token cannot resolve is skipped, and the other repositories on its host are still read.
 A failed run raises a CI alarm in Orc chat with a link to the run.

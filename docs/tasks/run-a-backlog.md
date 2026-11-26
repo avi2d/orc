@@ -8,7 +8,7 @@ Hand orc a stream of work, so that it places each task on a machine and an accou
 ## Before you begin
 
 - A task that ran by hand, as [Run your first task](run-your-first-task.md) shows.
-- pueue on each machine that runs tasks, with its daemon started by `pueued -d`.
+- [pueue](https://github.com/Nukesor/pueue) on each machine that runs tasks, with its daemon started by `pueued -d`.
 - A command that prints each account's room, or one login and the always-room command [Backlog configuration](../run/backlog-configuration.md#one-login-without-a-quota-reader) shows.
 
 ## Name the machines and the accounts

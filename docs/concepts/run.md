@@ -13,13 +13,15 @@ The beat starts most runs through the runner, and you can start one by hand in a
 ## An isolated copy
 
 Orc refuses a checkout with uncommitted changes.
-A ship run then makes a git worktree of the project on a new branch under `~/.orc/worktrees`, so the agent never touches your own checkout.
-Before Pi starts, a ship run runs the `prepare` command from the project's `.no-mistakes.yaml`, such as an install.
+A ship run then makes a [git](https://git-scm.com) worktree of the project on a new branch under `~/.orc/worktrees`, so the agent never touches your own checkout.
+Before [Pi](https://pi.dev) starts, a ship run runs the `prepare` command from the project's `.no-mistakes.yaml`, such as an install.
 
 ## The agent
 
 Orc runs only the Pi agent, and it starts Pi itself.
-A run you start by hand works inside the [nono](https://nono.sh) sandbox by default, and `--sandbox none` runs it on the host.
+A run you start by hand uses the [nono](https://nono.sh) sandbox by default unless you pass `--sandbox none`.
+Queued tasks always pass `--sandbox none` and run without a per-agent sandbox.
+Their safety boundary is the isolated space around the whole agent system, as [Running without a sandbox](../run/running-without-a-sandbox.md) describes.
 The agent file `implementer.md` holds Pi's instructions, and `config.json` names the model.
 The prompt is the task, and it asks Pi to print `ORC_COMPLETE` on its own line once the work is committed.
 

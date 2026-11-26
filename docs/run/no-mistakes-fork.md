@@ -3,7 +3,7 @@ kind: reference
 ---
 # What the no-mistakes fork adds
 Orc is developed against the avi2d/no-mistakes fork, and runs on upstream [no-mistakes](https://github.com/kunchenguid/no-mistakes) too.
-The fork sends and prints the same axi commands, flags and fields as upstream v1.100.2.
+The fork sends and prints the same [axi](https://github.com/kunchenguid/axi) commands, flags and fields as upstream v1.100.2.
 These fork changes alter what a run meets, and the table names what happens on upstream without each.
 
 | Fork change | What happens on upstream |

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises"
 import { homedir, tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
@@ -253,6 +253,11 @@ describe("orcHomeDir", () => {
 
   test("an override names the run-history directory", () => {
     expect(orcHomeDir("/tmp/orc-elsewhere")).toBe("/tmp/orc-elsewhere")
+  })
+
+  test("a drive-lettered or hash-bearing override stays a path and is no URL", () => {
+    expect(orcHomeDir("C:\\orc\\home")).toBe(resolve("C:\\orc\\home"))
+    expect(orcHomeDir("/tmp/orc#home?x")).toBe("/tmp/orc#home?x")
   })
 
   test("an empty override falls back to ~/.orc", () => {
