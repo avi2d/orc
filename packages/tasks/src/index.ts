@@ -33,16 +33,15 @@ export {
   topLine,
 } from "./board/layout";
 export { type Level, levelIndex, moved, type Navigation, pickedProject, pickedTask, startNavigation } from "./board/navigation";
+export { runSampler, type SamplerSources } from "./sampler/sampler";
 export {
   type MachineFigures,
-  runSampler,
   type SampleDetail,
   sampleRecords,
   type Sampled,
-  type SamplerSources,
   type WrittenLine,
   writtenOf,
-} from "./sampler/sampler";
+} from "./sampler/sample-records";
 export { tasksSourcesLive } from "./live/layer";
 export { listedDisplayIdOf, listedIdOf, type ListedRow, listedRows } from "./board/listed";
 export { spendLines } from "./board/levels";
