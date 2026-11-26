@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, Layer, Option } from "effect"
+import { Effect, FileSystem, Layer, Option, PlatformError } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { answerItem, routePullRequest, taskItems } from "../../../packages/run/src/entities/attention/index"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
@@ -272,6 +272,36 @@ describe("the beat gate around the merge", () => {
       const current = { ...view(), headRefOid: "1".repeat(40) }
       await beatAction(root, current, true, noFiles, merges)
       expect(merges).toEqual(["gh pr merge " + pr + " --squash --match-head-commit " + current.headRefOid])
+    })
+  })
+
+  test("a failed merge-record write does not lose the merge on the next beat", async () => {
+    await withBacklog(true, async (root) => {
+      await closeWith(root, "done")
+      const merges: Array<string> = []
+      let failed = false
+      const failingStore = Layer.effect(FileSystem.FileSystem, Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        return FileSystem.make({
+          ...fs,
+          rename: (from, to) => {
+            if (!failed && merges.length > 0 && from.endsWith(".tmp") && to === join(root, "closed", "task-1.md")) {
+              failed = true
+              return Effect.fail(PlatformError.systemError({ _tag: "Unknown", module: "FileSystem", method: "rename" }))
+            }
+            return fs.rename(from, to)
+          }
+        })
+      })).pipe(Layer.provide(BunServices.layer))
+      const task = await taskOf(root)
+      await Effect.runPromise(prEvents(root, task, () => Effect.succeed(view()), "2026-11-18T11:10:00.000Z", true, dirname(root)).pipe(
+        Effect.provide(Layer.mergeAll(BunServices.layer, ghLayer(view(), noFiles, merges), failingStore))
+      ))
+      expect(failed).toBe(true)
+      expect(merges).toHaveLength(1)
+      await beatAction(root, view("SUCCESS", "MERGED"), true, noFiles, merges)
+      expect(merges).toHaveLength(1)
+      expect((await taskOf(root)).merge).toMatchObject({ stage: "merged", head: view().headRefOid })
     })
   })
 
