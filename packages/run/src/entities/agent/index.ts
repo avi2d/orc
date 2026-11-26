@@ -2,6 +2,7 @@ export {
   parseAgentFile,
   bundledAgentFiles,
   bundledDeciderPolicyFile,
+  bundledSupportCheckPolicyFile,
   agentFileCandidates,
   finishAgentFile,
   readAgentFile,

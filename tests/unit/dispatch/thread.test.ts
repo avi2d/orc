@@ -10,6 +10,7 @@ import { addTask, appendNote, claimTask, closeStartedTask, listTasks, writeTaken
 import { answerTask, askStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
 import { decideReviewQuestions, DeciderUnheard, type AskDecider } from "../../../packages/run/src/features/decider/index"
 import { threadEntries, threadText } from "../../../packages/run/src/features/task-thread/index"
+import { supportsEveryAnswer } from "../../lib/support-check"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -176,7 +177,8 @@ describe("orc backlog thread", () => {
         ask: (request) =>
           request.prompt.includes("How many retries?")
             ? Effect.succeed(JSON.stringify({ decision: "answer", answer: "Two retries", rule: "Retry a failed upload twice, then give up.", reason: "the intent says twice" }))
-            : Effect.fail(new DeciderUnheard({ reason: "no reply in this test" }))
+            : Effect.fail(new DeciderUnheard({ reason: "no reply in this test" })),
+        checkSupport: () => supportsEveryAnswer
       }
       await run(decideReviewQuestions(root, await run(listTasks(root)), ask))
       await run(answerTask(root, "orc-1", "question-3=Yes, merge it", "2099-01-01T00:00:00.000Z"))
@@ -201,7 +203,7 @@ describe("orc backlog thread", () => {
       const asked = "2026-11-02T10:20:00.000Z"
       await run(askStartedTask(root, "orc-1", { asked, questions: [{ id: "r3", text: "Keep the old flag name?\nA) Keep it\nB) Rename it" }] }))
       await run(routeTaskItems(root, await run(listTasks(root)), asked))
-      const ask: AskDecider = { home: "/nonexistent/orc-home", ask: () => Effect.succeed(JSON.stringify({ decision: "escalate", reason: "the intent leaves the flag name open", recommendation: "Keep it" })) }
+      const ask: AskDecider = { home: "/nonexistent/orc-home", ask: () => Effect.succeed(JSON.stringify({ decision: "escalate", reason: "the intent leaves the flag name open", recommendation: "Keep it" })), checkSupport: () => supportsEveryAnswer }
       await run(decideReviewQuestions(root, await run(listTasks(root)), ask))
       const thread: unknown = JSON.parse(await run(threadText(root, "orc-1", true)))
       expect(thread).toMatchObject({
