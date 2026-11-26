@@ -14,9 +14,8 @@ const deciderArgv = (model: string, policy: string): Argv => [
   "--model", model, "--thinking", "low", "--system-prompt", policy
 ]
 
-export const askDeciderWithPi = (home: string): AskDecider => ({
-  home,
-  ask: (request) => Effect.gen(function*() {
+export const askDeciderWithPi = (home: string): AskDecider => {
+  const askPi: AskDecider["ask"] = (request) => Effect.gen(function*() {
     const config = yield* readOrcConfig(home).pipe(Effect.mapError((error) => new DeciderUnheard({ reason: error.file + ": " + error.detail })))
     const model = config.models?.decider
     if (model === undefined) {
@@ -36,4 +35,5 @@ export const askDeciderWithPi = (home: string): AskDecider => ({
     Effect.timeoutOrElse({ duration: Duration.millis(deciderTimeoutMillis), orElse: () => Effect.fail(new DeciderUnheard({ reason: "pi gave no reply in " + deciderTimeoutMillis / 1000 + " seconds" })) }),
     Effect.catchTag("PlatformError", (error) => Effect.fail(new DeciderUnheard({ reason: "pi did not run: " + error.message })))
   )
-})
+  return { home, ask: askPi, checkSupport: askPi }
+}

@@ -43,6 +43,7 @@ const expectedFiles = [
   "agents/fixer.md",
   "agents/implementer.md",
   "agents/reviewer.md",
+  "agents/support-check-policy.md",
   "dist/herdr-app/keys.json",
   "dist/herdr-app/layouts/orc.json",
   "dist/herdr-app/layouts/orc.svg",

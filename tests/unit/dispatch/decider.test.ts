@@ -44,24 +44,21 @@ const withAskingTask = async (body: (root: string) => Promise<void>, questions: 
 
 const supports = JSON.stringify({ verdict: "supports" })
 
-const replies = (byQuestion: Readonly<Record<string, string>>, heard: Array<DeciderRequest> = [], home = "/nonexistent/orc-home", supportByAnswer: Readonly<Record<string, string>> = {}, checked: Array<DeciderRequest> = []): AskDecider => {
-  const decider = {
-    home,
-    ask: (request: DeciderRequest) => {
-      heard.push(request)
-      const matching = Object.entries(byQuestion).filter(([text]) => request.prompt.includes(text))
-      matching.sort((a, b) => request.prompt.lastIndexOf(b[0]) - request.prompt.lastIndexOf(a[0]))
-      const first = matching.at(0)
-      return first === undefined ? Effect.fail(new DeciderUnheard({ reason: "no reply in this test" })) : Effect.succeed(first[1])
-    },
-    checkSupport: (request: DeciderRequest) => {
-      checked.push(request)
-      const found = Object.entries(supportByAnswer).find(([answerWords]) => request.prompt.includes(answerWords))
-      return Effect.succeed(found === undefined ? supports : found[1])
-    }
+const replies = (byQuestion: Readonly<Record<string, string>>, heard: Array<DeciderRequest> = [], home = "/nonexistent/orc-home", supportByAnswer: Readonly<Record<string, string>> = {}, checked: Array<DeciderRequest> = []): AskDecider => ({
+  home,
+  ask: (request) => {
+    heard.push(request)
+    const matching = Object.entries(byQuestion).filter(([text]) => request.prompt.includes(text))
+    matching.sort((a, b) => request.prompt.lastIndexOf(b[0]) - request.prompt.lastIndexOf(a[0]))
+    const first = matching.at(0)
+    return first === undefined ? Effect.fail(new DeciderUnheard({ reason: "no reply in this test" })) : Effect.succeed(first[1])
+  },
+  checkSupport: (request) => {
+    checked.push(request)
+    const found = Object.entries(supportByAnswer).find(([answerWords]) => request.prompt.includes(answerWords))
+    return Effect.succeed(found === undefined ? supports : found[1])
   }
-  return decider
-}
+})
 
 const answer = JSON.stringify({ decision: "answer", answer: "Two retries", rule: "Retry a failed upload twice, then give up.", reason: "the intent says twice" })
 const escalate = JSON.stringify({ decision: "escalate", reason: "the intent leaves the flag name open" })
@@ -185,6 +182,18 @@ describe("the decider", () => {
       const reply = JSON.stringify({ decision: "answer", answer: "Two retries", rule, reason: "the question names Two retries" })
       await decide(root, replies({ [recommended.text]: reply }))
       expect(await itemFile(root, r2Item)).toMatchObject({ owner: "decider", decision: { kind: "answered", rule: { quote: rule, source: "decider policy" } }, state: { kind: "closed", answer: { words: "Two retries" } } })
+    }, [recommended])
+  })
+
+  test("an answer on the recommended-option rule takes the question's own option without a support check, instead of closing only when a model agrees", async () => {
+    const recommended = { id: "r2", text: "How many retries?\nRecommended: Two retries" }
+    const rule = "When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
+    const checked: Array<DeciderRequest> = []
+    await withAskingTask(async (root) => {
+      const reply = JSON.stringify({ decision: "answer", answer: "Two retries", rule, reason: "the question names Two retries" })
+      await decide(root, replies({ [recommended.text]: reply }, [], undefined, { "Two retries": JSON.stringify({ verdict: "does-not-support", reason: "unused" }) }, checked))
+      expect(checked).toEqual([])
+      expect(await itemFile(root, r2Item)).toMatchObject({ owner: "decider", state: { kind: "closed", answer: { words: "Two retries" } } })
     }, [recommended])
   })
 
@@ -409,6 +418,14 @@ describe("the decider", () => {
       for (const words of [rule, r2.text, "Five retries"]) {
         expect(checked[0]?.prompt).toContain(words)
       }
+    }, [r2])
+  })
+
+  test("a support check whose reply holds no verdict escalates the answer, instead of taking silence as support", async () => {
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [r2.text]: answer }, [], undefined, { "Two retries": "Looks fine to me." }))
+      expect(await itemFile(root, r2Item)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      expect(filedAt(await itemFile(root, r2Item), "decision", "reason")).toContain("gave no verdict orc reads")
     }, [r2])
   })
 
