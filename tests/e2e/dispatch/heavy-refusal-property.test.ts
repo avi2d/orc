@@ -40,16 +40,16 @@ const launched: fc.Arbitrary<Words> = fc.tuple(
   )
 ).map(([call, version, launcher]) => [...launcher, ...versioned(call, version)])
 
-const managerOptions: Readonly<Record<string, ReadonlyArray<Words>>> = {
+const managerOptions = {
   bun: [[], ["--cwd", "pkg"], ["--filter", "web"]],
   npm: [[], ["--prefix", "pkg"], ["-w", "web"]],
   pnpm: [[], ["-C", "pkg"], ["--filter", "web"], ["-r"]],
   yarn: [[], ["--cwd", "pkg"], ["workspace", "web"]]
-}
+} satisfies Record<"bun" | "npm" | "pnpm" | "yarn", ReadonlyArray<Words>>
 
 const scriptCall: fc.Arbitrary<Words> = fc.constantFrom("bun", "npm", "pnpm", "yarn").chain((manager) =>
   fc.tuple(
-    fc.constantFrom(...(managerOptions[manager] ?? [[]])),
+    fc.constantFrom<Words>(...managerOptions[manager]),
     fc.constantFrom("test", "tests", "test:unit", "test:e2e", "e2e", "e2e:ci", "vitest", "jest", "pytest", ...(manager === "npm" ? ["t"] : [])),
     fc.constantFrom<Words>([], ["run"], ...(manager === "npm" ? [["run-script"]] : [])),
     runnerArgs
