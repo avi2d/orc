@@ -1,7 +1,7 @@
-import { Effect, FileSystem, Option, type Path } from "effect"
+import { DateTime, Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { runLabel, type BacklogError, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
-import type { Progress, StalledAction } from "../../entities/attention/index"
+import { closeStartedTask, runLabel, type BacklogError, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { withdrawTaskItems, type Progress, type StalledAction } from "../../entities/attention/index"
 import { killHeld, killHeldThrough } from "../../features/queueing-a-task/index"
 import { type DispatchConfig, throughFor } from "../../shared/config/index"
 import { closeFinished, retryDeadRun, type CloseContext } from "./beat-close"
@@ -14,9 +14,9 @@ const retryStalled = (
   task: TaskRecord,
   reading: Progress,
   stall: Option.Option<StalledAction>
-): Effect.Effect<Progress, TaskFileError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+): Effect.Effect<Progress, BacklogError | TaskFileError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    if (Option.isNone(stall) || reading.kind !== "running" || reading.run === undefined || task.retry !== undefined || task.state.kind !== "started") {
+    if (Option.isNone(stall) || reading.kind !== "running" || reading.run === undefined || task.state.kind !== "started") {
       return reading
     }
     const machineName = task.state.claim.machine
@@ -28,7 +28,16 @@ const retryStalled = (
       Effect.as(true),
       Effect.catchTag("RunnerError", () => Effect.succeed(false))
     )
-    return stopped ? yield* retryDeadRun(root, task.spec.id, machine.name, reading.run) : reading
+    if (!stopped) return reading
+    if (task.retry === undefined) return yield* retryDeadRun(root, task.spec.id, machine.name, reading.run)
+    const at = DateTime.formatIso(yield* DateTime.now)
+    const reason = "the retried run stalled with no output since " + stall.value.since
+    const closed = yield* closeStartedTask(root, task.spec.id, "failed", reason, { pr: null, report: null }, at).pipe(
+      Effect.catchTag("BacklogError", () => Effect.succeed(null))
+    )
+    if (closed === null) return { kind: "untracked" } satisfies Progress
+    yield* withdrawTaskItems(root, [task.spec.id], at)
+    return { kind: "ended", action: { kind: "closed", task: task.spec.id, machine: machine.name, outcome: "failed", reason, pr: null, report: null } } satisfies Progress
   })
 
 export const checkStalledRuns = (
