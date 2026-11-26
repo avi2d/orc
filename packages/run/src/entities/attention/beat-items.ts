@@ -1,6 +1,6 @@
 import { Effect, FileSystem } from "effect"
 import { backlogPaths, type BacklogError } from "../backlog/index"
-import { checkRefusals, greenChecks, type PullRequestView, redChecks } from "../pull-request/index"
+import { checkRefusals, greenChecks, type PullRequestView, redChecks, redCheckEvidence } from "../pull-request/index"
 import type { AttentionItem } from "./attention-item"
 import type { BeatAction } from "./beat-action"
 import { choice, closeItem, itemId, openItem, openItems, readItem, withdrawItem, openOrRefreshItem } from "./attention"
@@ -75,7 +75,7 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
       yield* openOrRefreshItem(root, itemId(task, "check-red", view.headRefOid), {
         kind: "check-red",
         task,
-        text: pr + ": the check " + red.join(", ") + " is red",
+        text: pr + ": the check " + redCheckEvidence(view).map((check) => check.name + (check.url === undefined ? "" : " " + check.url)).join(", ") + " is red",
         ...choice(
           "the PR " + pr + " of " + task,
           { text: "send back", outcome: "orc backlog send-back " + task + " <words> sends the PR back for another pass on the red check" },

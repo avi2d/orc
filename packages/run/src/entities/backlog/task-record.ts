@@ -122,6 +122,7 @@ export interface TaskRecord {
   readonly spec: TaskSpec
   readonly hold: Hold | null
   readonly retry?: typeof Retry.Type
+  readonly ciSentBack?: ReadonlyArray<string>
   readonly parked: Parked | null
   readonly priorPr?: string
   readonly state: TaskState
@@ -196,6 +197,7 @@ const Frontmatter = Schema.Struct({
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
   retry: Schema.optional(Retry),
+  ci_sent_back: Schema.optional(Schema.Array(Schema.String)),
   parked_branch: Schema.optional(Schema.String),
   parked_origin: Schema.optional(ParkedOrigin),
   parked_at: Schema.optional(Schema.String),
@@ -382,6 +384,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
       },
       hold,
       ...(front.retry === undefined ? {} : { retry: front.retry }),
+      ...(front.ci_sent_back === undefined ? {} : { ciSentBack: front.ci_sent_back }),
       parked,
       ...(front.merge === undefined ? {} : { merge: front.merge }),
       ...priorPrOf(front.pr, state),
