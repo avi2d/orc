@@ -176,18 +176,16 @@ describe("orc run --sandbox none", () => {
       await writeScript(join(fakeBin, "gh"), [
         "echo \"$* @ $(pwd)\" >> \"" + fakeBin + "/gh-calls\"",
         "if [ \"$1 $2\" = 'pr list' ]; then exit 0; fi",
-        "if [ \"$1\" = 'api' ]; then echo '{\"total_count\":0,\"check_runs\":[]}'; exit 0; fi",
         "echo " + directPrUrl
       ])
       const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none", "--delivery", "direct-PR"], repo, env)
-      expect(result.exitCode).not.toBe(0)
+      expect(result.exitCode).toBe(0)
       expect(result.stdout).toContain(directPrUrl)
-      expect(result.stdout).toContain("status: waiting on CI")
-      expect(result.stdout).toContain("pending, waiting on CI because no check run has reported on")
+      expect(result.stdout).toContain("status: completed")
       const piCwd = (await readFile(join(fakeBin, "pi-cwd"), "utf8")).trim()
       expect(git(origin, ["log", "orc/test", "--format=%s"], env).split("\n")).toEqual(["add greeting", "task"])
       const ghCalls = (await readFile(join(fakeBin, "gh-calls"), "utf8")).split("\n").filter((line) => line !== "")
-      expect(ghCalls.map((line) => line.split(" ").slice(0, 2).join(" "))).toEqual(["pr list", "pr create", "api --hostname"])
+      expect(ghCalls.map((line) => line.split(" ").slice(0, 2).join(" "))).toEqual(["pr list", "pr create"])
       expect(ghCalls.every((line) => line.endsWith(" @ " + piCwd))).toBe(true)
       const nmCalls = await readFile(join(fakeBin, "nm-calls"), "utf8").catch(() => "")
       expect(nmCalls).not.toContain("axi run")

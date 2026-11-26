@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Layer, Path } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { taskItems } from "../../../packages/run/src/entities/attention/index"
 import { parseDispatchArgs } from "../../../packages/run/src/app/dispatch-args"
 import { runDispatch, type DispatchPlace } from "../../../packages/run/src/app/dispatch-cli"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken, renderTaskFile, taskPr } from "../../../packages/run/src/entities/backlog/index"
@@ -373,6 +374,57 @@ describe("runner kill", () => {
   })
 })
 
+describe("the beat's conflicting PR", () => {
+  test("queues one rebase rather than marking ready or sending back a red check across repeated beats", async () => {
+    await withBacklog(async (root) => {
+      await startTaskOne(root, ["orc", "runner", "start"], oldStart)
+      const pr = "https://github.com/example/orc/pull/7"
+      await run(closeStartedTask(root, "orc-1", "done", "", { pr, report: null }, oldStart))
+      await Effect.runPromise(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "stopped", started: oldStart, ended: oldStart, prLink: pr, endReason: "the run was stopped" })),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(Effect.provide(BunServices.layer)))
+      const conflict = { state: "OPEN", headRefOid: "a".repeat(40), baseRefName: "main", mergeable: "CONFLICTING" as const, statusCheckRollup: [{ name: "test", status: "COMPLETED", conclusion: "SUCCESS", startedAt: oldStart }] }
+      const sources = quietSources(undefined, () => Effect.succeed(conflict))
+      const layer = Layer.merge(BunServices.layer, pueueStub(JSON.stringify({ tasks: {} })))
+      await Effect.runPromise(runBeat(root, root, sources).pipe(Effect.provide(layer)))
+      const first = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
+      expect(first?.state.kind).toBe("new")
+      expect(first === undefined ? "" : renderTaskFile(first)).toContain("rebase:")
+      const items = await run(taskItems(root, "orc-1"))
+      expect(items.some((entry) => entry.item.kind === "pr-ready")).toBe(false)
+      expect(first?.parked?.questions.some((question) => question.id.startsWith("send-back"))).toBe(false)
+      await Effect.runPromise(runBeat(root, root, sources).pipe(Effect.provide(layer)))
+      const second = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
+      expect((second === undefined ? "" : renderTaskFile(second)).match(/rebase:/g)).toHaveLength(1)
+    })
+  })
+})
+
+describe("a failed rebase", () => {
+  test("does not queue another rebase when the PR head moves after a lease rejection", async () => {
+    await withBacklog(async (root) => {
+      await startTaskOne(root, ["orc", "runner", "start"], oldStart)
+      const pr = "https://github.com/example/orc/pull/7"
+      const task = (await run(listTasks(root))).find((entry) => entry.spec.id === "orc-1")
+      if (task === undefined) throw new Error("missing task")
+      await run(writeTaken(root, { ...task, rebase: { pr, head: "a".repeat(40), at: oldStart } }))
+      await run(closeStartedTask(root, "orc-1", "failed", "lease rejected", { pr, report: null }, oldStart))
+      await Effect.runPromise(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "failed", started: oldStart, ended: oldStart, prLink: pr, endReason: "lease rejected" })),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(Effect.provide(BunServices.layer)))
+      const conflict = { state: "OPEN", headRefOid: "b".repeat(40), baseRefName: "main", mergeable: "CONFLICTING" as const, statusCheckRollup: [] }
+      await Effect.runPromise(runBeat(root, root, quietSources(undefined, () => Effect.succeed(conflict))).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueStub(JSON.stringify({ tasks: {} }))))))
+      const after = (await run(listTasks(root))).find((entry) => entry.spec.id === "orc-1")
+      expect(after?.state.kind).toBe("closed")
+      expect(after?.rebase?.head).toBe("a".repeat(40))
+    })
+  })
+})
+
 describe("the beat's stale start", () => {
   test("a started task the runner never picked up closes failed once the start outgrows the queue delay instead of staying started", async () => {
     await withBacklog(async (root) => {
@@ -429,7 +481,7 @@ describe("the beat's stale start", () => {
         .toBe("stopped:the run was stopped")
       expect(closed === undefined ? null : taskPr(closed)).toBe("https://github.com/example/orc/pull/7")
       expect(closed === undefined ? "" : renderTaskFile(closed)).toContain("pr: \"https://github.com/example/orc/pull/7\"")
-      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1"])
+      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1", "pr-checks:orc-1"])
     })
   })
   test("a fresh start with a failing close read waits for the next beat instead of closing failed", async () => {

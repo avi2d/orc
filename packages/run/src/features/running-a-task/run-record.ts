@@ -6,7 +6,7 @@ import { orcCompletionLine } from "../../entities/agent/index"
 import type { AllowWord, NoMistakesRecord, NoMistakesRunner, QuestionAnswer } from "../../entities/review-gate/index"
 import { OrcRunError } from "../../shared/lib/index"
 import { toFileUrl } from "../../entities/run-history/index"
-import { findingLine, reportFileName, reportMarkdown, runStatus, type OrcRunCommit, type OrcRunReport } from "../../entities/run-history/index"
+import { noMistakesFindingLines, reportFileName, reportMarkdown, runStatus, type OrcRunCommit, type OrcRunReport } from "../../entities/run-history/index"
 import { handoverFileName, handoverNote, lastAssistantReply, longSessionWarning } from "../../entities/agent/index"
 import { branchCommits } from "../../shared/process/index"
 import { readFailure } from "../../shared/config/index"
@@ -17,6 +17,7 @@ export type { ChecksRoundSummary, OrcRunCommit, OrcRunReport, RecordedFixAttempt
 export type RunDeliverer =
   | { readonly kind: "no-mistakes"; readonly runner: NoMistakesRunner }
   | { readonly kind: "direct-PR"; readonly opener: PullRequestOpener; readonly reviewer: AgentFile }
+  | { readonly kind: "orc"; readonly opener: PullRequestOpener; readonly reviewer: AgentFile }
 
 export const prBodyFileName = "pr-body.md"
 
@@ -28,6 +29,7 @@ export interface HistoryRun {
   readonly projectDir: string
   readonly runId: string
   readonly resumeRun?: string | undefined
+  readonly rebase?: { readonly head: string; readonly pr: string } | undefined
   readonly runDir: string
   readonly piSessionDir: string
   readonly hostSessionsDir: string
@@ -112,7 +114,7 @@ const noMistakesText = (record: NoMistakesRecord): string =>
     "reviewer: " + (record.reviewer ?? "not named"),
     "findings: " + record.findings.length.toString(),
     "gates answered: " + record.gatesAnswered.toString(),
-    ...record.findings.map(findingLine),
+    ...noMistakesFindingLines(record),
     record.result
   ].join("\n") + "\n"
 
@@ -129,7 +131,6 @@ export const failedReport = (run: HistoryRun, reason: string): OrcRunReport => (
   tokens: null,
   sessionSize: null,
   completed: false,
-  waitingOnCi: false,
   markerVerified: false,
   implementPassed: false,
   checksRounds: null,

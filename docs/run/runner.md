@@ -3,8 +3,8 @@ kind: reference
 ---
 # The runner
 
-Run `orc runner start` to queue a task from the beat in pueue.
-The run survives the beat and a dropped SSH connection.
+Run `orc runner start` to queue a task from the beat in [pueue](https://github.com/Nukesor/pueue).
+The run survives the beat and a dropped [SSH](https://www.openssh.com) connection.
 
 ## Queue a task
 
@@ -37,7 +37,7 @@ It sets neither thinking variable yet.
 
 ### Queue limits and files
 
-The runner updates the checkout's default branch and needs Git 2.48 or later.
+The runner updates the checkout's default branch and needs [Git](https://git-scm.com) 2.48 or later.
 It sets the pueue group's limit from the machine's slots.
 Zero slots becomes one because pueue treats zero as unlimited.
 A task already queued or running for this home is not queued again.
@@ -45,7 +45,9 @@ A completed task can be queued again.
 
 ### Alert stream
 
-When `orc-dash` is on `PATH`, the runner queues `orc-dash alerts --json` and appends its output to `~/.orc/backlog/alerts.jsonl`.
+When a compiled `orc runner start` queues the alert stream, it prefers the `orc-dash` beside `orc` to one on `PATH`.
+If no sibling executable is available, or orc runs from source, the runner looks for `orc-dash` on `PATH`.
+When it finds `orc-dash`, the runner queues `orc-dash alerts --json` and appends its output to `~/.orc/backlog/alerts.jsonl`.
 A running stream is not duplicated.
 If pueue refuses the stream, the runner reports the error and still queues the task.
 

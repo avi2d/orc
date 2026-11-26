@@ -2,7 +2,7 @@
 kind: reference
 ---
 # The heavy queue
-Without `through` set, each machine queues its heavy shell calls through one pueue group named `heavy` with one slot.
+Without `through` set, each machine queues its heavy shell calls through one [pueue](https://github.com/Nukesor/pueue) group named `heavy` with one slot.
 Heavy calls are test runs, builds and browser runs through tools like `bun`, `bunx`, `npm`, `npx`, `pnpm`, `yarn`, `vitest`, `playwright`, `jest`, `go`, `cargo`, `node`, `python`, `python3`, `uv`, `make`, `deno`, `pytest`, `tsc`, `oxlint`, `eslint`, `xcodebuild` and `xcrun`.
 The queue keeps two such calls from overloading the machine at the same time.
 
@@ -12,7 +12,7 @@ For `python`, `python3`, `uv`, `deno`, `go`, `cargo`, and `make`, orc writes a s
 Shell probes still find those tools absent when they are missing.
 Other tools get stand ins even without a `PATH` binary, so the helper can run the nearest `node_modules/.bin` copy.
 Each write removes stand ins for commands no longer configured and for those seven tools when they are neither configured nor on `PATH`.
-A stand in is a launcher of three shell lines that starts orc's TypeScript helper through the absolute path of its bun.
+A stand in is a launcher of three shell lines that starts orc's TypeScript helper through the absolute path of its [bun](https://bun.com).
 `orc run` puts that folder on `PATH` for the agent it starts, after only `~/.orc/heavy/ci-only`.
 A stand in queues the call with `pueue add` into the `heavy` group, or hands it to the `through` command when one is set, and waits for its turn, then prints the call output and exits with its exit code.
 Without `through` set, the wait message names how many queued calls stand ahead, counting higher priority calls and earlier calls at the same priority.
@@ -69,11 +69,11 @@ With `through` set, `orc heavy watch` prints a line naming the through command a
 With `through` set, `orc heavy check` and `orc heavy watch-once` fail with a line naming the through command.
 
 ## Test runs in agent sessions
-`orc run` sets `HEAVY_TESTS_CI_ONLY=1` for the steps it starts: `prepare`, the local checks and the Pi agent, under the [nono](https://nono.sh) sandbox and under `--sandbox none`.
+`orc run` sets `HEAVY_TESTS_CI_ONLY=1` for the steps it starts: `prepare`, the local checks and the [Pi](https://pi.dev) agent, under the [nono](https://nono.sh) sandbox and under `--sandbox none`.
 For those steps it also writes stand ins for `node` and `checks-test` into `~/.orc/heavy/ci-only`, even without a `PATH` binary.
 It puts that folder first on `PATH`, ahead of `~/.orc/heavy/bin`.
 A `ci-only` stand in never queues: it refuses a test run, or runs the next `node` or `checks-test` on `PATH`.
-Under that variable a stand in refuses a test run with exit 1 and a line naming the command, and leaves the tests to GitHub CI.
+Under that variable a stand in refuses a test run with exit 1 and a line naming the command, and leaves the tests to [GitHub](https://github.com) CI.
 A test run is one of these calls, watch and UI runs included:
 - `bun test`, `npm t`, `node --test`, `go test`, `cargo test`, and `cargo t`.
 - `python -m pytest`, `python3 -m pytest`, `uv run pytest`, and `uv run python -m pytest`, including flags before the runner.
@@ -116,6 +116,12 @@ Every other file call is refused, such as `bun run` on a bare path or `bun` on a
 - A runner called by path from a script file that a shell other than Bash runs, such as `sh test.sh`, or from a program other than the launchers in [Runners called by path](#runners-called-by-path) that starts it without a shell.
 - A runner the list does not name.
 - The [no-mistakes](https://github.com/kunchenguid/no-mistakes) review and fix agents, unless the no-mistakes config starts them through orc's agent wrapper, as the next section says.
+
+## The Pi prompt
+The Pi prompt that orc sends with each task is an instruction the agent reads, not a refusal.
+It says to leave repository tests to GitHub CI, and to run no tests locally.
+It also says: You may run build, lint, or typecheck.
+The stand ins in the section above refuse only test runs, so a build, a lint or a typecheck is never refused by them.
 
 ## The no-mistakes review and fix agents
 The no-mistakes daemon starts its review and fix agents with the daemon's own environment, never with the environment of the shell that runs `no-mistakes axi run`.

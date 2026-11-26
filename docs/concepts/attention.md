@@ -15,7 +15,7 @@ Each item names who must answer it, and a model called the decider takes the rou
 | Kind | What it is | Who owns it |
 | --- | --- | --- |
 | `review-question` | A question the review raised at its gate | The decider first |
-| `worker-question` | A question Pi asked mid-run with `orc_ask` | The decider first |
+| `worker-question` | A question [Pi](https://pi.dev) asked mid-run with `orc_ask` | The decider first |
 | `looping` question | Pi failed one command 6 times in a row | You |
 | `failing-command` | Pi failed one command 3 times in a row, which only tells you | You |
 | `run-died` | A run failed or its start failed | You |
@@ -23,6 +23,7 @@ Each item names who must answer it, and a model called the decider takes the rou
 | `check-red` | A check turned red on a closed task's pull request | You |
 | `pr-ready` | Every check is green on a closed task's pull request | You |
 | `overdue-wait` | A hold's date has passed | You |
+| `unasked-question` | A parked task waits on a question that no open item asks | You |
 | `update-failed` | The hourly Orc update on a dispatch machine failed | The decider when a retry can help, else you |
 
 A gate finding whose action is not `auto-fix`, `no-op`, or `ask-user` stays with you, as [The attention queue](../run/attention-queue.md) shows.

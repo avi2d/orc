@@ -14,9 +14,9 @@ Each runs inside the run, so a pull request that reaches you has already passed 
 ## The checks
 
 The project names its checks in a `.no-mistakes.yaml` file at its root, under `commands`.
-Orc runs only `build`, `lint`, and `typecheck` as local checks in the run's copy after Pi finishes.
+Orc runs only `build`, `lint`, and `typecheck` as local checks in the run's copy after [Pi](https://pi.dev) finishes.
 It skips every other command except `prepare`, which runs before Pi starts.
-GitHub CI runs repository tests and decides whether the run completes.
+[GitHub](https://github.com) CI runs repository tests.
 When a local check fails, orc starts a fixer Pi with the failing output, then runs the local checks again.
 After 3 fix attempts with a local check still red, the run ends failed and no pull request opens.
 Follow the local check and GitHub CI policy in [Local checks and CI](../run/running-a-task.md#local-checks-and-ci).
@@ -24,7 +24,8 @@ Follow the local check and GitHub CI policy in [Local checks and CI](../run/runn
 ## The review
 
 On a `no-mistakes` run, orc hands the checked branch to [no-mistakes](https://github.com/kunchenguid/no-mistakes) with the task as its intent.
-No-mistakes reviews the branch, pushes it, opens the pull request and reports when CI is green.
+No-mistakes reviews the branch, pushes it and opens the pull request.
+The beat reads the pull request's checks after the run ends.
 At each of its gates orc answers for you where it safely can.
 
 | Finding marked | What orc does |
@@ -47,7 +48,7 @@ A project's `mode` in `projects.json` decides how its ship tasks end.
 
 | Mode | How a ship task ends |
 | --- | --- |
-| `no-mistakes`, the default | Checks, then the no-mistakes review, then a pull request with green CI |
+| `no-mistakes`, the default | Checks, then the no-mistakes review, then a pull request |
 | `direct-PR` | Checks, then a [review turn that records findings without blocking](../run/delivery-modes.md), then orc pushes the branch and opens the pull request itself |
 | `no-mistakes-prod-only` | `direct-PR` for a task marked internal, `no-mistakes` for the rest |
 

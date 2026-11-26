@@ -62,7 +62,7 @@ export interface ParsedRun {
 
 export type GateAnswer =
   | { readonly kind: "fix"; readonly ids: ReadonlyArray<string>; readonly ignore: ReadonlyArray<string>; readonly instructions?: string }
-  | { readonly kind: "approve" }
+  | { readonly kind: "approve"; readonly followUps?: ReadonlyArray<string> }
   | { readonly kind: "refuse"; readonly reason: string }
 
 export type GateResponse = Exclude<GateAnswer, { readonly kind: "refuse" }>
@@ -139,7 +139,7 @@ export const parseRun = (output: string): ParsedRun => {
 
 type Classified = Pick<NoMistakesFinding, "id" | "action">
 
-const isQuestion = (finding: Classified): boolean => finding.id.startsWith("question-")
+export const isQuestion = (finding: Pick<NoMistakesFinding, "id">): boolean => finding.id.startsWith("question-")
 
 const orcActions = new Set(["auto-fix", "no-op"])
 
@@ -153,6 +153,9 @@ export const askUserFindings = (findings: ReadonlyArray<NoMistakesFinding>, allo
 const questionReason = (question: NoMistakesFinding): string => {
   const quoted = question.description === "" ? "" : ` "${question.description}"`
   if (isQuestion(question)) {
+    if (question.description.trim() === "") {
+      return `no-mistakes omitted the question text for ${question.id}, so orc needs your answer on a rerun with --answer ${question.id}="<answer>"`
+    }
     return `finding ${question.id} is a question${quoted} and needs your answer on a rerun with --answer ${question.id}="<answer>"`
   }
   return question.action === "ask-user"
@@ -243,7 +246,7 @@ export const answerForGate = (
 
 export const respondArgs = (answer: GateResponse): ReadonlyArray<string> =>
   answer.kind === "approve"
-    ? ["axi", "respond", "--action", "approve"]
+    ? ["axi", "respond", "--action", "approve", ...(answer.followUps === undefined ? [] : ["--follow-ups", answer.followUps.join(",")])]
     : [
       "axi", "respond", "--action", "fix", "--findings", answer.ids.join(","),
       ...(answer.ignore.length === 0 ? [] : ["--ignore", answer.ignore.join(",")]),

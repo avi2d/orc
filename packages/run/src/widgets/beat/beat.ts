@@ -1,20 +1,20 @@
 import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
-import { type Account, type ConfigError, type DispatchConfig, isYolo, type Machine, type Project, providerOf, readDispatchConfig, readProjects, type RoutedModels } from "../../shared/config/index"
-import { machineOverfull, type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
+import { type Account, type ConfigError, type DispatchConfig, isYolo, modeOf, type Machine, type Project, readDispatchConfig, readProjects, type RoutedModels } from "../../shared/config/index"
+import { machineOverfull, type MachinePlacement, type MachineRoom, type Placed, placeTask, readRoom, startable, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import { selectTaskRoute } from "./beat-route"
-import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
-import { checkToken, type TokenCache } from "./beat-token"
+import { encodeRenewal, encodeToken } from "../../entities/token/index"
+import { checkToken, type Credential, credentialFor, type TokenCache } from "./beat-token"
 import { closeFinished } from "./beat-close"
+import { checkStalledRuns } from "./retry-stall"
 import { parkedResumeWait } from "./beat-resume"
 import { type BeatAction, type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems, withdrawTaskItems, type Progress } from "../../entities/attention/index"
 import { attentionActions } from "./beat-attention"
 import { type AskDecider, askDeciderWithPi, decideReviewQuestions } from "../../features/decider/index"
-import { handAnswersToResume } from "../../entities/parked-runs/index"
+import { carryRecordedAnswers, handAnswersToResume } from "../../entities/parked-runs/index"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
-import { flagStall } from "./stall"
 import { readPullRequest } from "../../entities/pull-request/index"
 import { prEvents, type ReadPullRequest } from "./task-events"
 import { roomWaits, writeBeatWaits } from "./beat-waits"
@@ -28,12 +28,18 @@ export type { BeatAction } from "../../entities/attention/index"
 export type { MachineRoom } from "./beat-place"
 export { placeTask } from "./beat-place"
 
+interface TaskPlacement {
+  readonly task: string
+  readonly machines: ReadonlyArray<MachinePlacement>
+}
+
 export interface BeatReport {
   readonly beat: string
   readonly at: string
   readonly quota: QuotaReading
   readonly perTaskRouting?: true
   readonly room: ReadonlyArray<MachineRoom>
+  readonly placements: ReadonlyArray<TaskPlacement>
   readonly actions: ReadonlyArray<BeatAction>
 }
 
@@ -42,12 +48,6 @@ type BeatRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.
 const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
 type StartResult = { readonly kind: "started" } | { readonly kind: "failed"; readonly reason: string }
-
-type Credential =
-  | { readonly kind: "file"; readonly provider: string; readonly tokenFile: string }
-  | { readonly kind: "token"; readonly provider: string; readonly token: RunToken }
-  | { readonly kind: "none"; readonly provider: string }
-  | { readonly kind: "claude-config"; readonly provider: string; readonly configDirs: Readonly<Record<string, string>> }
 
 // Effect's spawner takes no file for stdio, so a shell sends the start command's output to the task's log.
 const logToTaskLog = ["sh", "-c", "exec \"$@\" >> \"$ORC_TASK_LOG\" 2>&1", "orc-start"] as const
@@ -152,76 +152,68 @@ interface BeatContext {
   readonly tokens: TokenCache
 }
 
-const credentialFor = (
-  context: BeatContext,
-  account: Account
-): Effect.Effect<Credential | { readonly kind: "waits"; readonly reason: string }, never, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function*() {
-    const provider = providerOf(context.config.quota, account)
-    switch (account.kind) {
-      case "token-file": {
-        return { kind: "file", provider, tokenFile: account.tokenFile }
-      }
-      case "claude-config": {
-        return { kind: "claude-config", provider, configDirs: account.configDirs }
-      }
-      case "none": {
-        return { kind: "none", provider }
-      }
-      case "token-command": {
-        const check = yield* checkToken(context.tokens, account)
-        return check.kind === "waits" ? check : { kind: "token", provider, token: check.token }
-      }
-    }
-  })
+const waitForTask = (task: string, reason: string): BeatAction => ({ kind: "waits", task, reason })
 
-const considerTask = (
+const dispatchPlacedTask = Effect.fnUntraced(function*(
+  context: BeatContext,
+  deciderOwns: DeciderOwns,
+  task: TaskRecord,
+  placement: Placed
+): Effect.fn.Return<BeatAction, BacklogError | TaskFileError, BeatRequirements> {
+  const waits = (reason: string): BeatAction => waitForTask(task.spec.id, reason)
+  const route = selectTaskRoute(context.config, context.quota, task.spec)
+  if (route.kind === "waits") {
+    return waits(route.reason)
+  }
+  const credential = yield* credentialFor(context.tokens, context.config.quota, route.account)
+  if (credential.kind === "waits") {
+    return waits(credential.reason)
+  }
+  const resumeWait = yield* parkedResumeWait(task, context.home, placement.machine)
+  if (resumeWait !== null) {
+    return waits(resumeWait)
+  }
+  const claimed = yield* claimUnheld(context.root, task.spec.id, deciderOwns)
+  if (claimed.kind !== "claimed") {
+    return claimed.kind === "lost" ? { kind: "lost", task: task.spec.id } satisfies BeatAction : waits(claimed.reason)
+  }
+  const slot = context.live.find((entry) => entry.machine === placement.machine.name)
+  if (slot !== undefined) {
+    slot.busy += 1
+  }
+  const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: route.account.name, takenAt: yield* nowIso }
+  const models = route.routed === undefined ? { legacy: route.account.models } : { legacy: undefined, routed: route.routed }
+  const action = yield* startTask(context.root, claimed.record, claim, placement, credential, models)
+  if (slot !== undefined) {
+    if (action.kind === "given-back") {
+      slot.busy = slot.slots
+    } else if (action.kind !== "started") {
+      slot.busy -= 1
+    }
+  }
+  return action
+})
+
+interface TaskConsideration {
+  readonly action: BeatAction
+  readonly placement: TaskPlacement | null
+}
+
+const considerTask = Effect.fnUntraced(function*(
   context: BeatContext,
   deciderOwns: DeciderOwns,
   task: TaskRecord
-): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
-  Effect.gen(function*() {
-    const waits = (reason: string): BeatAction => ({ kind: "waits", task: task.spec.id, reason })
-    const waiting = taskWait(task, context.tasks, context.merged, deciderOwns)
-    if (waiting !== null) {
-      return waits(waiting)
-    }
-    const placement = placeTask(task, context.config, context.projects, context.live, context.overloaded)
-    if (placement.kind === "waits") {
-      return waits(placement.reason)
-    }
-    const route = selectTaskRoute(context.config, context.quota, task.spec)
-    if (route.kind === "waits") {
-      return waits(route.reason)
-    }
-    const credential = yield* credentialFor(context, route.account)
-    if (credential.kind === "waits") {
-      return waits(credential.reason)
-    }
-    const resumeWait = yield* parkedResumeWait(task, context.home, placement.machine)
-    if (resumeWait !== null) {
-      return waits(resumeWait)
-    }
-    const claimed = yield* claimUnheld(context.root, task.spec.id, deciderOwns)
-    if (claimed.kind !== "claimed") {
-      return claimed.kind === "lost" ? { kind: "lost", task: task.spec.id } satisfies BeatAction : waits(claimed.reason)
-    }
-    const slot = context.live.find((entry) => entry.machine === placement.machine.name)
-    if (slot !== undefined) {
-      slot.busy += 1
-    }
-    const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: route.account.name, takenAt: yield* nowIso }
-    const models = route.routed === undefined ? { legacy: route.account.models } : { legacy: undefined, routed: route.routed }
-    const action = yield* startTask(context.root, claimed.record, claim, placement, credential, models)
-    if (slot !== undefined) {
-      if (action.kind === "given-back") {
-        slot.busy = slot.slots
-      } else if (action.kind !== "started") {
-        slot.busy -= 1
-      }
-    }
-    return action
-  })
+): Effect.fn.Return<TaskConsideration, BacklogError | TaskFileError, BeatRequirements> {
+  const waiting = taskWait(task, context.tasks, context.merged, deciderOwns)
+  if (waiting !== null) {
+    return { action: waitForTask(task.spec.id, waiting), placement: null }
+  }
+  const placement = placeTask(task, context.config, context.projects, context.live, context.overloaded)
+  const action = placement.kind === "waits"
+    ? waitForTask(task.spec.id, placement.reason)
+    : yield* dispatchPlacedTask(context, deciderOwns, task, placement)
+  return { action, placement: { task: task.spec.id, machines: placement.machines } }
+})
 
 const settledProgress = (
   progress: ReadonlyArray<Progress>
@@ -236,7 +228,7 @@ const failingReads = (started: ReadonlyArray<TaskRecord>, progress: ReadonlyArra
     if (entry.kind === "running") {
       return [{ task: task.spec.id, failing: entry.failing }]
     }
-    if (entry.kind === "ended" && (entry.action.kind === "closed" || entry.action.kind === "parked" || entry.action.kind === "held" || entry.action.kind === "split")) {
+    if (entry.kind === "ended" && (entry.action.kind === "retry" || entry.action.kind === "closed" || entry.action.kind === "parked" || entry.action.kind === "held" || entry.action.kind === "split")) {
       return [{ task: task.spec.id, failing: null }]
     }
     return []
@@ -247,7 +239,7 @@ const routeRunItems = (root: string, started: ReadonlyArray<TaskRecord>, progres
 
 const releaseClosedSlots = (live: BeatContext["live"], closed: ReadonlyArray<BeatAction>): void => {
   for (const action of closed) {
-    if (action.kind === "closed" || action.kind === "parked" || action.kind === "held" || action.kind === "split") {
+    if (action.kind === "retry" || action.kind === "closed" || action.kind === "parked" || action.kind === "held" || action.kind === "split") {
       const slot = live.find((entry) => entry.machine === action.machine)
       if (slot !== undefined) {
         slot.busy -= 1
@@ -362,27 +354,31 @@ export const runBeat = (
       tokens: new Map()
     }
     const started = tasks.filter((task) => task.state.kind === "started")
-    const progress = yield* Effect.forEach(started, (task) => closeFinished(context, task))
+    const { progress, stalls } = yield* checkStalledRuns(context, started)
     const settled = settledProgress(progress)
-    const stalls = yield* Effect.forEach(started, (task, index) => flagStall(root, task, progress[index] ?? { kind: "untracked" }))
     releaseClosedSlots(context.live, settled.closed)
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
-    const current = yield* listTasks(root)
+    const current = yield* carryRecordedAnswers(root, yield* listTasks(root))
     yield* routeTaskItems(root, current, at)
     yield* routeRunItems(root, started, progress, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
     const { reported, queue, deciderOwns } = yield* attentionActions(root, latest, [...settled.closed, ...relayed.closed, ...settled.asking, ...relayed.asking], at)
-    const queued = latest.filter((task) => task.state.kind === "new").toSorted(startOrder)
+    const queued = startable(latest, settled.closed)
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
-    const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task))
+    const { actions, placements } = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task)).pipe(
+      Effect.map((considered) => ({
+        actions: considered.map(({ action }) => action),
+        placements: considered.flatMap(({ placement }) => placement === null ? [] : [placement])
+      }))
+    )
     yield* openRunDeaths(root, actions, at).pipe(Effect.andThen(writeBeatWaits(root, at, roomWaits(queued, actions, fresh.tasks, fresh.merged, deciderOwns))))
-    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at, yoloTask(projects, task), home)).pipe(
+    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at, yoloTask(projects, task), home, projects.some((project) => project.name === task.spec.project && modeOf(project) === "orc"))).pipe(
       Effect.tap(() => pollBaseCi(root, sources.readBaseCi, projects, latest.map(taskPr).filter((url) => url !== null), at))
     )
     const updates = sources.update === null ? [] : yield* runBeatUpdates(root, home, beat, config.machines, sources.update)
-    return { beat, at, quota, ...(config.routing === undefined ? {} : { perTaskRouting: true }), room: readRoom(config.machines, latest), actions: [
+    return { beat, at, quota, ...(config.routing === undefined ? {} : { perTaskRouting: true }), room: readRoom(config.machines, latest), placements, actions: [
         ...reported,
         ...stalls.flatMap(Option.toArray),
         ...upstream,

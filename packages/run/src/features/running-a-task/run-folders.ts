@@ -2,7 +2,7 @@ import { Console, Effect, type FileSystem, type Path } from "effect"
 import { readFailure } from "../../shared/config/index"
 import { OrcRunError } from "../../shared/lib/index"
 import type { Database } from "bun:sqlite"
-import { openQuestionsForRun, type OrcRunReport } from "../../entities/run-history/index"
+import { openQuestionsForRun, runsForBranch, type OrcRunReport } from "../../entities/run-history/index"
 import type { HistoryRun } from "./run-record"
 
 export const runInstructions = (fs: FileSystem.FileSystem, path: Path.Path, cwd: string, named: string | undefined): Effect.Effect<string | null, OrcRunError> =>
@@ -53,10 +53,23 @@ const endsParked = (db: Database, runId: string, report: OrcRunReport): Effect.E
 
 export const dropEndedPiAgentDir = (db: Database, run: Pick<HistoryRun, "fs" | "path" | "runDir" | "runId">, report: OrcRunReport): Effect.Effect<void> =>
   Effect.gen(function*() {
-    if (report.waitingOnCi || (yield* endsParked(db, run.runId, report))) {
+    if (yield* endsParked(db, run.runId, report)) {
       return
     }
     yield* dropPiAgentDir(run.fs, run.path, run.runDir)
+  })
+
+export const dropResumedPiAgentDir = (db: Database, run: HistoryRun, priorDir: string | null): Effect.Effect<void> =>
+  Effect.gen(function*() {
+    if (priorDir === null) {
+      return
+    }
+    const runs = yield* runsForBranch(db, run.projectDir, run.branch).pipe(Effect.orElseSucceed(() => []))
+    const prior = runs.find((entry) => entry.id === run.path.basename(priorDir))
+    if (prior === undefined || prior.status === "running") {
+      return
+    }
+    yield* dropPiAgentDir(run.fs, run.path, priorDir)
   })
 
 export interface RunFolders {

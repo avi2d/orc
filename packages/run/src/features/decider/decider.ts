@@ -1,13 +1,17 @@
 import { Data, DateTime, Effect, FileSystem, Option, type Path, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { bundledDeciderPolicyFile } from "../../entities/agent/index"
+import { bundledDeciderPolicyFile, bundledSupportCheckPolicyFile } from "../../entities/agent/index"
 import { type AttentionItem, claimDeciding, type OpenItem, openItems, recordDecision, reviewQuestionId, routeTaskItems, taskItems } from "../../entities/attention/index"
 import { backlogPaths, findTask, type BacklogError, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { readInstructions, readOrcRules } from "../../entities/orc-rules/index"
 import { answerTask } from "../../entities/parked-runs/index"
+import { gateCapQuestionId, isQuestion } from "../../entities/review-gate/index"
+import { ciWaitingQuestionId } from "../../entities/pull-request/index"
 import { askBackWords, guardReason } from "./decider-guard"
-import { quotedSource, type RuleSource, spaced, type Verdict } from "./quoted-source"
-import { answerOnRule, recommendedAnswer } from "./recommended"
+import { objectIn, section } from "./prompt-text"
+import { type Quoted, quotedSource, type RuleSource, spaced, type Verdict } from "./quoted-source"
+import { answerOnRecommendedRule, quotesRecommendedRule, recommendedAnswer } from "./recommended"
+import { supportPrompt, supportVerdict } from "./support-check"
 
 export class DeciderUnheard extends Data.TaggedError("DeciderUnheard")<{
   readonly reason: string
@@ -18,9 +22,12 @@ export interface DeciderRequest {
   readonly prompt: string
 }
 
+type AskModel = (request: DeciderRequest) => Effect.Effect<string, DeciderUnheard, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner>
+
 export interface AskDecider {
   readonly home: string
-  readonly ask: (request: DeciderRequest) => Effect.Effect<string, DeciderUnheard, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner>
+  readonly ask: AskModel
+  readonly checkSupport: AskModel
 }
 
 const Words = Schema.String.check(Schema.isNonEmpty())
@@ -36,17 +43,16 @@ type Reply = typeof Reply.Type
 
 type EscalateReply = Extract<Reply, { readonly decision: "escalate" }>
 
+type AnswerReply = Extract<Reply, { readonly decision: "answer" }>
+
 interface WrittenRules extends RuleSource {
   readonly heading: string
 }
 
 const decodeReply = Schema.decodeUnknownOption(Schema.fromJsonString(Reply))
 
-// A model may wrap its JSON in prose or a fence, so the object is cut out of the reply before it is read.
-const readReply = (text: string): Reply | string => {
-  const json = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)
-  return Option.getOrElse(decodeReply(json), () => "the decider's reply held no decision orc reads: " + text.trim().slice(0, 200))
-}
+const readReply = (text: string): Reply | string =>
+  Option.getOrElse(decodeReply(objectIn(text)), () => "the decider's reply held no decision orc reads: " + text.trim().slice(0, 200))
 
 interface Earlier {
   readonly id: string
@@ -88,16 +94,18 @@ const escalation = (reply: EscalateReply, question: string): Verdict => {
     : { kind: "escalated", reason: reply.reason }
 }
 
-const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlier: ReadonlyArray<Earlier>, kind: AttentionItem["kind"], question: string): Verdict => {
+const answerVerdict = <R>(reply: AnswerReply, sources: ReadonlyArray<RuleSource>, question: string, supported: (found: Quoted, reply: AnswerReply) => Effect.Effect<Verdict, never, R>): Effect.Effect<Verdict, never, R> => {
+  const found = quotedSource(reply.rule, sources)
+  if (found === undefined) {
+    return Effect.succeed({ kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on a rule in none of the rules it read word for word from a clause start to a clause end: " + JSON.stringify(reply.rule) })
+  }
+  return quotesRecommendedRule(found) ? Effect.succeed(answerOnRecommendedRule(found, reply, question)) : supported(found, reply)
+}
+
+const otherVerdict = (reply: Exclude<Reply, AnswerReply>, sources: ReadonlyArray<RuleSource>, earlier: ReadonlyArray<Earlier>, kind: AttentionItem["kind"], question: string): Verdict => {
   switch (reply.decision) {
     case "escalate": {
       return recommendedAnswer(reply, sources, question) ?? escalation(reply, question)
-    }
-    case "answer": {
-      const found = quotedSource(reply.rule, sources)
-      return found === undefined
-        ? { kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on a rule in none of the rules it read word for word from a clause start to a clause end: " + JSON.stringify(reply.rule) }
-        : answerOnRule(found, reply, question)
     }
     case "duplicate": {
       const linked = earlier.find((entry) => entry.id === reply.of.trim())
@@ -114,8 +122,6 @@ const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlie
 }
 
 const policyRules = (policy: string): string => /^## Rules\s*\n([\s\S]*?)(?=^##\s|$(?![\s\S]))/m.exec(policy)?.[1] ?? ""
-
-const section = (heading: string, text: string): string => heading + ":\n\n" + text.trim()
 
 const earlierSection = (earlier: ReadonlyArray<Earlier>): ReadonlyArray<string> =>
   earlier.length === 0
@@ -157,7 +163,24 @@ const readRules = (home: string, root: string, task: TaskRecord): Effect.Effect<
     return { kind: "read" as const, written: [...own, ...project] }
   }).pipe(Effect.catchTag("RulesError", (error) => Effect.succeed({ kind: "unread" as const, reason: "orc cannot read the rules the decider reads: " + error.message })))
 
-const askOne = (ask: AskDecider, policy: string, root: string, task: TaskRecord, question: ParkedQuestion, entry: OpenItem) =>
+interface Policies {
+  readonly decider: Effect.Effect<string>
+  readonly supportCheck: Effect.Effect<string>
+}
+
+const supportChecked = (ask: AskDecider, policy: Effect.Effect<string>, task: TaskRecord, question: ParkedQuestion) => (found: Quoted, reply: AnswerReply) =>
+  Effect.gen(function*() {
+    const read = yield* policy
+    if (read === "") {
+      return { kind: "escalated", reason: "orc cannot read the support check policy at " + bundledSupportCheckPolicyFile } satisfies Verdict
+    }
+    return yield* ask.checkSupport({ policy: read, prompt: supportPrompt(task.spec.body, found, reply.answer.trim(), question.text) }).pipe(
+      Effect.map((text) => supportVerdict(text, found, reply)),
+      Effect.catchTag("DeciderUnheard", (error) => Effect.succeed<Verdict>({ kind: "escalated", reason: "the check that the rule supports the decider's answer was not heard: " + error.reason }))
+    )
+  })
+
+const askOne = (ask: AskDecider, policy: string, supportPolicy: Effect.Effect<string>, root: string, task: TaskRecord, question: ParkedQuestion, entry: OpenItem) =>
   Effect.gen(function*() {
     const rules = yield* readRules(ask.home, root, task)
     if (rules.kind === "unread") {
@@ -168,13 +191,16 @@ const askOne = (ask: AskDecider, policy: string, root: string, task: TaskRecord,
     const earlier = answeredEarlier(items, entry.id)
     const askedBack = askedBackEarlier(items, entry)
     const prompt = deciderPrompt(task, question, entry.item.kind, rules.written, earlier, askedBack)
-    return yield* ask.ask({ policy, prompt }).pipe(
-      Effect.map((text): Verdict => {
-        const reply = readReply(text)
-        return typeof reply === "string" ? { kind: "escalated", reason: reply } : checkedVerdict(reply, quotable, earlier, entry.item.kind, question.text)
-      }),
-      Effect.catchTag("DeciderUnheard", (error) => Effect.succeed<Verdict>({ kind: "escalated", reason: "the decider was not heard: " + error.reason }))
+    const reply = yield* ask.ask({ policy, prompt }).pipe(
+      Effect.map(readReply),
+      Effect.catchTag("DeciderUnheard", (error) => Effect.succeed("the decider was not heard: " + error.reason))
     )
+    if (typeof reply === "string") {
+      return { kind: "escalated", reason: reply } satisfies Verdict
+    }
+    return reply.decision === "answer"
+      ? yield* answerVerdict(reply, quotable, question.text, supportChecked(ask, supportPolicy, task, question))
+      : otherVerdict(reply, quotable, earlier, entry.item.kind, question.text)
   })
 
 const decisionOf = (verdict: Exclude<Verdict, { readonly kind: "escalated" }>, at: string) => {
@@ -234,16 +260,18 @@ const decidableOf = (byId: ReadonlyMap<string, TaskRecord>, entry: OpenItem): De
   return question === undefined || question.answer !== null ? null : { entry, task, question }
 }
 
-const verdictOf = (ask: AskDecider, policy: Effect.Effect<string>, root: string, { entry, task, question }: Decidable) =>
+const verdictOf = (ask: AskDecider, policies: Policies, root: string, { entry, task, question }: Decidable) =>
   Effect.gen(function*() {
-    const guarded = guardReason(entry.item.kind === "review-question" ? question : { text: question.text })
+    const isOrcQuestion = question.id === gateCapQuestionId || question.id === ciWaitingQuestionId
+    const kind = entry.item.kind === "worker-question" ? "worker-question" : isOrcQuestion || isQuestion(question) ? "review-question" : "review-finding"
+    const guarded = guardReason(question, kind)
     if (guarded !== null) {
       return { kind: "escalated", reason: guarded } satisfies Verdict
     }
-    const read = yield* policy
+    const read = yield* policies.decider
     return read === ""
       ? { kind: "escalated", reason: "orc cannot read the decider policy at " + bundledDeciderPolicyFile } satisfies Verdict
-      : yield* askOne(ask, read, root, task, question, entry)
+      : yield* askOne(ask, read, policies.supportCheck, root, task, question, entry)
   })
 
 // Each open question the decider owns gets its own call, so one question's reply never answers another.
@@ -254,7 +282,8 @@ export const decideReviewQuestions = (
 ): Effect.Effect<ReadonlyArray<Decided>, BacklogError | TaskFileError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    const policy = yield* Effect.cached(fs.readFileString(bundledDeciderPolicyFile).pipe(Effect.orElseSucceed(() => "")))
+    const readPolicy = (file: string) => Effect.cached(fs.readFileString(file).pipe(Effect.orElseSucceed(() => "")))
+    const policies: Policies = { decider: yield* readPolicy(bundledDeciderPolicyFile), supportCheck: yield* readPolicy(bundledSupportCheckPolicyFile) }
     const decided: Array<Decided> = []
     const byId = new Map(tasks.map((task) => [task.spec.id, task] as const))
     for (const entry of yield* openItems(root)) {
@@ -262,7 +291,7 @@ export const decideReviewQuestions = (
       if (decidable === null || !(yield* claimDeciding(root, entry.id, DateTime.formatIso(yield* DateTime.now)))) {
         continue
       }
-      const verdict = yield* verdictOf(ask, policy, root, decidable)
+      const verdict = yield* verdictOf(ask, policies, root, decidable)
       decided.push({ item: entry.id, task: decidable.task.spec.id, verdict: yield* settle(root, decidable.task, decidable.question, decidable.entry, verdict, DateTime.formatIso(yield* DateTime.now)) })
     }
     return decided

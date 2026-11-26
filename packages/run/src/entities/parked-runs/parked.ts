@@ -15,9 +15,11 @@ const parkedQuestions = (
   asking: string | null,
   askedOf: (question: OpenQuestion) => string
 ): Parked["questions"] => {
+  // A resumed run reports again the questions of the asking it resumes, so one stamped with the known asking is that asking and keeps its answer.
+  const sameAsking = (known: ParkedQuestion, question: OpenQuestion) => question.asked !== undefined && question.asked === known.asked
   const stillAsked = (known: ParkedQuestion, question: OpenQuestion) =>
     known.id === question.id && known.text === question.text && (known.asked === "" || question.asked === undefined || known.asked === askedOf(question)) &&
-    (known.answer === null || answersAsking(known.answer, asking))
+    (known.answer === null || answersAsking(known.answer, asking) || sameAsking(known, question))
   const kept = prior.filter((known) => known.answer !== null && answersAsking(known.answer, asking) && !open.some((question) => question.id === known.id))
   return Arr.appendAll(
     Arr.map(open, (question): ParkedQuestion => {
@@ -139,7 +141,7 @@ export const parkStartedTask = (
     const parked = yield* park.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
     yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
     return parked
-  })
+  }).pipe(Effect.uninterruptible)
 
 export type AnswerOutcome =
   | { readonly kind: "hold"; readonly hold: Hold }
@@ -270,7 +272,7 @@ const answerOn = (id: string, words: string, at: string, expected: ExpectedDecis
 const relayTakenQuestions = (
   root: string,
   id: string,
-  map: (questions: Arr.NonEmptyReadonlyArray<ParkedQuestion>) => Arr.NonEmptyReadonlyArray<ParkedQuestion>
+  map: (questions: ReadonlyArray<ParkedQuestion>) => ReadonlyArray<ParkedQuestion>
 ): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<void>, BacklogError> => {
     if (fresh.state.kind !== "started" || fresh.parked === null) {

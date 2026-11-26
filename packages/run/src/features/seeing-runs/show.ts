@@ -14,6 +14,7 @@ import {
   type SqliteFailure
 } from "../../entities/run-history/index"
 import { reportFileName } from "../../entities/run-history/index"
+import { agentReportFileName, reportKinds } from "../../entities/backlog/index"
 import { runDirOf } from "./run-facts"
 import { carriedFrom } from "./step-log"
 
@@ -102,7 +103,8 @@ const ScoreSqlRowSchema = Schema.Struct({
   scored_at: Schema.String
 })
 
-const reportPathForRunDir = (runDir: string): string => runDir + "/" + reportFileName
+const reportPathForRunDir = (runDir: string, kind: string | null): string =>
+  runDir + "/" + (reportKinds.some((reportKind) => reportKind === kind) ? agentReportFileName : reportFileName)
 
 // A resume carries checks and fixes only when it skips the implement step, so an implement step beside carried steps came from their run even when it names no log there.
 const carriedFirst = <S extends { readonly name: string; readonly from: string | null }>(steps: ReadonlyArray<S>): ReadonlyArray<S> => {
@@ -164,7 +166,7 @@ export const readShow = (
             }))
           })
         }
-        const report = reportPathForRunDir(runDir)
+        const report = reportPathForRunDir(runDir, runRow.kind)
         return yield* Schema.decodeEffect(ShowJsonSchema)({
           schema: SHOW_JSON_SCHEMA,
           run: {
@@ -206,9 +208,8 @@ export const formatShow = (document: ShowJsonDocument): string => {
   for (const step of document.steps) {
     lines.push("")
     lines.push("step " + step.name + " #" + step.attempt.toString() + ": " + step.status)
-    if (step.from !== null) {
-      lines.push("  from run " + step.from)
-    }
+    lines.push(...originLines(step))
+    lines.push(...timingLines(step))
     lines.push("  agent: " + (step.agentFile === null ? "none" : toFileUrl(step.agentFile)))
     lines.push("  session: " + (step.piSessionFile === null ? "none" : toFileUrl(step.piSessionFile)))
     for (const signal of step.signals) {
@@ -223,6 +224,22 @@ export const formatShow = (document: ShowJsonDocument): string => {
     }
   }
   return lines.join("\n")
+}
+
+const originLines = (step: Pick<ShowJsonDocument["steps"][number], "from" | "signals">): ReadonlyArray<string> => {
+  const reusedFrom = step.signals.find((signal) => signal.name === "review-reused-from")?.value
+  return [
+    ...(step.from === null ? [] : ["  from run " + step.from]),
+    ...(reusedFrom === undefined ? [] : ["  reused from run " + reusedFrom])
+  ]
+}
+
+const timingLines = (step: Pick<ShowJsonDocument["steps"][number], "model" | "started" | "ended">): ReadonlyArray<string> => {
+  const elapsed = step.ended === null ? Number.NaN : Date.parse(step.ended) - Date.parse(step.started)
+  return [
+    ...(step.model === null ? [] : ["  model: " + step.model]),
+    ...(Number.isFinite(elapsed) && elapsed >= 0 ? ["  minutes: " + (elapsed / 60_000).toFixed(1)] : [])
+  ]
 }
 
 const scoreLine = (score: ShowJsonDocument["steps"][number]["score"]): string =>

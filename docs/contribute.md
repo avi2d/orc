@@ -11,7 +11,7 @@ To run the checks:
 
 ## Run orc from a checkout
 
-To work on orc, run the `orc` command from a checkout instead of the npm package:
+To work on orc, run the `orc` command from a checkout instead of the [npm](https://www.npmjs.com) package:
 
 1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
 1. Run `cd orc && bun install --frozen-lockfile` to install the pinned dependencies.
@@ -53,7 +53,7 @@ Link the tool at its first mention, and add a new outside tool to that file with
 To time how fast orc starts:
 
 1. Run `bun run bench:start` to time `orc --help` and one heavy stand-in classification call from source.
-1. Read the median and p90 of each call, printed after the Bun version and the machine.
+1. Read the median and p90 of each call, printed after the [Bun](https://bun.com) version and the machine.
 
 The script runs each call once to warm up and then 20 times.
 `--runs N` sets the number of timed runs.

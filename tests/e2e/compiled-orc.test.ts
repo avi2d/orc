@@ -22,12 +22,12 @@ interface Ran {
 }
 
 // Windows names PATH as Path, and an environment holding both spellings leaves the child either one.
-const overlay = (env: Record<string, string>): Record<string, string | undefined> => {
+const overlay = (env: Record<string, string | undefined>): Record<string, string | undefined> => {
   const replaced = new Set(Object.keys(env).map((key) => key.toUpperCase()))
   return { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !replaced.has(key.toUpperCase()))), ...env }
 }
 
-const run = async (command: ReadonlyArray<string>, env: Record<string, string>, cwd: string): Promise<Ran> => {
+const run = async (command: ReadonlyArray<string>, env: Record<string, string | undefined>, cwd: string): Promise<Ran> => {
   const proc = Bun.spawn([...command], { stdin: "ignore", stdout: "pipe", stderr: "pipe", cwd, env: overlay(env) })
   const [stdout, stderr, exitCode] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
   return { exitCode, stdout, stderr }
@@ -96,6 +96,29 @@ const withFixture = async (body: (fixture: Fixture) => Promise<void>, quiet = fa
   }
 }
 
+const pythonScript = "#!/bin/sh\nprintf '<%s>\\n' \"$@\"\n"
+
+const runPythonStandin = (standin: string, { dir, env }: Fixture): Promise<Ran> =>
+  run([standin, "-c", "print(1)", "a b", ""], { ...env, HEAVY_QUEUE_UNREACHABLE: "1" }, dir)
+
+const pythonStandinResult = async (orc: string, fixture: Fixture): Promise<Ran> => {
+  const { dir, env } = fixture
+  await writeFile(join(dir, "bin", "python3"), pythonScript, { mode: 0o755 })
+  const setup = await run([orc, "heavy", "path"], { ...env, HEAVY_QUEUE_BYPASS: "fixture" }, dir)
+  expect(setup.exitCode).toBe(0)
+  return runPythonStandin(join(setup.stdout.trim(), "python3"), fixture)
+}
+
+const expectPythonResult = (result: Ran): void => {
+  expect(result.exitCode).toBe(0)
+  expect(result.stdout).toBe("<-c>\n<print(1)>\n<a b>\n<>\n")
+}
+
+const expectIsolatedResult = (result: Ran, preloaded: boolean): void => {
+  expect(result).toEqual({ exitCode: 0, stdout: "absent\nabsent\nabsent\nkept\n", stderr: "" })
+  expect(preloaded).toBe(false)
+}
+
 const seedRun = async (home: string): Promise<void> => {
   const db = await Effect.runPromise(openDatabase(home).pipe(Effect.provide(BunServices.layer)))
   try {
@@ -126,6 +149,94 @@ const seedRun = async (home: string): Promise<void> => {
 }
 
 describe("compiled orc", () => {
+  test.skipIf(windows)("the python assertion rejects a launcher that drops the first tool argument by omitting its own path", async () => {
+    await compileOrc()
+    await withFixture(async ({ dir, env }) => {
+      const real = join(dir, "bin", "python3")
+      const standin = join(dir, "wrong-python3")
+      await writeFile(real, pythonScript, { mode: 0o755 })
+      await writeFile(standin, '#!/bin/sh\nexec "$ORC_COMPILED_FIXTURE" "$ORC_STANDIN_SETTINGS" "$@"\n', { mode: 0o755 })
+      const result = await runPythonStandin(standin, {
+        dir,
+        env: {
+          ...env,
+          ORC_COMPILED_FIXTURE: compiledOrc,
+          ORC_STANDIN_SETTINGS: JSON.stringify({
+            tool: "python3", commands: [], home: env.ORC_HOME, group: "heavy", wrap: "", real, through: null, timing: null
+          })
+        }
+      })
+      expect(result.exitCode).toBe(0)
+      expect(result.stderr).toBe("")
+      expect(() => expectPythonResult(result)).toThrow()
+    })
+  }, compileTimeout)
+
+  test.skipIf(windows)("a generated python stand-in passes each argument instead of treating its settings as a command", async () => {
+    await compileOrc()
+    await withFixture(async (fixture) => {
+      expectPythonResult(await pythonStandinResult(compiledOrc, fixture))
+    })
+  }, compileTimeout)
+
+  test.skipIf(windows)("a compiled stand-in preserves inherited environment without loading caller dotenv files or Bun preloads", async () => {
+    await compileOrc()
+    await withFixture(async ({ dir, env }) => {
+      await writeFile(join(dir, "bin", "python3"), [
+        "#!/bin/sh",
+        'printf "%s\\n" "${ORC_COMPILED_DOTENV-absent}" "${ORC_COMPILED_LOCAL-absent}" "${ORC_COMPILED_DEVELOPMENT-absent}" "$ORC_COMPILED_INHERITED"',
+        ""
+      ].join("\n"), { mode: 0o755 })
+      const setup = await run([compiledOrc, "heavy", "path"], { ...env, HEAVY_QUEUE_BYPASS: "fixture" }, dir)
+      expect(setup.exitCode).toBe(0)
+      await Promise.all([
+        writeFile(join(dir, ".env"), "ORC_COMPILED_DOTENV=dotenv\n"),
+        writeFile(join(dir, ".env.local"), "ORC_COMPILED_LOCAL=local\n"),
+        writeFile(join(dir, ".env.development"), "ORC_COMPILED_DEVELOPMENT=development\n"),
+        writeFile(join(dir, "bunfig.toml"), 'preload = ["./preload.ts"]\n'),
+        writeFile(join(dir, "preload.ts"), 'import { writeFileSync } from "node:fs"\nwriteFileSync("preloaded", "ran")\nconsole.log("caller preload ran")\n')
+      ])
+      const helperEnv = {
+        ...env,
+        HEAVY_QUEUE_UNREACHABLE: "1",
+        NODE_ENV: "development",
+        ORC_COMPILED_DOTENV: undefined,
+        ORC_COMPILED_LOCAL: undefined,
+        ORC_COMPILED_DEVELOPMENT: undefined,
+        ORC_COMPILED_INHERITED: "kept",
+        ORC_COMPILED_REAL: join(dir, "bin", "python3")
+      }
+      const contaminated = await run([
+        process.execPath, "-e",
+        'process.exit(Bun.spawnSync([process.env.ORC_COMPILED_REAL ?? ""], { stdout: "inherit", stderr: "inherit" }).exitCode)'
+      ], helperEnv, dir)
+      expect(contaminated.exitCode).toBe(0)
+      const preloaded = await exists(join(dir, "preloaded"))
+      expect(() => expectIsolatedResult(contaminated, preloaded)).toThrow()
+      await rm(join(dir, "preloaded"), { force: true })
+
+      const result = await run([join(setup.stdout.trim(), "python3"), "--version"], helperEnv, dir)
+      expectIsolatedResult(result, await exists(join(dir, "preloaded")))
+    })
+  }, compileTimeout)
+
+  test.skipIf(windows)("compiled helper words reach the waiter and CI guards instead of the CLI usage error", async () => {
+    await compileOrc()
+    await withFixture(async ({ dir, env }) => {
+      const waiter = await run([compiledOrc, "orc-heavy-wait", String(process.pid), "/bin/sh", "-c", 'printf "%s" "$1"', "sh", "a b"], env, dir)
+      expect(waiter.exitCode).toBe(0)
+      expect(waiter.stdout).toBe("a b")
+
+      const ciOnly = await run([compiledOrc, "orc-ci-only", "pi", join(dir, "absent"), "-c", "echo ok"], env, dir)
+      expect(ciOnly.exitCode).toBe(0)
+      expect(ciOnly.stdout).toBe(join(dir, "bin", "pi"))
+
+      const ciPath = await run([compiledOrc, "orc-ci-only-path", "./node_modules/.bin/vitest run"], { ...env, HEAVY_TESTS_CI_ONLY: "1" }, dir)
+      expect(ciPath.exitCode).toBe(1)
+      expect(ciPath.stderr).toContain("repository tests run only in GitHub CI")
+    })
+  }, compileTimeout)
+
   test("bun run compile builds one bytecode file that answers help, beat, score, show, chat's self command, embeds chat tools, and reads its embedded agent file on POSIX", async () => {
     await compileOrc()
     await withFixture(async ({ dir, env }) => {

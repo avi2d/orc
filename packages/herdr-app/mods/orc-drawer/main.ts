@@ -1,17 +1,16 @@
 import { type AsyncContext, type Context, type Element, type FocusHandle, View, div } from "gpui-kit"
 import { ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { closeOverlay, exec, hc, home, nextCommand, openOverlay, props, readTextFile, run, setShared, shared } from "herdr"
-import { type Guard, type Guarded, fields, guardJson, ok, string } from "../../src/guard"
+import { closeOverlay, exec, hc, home, nextCommand, openOverlay, props, readTextFile, run, setShared, shared, writeTextFile } from "herdr"
+import { fields } from "../../src/guard"
+import { DrawerController, type DrawerChat, type DrawerPane as Pane } from "../../src/drawer-controller"
+import { drawerTerminal, endPreviousReleaseChat, previousReleaseChatKey } from "../../src/drawer-terminal"
 import type { Reading } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { type Turn, sessionTurns } from "../../src/turns"
 import { turnsView } from "../../src/turns-view"
 
-type Pane = "raw" | "turns"
+type Role = { readonly role: "controller" } | { readonly role: "bar"; readonly view: Pane } | { readonly role: "turns"; readonly session: string }
 
-type Role = { readonly role: "controller" } | { readonly role: "bar"; readonly view: Pane } | { readonly role: "turns" }
-
-const chatName = "orc-chat"
 const modName = "orc-drawer"
 const overlayKey = "orc-drawer"
 const everyMs = 1000
@@ -23,7 +22,8 @@ const roleOf = (value: unknown): Role => {
   const record = fields(value, "")
   if (record.kind === "refused") return { role: "controller" }
   const view = record.value["view"]
-  if (view === "turns") return { role: "turns" }
+  const session = record.value["session"]
+  if (view === "turns" && typeof session === "string") return { role: "turns", session }
   if (view === "bar") return { role: "bar", view: record.value["shown"] === "turns" ? "turns" : "raw" }
   return { role: "controller" }
 }
@@ -32,128 +32,15 @@ const drawerLayout = (view: Pane, chat: DrawerChat): unknown => ({
   type: "column",
   children: [
     { type: "block", size: { px: barHeight }, content: { mod: modName, props: { view: "bar", shown: view } } },
-    { type: "block", content: view === "raw" ? { terminal: chat.address } : { mod: modName, props: { view: "turns" } } }
+    { type: "block", content: view === "raw" ? { terminal: chat.address } : { mod: modName, props: { view: "turns", session: chat.session } } }
   ]
 })
 
 const stopPress = (element: Element): Element => element.on_mouse_down("left", (_event, cx) => cx.stop_propagation())
 
-interface Named {
-  readonly address: string
-  readonly name: string
-  readonly state: string
-}
-
-const recordWithAddress = (value: unknown, at: string): Guarded<{ record: Readonly<Record<string, unknown>>; address: string }> => {
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  const address = string(record.value, "address", at)
-  if (address.kind === "refused") return address
-  return ok({ record: record.value, address: address.value })
-}
-
-const named: Guard<Named> = (value, at) => {
-  const found = recordWithAddress(value, at)
-  if (found.kind === "refused") return found
-  const name = string(found.value.record, "name", at)
-  if (name.kind === "refused") return name
-  const state = string(found.value.record, "state", at)
-  if (state.kind === "refused") return state
-  return ok({ address: found.value.address, name: name.value, state: state.value })
-}
-
-const missing = (value: unknown): boolean => {
-  const record = fields(value, "")
-  if (record.kind === "refused") return false
-  const error = fields(record.value["error"], "error")
-  if (error.kind === "refused") return false
-  return error.value["kind"] === "not_found"
-}
-
-const started: Guard<string> = (value, at) => {
-  const record = fields(value, at)
-  return record.kind === "refused" ? record : string(record.value, "address", at)
-}
-
-const hcJson = <A>(args: ReadonlyArray<string>, guard: Guard<A>): Promise<Guarded<A>> =>
-  hc([...args]).then(
-    (result) => result.code === 0
-      ? guardJson(result.stdout, guard)
-      : { kind: "refused", reason: ["hc", args[0] ?? "", "failed:", (result.stderr || result.stdout).trim()].join(" ") },
-    (error: unknown) => ({ kind: "refused", reason: error instanceof Error ? error.message : ["hc", args[0] ?? "", "could not start"].join(" ") })
-  )
-
-interface DrawerChat {
-  readonly address: string
-  readonly session: string
-}
-
-const chatKey = "orc-drawer.chat"
-
-const drawerChat: Guard<DrawerChat> = (value, at) => {
-  const found = recordWithAddress(value, at)
-  if (found.kind === "refused") return found
-  const session = string(found.value.record, "session", at)
-  if (session.kind === "refused") return session
-  return ok({ address: found.value.address, session: session.value })
-}
-
-const heldChat = (): DrawerChat | null => {
-  const value = shared(chatKey)
-  if (value === null || value === undefined) return null
-  const held = drawerChat(value, chatKey)
-  return held.kind === "ok" ? held.value : null
-}
-
-const chatFolder = (): string => [home(), ".orc", "chat"].join("/")
-
-const startChat = (): Promise<Guarded<DrawerChat>> => {
-  const session = [chatFolder(), ["drawer-", String(Date.now()), ".jsonl"].join("")].join("/")
-  return exec("mkdir", ["-p", chatFolder()]).then(
-    (made): Promise<Guarded<DrawerChat>> => made.code !== 0
-      ? Promise.resolve({ kind: "refused", reason: ["Cannot make", chatFolder(), (made.stderr || made.stdout).trim()].join(" ") })
-      : hcJson(["run", "--bg", "--json", "--no-parent", "--name", chatName, "--cwd", home(), "--", "orc", "chat", "--session", session], started).then((address) => {
-        if (address.kind === "refused") return address
-        const chat = { address: address.value, session }
-        setShared(chatKey, chat)
-        return ok(chat)
-      }),
-    (error: unknown) => ({ kind: "refused", reason: error instanceof Error ? error.message : "mkdir could not start" })
-  )
-}
-
-const chatTerminal = (): Promise<Guarded<DrawerChat>> => {
-  const held = heldChat()
-  if (held === null) return startChat()
-  return hc(["get", chatName, "--json"]).then(
-    (result) => {
-      if (result.code !== 0) {
-        const text = (result.stderr || result.stdout).trim()
-        try {
-          if (missing(JSON.parse(text))) return startChat()
-        } catch {
-          return { kind: "refused", reason: ["hc get failed:", text].join(" ") }
-        }
-        return { kind: "refused", reason: ["hc get failed:", text].join(" ") }
-      }
-      let value: unknown
-      try {
-        value = JSON.parse(result.stdout)
-      } catch {
-        return { kind: "refused", reason: "hc get is no JSON" }
-      }
-      const found = named(value, "")
-      if (found.kind === "refused") return missing(value) ? startChat() : found
-      return found.value.address === held.address && found.value.state === "live" ? ok(held) : startChat()
-    },
-    (error: unknown) => ({ kind: "refused", reason: error instanceof Error ? error.message : "hc get could not start" })
-  )
-}
-
 export default class OrcDrawer extends View {
   role: Role = { role: "controller" }
-  overlay: { readonly id: string; readonly view: Pane } | null = null
-  chatCheck: Promise<Guarded<DrawerChat>> | null = null
+  controller: DrawerController | null = null
   problem: string | null = null
   turns: Reading<ReadonlyArray<Turn>> = { kind: "reading" }
   readText: string | null = null
@@ -167,8 +54,19 @@ export default class OrcDrawer extends View {
     this.role = roleOf(props())
     this.focusHandle = cx.focus_handle()
     if (this.role.role === "controller") {
+      this.controller = new DrawerController({
+        ...drawerTerminal({ exec, hc, sleep: (ms) => cx.sleep(ms), write: (path, text) => writeTextFile(path, text, null) }, home()),
+        show: (view, chat) => openOverlay({ kind: "window", key: overlayKey, width: drawerWidth, height: drawerHeight, layout: drawerLayout(view, chat) }),
+        hide: closeOverlay
+      })
       cx.spawn((task) => this.listen(task))
-      void this.ensureChat(cx)
+      cx.spawn((task) => endPreviousReleaseChat(hc, shared(previousReleaseChatKey)).then(
+        () => { setShared(previousReleaseChatKey, null) },
+        (error: unknown) => {
+          this.problem = error instanceof Error ? error.message : "Cannot end the chat an earlier Orc release left running"
+          task.notify()
+        }
+      ))
     }
     if (this.role.role === "turns") {
       this.focusHandle.focus()
@@ -178,50 +76,22 @@ export default class OrcDrawer extends View {
   }
 
   listen(cx: AsyncContext): Promise<void> {
-    return nextCommand().then(
-      (command) => this.obey(cx, command),
-      (error: unknown) => {
-        this.problem = error instanceof Error ? error.message : "The drawer command failed"
-      }
-    ).then(
-      () => {
-        cx.notify()
-        return this.listen(cx)
-      },
-      () => {
+    return nextCommand().then((command) => this.controller?.obey(command).then(
+      () => { this.problem = null },
+      (error: unknown) => { this.problem = error instanceof Error ? error.message : "The drawer command failed" }
+    )).then(() => {
+      if (this.controller !== null) {
         cx.notify()
         return this.listen(cx)
       }
-    )
-  }
-
-  obey(cx: AsyncContext, command: string): Promise<void> {
-    if (command.startsWith("gone:")) {
-      if (this.overlay?.id === command.slice(5)) this.overlay = null
-      return Promise.resolve()
-    }
-    if (command === "toggle") return this.overlay === null ? this.open(cx, "raw") : Promise.resolve(this.hideDrawer())
-    if (command === "show:raw") return this.open(cx, "raw")
-    if (command === "show:turns") return this.open(cx, "turns")
-    if (command === "close") this.hideDrawer()
-    return Promise.resolve()
-  }
-
-  open(cx: AsyncContext, view: Pane): Promise<void> {
-    return this.ensureChat(cx).then((chat) => {
-      if (chat === null) return
-      this.hideDrawer()
-      const id = openOverlay({ kind: "window", key: overlayKey, width: drawerWidth, height: drawerHeight, layout: drawerLayout(view, chat) })
-      this.overlay = { id, view }
     })
   }
 
-  hideDrawer(): void {
-    if (this.overlay !== null) closeOverlay(this.overlay.id)
-    this.overlay = null
-  }
-
   override close(_cx: AsyncContext): void {
+    if (this.controller !== null) {
+      void this.controller.dispose()
+      this.controller = null
+    }
     if (this.role.role !== "bar") return
     const record = fields(props(), "")
     if (record.kind === "refused") return
@@ -229,42 +99,20 @@ export default class OrcDrawer extends View {
     if (typeof overlay === "string") run([modName, ["gone", overlay].join(":")].join("."))
   }
 
-  ensureChat(cx: AsyncContext): Promise<DrawerChat | null> {
-    this.chatCheck ??= chatTerminal().finally(() => {
-      this.chatCheck = null
-    })
-    return this.chatCheck.then(
-      (terminal) => {
-        this.problem = terminal.kind === "refused" ? terminal.reason : null
-        cx.notify()
-        return terminal.kind === "ok" ? terminal.value : null
-      },
-      (error: unknown) => {
-        this.problem = error instanceof Error ? error.message : "orc chat could not start"
-        cx.notify()
-        return null
-      }
-    )
-  }
-
   readTurns(cx: AsyncContext): void {
-    if (this.reading) return
-    const chat = heldChat()
-    if (chat === null) {
-      this.showNoTurn(cx)
-      return
-    }
+    if (this.reading || this.role.role !== "turns") return
+    const { session } = this.role
     this.reading = true
-    cx.spawn((task) => readTextFile(chat.session).then(
+    cx.spawn((task) => readTextFile(session).then(
       (text) => {
         this.reading = false
         if (text === null) this.showNoTurn(task)
-        else this.showTurns(task, chat.session, text)
+        else this.showTurns(task, session, text)
       },
       () => {
         this.reading = false
         this.readText = null
-        this.turns = { kind: "failed", reason: ["Cannot read", chat.session].join(" ") }
+        this.turns = { kind: "failed", reason: ["Cannot read", session].join(" ") }
         task.notify()
       }
     ))

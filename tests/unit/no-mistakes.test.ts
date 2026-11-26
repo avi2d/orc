@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { reportMarkdown } from "../../packages/run/src/entities/run-history/index"
 import { holdReleaseId, respondArgs } from "../../packages/run/src/entities/review-gate/no-mistakes-gate"
 import { answerArgsFor, answerForGate, noMistakesBinary, omittedQuestionIds, parseRun, type NoMistakesFinding } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import { formatReport, type OrcRunReport } from "../../packages/run/src/features/running-a-task/run-record"
@@ -353,7 +354,6 @@ const report = (overrides: Partial<OrcRunReport>): OrcRunReport => ({
   tokens: null,
   sessionSize: null,
   completed: false,
-  waitingOnCi: false,
   markerVerified: true,
   implementPassed: true,
   checksRounds: null,
@@ -363,6 +363,25 @@ const report = (overrides: Partial<OrcRunReport>): OrcRunReport => ({
   noMistakes: null,
   endReason: "",
   ...overrides
+})
+
+test("the run report labels only the findings deferred to PR follow-ups", () => {
+  const noMistakes = {
+    status: "passed",
+    gate: null,
+    findings: [stubFinding("r1", "ask-user"), { ...stubFinding("r2", "auto-fix"), severity: "error" }],
+    deferredFindingIds: ["r1"],
+    gatesAnswered: 1,
+    openQuestions: [],
+    prLink: null,
+    reviewer: null,
+    result: "",
+    started: "",
+    ended: ""
+  } as const
+  const markdown = reportMarkdown("", "/task.md", "/report.md", report({ noMistakes }))
+  expect(markdown).toContain("- r1 warning a.go ask-user a finding (deferred to PR follow-ups)\n")
+  expect(markdown).toContain("- r2 error a.go auto-fix a finding\n")
 })
 
 const round = (number: number, passed: boolean) => ({ round: number, file: "checks-" + number.toString() + ".txt", started: "", ended: "", passed, failed: passed ? [] : ["lint"], checks: [{ name: "lint", passed }], refusals: [] })
@@ -375,7 +394,7 @@ describe("formatReport names the phase the run stopped in", () => {
       checksRounds: [round(1, false), round(2, true)],
       fixAttempts: 1,
       prLink: "https://github.com/o/r/pull/4",
-      noMistakes: { status: "refused", gate: "ci", findings: [], gatesAnswered: 0, openQuestions: [], prLink: "https://github.com/o/r/pull/4", reviewer: null, result: "", started: "", ended: "" }
+      noMistakes: { status: "refused", gate: "ci", findings: [], deferredFindingIds: [], gatesAnswered: 0, openQuestions: [], prLink: "https://github.com/o/r/pull/4", reviewer: null, result: "", started: "", ended: "" }
     }))
     expect(statusLine(text)).toBe("status: no-mistakes refused, PR open")
   })

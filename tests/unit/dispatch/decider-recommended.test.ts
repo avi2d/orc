@@ -9,6 +9,7 @@ import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/features/decider/index"
 import { askStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
 import { openQuestions } from "../../lib/open-questions-2026-11-25"
+import { supportsEveryAnswer } from "../../lib/support-check"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -44,7 +45,8 @@ const replying = (reply: string, heard: Array<DeciderRequest> = []): AskDecider 
   ask: (request) => {
     heard.push(request)
     return reply === "" ? Effect.fail(new DeciderUnheard({ reason: "no reply in this test" })) : Effect.succeed(reply)
-  }
+  },
+  checkSupport: () => supportsEveryAnswer
 })
 
 const itemFile = async (root: string, id: string): Promise<unknown> => JSON.parse(await readFile(join(root, "attention", id + ".json"), "utf8"))
@@ -135,7 +137,7 @@ describe("a review question with a Recommended: line", () => {
   })
 
   test("on the never list reaches the owner with no decider call, instead of being answered with its recommended option", async () => {
-    const pushing = { id: "r2", text: "Should the run push the branch itself?\nRecommended: yes" }
+    const pushing = { id: "question-2", text: "Should the run push the branch itself?\nRecommended: yes" }
     const heard: Array<DeciderRequest> = []
     await withAskingTask([pushing], async (root) => {
       await decide(root, replying(escalateOn(escalationBullet("You are not sure")), heard))

@@ -7,7 +7,8 @@ The dashboard combines panels in a layout that you can configure.
 
 ## Run the dashboard
 
-Run `orc-dash`, or `bun run dashboard` in the clone.
+Run `orc-dash`, or `bun run dashboard` in the checkout.
+To run from source, [set up a checkout and install its dependencies](contribute.md#run-orc-from-a-checkout).
 The dashboard shows quota, attention items, queues, machine resources, and tasks.
 Each panel title shows its refresh interval.
 While a source loads, the dashboard shows a saved reading and its age.
@@ -21,7 +22,7 @@ Add `--width 40` for a narrow frame or `--width 240 --height 60` for a wide one.
 
 The default wide layout shows quota and notices above the attention, machines, queues, and projects panels.
 Use the queue tabs to see schedules and dispatch.
-The scheduled panel includes delayed pueue tasks, machine timers, and GitHub workflows.
+The scheduled panel includes delayed [pueue](https://github.com/Nukesor/pueue) tasks, machine timers, and [GitHub](https://github.com) workflows.
 
 | Key | What it does |
 | --- | --- |
@@ -80,7 +81,7 @@ A key the command does not know, or a value out of range, stops the command with
 
 | Key | What it holds |
 | --- | --- |
-| `accounts` | Each Claude account's config folder, as [Show each Claude account](dash-quota.md#show-each-claude-account) tells |
+| `accounts` | Each [Claude](https://claude.com) account's config folder, as [Show each Claude account](dash-quota.md#show-each-claude-account) tells |
 | `appearance` | The colours of the tones and the providers, as [Set the colours](#set-the-colours) tells |
 | `layout` | Which panels show where, as [Lay out the dashboard](#lay-out-the-dashboard) tells |
 | `panels` | Each panel's own settings under its name |

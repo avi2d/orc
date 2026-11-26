@@ -134,6 +134,14 @@ const parseStop = (rest: ReadonlyArray<string>): DispatchArgs => {
   return extra.length === 0 ? { kind: "StopTask", id } : unexpected(extra[0])
 }
 
+const parseRetry = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", ...extra] = rest
+  if (!isTaskId(id)) {
+    return { kind: "UsageError", detail: "orc backlog retry takes a task id" }
+  }
+  return extra.length === 0 ? { kind: "RetryTask", id } : unexpected(extra[0])
+}
+
 const parseClose = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (rest.length < 2 || rest.length > 3) {
     return { kind: "UsageError", detail: "orc backlog close takes a task id, then done or failed with an optional reason, or --landed-in <pr-url>" }
@@ -307,6 +315,7 @@ const backlogSubcommands = {
   origin: parseOrigin,
   close: parseClose,
   stop: parseStop,
+  retry: parseRetry,
   drop: parseDrop,
   posted: parsePosted,
   hold: parseHold,

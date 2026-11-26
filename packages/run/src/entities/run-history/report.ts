@@ -49,7 +49,6 @@ export interface OrcRunReport {
   readonly tokens: PiTokenUse | null
   readonly sessionSize: LongSessionCounts | null
   readonly completed: boolean
-  readonly waitingOnCi: boolean
   readonly markerVerified: boolean
   readonly implementPassed: boolean
   readonly checksRounds: ReadonlyArray<ChecksRoundSummary> | null
@@ -60,8 +59,18 @@ export interface OrcRunReport {
   readonly endReason: string
 }
 
-export const findingLine = (finding: NoMistakesFinding): string =>
+const findingLine = (finding: NoMistakesFinding): string =>
   [finding.id, finding.severity, finding.file + (finding.line === "" ? "" : ":" + finding.line), finding.action, finding.description].filter((part) => part !== "").join(" ")
+
+export const noMistakesFindingLines = (record: NoMistakesRecord): ReadonlyArray<string> => {
+  const deferred = new Set(record.deferredFindingIds)
+  const described = new Set(record.findings.map((finding) => finding.id))
+  const suffix = " (deferred to PR follow-ups)"
+  return [
+    ...record.findings.map((finding) => findingLine(finding) + (deferred.has(finding.id) ? suffix : "")),
+    ...record.deferredFindingIds.filter((id) => !described.has(id)).map((id) => id + suffix)
+  ]
+}
 
 export const measuredSignals = (report: Pick<OrcRunReport, "tokens" | "commits" | "sessionSize">): ReadonlyArray<{ readonly name: string; readonly value: string }> => [
   ...longSessionSignal(report.sessionSize),
@@ -181,12 +190,11 @@ const tailLines = (report: OrcRunReport): Array<string> => {
     lines.push("- " + entry.name + ": " + entry.value)
   }
   lines.push("")
-  if (report.noMistakes !== null && report.noMistakes.findings.length > 0) {
+  const findings = report.noMistakes === null ? [] : noMistakesFindingLines(report.noMistakes)
+  if (findings.length > 0) {
     lines.push("## Findings")
     lines.push("")
-    for (const finding of report.noMistakes.findings) {
-      lines.push("- " + findingLine(finding))
-    }
+    lines.push(...findings.map((finding) => "- " + finding))
     lines.push("")
   }
   lines.push("## Result")
@@ -199,9 +207,6 @@ export const reportMarkdown = (taskText: string, taskFileUrl: string, reportUrl:
   [...headLines(taskText, taskFileUrl, reportUrl, report), ...tailLines(report)].join("\n") + "\n"
 
 export const runStatus = (report: OrcRunReport): string => {
-  if (report.waitingOnCi) {
-    return "waiting on CI"
-  }
   if (report.completed) {
     return "completed"
   }
@@ -214,9 +219,6 @@ export const runStatus = (report: OrcRunReport): string => {
   const finalRound = report.checksRounds?.at(-1)
   if (finalRound === undefined || (finalRound.checks.length > 0 && !finalRound.passed)) {
     return "checks failed"
-  }
-  if (report.noMistakes === null && report.prLink !== null) {
-    return "CI failed"
   }
   return "no-mistakes " + (report.noMistakes?.status ?? "never ran") + (report.prLink === null ? ", no PR" : ", PR open")
 }

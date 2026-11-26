@@ -5,7 +5,7 @@ import { backlogPaths, BacklogError, findTask, listTasks, markPosted, runLabel, 
 import { readAttention, routeTaskItems, withdrawTaskItems } from "../entities/attention/index"
 import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readBeatWaits, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText, taskPrState } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
-import { edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
+import { edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add, retryTask } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
 import { type ConfigError, readFailure, type DispatchConfig, readDispatchConfig, readProjects } from "../shared/config/index"
 import { holdRun, sendBack, killHeld, queueFromText, renewTask, startTask, stopNow, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson, ensureAlertStream, liveAlertStream } from "../features/queueing-a-task/index"
@@ -189,7 +189,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "CloseLandedTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "SendBack" | "NoteTask" | "ShowThread" | "DependTask" | "PrioritizeTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "CloseLandedTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "SendBack" | "NoteTask" | "ShowThread" | "DependTask" | "PrioritizeTask" | "MergeTask" | "ShowPlan" | "DropChild" | "RetryTask" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -224,7 +224,7 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
       return answerNow(args, place)
     }
     case "SendBack": {
-      return DateTime.now.pipe(Effect.flatMap((now) => sendBack(backlogRoot(place), place.home, args, DateTime.formatIso(now))))
+      return DateTime.now.pipe(Effect.flatMap((now) => sendBack(backlogRoot(place), place.home, args, DateTime.formatIso(now), "cleared")))
     }
     case "NoteTask": {
       return DateTime.now.pipe(Effect.flatMap((now) => noteTask(backlogRoot(place), args.id, args.words, DateTime.formatIso(now))))
@@ -246,6 +246,9 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "DropChild": {
       return DateTime.now.pipe(Effect.flatMap((now) => dropChild(backlogRoot(place), args.parent, args.child, DateTime.formatIso(now))))
+    }
+    case "RetryTask": {
+      return retryTask(backlogRoot(place), args.id)
     }
   }
 }
@@ -276,15 +279,17 @@ const runnerVerbLine = (args: RunnerVerb, place: DispatchPlace) => {
 }
 
 // The task is queued by now, so a stream that will not queue is told in the task's log and fails no task.
-const startAlertStream = (home: string) => {
-  const stream = liveAlertStream()
-  return stream === null
-    ? Effect.void
-    : ensureAlertStream(home, stream).pipe(
+const startAlertStream = (home: string, self: Command) =>
+  Effect.gen(function*() {
+    const stream = yield* liveAlertStream(self)
+    if (stream === null) {
+      return
+    }
+    yield* ensureAlertStream(home, stream).pipe(
       Effect.flatMap((line) => line === null ? Effect.void : Console.log(line)),
       Effect.catchTag("RunnerError", (error) => Console.error("orc runner start queued no alert stream: " + error.detail))
     )
-}
+  })
 
 const printBeat = (json: boolean, place: DispatchPlace) =>
   runBeat(backlogRoot(place), place.home, liveSources(place.home, place.env.ORC_BEAT_UPDATE === "off" ? null : place.self)).pipe(
@@ -319,7 +324,8 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       case "PrioritizeTask":
       case "MergeTask":
       case "ShowPlan":
-      case "DropChild": {
+      case "DropChild":
+      case "RetryTask": {
         yield* requireBacklog(backlogRoot(place))
         yield* Console.log(yield* taskVerbLine(args, place))
         break
@@ -338,7 +344,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         if (line !== null) {
           yield* Console.log(line)
         }
-        yield* startAlertStream(place.home)
+        yield* startAlertStream(place.home, place.self)
         yield* startHeavyWatch(place.home, place.self, "orc runner start")
         break
       }

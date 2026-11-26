@@ -55,6 +55,28 @@ describe("quotaBlocks over the accounts orc quota --json prints", () => {
     expect(session.accounts.map((account) => account.title)).toEqual(["claude", "claude second"]);
   });
 
+  test("does not lend a configured Claude account's name to an unmatched native row", () => {
+    const quota = decodeQuota(fixture("quota-axi/full.json"));
+    if (quota.kind !== "ok") throw new Error("the quota fixture does not decode");
+    const read = { ...quotaAxiRead({ ...quota, capturedAt: now }), accounts: [{ name: "main", read: undefined }] };
+    const orcQuota = orcQuotaOf("main", now);
+    expect(quotaBlocks(read, orcQuota, now).filter((block) => block.provider === "claude").map((block) => block.title))
+      .toEqual(["claude", "claude main", "account main"]);
+    const session = sessionQuotaView({
+      quota: read,
+      orcQuota,
+      panes: undefined,
+      processes: undefined,
+      ledger: ledgerOf([]),
+      sessions: [],
+      sessionOfFile: new Map(),
+      unmatched: [],
+      now,
+      timeZone: DateTime.zoneMakeNamedUnsafe("UTC"),
+    });
+    expect(session.accounts.filter((account) => account.provider === "claude").map((account) => account.title)).toEqual(["claude"]);
+  });
+
   test("puts one account block per account between live claude and codex without guessing the login", () => {
     expect(blocksWith(orcQuotaOf("main-second", now)).map((block) => block.title)).toEqual([
       "claude",

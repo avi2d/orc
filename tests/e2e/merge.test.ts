@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { closeTask, type Fixture, orchestratorConfig, ranClosing, runOrc, sessionFor, withFixture } from "./chat-helpers"
-import { closedWithPr, type Forge, ghCalls, head, newHead, passed, prUrl, type Rollup, stubGh, viewJson, writeProject } from "./merge-helpers"
+import { closeTask, type Fixture, ranClosing, runOrc, sessionFor } from "./chat-helpers"
+import { closedWithPr, type Forge, ghCalls, head, newHead, passed, prUrl, type Rollup, stubGh, viewJson, withMergeFixture, writeProject } from "./merge-helpers"
 
 const stubRunner = async (fixture: Fixture): Promise<void> => {
   const runner = join(fixture.dir, "bin", "runner-stub")
@@ -21,7 +21,7 @@ const mergeCalls = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
   (await readFile(ghCalls(fixture), "utf8")).split("\n").filter((line) => line.startsWith("pr merge"))
 
 const refusedMerge = async (forge: Forge, expected: string): Promise<void> => {
-  await withFixture(orchestratorConfig, 0, async (fixture) => {
+  await withMergeFixture(async (fixture) => {
     await closedWithPr(fixture)
     await stubGh(fixture, forge)
     const merged = await runOrc(fixture, ["merge", "orc-1"])
@@ -85,8 +85,19 @@ const forgeSteps = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
 const sentBackTask = (fixture: Fixture): Promise<string> => readFile(join(fixture.home, "backlog", "new", "orc-1.md"), "utf8")
 
 describe("orc merge compares the two sides of a PR behind its base", () => {
+  test("records the approved head and checks-running stage instead of leaving the closed task unchanged", async () => {
+    await withMergeFixture(async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1 })
+      const result = await runOrc(fixture, ["merge", "orc-1", "--basis", "captain-word", "--no-wait"])
+      expect(result.exitCode).toBe(0)
+      const text = await taskFile(fixture)
+      const front: unknown = Bun.YAML.parse(text.split("---\n")[1])
+      expect(front).toMatchObject({ merge: { basis: "captain-word", head, green: ["lint", "test"], stage: "checks-running" } })
+    })
+  }, 60_000)
   test("updates a disjoint PR rejected as out of date instead of refusing every retry", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, {
         behind: 3,
@@ -105,7 +116,7 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
   }, 60_000)
 
   test("does not update a disjoint PR when the merge is refused for another policy", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 1, baseFiles: [{ filename: "base-only.txt" }], mergeRefusal: "At least one approving review is required." })
       const merged = await runOrc(fixture, ["merge", "orc-1"])
@@ -116,7 +127,7 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
   }, 60_000)
 
   test("merges at the checked head instead of updating when the changed paths are disjoint", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 3, baseFiles: [{ filename: "base-only.txt" }] })
       const merged = await runOrc(fixture, ["merge", "orc-1"])
@@ -127,7 +138,7 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
   }, 60_000)
 
   test("does not treat a capped comparison as proof the changed paths are disjoint", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 1, baseFiles: Array.from({ length: 300 }, (_, index) => ({ filename: "base-" + index })) })
       const merged = await runOrc(fixture, ["merge", "orc-1"])
@@ -138,7 +149,7 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
   }, 60_000)
 
   test("updates a PR when the base renamed a path the PR changed instead of missing the overlap", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 1, baseFiles: [{ filename: "renamed.txt", previous_filename: "shared.txt" }] })
       const merged = await runOrc(fixture, ["merge", "orc-1"])
@@ -149,7 +160,7 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
   }, 60_000)
 
   test("an approved PR with a shared changed path is updated instead of merged at its old head", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 3 })
       const merged = await runOrc(fixture, ["merge", "orc-1"])
@@ -162,7 +173,7 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
   }, 60_000)
 
   test("a PR is not merged before the new head's checks pass", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 1, afterUpdate: [{ head, checks: [passed("lint"), passed("test")] }, { head: newHead, checks: [passed("lint"), running("test")] }, { head: newHead, checks: [passed("lint"), passed("test")] }] })
       const merged = await runOrc(fixture, ["merge", "orc-1"])
@@ -172,7 +183,7 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
   }, 60_000)
 
   test("a PR is not merged after the update conflicts, and the task goes back for a fix", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubRunner(fixture)
       await stubGh(fixture, { behind: 2, update: "conflicts" })
@@ -182,12 +193,46 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
       expect(merged.stderr).toContain("orc merge refused orc-1 and merged nothing: " + prUrl + " has a merge conflict with main")
       expect(merged.stderr).toContain("sent orc-1 back, so the next beat resumes run origin-run")
       expect(await mergeCalls(fixture)).toEqual([])
-      expect(await sentBackTask(fixture)).toContain("update-branch reported a merge conflict between " + head + " and main")
+      const sent = await sentBackTask(fixture)
+      expect(sent).toContain("update-branch reported a merge conflict between " + head + " and main")
+      const front: unknown = Bun.YAML.parse(sent.split("---\n")[1])
+      expect(front).toMatchObject({ merge: { basis: "captain-word", head, stage: "conflicted", detail: "main" } })
+    })
+  }, 60_000)
+
+  test("a captain's send-back after a conflicted re-close drops the conflict instead of labelling the review a merge conflict", async () => {
+    await withMergeFixture(async (fixture) => {
+      expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added orc-1 for orc")
+      await closeTask(fixture, "orc-1", [...ranClosing("done", "", prUrl), "merge: { basis: captain-word, head: " + head + ", green: [lint], stage: conflicted, detail: main }"])
+      await stubRunner(fixture)
+      await stubGh(fixture, {})
+      const sent = await runOrc(fixture, ["backlog", "send-back", "orc-1", "rename", "the", "flag"])
+      expect(sent.stderr).toBe("")
+      expect(sent.exitCode).toBe(0)
+      const text = await sentBackTask(fixture)
+      expect(text).toContain("rename the flag")
+      const front: unknown = Bun.YAML.parse(text.split("---\n")[1])
+      expect(front).not.toHaveProperty("merge")
+    })
+  }, 60_000)
+
+  test("a later refusal clears the red check an earlier attempt recorded instead of keeping the stale stage", async () => {
+    await withMergeFixture(async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { checks: [passed("lint"), red("test")] })
+      expect((await runOrc(fixture, ["merge", "orc-1"])).exitCode).not.toBe(0)
+      const first: unknown = Bun.YAML.parse((await taskFile(fixture)).split("---\n")[1])
+      expect(first).toMatchObject({ merge: { stage: "check-failed", detail: "ci/test" } })
+      await stubGh(fixture, { checks: [passed("lint"), running("test")] })
+      const second = await runOrc(fixture, ["merge", "orc-1"])
+      expect(second.stderr).toContain("the check ci/test has not reported")
+      const front: unknown = Bun.YAML.parse((await taskFile(fixture)).split("---\n")[1])
+      expect(front).not.toHaveProperty("merge")
     })
   }, 60_000)
 
   test("a PR pushed by someone else after the update is refused instead of merged", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 2, parents: foreignHead, afterUpdate: [{ head: newHead, checks: [passed("lint"), passed("test")] }] })
       const merged = await runOrc(fixture, ["merge", "orc-1"])
@@ -199,7 +244,7 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
   }, 60_000)
 
   test("a PR waits until every checked check is green on the new head", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 1, afterUpdate: [{ head: newHead, checks: [passed("lint")] }, { head: newHead, checks: [passed("lint"), passed("test")] }] })
       const merged = await runOrc(fixture, ["merge", "orc-1"])
@@ -209,7 +254,7 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
   }, 60_000)
 
   test("a PR with a transient view failure during the wait is still merged once the view answers", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 1, flakyViews: 1 })
       const merged = await runOrc(fixture, ["merge", "orc-1"])
@@ -219,7 +264,7 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
   }, 60_000)
 
   test("a PR with a transient parents failure during the wait is still merged once the parents answer", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 1, flakyParents: 1 })
       const merged = await runOrc(fixture, ["merge", "orc-1"])
@@ -229,7 +274,7 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
   }, 60_000)
 
   test("a PR is not merged when a check on the new head is red", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubRunner(fixture)
       await stubGh(fixture, { behind: 2, afterUpdate: [{ head: newHead, checks: [passed("lint"), red("test")] }] })
@@ -246,7 +291,7 @@ describe("orc merge compares the two sides of a PR behind its base", () => {
 describe("chat merge returns without waiting for CI", () => {
   for (const basis of ["captain-word", "yolo-green"] as const) {
     test(basis + " returns after requesting an update instead of polling CI or merging in the same call", async () => {
-      await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await withMergeFixture(async (fixture) => {
         await writeProject(fixture, { yolo: true })
         await closedWithPr(fixture)
         await stubGh(fixture, {
@@ -275,7 +320,7 @@ describe("chat merge returns without waiting for CI", () => {
   const status = (context: string): Rollup => ({ __typename: "StatusContext", context, state: "SUCCESS" })
 
   test("the retry command names the basis the caller used instead of dropping it", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 1 })
       const requested = await runOrc(fixture, ["merge", "orc-1", "--basis", "captain-word", "--no-wait"])
@@ -284,7 +329,7 @@ describe("chat merge returns without waiting for CI", () => {
   }, 60_000)
 
   test("a status context green before the update and not posted on the new head is refused instead of read as green", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 1, checks: [passed("lint"), status("ci/deploy")], afterUpdate: [{ head: newHead, checks: [passed("lint")] }] })
       const session = sessionFor(fixture)
@@ -301,7 +346,7 @@ describe("chat merge returns without waiting for CI", () => {
   }, 60_000)
 
   test("a rejected duplicate update does not let the new head merge without a check that passed before the first request", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, {
         behind: 1,
@@ -323,7 +368,7 @@ describe("chat merge returns without waiting for CI", () => {
   }, 60_000)
 
   test("a red check on the new head sends the task back on the next merge call instead of merging", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubRunner(fixture)
       await stubGh(fixture, { behind: 1, afterUpdate: [{ head: newHead, checks: [passed("lint"), red("test")] }] })
@@ -338,7 +383,7 @@ describe("chat merge returns without waiting for CI", () => {
   }, 60_000)
 
   test("a head that does not descend from the checked head is refused on the next merge call instead of merged", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 1, parents: foreignHead })
       const session = sessionFor(fixture)
@@ -351,7 +396,7 @@ describe("chat merge returns without waiting for CI", () => {
   }, 60_000)
 
   test("a conflict send-back drops the saved update, so the fixed head is judged on its own checks instead of refused as changed", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubRunner(fixture)
       await stubGh(fixture, { behind: 1, update: "conflicts", parents: foreignHead, afterUpdate: [{ head: newHead, checks: [passed("lint"), passed("test")] }] })
@@ -370,7 +415,7 @@ describe("chat merge returns without waiting for CI", () => {
   }, 60_000)
 
   test("a saved check the new head never runs keeps merge_task refusing, and plain orc merge waits for the new head's own checks instead of staying blocked", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       const unitGreen: Rollup = { ...running("unit"), status: "COMPLETED", conclusion: "SUCCESS" }
       const unitRunning = { head: newHead, checks: [passed("lint"), running("unit")] }
@@ -392,7 +437,7 @@ describe("chat merge returns without waiting for CI", () => {
 
 describe("orc merge lands a green PR", () => {
   test("squash-merges the open green PR at its checked head instead of leaving it open", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, {})
       const merged = await runOrc(fixture, ["merge", "orc-1"])
@@ -412,7 +457,7 @@ describe("orc merge lands a green PR", () => {
   }, 60_000)
 
   test("a cancelled check re-run green reads green instead of red", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { checks: [{ __typename: "CheckRun", workflowName: "ci", detailsUrl: "https://github.com/acme/orc/actions/runs/31/job/1", name: "test", status: "COMPLETED", conclusion: "CANCELLED", startedAt: "2026-11-02T10:00:00Z" }, { __typename: "CheckRun", workflowName: "ci", detailsUrl: "https://github.com/acme/orc/actions/runs/31/job/2", name: "test", status: "COMPLETED", conclusion: "SUCCESS", startedAt: "2026-11-02T10:05:00Z" }] })
       expect((await runOrc(fixture, ["merge", "orc-1"])).stdout.trim()).toBe("merged orc-1 " + prUrl)
@@ -420,7 +465,7 @@ describe("orc merge lands a green PR", () => {
   }, 60_000)
 
   test("a task with no PR is refused instead of calling gh", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added orc-1 for orc")
       await closeTask(fixture, "orc-1", ranClosing("failed", "no change", null))
       await stubGh(fixture, {})
@@ -436,7 +481,7 @@ const rejection = (pending: Promise<string>): Promise<string> =>
 
 describe("the merge_task chat tool", () => {
   test("yolo-green on a project without yolo true is refused instead of merged", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await writeProject(fixture, { yolo: false })
       await closedWithPr(fixture)
       await stubGh(fixture, {})
@@ -447,7 +492,7 @@ describe("the merge_task chat tool", () => {
   }, 60_000)
 
   test("yolo-green on a project with no yolo entry is refused instead of read as yolo", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, {})
       expect(await rejection(sessionFor(fixture).call("merge_task", { id: "orc-1", basis: "yolo-green" }))).toContain("the project orc has no yolo true")
@@ -456,7 +501,7 @@ describe("the merge_task chat tool", () => {
   }, 60_000)
 
   test("yolo-green on a yolo project's green PR merges it instead of waiting for the captain", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await writeProject(fixture, { yolo: true })
       await closedWithPr(fixture)
       await stubGh(fixture, {})
@@ -466,7 +511,7 @@ describe("the merge_task chat tool", () => {
   }, 60_000)
 
   test("captain-word on a project without yolo merges the green PR instead of refusing it", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, {})
       expect(await sessionFor(fixture).call("merge_task", { id: "orc-1", basis: "captain-word" })).toBe("merged orc-1 " + prUrl)
@@ -474,7 +519,7 @@ describe("the merge_task chat tool", () => {
   }, 60_000)
 
   test("a yolo project's red PR is still refused on yolo-green instead of merged", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await writeProject(fixture, { yolo: true })
       await closedWithPr(fixture)
       await stubGh(fixture, { checks: [{ __typename: "CheckRun", workflowName: "ci", name: "test", status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-11-02T10:00:00Z" }] })
@@ -488,7 +533,7 @@ describe("owner-word changes cannot change a branch on yolo-green", () => {
   for (const noWait of [false, true]) {
     for (const pendingHead of [null, head, foreignHead]) {
       test("a workflow PR is refused before updating or sending back with noWait=" + String(noWait) + " and pending=" + String(pendingHead), async () => {
-        await withFixture(orchestratorConfig, 0, async (fixture) => {
+        await withMergeFixture(async (fixture) => {
           await writeProject(fixture, { yolo: true })
           await closedWithPr(fixture)
           await stubGh(fixture, {
@@ -519,7 +564,7 @@ describe("owner-word changes cannot change a branch on yolo-green", () => {
   }
 
   test("chat reports both the red check and owner-word changes instead of only the first refusal", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await writeProject(fixture, { yolo: true })
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 1, checks: [red("test")], files: ["CHANGELOG.md", ".env.production"] })
@@ -534,7 +579,7 @@ describe("owner-word changes cannot change a branch on yolo-green", () => {
 
 describe("beat merge output", () => {
   test("an overlapping branch update does not corrupt the beat JSON document with progress output", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
+    await withMergeFixture(async (fixture) => {
       await writeProject(fixture, { yolo: true })
       await closedWithPr(fixture)
       await stubGh(fixture, { behind: 1 })
@@ -549,25 +594,6 @@ describe("beat merge output", () => {
       })
       expect(await forgeSteps(fixture)).toEqual(["view", "view", "update"])
       expect(await mergeCalls(fixture)).toEqual([])
-    })
-  }, 60_000)
-})
-
-describe("yolo in projects.json", () => {
-  test("a non-boolean yolo is refused naming the project instead of read as true", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
-      await writeProject(fixture, { yolo: "yes" })
-      expect(await rejection(sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" }))).toContain("the project orc names yolo \"yes\", which is not true or false")
-      expect(await readFile(join(fixture.home, "backlog", "new", "orc-1.md"), "utf8").catch(() => "no task file")).toBe("no task file")
-    })
-  }, 60_000)
-
-  test("an entry with no yolo reads as before instead of gaining a yolo field", async () => {
-    await withFixture(orchestratorConfig, 0, async (fixture) => {
-      const json: unknown = JSON.parse((await runOrc(fixture, ["backlog", "--json"])).stdout)
-      expect(json).toMatchObject({ projects: [{ name: "orc", checkouts: { mac: fixture.dir } }] })
-      expect(JSON.stringify(json)).not.toContain("yolo")
-      expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added orc-1 for orc")
     })
   }, 60_000)
 })

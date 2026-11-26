@@ -200,7 +200,8 @@ const buildRun = (
     const instructions = request.instructions === undefined ? [] : ["--instructions", yield* writeInstructions(folder + "/" + key + ".instructions", request.instructions)]
     const resume = request.resumeRun === undefined ? [] : ["ORC_DISPATCH_RESUME_RUN=" + request.resumeRun]
     const routed = request.routedModels === undefined ? [] : ["ORC_DISPATCH_ROUTED_MODELS=" + JSON.stringify(request.routedModels)]
-    const assigned = [...resume, ...routed, ...withClaimedMachine(request.machine)]
+    const rebase = request.rebase === undefined ? [] : ["ORC_DISPATCH_REBASE=" + JSON.stringify(request.rebase)]
+    const assigned = [...resume, ...routed, ...rebase, ...withClaimedMachine(request.machine)]
     const env = assigned.length === 0 ? [] : ["env", ...assigned]
     return [...env, ...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...models, ...kind, ...delivery, ...instructions, ...answers]
   })

@@ -26,7 +26,7 @@ Each run's `state` is `waiting` while a running run's folder holds `asking.json`
 
 ### Queued tasks
 
-Each backlog task that waits in the runner's `orc` pueue group for this `ORC_HOME` adds one entry with `state` `queued`, listed before the recorded runs.
+Each backlog task that waits in the runner's `orc` [pueue](https://github.com/Nukesor/pueue) group for this `ORC_HOME` adds one entry with `state` `queued`, listed before the recorded runs.
 A `queued` entry gives the backlog id as `task`, its `orc/<task-id>` branch, the checkout it will run in as `project`, and 0 `questions`.
 The queued entry's `id`, `status` and every other fact a run gains once it starts are `null`.
 When pueue cannot be reached, `orc runs --json` adds no `queued` entry and still prints the recorded runs.
@@ -48,6 +48,7 @@ Runs recorded before these facts show each as `null`.
 
 To see one run step by step, run `orc show <run-id>`.
 It lists each step with its agent, session, signals, latest score and evidence, every file as a full link.
+Each step prints its `model` when an agent ran it, and its `minutes` from start to end once it ended.
 To print the same facts as JSON, run `orc show <run-id> --json`.
 Its JSON document names its version first as `schema`, starting at `orc.show.v1`.
 Its `run` gives the same `task`, `machine` and `worktree` as `orc runs --json`.
@@ -61,7 +62,8 @@ An implement step beside carried steps gives their run even when its own evidenc
 ## Read a step's output
 
 To print one step's output, run `orc log <run-id> <step-id>` with the step's `id` from that JSON.
-An implement step prints `agent.log` and a fix step its `fix-<attempt>.log`, which Pi appends to as it works.
+An implement step prints `agent.log` and a fix step its `fix-<attempt>.log`, which [Pi](https://pi.dev) appends to as it works.
+A review turn writes `review-<n>.log` the same way.
 A checks or [no-mistakes](https://github.com/kunchenguid/no-mistakes) step prints the file it wrote.
 A step whose output is not written yet prints nothing.
 A carried step prints the log from the evidence path it records.

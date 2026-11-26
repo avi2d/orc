@@ -39,7 +39,8 @@ The panel keeps its state when you switch tabs.
 Select an answer option, or type an answer and select Send.
 The panel shows an error if the answer command fails.
 A run event question has no answer box.
-Select **Open run** to see the newest local run in Agents.
+Select **Open run** to open the newest of this task's runs that this machine recorded, in Agents.
+The list comes from `orc runs --json --local`.
 While a task is queued, its queue position replaces that button.
 
 Select a PR link to open it in your browser.
@@ -55,7 +56,7 @@ Runs out shows an estimate only when the quota will run out before reset.
 
 Machines shows local and configured remote resources.
 Load turns red above the machine's core count.
-Orc runs counts running pueue tasks in the `orc` group.
+Orc runs counts running [pueue](https://github.com/Nukesor/pueue) tasks in the `orc` group.
 An unreadable machine shows dashes and a reason below the table.
 
 ![Resources tab with the second machine unreachable](images/herdr-resources-unreachable.png)

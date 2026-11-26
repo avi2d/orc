@@ -16,7 +16,7 @@ Otherwise orc runs `gh pr merge <url> --squash --match-head-commit <sha>` at the
 ## A PR behind its base
 When an open green PR is behind its base, Orc compares the files each side changed since the merge base.
 If the two lists share no path, Orc tries to merge at the head it checked without updating the branch.
-If GitHub refuses because the branch is not up to date, Orc updates the branch and waits for its checks before merging.
+If [GitHub](https://github.com) refuses because the branch is not up to date, Orc updates the branch and waits for its checks before merging.
 Orc counts both paths of a renamed file.
 If GitHub returns its limit of 300 files on either side, Orc updates the branch because the lists may be incomplete.
 When the lists share a path, Orc updates the branch before merging.
@@ -29,6 +29,23 @@ A read that fails during the wait counts as no answer, and orc keeps waiting unt
 It stops waiting early once a check on the new head is red.
 It reads the new head's parents and treats a head that leaves out the checked head as changed after the approval.
 Once the new head is green and no longer behind, orc runs `gh pr merge <url> --squash --match-head-commit <new sha>`.
+
+## Change the first wait
+
+Set `ORC_MERGE_POLL_SECONDS` to change the first wait before Orc reads an updated PR, such as `ORC_MERGE_POLL_SECONDS=0.5 orc merge orc-7`.
+Later waits still double up to 15 seconds.
+The value is a number of seconds above zero and at most 15, and Orc refuses any other value before it reads the PR.
+
+## The recorded stage
+
+At each step of an `orc merge`, Orc writes a `merge` record into the closed task file.
+The record holds the basis, the head it checked, the checks that were green on that head, and the current stage.
+The stage is `updating`, `checks-running`, `conflicted`, `check-failed` or `merged`.
+A `conflicted` stage names the base branch as its detail, and a `check-failed` stage names the red checks.
+`orc backlog --json` carries the record as `merge`, and the App's Approve step reads it, as [Approve a run's PR](../herdr-app-agents.md#approve-a-runs-pr) says.
+Each `orc merge` drops the record of an earlier attempt once the PR is open.
+When Orc cannot write the record, it prints the reason and goes on with the merge.
+A merge's own send-back keeps the record on the sent-back task, and `orc backlog send-back` drops it.
 
 ## Return without waiting for CI
 
@@ -85,4 +102,4 @@ Either basis meets every refusal above.
 - A secret change, to a file named `.env`, `.env.<name>`, `*.env`, `.envrc`, `id_rsa`, `id_ed25519`, `.npmrc`, `.netrc`, `credentials.json`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, or a name with `secret` in it.
 
 Each such refusal ends `which waits for the captain's merge word`.
-The beat also merges a yolo project's green PR by itself, as [Merging a task's PR](beat-runs.md#merging-a-tasks-pr) in the beat reference describes.
+The beat also merges a yolo project's green PR by itself, as [Automatic PR merges](beat-runs.md#automatic-pr-merges) in the beat reference describes.

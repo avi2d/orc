@@ -6,8 +6,8 @@ const sendBackQuestionId = "send-back"
 export const isSendBackQuestion = (question: string): boolean =>
   question === sendBackQuestionId || question.startsWith(sendBackQuestionId + "-")
 
-const sendBackQuestion = (id: string, words: string, at: string): ParkedQuestion =>
-  ({ id, text: "The captain sent the pull request back", asked: at, blocks: true, answer: { words, at, relayedTo: null } })
+const sendBackQuestion = (id: string, words: string, at: string, source: "captain" | "ci" = "captain"): ParkedQuestion =>
+  ({ id, text: source === "ci" ? "A CI check sent the pull request back" : "The captain sent the pull request back", asked: at, blocks: true, answer: { words, at, relayedTo: null } })
 
 const notSentBack = (id: string, kind: string) =>
   new BacklogError({ detail: "orc backlog send-back refused: " + id + " is " + kind + ", and only a closed task goes back" })
@@ -20,7 +20,7 @@ export const addSendBackWords = (
 ): Effect.Effect<NonNullable<Parked["origin"]>, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   rewriteNew(root, id, (fresh) => {
     const parked = fresh.parked
-    if (parked === null || parked.origin === undefined || parked.branch !== taskBranch(id) || !parked.questions.every((question) => isSendBackQuestion(question.id))) {
+    if (parked === null || parked.origin === undefined || parked.branch !== taskBranch(id) || parked.questions.length === 0 || !parked.questions.every((question) => isSendBackQuestion(question.id))) {
       return Effect.fail(notSentBack(id, fresh.state.kind))
     }
     const question = sendBackQuestion(sendBackQuestionId + "-" + (parked.questions.length + 1).toString(), words, at)
@@ -33,7 +33,9 @@ export const sendBackClosedTask = (
   id: string,
   words: string,
   at: string,
-  origin: NonNullable<Parked["origin"]>
+  origin: NonNullable<Parked["origin"]>,
+  mergeRecord: "kept" | "cleared",
+  ciChecks: ReadonlyArray<string> = []
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const { fs, paths, file, grabbed, putBack, read } = yield* grabIn(root, "closed", id, Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" })))
@@ -43,8 +45,10 @@ export const sendBackClosedTask = (
       if (ran === null) {
         return yield* new BacklogError({ detail: id + " closed without a run, so it has no branch to send back" })
       }
-      const parked: Parked = { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at)], origin: ran.pr === null ? origin : { ...origin, pr: ran.pr }, at, sentBackAt: at }
-      const sent: TaskRecord = { ...record, parked, state: { kind: "new" } }
+      const parked: Parked = { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at, ciChecks.length === 0 ? "captain" : "ci")], origin: ran.pr === null ? origin : { ...origin, pr: ran.pr }, at, sentBackAt: at }
+      const { retry: _retry, ...retryable } = record
+      const { merge: _merge, ...unmerged } = retryable
+      const sent: TaskRecord = { ...(mergeRecord === "kept" ? retryable : unmerged), ...(ciChecks.length === 0 ? {} : { ciSentBack: [...new Set([...(record.ciSentBack ?? []), ...ciChecks])] }), parked, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(sent)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })
       }
@@ -53,4 +57,4 @@ export const sendBackClosedTask = (
     const sent = yield* send.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
     yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
     return sent
-  })
+  }).pipe(Effect.uninterruptible)

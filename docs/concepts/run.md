@@ -13,8 +13,8 @@ The beat starts most runs through the runner, and you can start one by hand in a
 ## An isolated copy
 
 Orc refuses a checkout with uncommitted changes.
-A ship run then makes a git worktree of the project on a new branch under `~/.orc/worktrees`, so the agent never touches your own checkout.
-Before Pi starts, a ship run runs the `prepare` command from the project's `.no-mistakes.yaml`, such as an install.
+A ship run then makes a [git](https://git-scm.com) worktree of the project on a new branch under `~/.orc/worktrees`, so the agent never touches your own checkout.
+Before [Pi](https://pi.dev) starts, a ship run runs the `prepare` command from the project's `.no-mistakes.yaml`, such as an install.
 
 ## The agent
 
@@ -37,7 +37,7 @@ A ship run records success only when all of these hold.
 1. Pi's final reply stopped cleanly with `ORC_COMPLETE` on its own line.
 1. The branch holds at least one new commit.
 1. The configured local checks pass.
-1. The pull request is open, and on a `no-mistakes` run CI is green.
+1. The pull request is open.
 
 A scout or task run makes no branch and no pull request.
 It counts as done once Pi wrote `agent-report.md` into the run folder.
@@ -46,7 +46,7 @@ It counts as done once Pi wrote `agent-report.md` into the run folder.
 
 Each run keeps its task, its logs, its Pi session and its `report.md` in `~/.orc/runs/<run-id>`.
 A run that ends done or failed removes its Pi folder, `session/agent`, which holds the run's Pi settings and its installed packages, or links to the packages orc shares between runs.
-A parked run, a stopped run and a run still waiting on CI keep that folder.
+A parked run and a stopped run keep that folder.
 `orc runs` lists the runs, `orc show <run-id>` shows one step by step, and `orc log <run-id> <step-id>` prints one step's output.
 
 ## Stopping and resuming

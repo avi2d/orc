@@ -52,7 +52,7 @@ const trigger = (t: Palette, name: MenuName, menu: FilterMenu<unknown>, open: Me
   h_flex().id(`filter-${name}`).w(menuWidth).h(triggerHeight).px(8).gap(6).items_center().justify_between().rounded(4).cursor_pointer()
     .bg(open === name ? t.selected : t.surface)
     .hover((style) => style.bg(t.hover))
-    .on_click((_event, cx) => act.openMenu(cx, open === name ? null : name))
+    .on_mouse_down("left", (_event, cx) => act.openMenu(cx, open === name ? null : name))
     .child(div().min_w_0().truncate().child(`${menu.title}: ${menu.chosen.name}`))
     .child(div().flex_shrink_0().text_color(t.dim).child(String(menu.chosen.count)))
     .child(div().flex_shrink_0().text_color(t.dim).child("▾"))

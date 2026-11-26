@@ -4,7 +4,7 @@ kind: how-to
 # Updating orc
 
 Run `orc update` on a machine to move its orc to the newest published release.
-The command installs only when the npm registry holds a newer version than the orc that runs it.
+The command installs only when the [npm](https://www.npmjs.com) registry holds a newer version than the orc that runs it.
 
 ## Update orc
 
@@ -14,7 +14,7 @@ To update orc on a machine:
 1. Read the line it prints, which names the version it found and the version that runs.
 
 `orc update` reads the newest version of `@avi2dg/orc` from the registry `npm_config_registry` names, else from `https://registry.npmjs.org`.
-When that version is newer than the running one, a Bun global install runs `bun add -g @avi2dg/orc@<version>`.
+When that version is newer than the running one, a [Bun](https://bun.com) global install runs `bun add -g @avi2dg/orc@<version>`.
 If the machine uses a launcher that reads `~/.local/share/orc/release`, Orc prepares the new release before changing that file.
 An `update.command` overrides both install methods.
 When the versions are equal, or the running orc is newer, it installs nothing.
@@ -29,12 +29,16 @@ Orc detects the launcher when its running entry point resolves to `~/.local/shar
 For example, if `release` holds `1.2.3`, the launcher starts `v1.2.3/packages/run/src/bin.ts` with Bun or runs `v1.2.3/orc`.
 
 If the launcher starts the source entry, Orc clones the new version tag, installs its production dependencies from the lockfile with the Bun that runs orc, and checks that the new checkout prints the expected version.
-If the launcher runs the compiled `orc`, Orc downloads the archive for its platform and the archive's `.sha256` file from the GitHub release, as [Release assets](release-assets.md) lists them.
-Orc then checks the archive's SHA-256, unpacks it into `v<version>`, and checks that the new `orc` prints the expected version, so the update needs no Bun.
-If the version directory already exists, Orc checks only the entry the launcher would run, the source entry or the compiled `orc`.
+If the launcher runs the compiled `orc`, Orc downloads the archive for its platform and the archive's `.sha256` file from the [GitHub](https://github.com) release, as [Release assets](release-assets.md) lists them.
+Orc checks the archive's SHA-256, then unpacks it with `orc-dash` and `orc-dash-capture` beside `orc` in the same version directory.
+Before selecting the release, Orc checks its version and runs both dashboard commands with `--help` to check that they start.
+Both commands must exit 0, regardless of their help text.
+The compiled update needs no Bun.
+If the version directory already exists, Orc runs the same checks on that directory before selecting it.
 If any step fails, the launcher keeps the old release.
 After an install, run `orc --version` through the launcher to see the new version.
 Runs that already started still use their old checkout.
+If you use launchers for `orc-dash` or `orc-dash-capture`, have them read the same `release` file as the `orc` launcher to follow updates.
 
 ## Update a linked checkout
 

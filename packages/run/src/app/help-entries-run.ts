@@ -13,7 +13,7 @@ export const runHelp: HelpEntry = {
   about: "Runs the task in the clean checkout you are in: Pi writes the change, the checks run, and no-mistakes reviews it and opens the PR. Give --branch with no task file to resume a stopped run on that branch.",
   options: [
     { flag: "--kind " + choice(runKinds), meaning: "What the task ends in. ship ends in a PR, scout and task end in a report, and parent runs a parent's final check. Defaults to ship." },
-    { flag: "--delivery " + choice(runDeliveries), meaning: "How a ship task reaches its PR. Defaults to no-mistakes, and direct-PR opens the PR after a review turn that records findings and blocks nothing." },
+    { flag: "--delivery " + choice(runDeliveries), meaning: "How a ship task reaches its PR. Defaults to no-mistakes. direct-PR records a review before opening the PR, and orc rebases and records a review before opening the PR without a CI verdict." },
     { flag: "--branch <name>", meaning: "The branch to commit to, or to resume. Defaults to orc/<run-id>." },
     { flag: "--sandbox " + choice(sandboxKinds), meaning: "Where the agent runs. Defaults to nono, and none runs it on the host as you." },
     { flag: "--token-file <path>", meaning: "A file holding the provider token the run uses." },

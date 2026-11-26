@@ -7,8 +7,8 @@ kind: how-to
 
 ## Before you begin
 
-Install the Bun version pinned in `.bun-version`.
-The other tools below are optional.
+The release executables run without [Bun](https://bun.com).
+The tools below are optional.
 A panel reports a missing tool without stopping the rest of the screen.
 
 | Optional tool | Used for |
@@ -19,7 +19,7 @@ A panel reports a missing tool without stopping the rest of the screen.
 | `pueue` 4.0.4 | Queued and running jobs |
 | [`no-mistakes`](https://github.com/kunchenguid/no-mistakes) | Full review fix stages |
 | `orc` | Orc run stages, the attention queue and the dispatch accounts |
-| `gh` | GitHub Actions and runner repositories |
+| `gh` | [GitHub Actions](https://github.com/features/actions) and runner repositories |
 
 Put the tools you use on `PATH`.
 For GPU usage on WSL, the panel also checks `/usr/lib/wsl/lib`.
@@ -30,22 +30,23 @@ They are off until configured.
 
 ## Install
 
-To install orc-dash:
+To install `orc-dash` and `orc-dash-capture`:
 
-1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
-1. Run `cd orc` to enter it.
-1. Run `bun install --frozen-lockfile` to install the pinned dependencies.
-1. Run `mkdir -p ~/.local/bin && ln -s "$PWD/packages/cli/src/bin.ts" ~/.local/bin/orc-dash` to put the `orc-dash` command in a folder the `PATH` holds.
-   When `~/.local/bin` is not on the `PATH`, add `export PATH="$HOME/.local/bin:$PATH"` to the shell startup file and restart the shell.
+1. Download the archive for your platform and its checksum from the [Orc releases on GitHub](https://github.com/avi2d/orc/releases).
+1. Check the archive's checksum as [Release assets](run/release-assets.md#checksum-file) describes.
+1. Unpack the archive into a folder outside `PATH`.
+1. Copy only `orc-dash` and `orc-dash-capture` into a folder on `PATH`.
+1. Run `orc-dash --help` and `orc-dash-capture --help` to check that both commands start.
 
-The command runs the clone's code through `bun`, so `bun` must be on the `PATH` as well.
+If you use a versioned launcher, see [Updating orc](run/updating-orc.md#update-a-versioned-checkout) for how to follow its selected release.
 
 ## Open one panel
 
 Run `orc-dash panel --list` to see the available panels.
 Run `orc-dash panel quota` to open the quota panel, or replace `quota` with another panel name.
 Press `q` or Control C to quit.
-In the clone, `bun run dashboard panel quota` runs the same panel.
+To run the panel from source, [set up a checkout and install its dependencies](contribute.md#run-orc-from-a-checkout).
+In the checkout, `bun run dashboard panel quota` runs the same panel.
 
 Add `--print` to print one frame instead of opening the live panel.
 Use `--width 120 --height 30` to set its size and `--color` for ANSI colours.
@@ -71,7 +72,7 @@ See [the second machine](dash-resources.md#show-the-resources-of-a-second-machin
 
 <div id="run-the-queues-tool"><span id="run-the-dispatch-tool"></span></div>
 
-[Queues](dash-queues.md) shows pueue and GitHub Actions.
+[Queues](dash-queues.md) shows [pueue](https://github.com/Nukesor/pueue) and GitHub Actions.
 [Dispatch](dash-dispatch.md) shows the backlog and machine slots.
 
 <div id="run-the-attention-tool"></div>
@@ -114,7 +115,7 @@ Run `orc quota --json` and check its output.
 
 ### The other machine's resources panel says it is unreachable
 
-The panel reports why the configured command failed, such as `sh exited 255` from SSH.
+The panel reports why the configured command failed, such as `sh exited 255` from [SSH](https://www.openssh.com).
 Run `sh -c "$ORC_DASH_REMOTE_RESOURCES"` locally and check that its output contains only the version 1 report.
 
 `sh exited 127` means the remote shell could not find `bun`.

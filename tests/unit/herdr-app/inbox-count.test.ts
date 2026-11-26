@@ -38,7 +38,41 @@ const find = (element: object | string, id: string): Node | null => {
   return null
 }
 
+const paths = (element: object | string, parents: ReadonlyArray<Node> = []): ReadonlyArray<ReadonlyArray<Node>> => {
+  const made = typeof element === "string" ? undefined : nodes.get(element)
+  if (made === undefined) return []
+  const path = [...parents, made]
+  return [path, ...made.kids.flatMap((kid) => paths(kid, path))]
+}
+
+const press = (view: { render(cx: Context): object }, target: string): void => {
+  const rendered = paths(view.render(cx))
+  const under = rendered.find((path) => path.at(-1)?.calls.some((call) => call.name === "id" && call.args[0] === target))
+  if (under === undefined) throw new Error(`No element ${target}`)
+  for (const path of rendered) {
+    const made = path.at(-1)
+    if (made !== undefined && !under.includes(made)) mouseDownOut(made)
+  }
+  for (const made of [...under].reverse()) mouseDown(made)
+  click(find(view.render(cx), target))
+}
+
+const mouseDownOut = (made: Node): void => {
+  for (const call of made.calls) {
+    const handler = call.args[0]
+    if (call.name === "on_mouse_down_out" && typeof handler === "function") handler({}, cx)
+  }
+}
+
+const mouseDown = (made: Node): void => {
+  for (const call of made.calls) {
+    const handler = call.args[1]
+    if (call.name === "on_mouse_down" && call.args[0] === "left" && typeof handler === "function") handler({}, cx)
+  }
+}
+
 const documents = new Map<string, unknown>()
+let attentionPending: Promise<{ code: number; stdout: string; stderr: string }> | null = null
 const executed: Array<string> = []
 const spawned: Array<Promise<unknown>> = []
 const ran: Array<{ readonly name: string; readonly args: unknown }> = []
@@ -66,7 +100,7 @@ const click = (element: Node | null): void => {
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node }))
 void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Input: { new: () => node() }, Avatar: node, AvatarFallback: node, AvatarImage: node,
+  h_flex: node, v_flex: node, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
   InputState: { new: () => {
     let typed = ""
@@ -78,6 +112,7 @@ void mock.module("herdr", () => ({
   exec: (command: string, args: ReadonlyArray<string>) => {
     const line = [command, ...args].join(" ")
     executed.push(line)
+    if (line === "orc attention --json" && attentionPending !== null) return attentionPending
     const document = documents.get(line)
     return Promise.resolve(document === undefined
       ? { code: 1, stdout: "", stderr: `Unexpected command: ${line}` }
@@ -106,6 +141,55 @@ const loadAttention = async () => {
   if (inbox.kind !== "ok") throw new Error(inbox.kind === "failed" ? inbox.reason : inbox.kind)
   return { agents: agents.value, inbox: inbox.value }
 }
+
+test("a stalled remote question request does not hold back local steps and log refresh", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const runId = "20261126-090000-aaaaaa"
+  const step = { id: 1, name: "implement", attempt: 1, status: "running", model: null, thinking: null, piSessionFile: null, from: null }
+  documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [{ id: runId, project: "/work/garden", branch: "orc/garden-1", status: "running", prLink: null, title: "Local run", step: null, questions: 0, endReason: null, kind: null, delivery: null, worktree: null }] })
+  documents.set("orc backlog --json", { schema: "orc.backlog.v1", tasks: [] })
+  documents.set(`orc show ${runId} --json`, { schema: "orc.show.v1", run: { taskFile: "/work/garden/task.md" }, steps: [step] })
+  documents.set(`orc log ${runId} 1`, "local output")
+  let release = (): void => undefined
+  attentionPending = new Promise((resolve) => { release = () => resolve({ code: 0, stdout: JSON.stringify(fixture), stderr: "" }) })
+  const agents = new OrcAgents()
+  agents.pane = "raw"
+  try {
+    agents.refresh(cx)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(agents.steps?.reading.kind).toBe("ok")
+    expect(agents.output.log?.reading).toEqual({ kind: "ok", value: JSON.stringify("local output") })
+  } finally {
+    release()
+    attentionPending = null
+    documents.clear()
+  }
+})
+
+const openedOn = async (menu: "project" | "status") => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const agents = new OrcAgents()
+  agents.menu = menu
+  return agents
+}
+
+test("pressing the open Project trigger closes its list instead of reopening it after repaint", async () => {
+  const agents = await openedOn("project")
+  press(agents, "filter-project")
+  expect(agents.menu).toBeNull()
+})
+
+test("pressing the open Status trigger closes its list instead of reopening it after repaint", async () => {
+  const agents = await openedOn("status")
+  press(agents, "filter-status")
+  expect(agents.menu).toBeNull()
+})
+
+test("pressing Status while Project is open switches lists instead of closing both", async () => {
+  const agents = await openedOn("project")
+  press(agents, "filter-status")
+  expect(agents.menu).toBe("status")
+})
 
 const cmd4 = { name: "layout.select", args: { stack: "orc-views", child: "orc-inbox" } }
 
@@ -233,6 +317,37 @@ test("the Board's Awaiting you lane lists the tasks the Inbox lists instead of a
   expect(idsIn(find(element, "cards-Awaiting you"))).toEqual(userOwned.map((id) => `card-${id}`))
   expect(find(element, "inbox-count")?.kids).toEqual(["4"])
   expect(idsIn(find(element, "cards-Planned"))).toEqual(["card-garden-9"])
+})
+
+test("a PR with no recorded state remains actionable across the Inbox, Board and task panel instead of losing its merge button", async () => {
+  const { default: OrcBoard } = await import("../../../packages/herdr-app/mods/orc-board/main")
+  const { default: OrcTask } = await import("../../../packages/herdr-app/mods/orc-task/main")
+  const { readInbox } = await import("../../../packages/herdr-app/src/inbox-read")
+  const { guardJson } = await import("../../../packages/herdr-app/src/guard")
+  const { taskDetails } = await import("../../../packages/herdr-app/src/task-guard")
+  const { palette } = await import("../../../packages/herdr-app/src/palette")
+  const closed = {
+    ...openTask("garden-3"), status: "closed", prState: null, claim: null, started: null, outcome: "done",
+    pr: "https://github.com/example/garden/pull/3", report: null, closedAt: "2026-11-24T09:00:00Z"
+  }
+  const backlog = { schema: "orc.backlog.v1", projects: [{ name: "garden" }], tasks: [closed] }
+  documents.set("orc backlog --json", backlog)
+  documents.set("orc attention --json", fixture)
+  const board = new OrcBoard()
+  const [reading, inbox] = await Promise.all([board.load(), readInbox()]).finally(() => documents.clear())
+  if (inbox.kind !== "ok") throw new Error(inbox.kind === "failed" ? inbox.reason : inbox.kind)
+  const parsed = guardJson(JSON.stringify(backlog), taskDetails)
+  if (parsed.kind !== "ok") throw new Error(parsed.reason)
+  const detail = parsed.value[0]
+  expect(inbox.value.items.find((item) => item.task === closed.id)).toMatchObject({ kind: "pr", link: closed.pr, action: { kind: "merge" } })
+  board.reading = reading
+  expect(idsIn(find(board.render(), "cards-Awaiting you"))).toEqual(["card-garden-3"])
+  const panel = new OrcTask()
+  panel.tab = "Info"
+  const info = panel.tabBody(palette(), detail, [])
+  expect(wordsOf(info)).toContain(closed.pr)
+  expect(wordsOf(info)).not.toContain(`${closed.pr} (open)`)
+  expect(find(info, "merge")).not.toBeNull()
 })
 
 test("an Inbox question with options also sends a typed answer instead of offering only the option buttons", async () => {

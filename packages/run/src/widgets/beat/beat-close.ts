@@ -1,13 +1,14 @@
 import { Array as Arr, DateTime, Duration, Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, closeStartedTask, runLabel, runDirFor, taskBranch, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { recordEvent } from "../../entities/events/index"
 import { type BeatAction, openUnreachedMachine, type Progress, withdrawTaskItems, withdrawUnreachedMachine } from "../../entities/attention/index"
 import type { FailingMark } from "../../entities/agent/index"
 import type { DispatchConfig } from "../../shared/config/index"
 import { ownedBySweep, throughFor } from "../../shared/config/index"
 import { logWrittenAt, stallMillis } from "./stall"
 import { endSplit } from "./beat-split"
-import { answersFor, askStartedTask, type AskedQuestion, correctionsDue, markAnswersRelayed, markCorrectionsQueued, parkStartedTask } from "../../entities/parked-runs/index"
+import { answersFor, askStartedTask, type AskedQuestion, correctionsDue, markAnswersRelayed, markCorrectionsQueued, parkStartedTask, retryStartedTask } from "../../entities/parked-runs/index"
 import { Asking, askingFileName, hasBlockingQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
 import { readJsonFileIfPresent } from "../../shared/config/index"
 import { type RunnerRequirements } from "../../features/queueing-a-task/index"
@@ -243,7 +244,7 @@ const readClose = (
     }),
     Effect.timeoutOrElse({
       duration: Duration.seconds(closeSeconds),
-      orElse: () => Effect.succeed({ kind: "unread" as const, reason: "the close read timed out after " + closeSeconds + " seconds" })
+      orElse: () => Effect.succeed<CloseReading>({ kind: through === null ? "unread" : "unreached", reason: "the close read timed out after " + closeSeconds + " seconds" })
     })
   )
 
@@ -297,6 +298,61 @@ const trackUnreached = (
     }
   })
 
+const trackReading = (
+  context: CloseContext,
+  task: string,
+  machine: string,
+  reading: CloseReading
+): Effect.Effect<{ readonly nowText: string; readonly unreadSince: number | null }, BacklogError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const unreadFile = backlogPaths(context.root).unreadFile(task)
+    const nowText = yield* nowIso
+    const unreadSince = reading.kind === "unread"
+      ? yield* readSince(fs, unreadFile, nowText)
+      : yield* clearSince(fs, unreadFile)
+    yield* trackUnreached(context.root, task, machine, reading, fs, nowText)
+    return { nowText, unreadSince }
+  })
+
+const deadRunOf = (reading: CloseReading): string | undefined =>
+  reading.kind === "read" && reading.result.status === "failed" && reading.result.reason !== "the run was killed" ? reading.result.run?.id : undefined
+
+export const retryDeadRun = (
+  root: string,
+  task: string,
+  machine: string,
+  run: string
+): Effect.Effect<Progress, TaskFileError, FileSystem.FileSystem | Path.Path> =>
+  Effect.gen(function*() {
+    const at = yield* nowIso
+    const retried = yield* retryStartedTask(root, task, machine, run, at).pipe(
+      Effect.catchTag("BacklogError", () => Effect.succeed(null))
+    )
+    if (retried === null) {
+      return { kind: "untracked" } satisfies Progress
+    }
+    yield* recordEvent(root, { key: task + ".retry." + run, at, text: task + " will retry from run " + run + " on its kept branch" }).pipe(
+      Effect.catchTag("BacklogError", () => Effect.void)
+    )
+    return { kind: "ended", action: { kind: "retry", task, machine, run } } satisfies Progress
+  })
+
+const closeOwnLogRun = (
+  context: CloseContext,
+  task: TaskRecord,
+  machine: string,
+  started: { readonly at: string; readonly log: string }
+): Effect.Effect<Progress, BacklogError | TaskFileError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const silent = ownLogEndingOf(started.at, yield* logWrittenAt(started.log), Date.parse(yield* nowIso))
+    if (silent === null) {
+      return { kind: "own-log" } satisfies Progress
+    }
+    const silentEnded = yield* endTask(context.root, context.home, task, machine, silent)
+    return Option.match(silentEnded, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
+  })
+
 // A finished run ends its task here, because no other beat step reads a started task after its run ends.
 export const closeFinished = (
   context: CloseContext,
@@ -314,35 +370,31 @@ export const closeFinished = (
       return { kind: "untracked" } satisfies Progress
     }
     if (!ownedBySweep(machine)) {
-      const silent = ownLogEndingOf(started.at, yield* logWrittenAt(started.log), Date.parse(yield* nowIso))
-      if (silent === null) {
-        return { kind: "own-log" } satisfies Progress
-      }
-      const silentEnded = yield* endTask(context.root, context.home, task, claim.machine, silent)
-      return Option.match(silentEnded, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
+      return yield* closeOwnLogRun(context, task, claim.machine, started)
     }
     const through = throughFor(machine)
     const reading: CloseReading = yield* readClose(task, context.home, label, through)
-    const fs = yield* FileSystem.FileSystem
-    const unreadFile = backlogPaths(context.root).unreadFile(task.spec.id)
-    const nowText = yield* nowIso
-    const unreadSince = reading.kind === "unread"
-      ? yield* readSince(fs, unreadFile, nowText)
-      : yield* clearSince(fs, unreadFile)
-    yield* trackUnreached(context.root, task.spec.id, claim.machine, reading, fs, nowText)
+    const { nowText, unreadSince } = yield* trackReading(context, task.spec.id, claim.machine, reading)
     const stale = staleEndingOf(started.at, Date.parse(nowText), reading, unreadSince)
     const ending = reading.kind === "read" ? (stale ?? reading.ending) : stale
     if (ending === null) {
+      if (reading.kind === "unreached") {
+        return { kind: "unknown" } satisfies Progress
+      }
       if (reading.kind !== "read") {
         return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: reading.reason } } satisfies Progress
       }
       const action = yield* serveRunning(context, task, claim.machine, through, label, reading.asking)
-      return { kind: "running", outputAt: reading.outputAt, action, failing: reading.failing } satisfies Progress
+      return { kind: "running", outputAt: reading.outputAt, action, failing: reading.failing, ...(reading.result.run == null ? {} : { run: reading.result.run.id }) } satisfies Progress
+    }
+    const run = deadRunOf(reading)
+    if (stale === null && ending.kind === "close" && ending.outcome === "failed" && task.retry === undefined && run !== undefined) {
+      return yield* retryDeadRun(context.root, task.spec.id, claim.machine, run)
     }
     const ended = yield* endTask(context.root, context.home, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   }).pipe(
-    Effect.tap((progress) => progress.kind === "ended" && (progress.action.kind === "closed" || (progress.action.kind === "split" && task.spec.parent !== null))
+    Effect.tap((progress) => progress.kind === "ended" && (progress.action.kind === "retry" || progress.action.kind === "closed" || (progress.action.kind === "split" && task.spec.parent !== null))
       ? nowIso.pipe(Effect.flatMap((at) => withdrawTaskItems(context.root, [task.spec.id], at)))
       : Effect.void)
   )

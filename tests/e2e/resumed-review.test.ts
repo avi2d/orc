@@ -100,16 +100,18 @@ describe("direct-PR review across resume", () => {
   test("an unchanged branch keeps findings in each run folder without rerunning or depending on the first folder", async () => {
     const result = await scenario("unchanged")
     expect(result.resumedTurns).toBe(0)
-    expect(result.resumed).toEqual({ status: "passed", findings: [finding], file: join(result.second, "review.json") })
+    expect(result.original?.reusedFrom).toBeNull()
+    expect(result.resumed).toEqual({ status: "passed", findings: [finding], file: join(result.second, "review.json"), reusedFrom: "first" })
     expect(JSON.parse(result.resumedSaved ?? "null")).toEqual([finding])
-    expect(JSON.parse(result.resumedCheckpoint ?? "null")).toMatchObject({ outcome: result.resumed })
+    expect(JSON.parse(result.resumedCheckpoint ?? "null")).toMatchObject({ outcome: { status: "passed", findings: [finding], file: join(result.second, "review.json") } })
     expect(result.carried?.turns).toBe(0)
-    expect(result.carried?.outcome).toEqual({ status: "passed", findings: [finding], file: join(result.third, "review.json") })
+    expect(result.carried?.outcome).toEqual({ status: "passed", findings: [finding], file: join(result.third, "review.json"), reusedFrom: "second" })
     expect(JSON.parse(result.carried?.saved ?? "null")).toEqual([finding])
   })
 
   test("a new commit does not reuse the earlier review", async () => {
     const result = await scenario("commit")
+    expect(result.resumed.reusedFrom).toBeNull()
     expect(result.resumedTurns).toBe(1)
     expect(result.resumed.status).toBe("passed")
   })
@@ -122,7 +124,7 @@ describe("direct-PR review across resume", () => {
 
   test("a failed reviewer is not checkpointed or reused on an unchanged branch", async () => {
     const result = await scenario("failed")
-    expect(result.original).toEqual({ status: "failed", reason: "the reviewer could not start" })
+    expect(result.original).toEqual({ status: "failed", reason: "the reviewer could not start", reusedFrom: null })
     expect(result.originalCheckpoint).toBeNull()
     expect(result.resumedTurns).toBe(1)
     expect(result.resumed.status).toBe("passed")
@@ -145,7 +147,7 @@ describe("direct-PR review across resume", () => {
   test("a reused checkpoint write failure does not abort the review result", async () => {
     const result = await scenario("reused-checkpoint-write")
     expect(result.resumedTurns).toBe(0)
-    expect(result.resumed).toEqual({ status: "passed", findings: [finding], file: join(result.second, "review.json") })
+    expect(result.resumed).toEqual({ status: "passed", findings: [finding], file: join(result.second, "review.json"), reusedFrom: "first" })
     expect(JSON.parse(result.resumedSaved ?? "null")).toEqual([finding])
     expect(result.resumedCheckpoint).toBeNull()
   })
@@ -160,6 +162,7 @@ describe("direct-PR review across resume", () => {
 
   test("a reused findings write failure returns a failure instead of a stale file path or an exception", async () => {
     const result = await scenario("reused-review-write")
+    expect(result.resumed.reusedFrom).toBe("first")
     expect(result.resumedTurns).toBe(0)
     expect(result.resumed.status).toBe("failed")
     expect(result.resumed).not.toHaveProperty("file")

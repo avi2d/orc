@@ -192,15 +192,11 @@ const stubNoMistakes = async (replies: ReadonlyArray<NoMistakesReply>): Promise<
 
 export const ghPrLink = "https://github.com/o/r/pull/9"
 
-const noCheckRuns = "{\"total_count\":0,\"check_runs\":[]}"
-
-const stubGh = async (checkRuns: string): Promise<{ readonly dir: string; readonly calls: string }> => {
+const stubGh = async (): Promise<{ readonly dir: string; readonly calls: string }> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-gh-stub-"))
   const calls = join(dir, "calls")
   await writeFile(calls, "")
-  await writeFile(join(dir, "check-runs.json"), checkRuns)
   const script = ["#!/bin/sh", "echo \"$@\" >> \"" + calls + "\"",
-    "if [ \"$1\" = \"api\" ]; then cat \"" + join(dir, "check-runs.json") + "\"; exit 0; fi",
     "if [ \"$1 $2\" = \"pr list\" ]; then exit 0; fi",
     "if [ \"$1 $2\" = \"pr create\" ]; then echo '" + ghPrLink + "'; exit 0; fi",
     "echo 'unexpected gh call' >&2", "exit 1"].join("\n") + "\n"
@@ -222,8 +218,8 @@ export const runStep = (dir: string, home: string, sandbox: FakeAgent, execCheck
 export const runStepAs = (dir: string, home: string, sandbox: FakeAgent, facts: RunFacts): Promise<StepOutcome & { readonly nmCalls: string }> =>
   runStepWith(dir, home, sandbox, unexpectedChecks, unexpectedNoMistakes, [], noMistakesDelivery, "", facts)
 
-export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, checkRuns: string = noCheckRuns): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
-  const gh = await stubGh(checkRuns)
+export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+  const gh = await stubGh()
   try {
     const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], (spawner, hostGit, pathEnv, worktreeDir) =>
       ({ kind: "direct-PR", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer }), gh.dir + ":")
@@ -233,8 +229,19 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
   }
 }
 
-export const runDirectPrResume = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, checkRuns: string, answers: ReadonlyArray<QuestionAnswer>): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
-  const gh = await stubGh(checkRuns)
+export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+  const gh = await stubGh()
+  try {
+    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], (spawner, hostGit, pathEnv, worktreeDir) =>
+      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer }), gh.dir + ":")
+    return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
+  } finally {
+    await rm(gh.dir, { recursive: true, force: true })
+  }
+}
+
+export const runDirectPrResume = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, answers: ReadonlyArray<QuestionAnswer>): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+  const gh = await stubGh()
   try {
     const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, answers, (spawner, hostGit, pathEnv, worktreeDir) =>
       ({ kind: "direct-PR", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer }), gh.dir + ":", handRunFacts, { runId: "step-run-2", resumeRun: "step-run-1" })

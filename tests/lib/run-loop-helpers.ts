@@ -9,6 +9,7 @@ import type { AgentFile } from "../../packages/run/src/entities/agent/index"
 import { askSetupFor } from "../../packages/run/src/entities/agent/index"
 import { openDatabase, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
 import {
+  deliveryCheckpoints,
   recordChecksDone,
   recordChecksStart,
   recordFixDone,
@@ -16,10 +17,6 @@ import {
   recordImplementDone,
   recordImplementStart,
   recordOpenQuestion,
-  recordNoMistakesDone,
-  recordNoMistakesStart,
-  recordPullRequestDone,
-  recordPullRequestStart,
   recordStepSession
 } from "../../packages/run/src/features/running-a-task/history-write"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
@@ -135,10 +132,7 @@ export const runLoopCheckpoints = (db: Database, run: HistoryRun): RunCheckpoint
   fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer, started),
   fixSession: (attempt, file) => recordStepSession(db, run.runId, "fix", attempt, file),
   fixDone: (fix) => recordFixDone(db, run.runId, fix),
-  noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
-  noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
-  pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
-  pullRequestDone: (record) => recordPullRequestDone(db, run, record),
+  ...deliveryCheckpoints(db, run),
   questionAsked: (step, question) => recordOpenQuestion(db, run.runId, step, question)
 })
 

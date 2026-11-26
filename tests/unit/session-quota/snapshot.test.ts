@@ -405,7 +405,7 @@ describe("the live session quota panel inside the terminal's rows where flags de
     };
   };
 
-  test("shows five of seven flags in a 30 by 8 terminal with its two-row caption and counts the other two, naming the JSON command", async () => {
+  test("wraps the full public report command without clipping it and counts three hidden flags at 30 by 8", async () => {
     const lines = sessionPanelWithin(Option.some(sevenFlags()), 30, 8, Number.POSITIVE_INFINITY);
     const setup = await createTestRenderer({ width: 30, height: 8 });
     setup.renderer.root.add(new TextRenderable(setup.renderer, { content: blockDocument(lines), wrapMode: "none" }));
@@ -419,14 +419,14 @@ describe("the live session quota panel inside the terminal's rows where flags de
       "⚑ sho…/1 w1A:p2 2h claude main",
       "⚑ sho…/1 w1A:p2 3h claude main",
       "⚑ sho…/1 w1A:p2 4h claude main",
-      "⚑ sho…/1 w1A:p2 5h claude main",
-      "+2 bun run session-quota-json",
+      "+3 flags: orc-dash",
+      "report session-quota",
     ]);
   });
 
   test("counts the hidden flags in words where the row has room", () => {
     expect(sessionPanelWithin(Option.some(sevenFlags()), 60, 5, Number.POSITIVE_INFINITY).map(plain).at(-1)).toBe(
-      "+4 more flags, see bun run session-quota-json",
+      "+4 more flags, see orc-dash report session-quota",
     );
   });
 

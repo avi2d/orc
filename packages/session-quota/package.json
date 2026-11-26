@@ -15,7 +15,7 @@
     "orc-dash-capture": "src/capture-bin.ts"
   },
   "scripts": {
-    "build": "bun build src/capture-bin.ts --outdir dist --target bun --minify"
+    "build": "bun ../../scripts/compile-dashboard.ts orc-dash-capture"
   },
   "dependencies": {
     "@effect/platform-bun": "4.0.0",

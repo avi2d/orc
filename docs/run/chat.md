@@ -3,7 +3,7 @@ kind: reference
 ---
 # Adding tasks from a chat
 
-Run `orc chat` to add and manage tasks in a Pi session.
+Run `orc chat` to add and manage tasks in a [Pi](https://pi.dev) session.
 The chat uses `models.orchestrator` from `config.json` and refuses to start if no model is set.
 
 ## Session and instructions
@@ -12,6 +12,7 @@ Use `orc chat --session <file>` to choose a session file.
 Orc passes its absolute path to Pi.
 If the file exists, Pi resumes it.
 Otherwise, Pi creates it after the first reply.
+A hangup of the chat's terminal also stops Pi.
 
 When present, `<ORC_HOME>/orchestrator.md` supplies the orchestrator's system instructions.
 The chat also loads each instructions file named in `projects.json`, labelled by project.
@@ -30,6 +31,7 @@ The chat gives Pi these tools:
 | `orc_backlog_priority` | Set or clear a new task's priority from 0 to 4. |
 | `orc_machines` | Read the orc version each dispatch machine runs, through `orc machines --json`. |
 | `orc_backlog_stop` | Kill a started task's run and close the task stopped. |
+| `orc_backlog_retry` | Run a failed or stopped task again, on the machine it ran on, reusing its kept branch when one exists. |
 | `orc_backlog_drop` | Close a new task as dropped, with a reason. |
 | `orc_backlog_send_back` | Send a closed task's open PR back with your review. |
 | `orc_backlog_note` | Leave a note on a task. |
@@ -76,13 +78,13 @@ The board has no login.
 Anyone on the same network with its link can submit answers that orc records as yours.
 The chat opens it with `lavish-axi <board.html> --no-open --reopen` and posts a LAN URL.
 The board is not published through `lavish-axi share`, a third-party host, or a public tunnel.
-The page loads Tailwind and DaisyUI styles from the jsDelivr CDN.
+The page loads [Tailwind](https://tailwindcss.com) and [DaisyUI](https://daisyui.com) styles from the [jsDelivr](https://www.jsdelivr.com) CDN.
 The shell running `orc chat` must have `lavish-axi` on its `PATH`.
 
 ### Board address
 
 Set `ORC_BOARD_HOST` to a hostname or IP address to choose the address.
-Orc passes it as `LAVISH_AXI_HOST`, and Lavish binds that address and loopback and prints the session link.
+Orc passes it as `LAVISH_AXI_HOST`, and [Lavish](https://github.com/kunchenguid/lavish-axi) binds that address and loopback and prints the session link.
 Use `127.0.0.1` to keep the board on this machine.
 
 Without `ORC_BOARD_HOST`, orc selects a private LAN IPv4 address, preferring 192.168.0.0/16, then 10.0.0.0/8, then 172.16.0.0/12.

@@ -20,13 +20,16 @@ const PullRequestView = Schema.fromJsonString(Schema.Struct({
   state: Schema.String,
   headRefOid: Schema.String,
   baseRefName: Schema.String,
-  statusCheckRollup: Schema.Array(Schema.Union([CheckRun, StatusContext]))
+  mergeable: Schema.optional(Schema.Literals(["MERGEABLE", "CONFLICTING", "UNKNOWN"])),
+  statusCheckRollup: Schema.Array(Schema.Union([CheckRun, StatusContext])),
+  mergeCommit: Schema.optional(Schema.NullOr(Schema.Struct({ oid: Schema.String }))),
+  mergedAt: Schema.optional(Schema.NullOr(Schema.String))
 }))
 export type PullRequestView = typeof PullRequestView.Type
 type CheckRun = typeof CheckRun.Type
 
 type CheckVerdict = "green" | "red" | "unreported"
-type NamedVerdict = { readonly name: string; readonly verdict: CheckVerdict }
+type NamedVerdict = { readonly name: string; readonly verdict: CheckVerdict; readonly url?: string }
 
 const greenConclusions = new Set(["SUCCESS", "NEUTRAL", "SKIPPED"])
 const unreportedStates = new Set(["PENDING", "EXPECTED"])
@@ -39,13 +42,14 @@ const runVerdict = (run: CheckRun): CheckVerdict => {
 }
 
 // GitHub keeps a cancelled run beside its re-run under one run and name, so only the newest run of each run and name speaks for the check.
-const runScope = (run: CheckRun): string => run.detailsUrl?.match(/\/actions\/runs\/(\d+)(?:\/|$)/)?.[1] ?? run.workflowName ?? ""
+const actionsRunId = (run: CheckRun): string | undefined => run.detailsUrl?.match(/\/actions\/runs\/(\d+)(?:\/|$)/)?.[1]
+const runScope = (run: CheckRun): string => actionsRunId(run) ?? run.workflowName ?? ""
 const newestRuns = (runs: ReadonlyArray<CheckRun>): ReadonlyArray<CheckRun> => {
   const newest = new Map<string, CheckRun>()
   for (const run of runs) {
     const key = runScope(run) + "\0" + run.name
     const seen = newest.get(key)
-    if (seen === undefined || run.startedAt > seen.startedAt) {
+    if (seen === undefined || (run.status !== "COMPLETED" && seen.status === "COMPLETED") || ((run.status === "COMPLETED") === (seen.status === "COMPLETED") && run.startedAt > seen.startedAt)) {
       newest.set(key, run)
     }
   }
@@ -56,7 +60,7 @@ const checkVerdicts = (view: PullRequestView): ReadonlyArray<NamedVerdict> => {
   const runs = view.statusCheckRollup.filter((entry) => "status" in entry)
   const contexts = view.statusCheckRollup.filter((entry) => "context" in entry)
   return [
-    ...newestRuns(runs).map((run) => ({ name: run.workflowName === undefined || run.workflowName === "" ? run.name : run.workflowName + "/" + run.name, verdict: runVerdict(run) })),
+    ...newestRuns(runs).map((run) => ({ name: run.workflowName === undefined || run.workflowName === "" ? run.name : run.workflowName + "/" + run.name, verdict: runVerdict(run), ...(run.detailsUrl === undefined ? {} : { url: run.detailsUrl }) })),
     ...contexts.map((context): NamedVerdict => ({
       name: context.context,
       verdict: context.state === "SUCCESS" ? "green" : unreportedStates.has(context.state) ? "unreported" : "red"
@@ -67,9 +71,42 @@ const checkVerdicts = (view: PullRequestView): ReadonlyArray<NamedVerdict> => {
 const namesWith = (verdicts: ReadonlyArray<NamedVerdict>, verdict: CheckVerdict): ReadonlyArray<string> =>
   verdicts.filter((entry) => entry.verdict === verdict).map((entry) => entry.name || "(unnamed check)")
 
+const failedRuns = (view: PullRequestView): ReadonlyArray<CheckRun> =>
+  newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry)).filter((run) => runVerdict(run) === "red")
+
+const unfinishedScopes = (view: PullRequestView): ReadonlySet<string> =>
+  new Set(newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry)).filter((run) => run.status !== "COMPLETED").map(runScope))
+
+const pendingInFailedScopes = (view: PullRequestView): ReadonlyArray<CheckRun> => {
+  const failedScopes = new Set(failedRuns(view).filter((run) => actionsRunId(run) !== undefined).map(runScope))
+  return newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry))
+    .filter((run) => run.status !== "COMPLETED" && failedScopes.has(runScope(run)))
+}
+
+const canHold = (run: CheckRun): boolean => run.status === "QUEUED" || run.status === "IN_PROGRESS"
+
+export const pendingRedRuns = (view: PullRequestView): boolean => {
+  const pending = pendingInFailedScopes(view)
+  return pending.length > 0 && pending.every(canHold)
+}
+
+export const redRuns = (view: PullRequestView): ReadonlyArray<{ readonly run: string; readonly name: string }> => {
+  if (pendingInFailedScopes(view).some((run) => !canHold(run))) {
+    return []
+  }
+  const unfinished = unfinishedScopes(view)
+  return failedRuns(view).flatMap((run) => {
+    const id = actionsRunId(run)
+    return id === undefined || unfinished.has(runScope(run)) ? [] : [{ run: id, name: run.workflowName === undefined || run.workflowName === "" ? run.name : run.workflowName + "/" + run.name }]
+  })
+}
+
 export const greenChecks = (view: PullRequestView): ReadonlyArray<string> => namesWith(checkVerdicts(view), "green")
 
 export const redChecks = (view: PullRequestView): ReadonlyArray<string> => namesWith(checkVerdicts(view), "red")
+
+export const redCheckEvidence = (view: PullRequestView): ReadonlyArray<{ readonly name: string; readonly url?: string }> =>
+  checkVerdicts(view).filter((entry) => entry.verdict === "red").map((entry) => ({ name: entry.name || "(unnamed check)", ...(entry.url === undefined ? {} : { url: entry.url }) }))
 
 export const checkRefusals = (view: PullRequestView): ReadonlyArray<string> => {
   const verdicts = checkVerdicts(view)
@@ -79,6 +116,7 @@ export const checkRefusals = (view: PullRequestView): ReadonlyArray<string> => {
   const red = namesWith(verdicts, "red")
   const unreported = namesWith(verdicts, "unreported")
   return [
+    ...(view.mergeable === "CONFLICTING" ? ["the PR has a merge conflict"] : []),
     ...(red.length === 0 ? [] : ["the check " + red.join(", ") + " is red"]),
     ...(unreported.length === 0 ? [] : ["the check " + unreported.join(", ") + " has not reported"])
   ]
@@ -96,7 +134,7 @@ export const gh = (args: ReadonlyArray<string>): Effect.Effect<Said, RunnerError
 
 export const readPullRequest = (url: string): Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    const viewed = yield* gh(["pr", "view", url, "--json", "state,headRefOid,baseRefName,statusCheckRollup"])
+    const viewed = yield* gh(["pr", "view", url, "--json", "state,headRefOid,baseRefName,mergeable,statusCheckRollup,mergeCommit,mergedAt"])
     if (viewed.exitCode !== 0) {
       return yield* new BacklogError({ detail: "cannot read " + url + ": " + viewed.said })
     }

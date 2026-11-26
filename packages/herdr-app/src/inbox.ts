@@ -1,5 +1,5 @@
 import type { AttentionItem } from "./guard-attention"
-import { type AnswerTarget, type TaskDetail, answerArgv, mergeArgv } from "./task"
+import { type AnswerTarget, type TaskDetail, answerArgv, mergeArgv, mergeablePr } from "./task"
 import { type AskOption, type AskText, type ThreadLine, askText } from "./thread"
 
 interface InboxEntry {
@@ -31,9 +31,6 @@ export interface InboxApproval extends InboxEntry {
 }
 
 export type InboxItem = InboxAnswer | InboxApproval
-
-const openPr = (task: TaskDetail | undefined): string | null =>
-  task?.state.status === "closed" && (task.prState === "open" || task.prState === null) ? task.state.pr : null
 
 const questionKinds: ReadonlySet<string> = new Set(["worker-question", "review-question"])
 
@@ -77,9 +74,10 @@ const attentionCard = (item: AttentionItem, task: TaskDetail | undefined): Inbox
     return action === null ? null : { ...base, kind: item.decision?.kind === "escalated" ? "decision" : "question", action }
   }
   if (item.kind === "overdue-wait") return { ...base, kind: "hold", action: { kind: "overdue-hold" } }
+  if (item.kind === "unasked-question") return { ...base, kind: "question", action: { kind: "unavailable" } }
   if ((item.kind === "pr-ready" || item.kind === "check-red") && isSettledPr(task)) return null
   if (item.kind === "pr-ready") {
-    const link = openPr(task)
+    const link = mergeablePr(task)
     if (link !== null) return { ...base, kind: "pr", link, action: { kind: "merge", argv: mergeArgv(item.task), attentionId: item.id } }
   }
   return { ...base, kind: "event", action: { kind: "event", id: item.id } }

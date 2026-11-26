@@ -81,6 +81,10 @@ export const StopInput = Schema.Struct({
   id: Schema.String.annotate({ description: "The id of the started task whose run ends" })
 })
 
+export const RetryInput = Schema.Struct({
+  id: Schema.String.annotate({ description: "The id of the failed or stopped task to run again" })
+})
+
 export const DropInput = Schema.Struct({
   id: Schema.String.annotate({ description: "The id of the new task that never runs" }),
   reason: Schema.String.check(Schema.isNonEmpty()).annotate({ description: "The reason the task is dropped" })

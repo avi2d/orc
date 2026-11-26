@@ -73,13 +73,18 @@ const askedActionReason = (asks: string): string | null => {
     : "the review question asks the owner to " + named + ", and orc hands every asked action to the owner"
 }
 
-const unclassified = "unknown"
-
-const textReason = (text: string): string | null =>
-  text.trim() === "" ? "the question carries no words orc can check, so orc hands it to the owner" : neverDecidedReason(text)
-
-export const guardReason = (question: { readonly text: string; readonly asks?: string | undefined }): string | null =>
-  question.asks === undefined || question.asks === unclassified ? textReason(question.text) : askedActionReason(question.asks)
+export const guardReason = (question: { readonly text: string; readonly asks?: string | undefined }, kind: "worker-question" | "review-question" | "review-finding"): string | null => {
+  if (question.text.trim() === "") {
+    return kind === "review-question"
+      ? "no-mistakes omitted the question text, so orc hands it to the owner"
+      : "the question carries no words orc can check, so orc hands it to the owner"
+  }
+  if (kind === "worker-question") return neverDecidedReason(question.text)
+  if (question.asks === undefined || question.asks === "unknown") {
+    return kind === "review-finding" ? null : neverDecidedReason(question.text)
+  }
+  return askedActionReason(question.asks)
+}
 
 export const askBackWords = (question: string): string =>
   "Before it answers, orc's decider asks you: " + question + "\nPut your reply in a new orc_ask question."

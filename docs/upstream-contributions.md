@@ -3,7 +3,7 @@ kind: reference
 ---
 # Follow up on your upstream contributions
 To have orc follow the issues and pull requests you filed on other people's repositories, add `"upstream": ["<url>"]` to that project in `projects.json`.
-Each entry is a GitHub issue or pull request URL, such as `https://github.com/owner/repo/pull/12`.
+Each entry is a [GitHub](https://github.com) issue or pull request URL, such as `https://github.com/owner/repo/pull/12`.
 Only `orc beat` reads the list, through the `gh` login of the machine that runs it, so a private repository needs a login that can see it.
 The beat only reads upstream and never comments, pushes or opens anything there.
 The first beat to read a contribution records its state and adds no task.

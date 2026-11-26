@@ -73,6 +73,14 @@ Tasks that depend on it no longer wait for it.
 Orc withdraws the task's open attention items and leaves the parked run's branch and PR untouched.
 The command records your decision without checking the PR on the forge.
 
+### Retry a task
+
+Run `orc backlog retry <task-id>` to run a failed or stopped task again.
+Failed and stopped tasks stay on the machine they ran on and reuse their kept branch when one exists.
+A failed start keeps its pending answers and any machine pin.
+Without a pin, the beat places a failed start normally.
+Retry keeps the recorded PR and withdraws the task's open attention items.
+
 ### Send a task back
 
 Run `orc backlog send-back <task-id> <words>` to request another pass on a closed task's open PR.
@@ -109,6 +117,8 @@ Without either event it is the last state the beat read for the PR.
 For a task closed with `--landed-in`, `landedIn` names the merged PR instead of `pr`.
 
 The beat prints `closed <task-id> <done|failed|stopped> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds, until it stays unread for 10 minutes.
+A confirmed failed run with a known run ID can [retry once](attention-queue.md#retry-a-dead-run-once) instead of closing.
+The beat prints `retry <task-id> on <machine> from run <run-id>` when it returns the task to `new` on its kept branch.
 
 ## Hold a task for an answer
 
