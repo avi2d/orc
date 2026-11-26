@@ -42,7 +42,7 @@ The tabs refresh while visible and show a reason when a command fails.
 
 ## Answer in the Inbox
 
-Select **Inbox** or press `cmd-4` to see everything Orc assigns to you in one list, oldest first.
+Select **Inbox** or press `cmd-4` to see everything Orc assigns to you, oldest first.
 
 ![Inbox tab with an overdue event and decisions assigned across tasks](images/herdr-inbox.png)
 
@@ -70,7 +70,7 @@ To merge a PR that waits:
 1. Confirm the dialog, and the Inbox runs `orc merge <task> --basis captain-word`.
 
 Click **hold** to leave the PR open, and the Inbox runs `orc attention answer <item> hold`.
-A failed command shows on its card with the first line of its error.
+A failed command shows the first line of its error on its card.
 
 Questions the agent owns, and its answers, stay in the collapsed **Agent attention** section at the end, each with its basis.
 Where you replaced an agent's answer, your answer shows beside it as **Decided by you**.
