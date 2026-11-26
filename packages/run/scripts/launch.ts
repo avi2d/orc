@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { spawn } from "node:child_process"
 import { createRequire } from "node:module"
 import { join } from "node:path"
@@ -8,8 +7,19 @@ import manifest from "../package.json" with { type: "json" }
 const { name, version } = manifest
 const require = createRequire(import.meta.url)
 const packageRoot = fileURLToPath(new URL("../", import.meta.url))
-const args = process.argv.slice(2)
-const env = { ...process.env }
+const isStandin = process.argv[2] === "--orc-standin"
+const args = process.argv.slice(isStandin ? 3 : 2)
+const {
+  ORC_LAUNCHER_BUN: bun,
+  ORC_LAUNCHER_RESTORE: restore,
+  ...env
+} = process.env
+
+for (const key of restore?.trim().split(" ") ?? []) {
+  const saved = "_ORC_CALLER_" + key
+  env[key] = env[saved]
+  delete env[saved]
+}
 
 const npmGlobalSuffix = join("lib", "node_modules", name, "/")
 if (packageRoot.endsWith("/" + npmGlobalSuffix)) {
@@ -57,8 +67,7 @@ async function launch(): Promise<void> {
       await run(binary, args, {
         ...env,
         ORC_BUNDLED_APP_DIR: join(packageRoot, "dist", "herdr-app"),
-        ORC_LAUNCHER_NODE: process.execPath,
-        ORC_LAUNCHER: fileURLToPath(import.meta.url),
+        ORC_LAUNCHED_MAIN: undefined,
         ORC_LAUNCHED_BINARY: binary
       })
       return
@@ -66,13 +75,18 @@ async function launch(): Promise<void> {
       if (codeOf(error) !== "ENOENT") throw error
     }
   }
-  try {
-    await run(process.versions.bun ? process.execPath : "bun", [join(packageRoot, "src", "bin.ts"), ...args], env)
-  } catch (error) {
-    if (codeOf(error) !== "ENOENT") throw error
-    throw new Error("no compiled binary for " + process.platform + "-" + process.arch +
-      ". Install Bun for the source version, or reinstall Orc without omitting optional dependencies.", { cause: error })
+  const main = join(packageRoot, "src", isStandin ? "entities/heavy-queue/heavy-standin-main.ts" : "bin.ts")
+  const config = isStandin ? ["--no-env-file", "--config=/dev/null"] : []
+  if (bun) {
+    try {
+      await run(bun, [...config, main, ...args], { ...env, ORC_LAUNCHED_BINARY: undefined, ORC_LAUNCHED_MAIN: main })
+      return
+    } catch (error) {
+      if (codeOf(error) !== "ENOENT") throw error
+    }
   }
+  throw new Error("no compiled binary for " + process.platform + "-" + process.arch +
+    ". Install Bun for the source version, or reinstall Orc without omitting optional dependencies.")
 }
 
 await launch().catch((error: unknown) => {

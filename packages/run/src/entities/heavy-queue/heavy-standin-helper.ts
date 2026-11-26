@@ -1,4 +1,5 @@
-import { dirname } from "node:path"
+import { realpathSync } from "node:fs"
+import { dirname, isAbsolute } from "node:path"
 
 const embeddedRoot = /^(?:\/\$bunfs\/|[A-Za-z]:[\\/]~BUN[\\/])/
 
@@ -7,20 +8,30 @@ const embeddedRoot = /^(?:\/\$bunfs\/|[A-Za-z]:[\\/]~BUN[\\/])/
 export const helperCommandOf = (runtime: string, modulePath: string, main: string): ReadonlyArray<string> =>
   embeddedRoot.test(modulePath) ? [runtime] : [runtime, "--no-env-file", "--config=/dev/null", main]
 
-// An npm update deletes the binary named for the old version, so a command orc keeps names the launcher npm keeps.
-// Every child inherits the launcher's variables, so they hold only for the binary the launcher started.
-export const launcherCommand = (env: Readonly<Record<string, string | undefined>>, executable: string): readonly [string, string] | null => {
-  const { ORC_LAUNCHER_NODE: node, ORC_LAUNCHER: script, ORC_LAUNCHED_BINARY: binary } = env
-  return node !== undefined && script !== undefined && binary === executable ? [node, script] : null
+// Children inherit these variables, so require the binary or source file the launcher started.
+export const launcherCommand = (env: Readonly<Record<string, string | undefined>>, executable: string, main: string): readonly [string] | null => {
+  const { ORC_LAUNCHER_ENTRY: entry, ORC_LAUNCHED_BINARY: binary, ORC_LAUNCHED_MAIN: source } = env
+  if (entry === undefined || !isAbsolute(entry)) return null
+  return (binary === undefined ? source === main : binary === executable) ? [entry] : null
 }
 
-const launched = launcherCommand(Bun.env, process.execPath)
+const launched = launcherCommand(Bun.env, process.execPath, Bun.main)
 
-export const helperCommand: ReadonlyArray<string> = launched ?? helperCommandOf(
-  process.execPath, import.meta.path, Bun.fileURLToPath(import.meta.resolve("./heavy-standin-main.ts"))
-)
+export const helperCommand: ReadonlyArray<string> = launched === null
+  ? helperCommandOf(process.execPath, import.meta.path, Bun.fileURLToPath(import.meta.resolve("./heavy-standin-main.ts")))
+  : [...launched, "--orc-standin"]
 
-// Node reads the launcher's package and resolves the binary in its platform package, so a sandboxed helper reads both.
+export const helperEntry = launched?.[0] ?? helperCommand.at(-1) ?? ""
+
+const packageFolders = (entry: string): ReadonlyArray<string> => {
+  try {
+    const launcherPackage = dirname(dirname(realpathSync(entry)))
+    return Bun.env.ORC_LAUNCHED_BINARY === undefined ? [launcherPackage] : [launcherPackage, dirname(process.execPath)]
+  } catch {
+    return []
+  }
+}
+
 export const standinHelper = launched === null
-  ? { runtime: helperCommand[0] ?? "", folders: [dirname(helperCommand.at(-1) ?? "")] }
-  : { runtime: launched[0], folders: [dirname(dirname(launched[1])), dirname(process.execPath)] }
+  ? { runtime: helperCommand[0] ?? "", folders: [dirname(helperEntry)] }
+  : { runtime: launched[0], folders: packageFolders(launched[0]) }

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { Schema } from "effect"
@@ -63,6 +63,7 @@ const expectedFiles = [
   "dist/herdr-app/mods/orc-tabs/mod.json",
   "dist/herdr-app/mods/orc-task/main.js",
   "dist/herdr-app/mods/orc-task/mod.json",
+  "dist/launch",
   "dist/launch.js",
   "package.json",
   "scripts/patch-knip-jiti.ts",
@@ -477,7 +478,7 @@ describe("the npm release", () => {
     expect(usage.stderr.toString()).toContain("not-a-command")
   }, 60_000)
 
-  test("a command the installed orc keeps names the launcher npm keeps instead of the version-named binary an update deletes", async () => {
+  test("a persisted npm self-command names the npm bin link instead of the versioned Orc or Node binary", async () => {
     const addArgs = join(dir, "pueue-add-args")
     await writeFile(join(bin, "pueue"), [
       "#!/bin/sh",
@@ -490,15 +491,30 @@ describe("the npm release", () => {
       ""
     ].join("\n"), { mode: 0o755 })
     const orcHome = join(dir, "orc-home")
-    spawnPassing([join(prefix, "bin/orc"), "heavy", "watch"], dir, { ...env, ORC_HOME: orcHome, HEAVY_QUEUE_BYPASS: "npm release test" })
-    const node = spawnPassing([join(bin, "node"), "-p", "process.execPath"], dir, env).trim()
-    const launcher = [node, join(await realpath(prefix), "lib/node_modules/@avi2dg/orc/dist/launch.js")]
+    const orc = join(prefix, "bin/orc")
+    spawnPassing([orc, "heavy", "watch"], dir, { ...env, ORC_HOME: orcHome, HEAVY_QUEUE_BYPASS: "npm release test" })
     const queued = (await readFile(addArgs, "utf8")).split("\n")
     const command = queued.slice(queued.indexOf("orc-heavy-watch") + 2, -1)
-    expect(command).toEqual([...launcher, "heavy", "watch-once"])
-    expect(spawnPassing([...launcher, "--version"], dir, env)).toBe("orc " + runManifest.version + "\n")
-    const helper = launcher.map((part) => "'" + part + "'").join(" ") + " 'orc-ci-only-path'"
-    expect(await readFile(join(orcHome, "heavy/ci-only.bash"), "utf8")).toContain(helper)
+    expect(command).toEqual([orc, "heavy", "watch-once"])
+    expect(await readFile(join(orcHome, "heavy/ci-only.bash"), "utf8")).toContain("'" + orc + "' '--orc-standin' 'orc-ci-only-path'")
+  }, 60_000)
+
+  test("npm shims run the real tool with its original Node settings instead of preloading them in the helper", async () => {
+    const orcHome = join(dir, "shim-home")
+    const orc = join(prefix, "bin/orc")
+    const tool = "#!/bin/sh\nprintf '%s\\n' \"$NODE_OPTIONS\" \"$NODE_PATH\" \"$1\"\n"
+    await writeFile(join(bin, "tsc"), tool, { mode: 0o755 })
+    await writeFile(join(bin, "checks-test"), tool, { mode: 0o755 })
+    const setup = { ...env, ORC_HOME: orcHome, HEAVY_QUEUE_BYPASS: "npm release test" }
+    spawnPassing([orc, "heavy", "path"], dir, setup)
+    const heavy = join(orcHome, "heavy/bin")
+    const ciOnly = join(orcHome, "heavy/ci-only")
+    const options = "--require " + join(dir, "missing.cjs")
+    const nodePath = join(dir, "custom modules")
+    const caller = { ...setup, PATH: [ciOnly, heavy, bin].join(":"), NODE_OPTIONS: options, NODE_PATH: nodePath }
+    const expected = [options, nodePath, "--help", ""].join("\n")
+    expect(spawnPassing([join(heavy, "tsc"), "--help"], dir, caller)).toBe(expected)
+    expect(spawnPassing([join(ciOnly, "checks-test"), "--help"], dir, caller)).toBe(expected)
   }, 60_000)
 })
 

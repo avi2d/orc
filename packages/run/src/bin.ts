@@ -20,7 +20,7 @@ import { backlogPaths, backlogRoot as backlogRootOf, Rebase, type ReportKind, ru
 import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listAllRuns, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
 import { encodeMachinesJson, encodeRunsJson, encodeShowJson, encodeVersionJson, formatRunsTable, formatShow, readListedRuns, readMachineVersions, readOtherMachinesFrom, readRunsJsonRuns, readShow, readStepLog, recordStepScore, runsJson, withOtherMachines, withQueued } from "./features/seeing-runs/index"
 
-const self = launcherCommand(Bun.env, process.execPath) ?? selfCommand(process.execPath, Bun.main)
+const self = launcherCommand(Bun.env, process.execPath, Bun.main) ?? selfCommand(process.execPath, Bun.main)
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)

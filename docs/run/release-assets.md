@@ -8,7 +8,7 @@ The executables are [Bun](https://bun.com) bytecode builds that run without Bun 
 The archive also holds the bundled [Herdr App](https://herdr.dev), which Herdr loads as mods.
 The `assets` job of `.github/workflows/main.yml` runs after the `release` job has written the GitHub release.
 Both the `binaries` and `assets` jobs run `bun run release:assets` on macOS arm64 and Linux x64.
-The `binaries` job runs before `release` so npm can publish the platform packages before `@avi2dg/orc`.
+The `binaries` job runs before `release` so [npm](https://www.npmjs.com) can publish the platform packages before `@avi2dg/orc`.
 The `assets` job attaches the files to the GitHub release.
 The build runs both dashboard executables with `--help`.
 The `@avi2dg/checks` kit writes these jobs from the release settings in `checks.config.ts`.

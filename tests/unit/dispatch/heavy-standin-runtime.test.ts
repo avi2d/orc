@@ -109,19 +109,26 @@ describe("projectTool", () => {
 })
 
 describe("launcherCommand", () => {
-  const launcher = { ORC_LAUNCHER_NODE: "/usr/bin/node", ORC_LAUNCHER: "/p/lib/node_modules/@avi2dg/orc/dist/launch.js" }
+  const launcher = { ORC_LAUNCHER_ENTRY: "/p/bin/orc" }
   const binary = "/p/lib/node_modules/@avi2dg/orc-linux-x64/orc-0.24.0"
+  const main = "/$bunfs/root/orc"
+  const source = "/p/lib/node_modules/@avi2dg/orc/src/bin.ts"
 
-  test("the binary the launcher started names the launcher instead of its own version-named file", () => {
-    expect(launcherCommand({ ...launcher, ORC_LAUNCHED_BINARY: binary }, binary)).toEqual([launcher.ORC_LAUNCHER_NODE, launcher.ORC_LAUNCHER])
+  test("the launched binary names the npm bin link instead of its own version-named file", () => {
+    expect(launcherCommand({ ...launcher, ORC_LAUNCHED_BINARY: binary }, binary, main)).toEqual([launcher.ORC_LAUNCHER_ENTRY])
+  })
+
+  test("the npm source fallback names the npm bin link instead of the Bun runtime", () => {
+    expect(launcherCommand({ ...launcher, ORC_LAUNCHED_MAIN: source }, "/bin/bun", source)).toEqual([launcher.ORC_LAUNCHER_ENTRY])
   })
 
   test.each([
-    ["another binary that inherited the variables", { ...launcher, ORC_LAUNCHED_BINARY: binary }, "/home/u/.orc/releases/0.25.0/orc"],
-    ["a run with no launcher", {}, binary],
-    ["a launcher missing its node", { ORC_LAUNCHER: launcher.ORC_LAUNCHER, ORC_LAUNCHED_BINARY: binary }, binary]
-  ])("%s keeps its own self command instead of an inherited launcher", (_case, env, executable) => {
-    expect(launcherCommand(env, executable)).toBeNull()
+    ["another binary that inherited the variables", { ...launcher, ORC_LAUNCHED_BINARY: binary }, "/home/u/.orc/releases/0.25.0/orc", main],
+    ["another source file running in Bun", { ...launcher, ORC_LAUNCHED_MAIN: source }, "/bin/bun", "/repo/src/bin.ts"],
+    ["a run with no launcher", {}, binary, main],
+    ["a launcher missing its bin entry", { ORC_LAUNCHED_BINARY: binary }, binary, main]
+  ])("%s keeps its own self command instead of an inherited launcher", (_case, env, executable, launchedMain) => {
+    expect(launcherCommand(env, executable, launchedMain)).toBeNull()
   })
 })
 

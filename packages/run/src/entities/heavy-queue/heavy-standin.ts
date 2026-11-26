@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Option } from "effect"
 import { defaultHeavyTools } from "./heavy"
-import { helperCommand } from "./heavy-standin-helper"
+import { helperCommand, helperEntry } from "./heavy-standin-helper"
 import { ciOnlyMarker, ciOnlyPathWord, ciOnlyWord, standinMarker, type StandinCall, type StandinTiming } from "./heavy-standin-runtime"
 
 export type { StandinTiming } from "./heavy-standin-runtime"
@@ -79,7 +79,7 @@ export const quoteSingle = (value: string): string => "'" + value.replaceAll("'"
 const launcher = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, real: string, timing?: StandinTiming): string => {
   const call = { tool, ...settings, commands, real, timing: timing ?? null } satisfies StandinCall
   const runtime = helperCommand[0] ?? ""
-  const main = helperCommand.at(-1) ?? ""
+  const main = helperEntry
   const fallback = call.real === "" ? "running the nearest node_modules/.bin/" + call.tool + " unqueued" : "running " + call.real + " unqueued"
   const warning = "orc heavy: no runtime at " + runtime + " or no stand-in helper at " + main + "; " + fallback + ", rerun orc to rewrite the stand-ins"
   const project = quoteSingle("/node_modules/.bin/" + call.tool)
@@ -113,7 +113,7 @@ fi
 // A missing helper cannot tell a test run from any other call, so the stand-in refuses rather than run the tool unchecked.
 export const ciOnlyScript = (tool: string): string => {
   const runtime = helperCommand[0] ?? ""
-  const main = helperCommand.at(-1) ?? ""
+  const main = helperEntry
   const missing = "orc heavy: no runtime at " + runtime + " or no stand-in helper at " + main + "; rerun orc to rewrite the stand-ins"
   return `#!/bin/sh
 # ${ciOnlyMarker}. Regenerated on every run of that command.
