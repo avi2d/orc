@@ -1,10 +1,11 @@
 import { Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { runLabel, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { runLabel, type BacklogError, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import type { Progress, StalledAction } from "../../entities/attention/index"
 import { killHeld, killHeldThrough } from "../../features/queueing-a-task/index"
 import { type DispatchConfig, throughFor } from "../../shared/config/index"
-import { retryDeadRun } from "./beat-close"
+import { closeFinished, retryDeadRun, type CloseContext } from "./beat-close"
+import { flagStall } from "./stall"
 
 export const retryStalled = (
   root: string,
@@ -28,4 +29,15 @@ export const retryStalled = (
       Effect.catchTag("RunnerError", () => Effect.succeed(false))
     )
     return stopped ? yield* retryDeadRun(root, task.spec.id, machine.name, reading.run) : reading
+  })
+
+export const checkStalledRuns = (
+  context: CloseContext,
+  started: ReadonlyArray<TaskRecord>
+): Effect.Effect<{ readonly progress: ReadonlyArray<Progress>; readonly stalls: ReadonlyArray<Option.Option<StalledAction>> }, BacklogError | TaskFileError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const reads = yield* Effect.forEach(started, (task) => closeFinished(context, task))
+    const stalls = yield* Effect.forEach(started, (task, index) => flagStall(context.root, task, reads[index] ?? { kind: "untracked" }))
+    const progress = yield* Effect.forEach(started, (task, index) => retryStalled(context.root, context.home, context.config, task, reads[index] ?? { kind: "untracked" }, stalls[index]))
+    return { progress, stalls }
   })

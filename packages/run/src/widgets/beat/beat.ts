@@ -8,14 +8,13 @@ import { selectTaskRoute } from "./beat-route"
 import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
 import { checkToken, type TokenCache } from "./beat-token"
 import { closeFinished } from "./beat-close"
-import { retryStalled } from "./retry-stall"
+import { checkStalledRuns } from "./retry-stall"
 import { parkedResumeWait } from "./beat-resume"
 import { type BeatAction, type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems, withdrawTaskItems, type Progress } from "../../entities/attention/index"
 import { attentionActions } from "./beat-attention"
 import { type AskDecider, askDeciderWithPi, decideReviewQuestions } from "../../features/decider/index"
 import { carryRecordedAnswers, handAnswersToResume } from "../../entities/parked-runs/index"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
-import { flagStall } from "./stall"
 import { readPullRequest } from "../../entities/pull-request/index"
 import { prEvents, type ReadPullRequest } from "./task-events"
 import { roomWaits, writeBeatWaits } from "./beat-waits"
@@ -363,9 +362,7 @@ export const runBeat = (
       tokens: new Map()
     }
     const started = tasks.filter((task) => task.state.kind === "started")
-    const reads = yield* Effect.forEach(started, (task) => closeFinished(context, task))
-    const stalls = yield* Effect.forEach(started, (task, index) => flagStall(root, task, reads[index] ?? { kind: "untracked" }))
-    const progress = yield* Effect.forEach(started, (task, index) => retryStalled(root, home, config, task, reads[index] ?? { kind: "untracked" }, stalls[index]))
+    const { progress, stalls } = yield* checkStalledRuns(context, started)
     const settled = settledProgress(progress)
     releaseClosedSlots(context.live, settled.closed)
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
