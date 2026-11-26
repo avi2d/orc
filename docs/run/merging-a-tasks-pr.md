@@ -102,4 +102,4 @@ Either basis meets every refusal above.
 - A secret change, to a file named `.env`, `.env.<name>`, `*.env`, `.envrc`, `id_rsa`, `id_ed25519`, `.npmrc`, `.netrc`, `credentials.json`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, or a name with `secret` in it.
 
 Each such refusal ends `which waits for the captain's merge word`.
-The beat also merges a yolo project's green PR by itself, as [Merging a task's PR](beat-runs.md#merging-a-tasks-pr) in the beat reference describes.
+The beat also merges a yolo project's green PR by itself, as [Automatic PR merges](beat-runs.md#automatic-pr-merges) in the beat reference describes.
