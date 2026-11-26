@@ -54,6 +54,7 @@ If the update conflicts, **Merge conflict with main** appears there instead of t
 If a check is red, **Check failed** and the name of the check appear there instead.
 When the merge sends the task back, its card reads **Sent back** with the PR and stage, such as **Sent back PR #48: Merge conflict**.
 When you send the task back yourself, Orc drops the recorded stage and the card reads **Sent back** with the PR alone.
+When the beat retries a failed run that opened a PR, that run's card reads **Retried** with the PR, such as **Retried PR #48**.
 
 ### Read a run's changes
 
