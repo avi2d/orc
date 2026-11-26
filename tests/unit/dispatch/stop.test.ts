@@ -402,6 +402,29 @@ describe("the beat's conflicting PR", () => {
   })
 })
 
+describe("a failed rebase", () => {
+  test("does not queue another rebase when the PR head moves after a lease rejection", async () => {
+    await withBacklog(async (root) => {
+      await startTaskOne(root, ["orc", "runner", "start"], oldStart)
+      const pr = "https://github.com/example/orc/pull/7"
+      const task = (await run(listTasks(root))).find((entry) => entry.spec.id === "orc-1")
+      if (task === undefined) throw new Error("missing task")
+      await run(writeTaken(root, { ...task, rebase: { pr, head: "a".repeat(40), at: oldStart } }))
+      await run(closeStartedTask(root, "orc-1", "failed", "lease rejected", { pr, report: null }, oldStart))
+      await Effect.runPromise(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "failed", started: oldStart, ended: oldStart, prLink: pr, endReason: "lease rejected" })),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(Effect.provide(BunServices.layer)))
+      const conflict = { state: "OPEN", headRefOid: "b".repeat(40), baseRefName: "main", mergeable: "CONFLICTING" as const, statusCheckRollup: [] }
+      await Effect.runPromise(runBeat(root, root, quietSources(undefined, () => Effect.succeed(conflict))).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueStub(JSON.stringify({ tasks: {} }))))))
+      const after = (await run(listTasks(root))).find((entry) => entry.spec.id === "orc-1")
+      expect(after?.state.kind).toBe("closed")
+      expect(after?.rebase?.head).toBe("a".repeat(40))
+    })
+  })
+})
+
 describe("the beat's stale start", () => {
   test("a started task the runner never picked up closes failed once the start outgrows the queue delay instead of staying started", async () => {
     await withBacklog(async (root) => {
