@@ -10,6 +10,7 @@ import type { RunnerError } from "../../shared/process/index"
 import { isPendingUpdateHead, readPendingUpdate } from "../../features/merging-a-pr/index"
 import { sendBack } from "../../features/queueing-a-task/index"
 import { ownerWaits, yoloMerge } from "./yolo-merge"
+import { queueRebase } from "./beat-rebase"
 
 export type ReadPullRequest = (url: string) => Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner>
 
@@ -109,6 +110,40 @@ const sendFreshRedChecks = (root: string, home: string, task: TaskRecord, view: 
     return Result.isSuccess(sent)
   })
 
+const observeShipPr = (
+  root: string,
+  task: TaskRecord,
+  pr: string,
+  view: PullRequestView,
+  at: string,
+  yolo: boolean,
+  home: string,
+  prState: PrState,
+  orcMode: boolean
+): Effect.Effect<Option.Option<BeatAction>, BacklogError, Requirements> =>
+  Effect.gen(function*() {
+    const id = task.spec.id
+    const waits = yield* readWaits(pr, view, yolo)
+    const holdingRed = yield* recordObservation(root, task, pr, view, at, waits, prState)
+    if (holdingRed || (yield* sendFreshRedChecks(root, home, task, view, at, orcMode))) {
+      return Option.none()
+    }
+    if (Result.isFailure(waits)) {
+      return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: waits.failure.detail })
+    }
+    const refusals = checkRefusals(view)
+    if (view.state === "OPEN" && refusals.length > 0) {
+      return Option.some<BeatAction>({ kind: "pr-checks", task: id, reason: refusals.join("; ") })
+    }
+    if (waits.success === null || waits.success.length > 0) {
+      return Option.none()
+    }
+    if (ranClosing(task)?.outcome !== "done" || (yield* pullRequestHeld(root, id, view.headRefOid)) || (yield* heldAcrossUpdate(root, id, pr, view.headRefOid))) {
+      return Option.none()
+    }
+    return Option.some(yield* mergeTimed(root, id, pr, home))
+  })
+
 export const prEvents = (
   root: string,
   task: TaskRecord,
@@ -140,23 +175,9 @@ export const prEvents = (
       yield* writePrState(root, id, pr, prState)
       return Option.none()
     }
-    const waits = yield* readWaits(pr, view.success, yolo)
-    const holdingRed = yield* recordObservation(root, task, pr, view.success, at, waits, prState)
-    if (holdingRed || (yield* sendFreshRedChecks(root, home, task, view.success, at, orcMode))) {
-      return Option.none()
+    if (view.success.state === "OPEN" && view.success.mergeable === "CONFLICTING") {
+      const queued = yield* queueRebase(root, home, task, view.success, at)
+      return queued ? Option.some<BeatAction>({ kind: "rebase-queued", task: id, pr }) : Option.none()
     }
-    if (Result.isFailure(waits)) {
-      return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: waits.failure.detail })
-    }
-    const refusals = checkRefusals(view.success)
-    if (view.success.state === "OPEN" && refusals.length > 0) {
-      return Option.some<BeatAction>({ kind: "pr-checks", task: id, reason: refusals.join("; ") })
-    }
-    if (waits.success === null || waits.success.length > 0) {
-      return Option.none()
-    }
-    if (ranClosing(task)?.outcome !== "done" || (yield* pullRequestHeld(root, id, view.success.headRefOid)) || (yield* heldAcrossUpdate(root, id, pr, view.success.headRefOid))) {
-      return Option.none()
-    }
-    return Option.some(yield* mergeTimed(root, id, pr, home))
+    return yield* observeShipPr(root, task, pr, view.success, at, yolo, home, prState, orcMode)
   })

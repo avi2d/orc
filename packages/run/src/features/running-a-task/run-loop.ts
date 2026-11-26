@@ -10,7 +10,7 @@ import { askedNote, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, w
 import { holdReleaseGuidance, holdReleaseWordsOf } from "../../entities/review-gate/index"
 import { freshFixOf, releaseGuidanceOf, resumedFix } from "./fix-guidance"
 import { finishAfterChecks } from "./run-finish"
-import { rebaseDelivery } from "./rebase-delivery"
+import { rebaseDelivery, runRebase } from "./rebase-delivery"
 import { finishChecked, runRecordedChecks } from "./review-loop"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
@@ -314,6 +314,9 @@ const runChecksFixLoop = (
 
 const runFullReport = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, tracked: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
+    if (run.rebase !== undefined) {
+      return yield* runRebase(run, run.rebase)
+    }
     const plan = resume
     const parkedLoop = loopAnswerOf(plan.answers)
     if (parkedLoop?.kind === "stop") {

@@ -4,6 +4,7 @@ import deciderPolicyFile from "../../../agents/decider-policy.md" with { type: "
 import fixerFile from "../../../agents/fixer.md" with { type: "file" }
 import implementerFile from "../../../agents/implementer.md" with { type: "file" }
 import reviewerFile from "../../../agents/reviewer.md" with { type: "file" }
+import supportCheckPolicyFile from "../../../agents/support-check-policy.md" with { type: "file" }
 
 export class AgentFileError extends Data.TaggedError("AgentFileError")<{
   readonly message: string
@@ -143,6 +144,8 @@ export const bundledAgentFiles: Readonly<Record<AgentKind, string>> = {
 }
 
 export const bundledDeciderPolicyFile: string = deciderPolicyFile
+
+export const bundledSupportCheckPolicyFile: string = supportCheckPolicyFile
 
 export const agentFileCandidates = (
   path: Path.Path,

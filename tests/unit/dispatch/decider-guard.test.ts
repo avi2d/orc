@@ -10,6 +10,7 @@ import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderReq
 import { neverDecidedReason } from "../../../packages/run/src/features/decider/decider-guard"
 import { askStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
 import { openQuestions } from "../../lib/open-questions-2026-11-25"
+import { supportsEveryAnswer } from "../../lib/support-check"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -48,7 +49,8 @@ const replies = (byQuestion: Readonly<Record<string, string>>, heard: Array<Deci
     matching.sort((a, b) => request.prompt.lastIndexOf(b[0]) - request.prompt.lastIndexOf(a[0]))
     const first = matching.at(0)
     return first === undefined ? Effect.fail(new DeciderUnheard({ reason: "no reply in this test" })) : Effect.succeed(first[1])
-  }
+  },
+  checkSupport: () => supportsEveryAnswer
 })
 
 const answer = JSON.stringify({ decision: "answer", answer: "Two retries", rule: "Retry a failed upload twice, then give up.", reason: "the intent says twice" })
