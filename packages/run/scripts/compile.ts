@@ -1,15 +1,15 @@
-const run = Bun.fileURLToPath(new URL("..", import.meta.url))
-const chat = run + "src/features/chat/"
+const run = new URL("..", import.meta.url)
+const at = (path: string): string => Bun.fileURLToPath(new URL(path, run))
 
-const tools = await Bun.build({ entrypoints: [chat + "chat-tools.ts"], target: "node", format: "esm" })
+const tools = await Bun.build({ entrypoints: [at("src/features/chat/chat-tools.ts")], target: "node", format: "esm" })
 
 await Bun.build({
-  entrypoints: [run + "src/bin.ts"],
-  compile: { outfile: process.argv[2] ?? run + "dist/orc", autoloadDotenv: false, autoloadBunfig: false },
+  entrypoints: [at("src/bin.ts")],
+  compile: { outfile: process.argv[2] ?? at("dist/orc"), autoloadDotenv: false, autoloadBunfig: false },
   bytecode: true,
   format: "esm",
   files: {
-    [chat + "chat-tools-bundle.ts"]: "import file from \"./orc-chat-tools.js\" with { type: \"file\" }\nexport const chatToolsBundle: string | null = file\n",
-    [chat + "orc-chat-tools.js"]: await tools.outputs[0].text()
+    [at("src/features/chat/chat-tools-bundle.ts")]: "import file from \"./orc-chat-tools.js\" with { type: \"file\" }\nexport const chatToolsBundle: string | null = file\n",
+    [at("src/features/chat/orc-chat-tools.js")]: await tools.outputs[0].text()
   }
 })

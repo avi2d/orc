@@ -304,7 +304,7 @@ const program = Effect.gen(function*() {
   }
 })
 
-if (import.meta.main) {
+if (Bun.isStandaloneExecutable || import.meta.main) {
   const words = process.argv.slice(2)
   if (Bun.isStandaloneExecutable && isStandinInvocation(words[0] ?? "")) {
     process.exitCode = await runStandinInvocation(words)
