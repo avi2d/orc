@@ -64,7 +64,7 @@ describe("orc delivery", () => {
           git(dir, ["push", "origin", baseBranch])
           git(dir, ["checkout", "-q", "orc/test"])
           const kinds: Array<string> = []
-          const finding = { id: "missing-check", file: "work.txt", line: 1, severity: "warning", action: "Add the check.", description: "The change accepts an invalid value." }
+          const finding = { id: "missing-check", file: "work.txt", line: 1, severity: "info", action: "Add the check.", description: "The change accepts an invalid value." }
           let checkedBase = ""
           const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(async (run, sessionsDir) => {
             if (run.agent.kind !== "reviewer") return sandboxResult(sha)(run, sessionsDir)
