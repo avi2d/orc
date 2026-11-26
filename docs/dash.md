@@ -45,7 +45,8 @@ If you use a versioned launcher, see [Updating orc](run/updating-orc.md#update-a
 Run `orc-dash panel --list` to see the available panels.
 Run `orc-dash panel quota` to open the quota panel, or replace `quota` with another panel name.
 Press `q` or Control C to quit.
-In the clone, `bun run dashboard panel quota` runs the same panel.
+To run the panel from source, [set up a checkout and install its dependencies](contribute.md#run-orc-from-a-checkout).
+In the checkout, `bun run dashboard panel quota` runs the same panel.
 
 Add `--print` to print one frame instead of opening the live panel.
 Use `--width 120 --height 30` to set its size and `--color` for ANSI colours.

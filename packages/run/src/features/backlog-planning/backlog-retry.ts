@@ -7,12 +7,8 @@ const retryState = (record: TaskRecord) => {
   return state.kind === "closed" && (state.closing.outcome === "failed" || state.closing.outcome === "stopped" || state.closing.outcome === "start-failed") ? state : null
 }
 
-export const retryTask = (root: string, id: string): Effect.Effect<string, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+const reopen = (root: string, id: string): Effect.Effect<string, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const record = yield* findTask(root, id)
-    if (retryState(record) === null) {
-      return yield* new BacklogError({ detail: id + " is not a failed or stopped task" })
-    }
     const { fs, paths, file, grabbed, putBack, read } = yield* grabIn(root, "closed", id, Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" })))
     const retry = Effect.gen(function*() {
       const fresh = yield* parseTaskFile(file, "closed", yield* read)
@@ -38,6 +34,16 @@ export const retryTask = (root: string, id: string): Effect.Effect<string, Backl
     })
     const result = yield* retry.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
     yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
+    return result
+  }).pipe(Effect.uninterruptible)
+
+export const retryTask = (root: string, id: string): Effect.Effect<string, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const record = yield* findTask(root, id)
+    if (retryState(record) === null) {
+      return yield* new BacklogError({ detail: id + " is not a failed or stopped task" })
+    }
+    const result = yield* reopen(root, id)
     const now = yield* DateTime.now
     yield* withdrawTaskItems(root, [id], DateTime.formatIso(now))
     return result

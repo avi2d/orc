@@ -13,12 +13,13 @@ It adds GPU utilisation, VRAM and temperature where `nvidia-smi` answers, and le
 On a short terminal it lists fewer processes, the same number on every machine.
 Press `q` or Control C to quit.
 To print one frame of plain text instead, run `orc-dash panel resources --print`.
-To print the versioned JSON report, run `bun run resources-json`.
+To print the versioned JSON report, [set up a checkout and install its dependencies](contribute.md#run-orc-from-a-checkout), then run `bun run resources-json` in the checkout.
 
 ### Show the resources of a second machine
 
 The resources panel and the dashboard show a second machine's resources when a command that prints its report is configured.
 The command runs on this machine and prints the other machine's `bun run resources-json` report.
+Set up the checkout and dependencies on the other machine too.
 Set these variables where the panel runs:
 
 | Variable | What it holds |

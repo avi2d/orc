@@ -1,6 +1,6 @@
 import { DateTime, Effect } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { type Account } from "../../shared/config/index"
+import { type Account, type DispatchConfig, providerOf } from "../../shared/config/index"
 import { readToken, type RunToken, tokenLive } from "../../entities/token/index"
 
 export type TokenCheck = { readonly kind: "live"; readonly token: RunToken } | { readonly kind: "waits"; readonly reason: string }
@@ -27,3 +27,32 @@ export const checkToken = (
     tokens.set(account.name, check)
     return check
   })
+
+export type Credential =
+  | { readonly kind: "file"; readonly provider: string; readonly tokenFile: string }
+  | { readonly kind: "token"; readonly provider: string; readonly token: RunToken }
+  | { readonly kind: "none"; readonly provider: string }
+  | { readonly kind: "claude-config"; readonly provider: string; readonly configDirs: Readonly<Record<string, string>> }
+
+export const credentialFor = Effect.fnUntraced(function*(
+  tokens: TokenCache,
+  quota: DispatchConfig["quota"],
+  account: Account
+): Effect.fn.Return<Credential | { readonly kind: "waits"; readonly reason: string }, never, ChildProcessSpawner.ChildProcessSpawner> {
+  const provider = providerOf(quota, account)
+  switch (account.kind) {
+    case "token-file": {
+      return { kind: "file", provider, tokenFile: account.tokenFile }
+    }
+    case "claude-config": {
+      return { kind: "claude-config", provider, configDirs: account.configDirs }
+    }
+    case "none": {
+      return { kind: "none", provider }
+    }
+    case "token-command": {
+      const check = yield* checkToken(tokens, account)
+      return check.kind === "waits" ? check : { kind: "token", provider, token: check.token }
+    }
+  }
+})

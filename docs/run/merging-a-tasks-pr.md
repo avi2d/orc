@@ -30,6 +30,12 @@ It stops waiting early once a check on the new head is red.
 It reads the new head's parents and treats a head that leaves out the checked head as changed after the approval.
 Once the new head is green and no longer behind, orc runs `gh pr merge <url> --squash --match-head-commit <new sha>`.
 
+## Change the first wait
+
+Set `ORC_MERGE_POLL_SECONDS` to change the first wait before Orc reads an updated PR, such as `ORC_MERGE_POLL_SECONDS=0.5 orc merge orc-7`.
+Later waits still double up to 15 seconds.
+The value is a number of seconds above zero and at most 15, and Orc refuses any other value before it reads the PR.
+
 ## The recorded stage
 
 At each step of an `orc merge`, Orc writes a `merge` record into the closed task file.
@@ -96,4 +102,4 @@ Either basis meets every refusal above.
 - A secret change, to a file named `.env`, `.env.<name>`, `*.env`, `.envrc`, `id_rsa`, `id_ed25519`, `.npmrc`, `.netrc`, `credentials.json`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, or a name with `secret` in it.
 
 Each such refusal ends `which waits for the captain's merge word`.
-The beat also merges a yolo project's green PR by itself, as [Merging a task's PR](beat-runs.md#merging-a-tasks-pr) in the beat reference describes.
+The beat also merges a yolo project's green PR by itself, as [Automatic PR merges](beat-runs.md#automatic-pr-merges) in the beat reference describes.

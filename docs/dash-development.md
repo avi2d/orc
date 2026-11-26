@@ -7,6 +7,8 @@ The orc-dash workspace contains the panels, dashboard, and their checks.
 
 ## Run the checks
 
+Before running checks, [set up a checkout and install its dependencies](contribute.md#run-orc-from-a-checkout).
+
 To run the checks:
 
 1. Run `bun run lint` to run [oxlint](https://oxc.rs) and every kit lint gate.

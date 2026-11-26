@@ -5,7 +5,8 @@ import { AgentAttentionSection } from "../../src/agent-attention-view"
 import type { InboxItem } from "../../src/inbox"
 import type { AgentAttention } from "../../src/inbox-read"
 import { type Card, type Filter, type RunAgent, cardAnswers, filterCards, goesOn, openedFilter, recordedStatus, runAgent } from "../../src/agents"
-import { readAgents } from "../../src/agents-read"
+import { type LocalAgents, agentsDocuments, readAgentQuestions, readLocalAgents } from "../../src/agents-read"
+import type { AttentionQueue } from "../../src/guard-attention"
 import { type AgentsActions, type Chosen, type DetailShown, type Keyed, approvalOf, askMerge, detailView, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
 import { type MenuName, runsColumn } from "../../src/runs-view"
 import { type Merge, mergeCommand, mergedNote, runMerge, watchMerges } from "../../src/agents-merge"
@@ -60,6 +61,9 @@ export default class OrcAgents extends View {
   merge: Merge | null = null
   busy = false
   stale = false
+  questionsBusy = false
+  questions: AttentionQueue = { items: [], decided: [] }
+  local: LocalAgents | null = null
   review = InputState.new({ placeholder: "What to change before this PR merges" })
   sent: Keyed<string> | null = null
   answers = new InboxAnswers((cx) => this.refresh(cx))
@@ -82,6 +86,7 @@ export default class OrcAgents extends View {
   }
 
   refresh(cx: Context): void {
+    this.refreshQuestions(cx)
     if (this.busy) {
       this.stale = true
       return
@@ -100,12 +105,35 @@ export default class OrcAgents extends View {
     )
   }
 
-  readAll(cx: Context): Promise<void> {
-    return readAgents().then((reading) => {
-      this.cards = reading.kind === "ok" ? { kind: "ok", value: reading.value.cards } : reading
+  refreshQuestions(cx: Context): void {
+    if (this.questionsBusy) return
+    this.questionsBusy = true
+    cx.spawn((task) => readAgentQuestions().then((reading) => {
+      this.questionsBusy = false
       if (reading.kind === "ok") {
-        this.agent = reading.value.agent
-        this.answers.sync(cx, reading.value.cards.flatMap(cardAttention))
+        this.questions = reading.value
+        this.showCards(task)
+      }
+      task.notify()
+    }))
+  }
+
+  showCards(cx: Context): void {
+    if (this.local === null) return
+    const documents = agentsDocuments(this.local, this.questions)
+    this.cards = { kind: "ok", value: documents.cards }
+    this.agent = documents.agent
+    this.answers.sync(cx, documents.cards.flatMap(cardAttention))
+  }
+
+  readAll(cx: Context): Promise<void> {
+    return readLocalAgents().then((reading) => {
+      if (reading.kind === "ok") {
+        this.local = reading.value
+        this.showCards(cx)
+      } else {
+        this.local = null
+        this.cards = reading
       }
       cx.notify()
       if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {

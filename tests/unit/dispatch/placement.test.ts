@@ -7,6 +7,7 @@ import { Effect, Layer } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { addTask, claimTask, findTask, rewriteNew, writeTaken, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 import { placeTask, runBeat } from "../../../packages/run/src/widgets/beat/beat"
+import { beatJson } from "../../../packages/run/src/widgets/beat/board"
 import type { DispatchConfig, Project } from "../../../packages/run/src/shared/config/dispatch-config"
 import { quietSources } from "../../lib/beat-sources"
 
@@ -24,7 +25,14 @@ const newTask = (machine: string | null): TaskRecord => ({ spec: { ...spec, id: 
 describe("placeTask", () => {
   const room = [{ machine: "mac", slots: 1, busy: 1 }, { machine: "linux", slots: 4, busy: 0 }]
   test("a task marked for a full machine waits instead of going to a machine with room", () => {
-    expect(placeTask(newTask("mac"), config, projects, room)).toEqual({ kind: "waits", reason: "mac has no room" })
+    expect(placeTask(newTask("mac"), config, projects, room)).toMatchObject({
+      kind: "waits",
+      reason: "mac has no room",
+      machines: [
+        { machine: "mac", kind: "rejected", code: "capacity", reason: "mac has no room" },
+        { machine: "linux", kind: "rejected", code: "pin", reason: "the task is pinned to mac" }
+      ]
+    })
   })
   test("a task marked for a machine goes there even when another has more room", () => {
     const placement = placeTask(newTask("mac"), config, projects, [{ machine: "mac", slots: 1, busy: 0 }, { machine: "linux", slots: 4, busy: 0 }])
@@ -34,21 +42,57 @@ describe("placeTask", () => {
     const placement = placeTask(newTask(null), config, projects, room)
     expect(placement.kind === "place" ? [placement.machine.name, placement.checkout] : placement.reason).toEqual(["linux", "/home/a/orc"])
   })
-  test("a task marked for a machine with no checkout of its project waits", () => {
+  test("a pinned task rejects a missing checkout without treating the other machine as eligible", () => {
     const onlyMac: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc" } }]
-    expect(placeTask(newTask("linux"), config, onlyMac, room).kind).toBe("waits")
+    expect(placeTask(newTask("linux"), config, onlyMac, room)).toMatchObject({
+      kind: "waits",
+      reason: "the project orc has no checkout on linux",
+      machines: [
+        { machine: "mac", kind: "rejected", code: "pin", reason: "the task is pinned to linux" },
+        { machine: "linux", kind: "rejected", code: "no-checkout", reason: "the project orc has no checkout on linux" }
+      ]
+    })
+  })
+  test("the less roomy machine stays eligible when the roomier one wins", () => {
+    const bothFree = [{ machine: "mac", slots: 1, busy: 0 }, { machine: "linux", slots: 4, busy: 0 }]
+    expect(placeTask(newTask(null), config, projects, bothFree)).toMatchObject({
+      kind: "place",
+      machine: { name: "linux" },
+      machines: [
+        { machine: "mac", kind: "eligible" },
+        { machine: "linux", kind: "eligible" }
+      ]
+    })
+  })
+  test("a full machine reports capacity instead of load even when both checks would reject it", () => {
+    const overloaded = new Map([["mac", "mac's five-minute load is 8, above its limit of 4"]])
+    expect(placeTask(newTask("mac"), config, projects, room, overloaded)).toMatchObject({
+      kind: "waits",
+      reason: "mac has no room",
+      machines: [
+        { machine: "mac", kind: "rejected", code: "capacity", reason: "mac has no room" },
+        { machine: "linux", kind: "rejected", code: "pin", reason: "the task is pinned to mac" }
+      ]
+    })
   })
   const linuxFull = [{ machine: "mac", slots: 1, busy: 0 }, { machine: "linux", slots: 4, busy: 4 }]
   test("an unmarked task goes to the idle mac while the other machine is full instead of waiting", () => {
     const placement = placeTask(newTask(null), config, projects, linuxFull)
     expect(placement.kind === "place" ? placement.machine.name : placement.reason).toBe("mac")
   })
-  test("a task parked on a full machine waits for it instead of resuming on the idle mac", () => {
+  test("a task parked on a full machine rejects the idle mac even when the task pins it", () => {
     const parked: TaskRecord = {
-      ...newTask(null),
+      ...newTask("mac"),
       parked: { origin: { machine: "linux", run: "run-1" }, branch: "orc/task-1", questions: [{ id: "ask-1", text: "Which one?", asked: "2026-10-27T10:05:00.000Z", blocks: true, answer: { words: "Keep it", at: "2026-10-27T10:06:00.000Z", relayedTo: null } }] }
     }
-    expect(placeTask(parked, config, projects, linuxFull)).toEqual({ kind: "waits", reason: "linux has no room" })
+    expect(placeTask(parked, config, projects, linuxFull)).toMatchObject({
+      kind: "waits",
+      reason: "linux has no room",
+      machines: [
+        { machine: "mac", kind: "rejected", code: "parked-origin", reason: "the task is parked on linux" },
+        { machine: "linux", kind: "rejected", code: "capacity", reason: "linux has no room" }
+      ]
+    })
   })
 })
 
@@ -76,7 +120,7 @@ const quotaAnswering = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Eff
 })).pipe(Layer.provide(BunServices.layer))
 
 describe("the beat over linux-parked tasks", () => {
-  test("starts nothing on the idle mac while only linux-parked tasks wait, then starts the next unmarked task there instead of leaving it waiting", async () => {
+  test("keeps each machine decision in beat JSON instead of reporting only the wait and start", async () => {
     await withBacklog(async (root) => {
       await writeFile(join(root, "dispatch.json"), JSON.stringify(config))
       await writeFile(join(root, "projects.json"), JSON.stringify({ projects }))
@@ -97,9 +141,36 @@ describe("the beat over linux-parked tasks", () => {
       expect(first.actions.filter((action) => action.kind === "waits" && "task" in action && action.task === parkedRecord.spec.id)).toEqual([
         { kind: "waits", task: parkedRecord.spec.id, reason: "linux has no room" }
       ])
+      expect(beatJson(first)).toMatchObject({
+        placements: [{
+          task: parkedRecord.spec.id,
+          machines: [
+            { machine: "mac", kind: "rejected", code: "parked-origin", reason: "the task is parked on linux" },
+            { machine: "linux", kind: "rejected", code: "capacity", reason: "linux has no room" }
+          ]
+        }]
+      })
       const next = await run(addTask(root, spec))
       const second = await beat()
       expect(second.actions.filter((action) => action.kind === "started" && "task" in action && "machine" in action).map((action) => "task" in action && "machine" in action ? action.task + ":" + action.machine : "")).toEqual([next.spec.id + ":mac"])
+      expect(beatJson(second)).toMatchObject({
+        placements: [
+          {
+            task: parkedRecord.spec.id,
+            machines: [
+              { machine: "mac", kind: "rejected", code: "parked-origin", reason: "the task is parked on linux" },
+              { machine: "linux", kind: "rejected", code: "capacity", reason: "linux has no room" }
+            ]
+          },
+          {
+            task: next.spec.id,
+            machines: [
+              { machine: "mac", kind: "eligible" },
+              { machine: "linux", kind: "rejected", code: "capacity", reason: "linux has no room" }
+            ]
+          }
+        ]
+      })
     })
   })
 })

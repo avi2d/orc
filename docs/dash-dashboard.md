@@ -7,7 +7,8 @@ The dashboard combines panels in a layout that you can configure.
 
 ## Run the dashboard
 
-Run `orc-dash`, or `bun run dashboard` in the clone.
+Run `orc-dash`, or `bun run dashboard` in the checkout.
+To run from source, [set up a checkout and install its dependencies](contribute.md#run-orc-from-a-checkout).
 The dashboard shows quota, attention items, queues, machine resources, and tasks.
 Each panel title shows its refresh interval.
 While a source loads, the dashboard shows a saved reading and its age.
