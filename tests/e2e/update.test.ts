@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import runPackage from "../../packages/run/package.json" with { type: "json" }
 
-const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
+const binPath = new URL("../../packages/run/dist/bin.js", import.meta.url).pathname
 
 const dirs: Array<string> = []
 

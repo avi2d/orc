@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Schema } from "effect"
 
-export const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
+export const binPath = new URL("../../packages/run/dist/bin.js", import.meta.url).pathname
 const pueueFixtures = new URL("../fixtures/runner/pueue", import.meta.url).pathname
 
 export const startWaitMillis = 10_000

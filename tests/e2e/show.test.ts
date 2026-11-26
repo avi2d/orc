@@ -15,7 +15,7 @@ interface OrcResult {
 }
 
 const runOrc = async (args: ReadonlyArray<string>, home: string): Promise<OrcResult> => {
-  const proc = Bun.spawn([process.execPath, "packages/run/src/bin.ts", ...args], {
+  const proc = Bun.spawn([process.execPath, "packages/run/dist/bin.js", ...args], {
     stdout: "pipe",
     stderr: "pipe",
     env: { ...process.env, HOME: home, ORC_HOME: "" }

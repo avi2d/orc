@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 export const beatTimeout = 120_000
 
-export const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
+export const binPath = new URL("../../packages/run/dist/bin.js", import.meta.url).pathname
 
 const quotaStatus = {
   schema: "orc.quota.v1",

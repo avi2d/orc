@@ -4,7 +4,7 @@ import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
+const binPath = new URL("../../packages/run/dist/bin.js", import.meta.url).pathname
 
 const token = "sk-ant-oat01-" + "Q7f".repeat(30)
 const codexToken = "sk-proj-" + "Z4k".repeat(30)

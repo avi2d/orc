@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { chatExtension, chatSession } from "../../packages/run/src/features/chat/chat-tools"
 import type { ChatTool } from "../../packages/run/src/features/chat/chat-run"
 
-export const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
+export const binPath = new URL("../../packages/run/dist/bin.js", import.meta.url).pathname
 
 export interface Fixture {
   readonly dir: string

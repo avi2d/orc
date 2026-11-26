@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
+const binPath = new URL("../../packages/run/dist/bin.js", import.meta.url).pathname
 
 const modelListReply = JSON.stringify({ id: "orc-models", type: "response", command: "get_available_models", success: true, data: { models: [{ provider: "acme-go", id: "coder-1", contextWindow: 262144 }] } })
 

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { orcCompletionLine } from "../../packages/run/src/entities/agent/index"
 
-export const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
+export const binPath = new URL("../../packages/run/dist/bin.js", import.meta.url).pathname
 
 const sessionId = "0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
 

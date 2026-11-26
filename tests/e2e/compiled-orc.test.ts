@@ -11,7 +11,7 @@ import { decodeShowJson } from "../../packages/run/src/features/seeing-runs/inde
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url))
 const compiledOrc = join(repoRoot, "packages/run/dist/orc")
-const sourceOrc = [process.execPath, join(repoRoot, "packages/run/src/bin.ts")]
+const bundledOrc = [process.execPath, join(repoRoot, "packages/run/dist/bin.js")]
 const compileTimeout = 300_000
 
 interface Ran {
@@ -263,29 +263,29 @@ describe("compiled orc", () => {
     })
   }, compileTimeout)
 
-  test("the compiled file gives the same exit code and output as the source for help, beat, show and chat", async () => {
+  test("the compiled file gives the same exit code and output as the bundle for help, beat, show and chat", async () => {
     await compileOrc()
     await withFixture(async ({ dir, env }) => {
       await seedRun(env.ORC_HOME)
       const both = async (args: ReadonlyArray<string>) => ({
-        source: await run([...sourceOrc, ...args], env, dir),
+        bundle: await run([...bundledOrc, ...args], env, dir),
         compiled: await run([compiledOrc, ...args], env, dir)
       })
 
       const help = await both(["--help"])
-      expect(help.compiled).toEqual(help.source)
+      expect(help.compiled).toEqual(help.bundle)
 
       const beat = await both(["beat", "--json"])
-      expect(beat.source.exitCode).toBe(0)
-      expect(unstamped(beat.compiled)).toEqual(unstamped(beat.source))
+      expect(beat.bundle.exitCode).toBe(0)
+      expect(unstamped(beat.compiled)).toEqual(unstamped(beat.bundle))
 
       const show = await both(["show", "compiled-1", "--json"])
-      expect(show.source.exitCode).toBe(0)
-      expect(show.compiled).toEqual(show.source)
+      expect(show.bundle.exitCode).toBe(0)
+      expect(show.compiled).toEqual(show.bundle)
 
       const chat = await both(["chat"])
-      expect(chat.source.exitCode).toBe(0)
-      expect(chat.compiled).toEqual(chat.source)
+      expect(chat.bundle.exitCode).toBe(0)
+      expect(chat.compiled).toEqual(chat.bundle)
     }, quietPi)
   }, compileTimeout)
 })
