@@ -113,74 +113,142 @@ export interface Placed {
   readonly instructions: string | null
 }
 
-type Placement = Placed | { readonly kind: "waits"; readonly reason: string }
+type MachineRejection = "unknown-project" | "priority-floor" | "missing-origin" | "parked-origin" | "pin" | "no-checkout" | "capacity" | "load"
 
-interface Candidate {
+interface RejectedMachine {
+  readonly kind: "rejected"
+  readonly machine: string
+  readonly code: MachineRejection
+  readonly reason: string
+}
+
+export type MachinePlacement = { readonly kind: "eligible"; readonly machine: string } | RejectedMachine
+
+type PlacementWait = { readonly kind: "waits"; readonly reason: string }
+type Placement = (Placed | PlacementWait) & { readonly machines: ReadonlyArray<MachinePlacement> }
+
+interface EligibleMachine {
+  readonly kind: "eligible"
   readonly machine: Machine
   readonly checkout: string
+  readonly free: number
 }
 
-const roomiest = (
-  candidates: ReadonlyArray<Candidate>,
+type MachineAssessment = EligibleMachine | RejectedMachine
+
+interface MachineRestriction {
+  readonly machine: string
+  readonly code: "parked-origin" | "pin"
+}
+
+const restrictedMachine = (task: Pick<TaskRecord, "parked" | "spec">): MachineRestriction | null => {
+  const origin = task.parked?.origin
+  if (origin !== undefined) {
+    return { machine: origin.machine, code: "parked-origin" }
+  }
+  return task.spec.machine === null ? null : { machine: task.spec.machine, code: "pin" }
+}
+
+const rejectMachine = (machine: string, code: MachineRejection, reason: string): RejectedMachine =>
+  ({ kind: "rejected", machine, code, reason })
+
+const rejectPlacement = (
+  machines: ReadonlyArray<Machine>,
+  code: MachineRejection,
+  reason: string
+): PlacementWait & { readonly machines: ReadonlyArray<RejectedMachine> } =>
+  ({ kind: "waits", reason, machines: machines.map((machine) => rejectMachine(machine.name, code, reason)) })
+
+const checkoutMissing = (project: string, machine: string): string =>
+  "the project " + project + " has no checkout on " + machine
+
+const noRoom = (machine: string): string => machine + " has no room"
+
+const assessMachine = (
+  machine: Machine,
+  project: Project,
+  restriction: MachineRestriction | null,
   room: ReadonlyArray<MachineRoom>,
   overloaded: ReadonlyMap<string, string>
-): { readonly best: Candidate | null; readonly loaded: ReadonlyArray<string> } => {
-  let best: (Candidate & { readonly free: number }) | null = null
-  const loaded: Array<string> = []
-  for (const candidate of candidates) {
-    const free = freeRoom(room.find((entry) => entry.machine === candidate.machine.name) ?? { machine: candidate.machine.name, slots: 0, busy: 0 })
-    const load = overloaded.get(candidate.machine.name)
-    if (load === undefined && free > (best?.free ?? 0)) {
-      best = { ...candidate, free }
-    } else if (load !== undefined && free > 0) {
-      loaded.push(load)
-    }
+): MachineAssessment => {
+  if (restriction !== null && machine.name !== restriction.machine) {
+    const reason = restriction.code === "parked-origin" ? "the task is parked on " : "the task is pinned to "
+    return rejectMachine(machine.name, restriction.code, reason + restriction.machine)
   }
-  return { best, loaded }
+  const checkout = checkoutOn(project, machine.name)
+  if (checkout === null) {
+    return rejectMachine(machine.name, "no-checkout", checkoutMissing(project.name, machine.name))
+  }
+  const slot = room.find((entry) => entry.machine === machine.name)
+  const free = slot === undefined ? 0 : freeRoom(slot)
+  if (free === 0) {
+    return rejectMachine(machine.name, "capacity", noRoom(machine.name))
+  }
+  const load = overloaded.get(machine.name)
+  if (load !== undefined) {
+    return rejectMachine(machine.name, "load", load)
+  }
+  return { kind: "eligible", machine, checkout, free }
 }
 
-// A task that names a machine is placed there or nowhere, whatever room the other machines have.
+const roomiest = (assessments: ReadonlyArray<MachineAssessment>): EligibleMachine | null => {
+  let best: EligibleMachine | null = null
+  for (const assessment of assessments) {
+    if (assessment.kind === "eligible" && assessment.free > (best?.free ?? 0)) {
+      best = assessment
+    }
+  }
+  return best
+}
+
+const machinePlacement = (assessment: MachineAssessment): MachinePlacement =>
+  assessment.kind === "eligible" ? { kind: "eligible", machine: assessment.machine.name } : assessment
+
+const placementWait = (project: string, pinned: string | undefined, machines: ReadonlyArray<MachinePlacement>): string => {
+  const loaded = machines.flatMap((machine) => machine.kind === "rejected" && machine.code === "load" ? [machine.reason] : [])
+  if (loaded.length > 0) {
+    return loaded.join("; ")
+  }
+  if (machines.some((machine) => machine.kind === "rejected" && machine.code === "capacity")) {
+    return pinned === undefined ? "no machine with a checkout of " + project + " has room" : noRoom(pinned)
+  }
+  return checkoutMissing(project, pinned ?? "any machine")
+}
+
 export const placeTask = (
   task: TaskRecord,
-  config: DispatchConfig,
+  config: Pick<DispatchConfig, "machines">,
   projects: ReadonlyArray<Project>,
   room: ReadonlyArray<MachineRoom>,
   overloaded: ReadonlyMap<string, string> = new Map()
 ): Placement => {
   const project = projects.find((candidate) => candidate.name === task.spec.project)
   if (project === undefined) {
-    return { kind: "waits", reason: "the project " + task.spec.project + " is not in the project list" }
+    return rejectPlacement(config.machines, "unknown-project", "the project " + task.spec.project + " is not in the project list")
   }
   if (project.floor !== undefined && task.spec.priority !== null && task.spec.priority > project.floor) {
-    return { kind: "waits", reason: "P" + task.spec.priority + " is under the floor P" + project.floor + " of the project " + project.name }
+    return rejectPlacement(config.machines, "priority-floor", "P" + task.spec.priority + " is under the floor P" + project.floor + " of the project " + project.name)
   }
   const originWait = parkedOriginWait(task)
   if (originWait !== null) {
-    return { kind: "waits", reason: originWait }
+    return rejectPlacement(config.machines, "missing-origin", originWait)
   }
-  const pinned = task.parked?.origin?.machine ?? task.spec.machine
-  if (pinned !== null && !config.machines.some((machine) => machine.name === pinned)) {
-    return { kind: "waits", reason: "the machine " + pinned + " is not in dispatch.json" }
+  const restriction = restrictedMachine(task)
+  if (restriction !== null && !config.machines.some((machine) => machine.name === restriction.machine)) {
+    return rejectPlacement(config.machines, restriction.code, "the machine " + restriction.machine + " is not in dispatch.json")
   }
-  const candidates = config.machines.flatMap((machine) => {
-    const checkout = checkoutOn(project, machine.name)
-    return (pinned === null || machine.name === pinned) && checkout !== null ? [{ machine, checkout }] : []
-  })
-  if (candidates.length === 0) {
-    return { kind: "waits", reason: "the project " + project.name + " has no checkout on " + (pinned ?? "any machine") }
-  }
-  const { best, loaded } = roomiest(candidates, room, overloaded)
-  if (best === null && loaded.length > 0) {
-    return { kind: "waits", reason: loaded.join("; ") }
-  }
+  const assessments = config.machines.map((machine) => assessMachine(machine, project, restriction, room, overloaded))
+  const machines = assessments.map(machinePlacement)
+  const best = roomiest(assessments)
   if (best === null) {
-    return { kind: "waits", reason: pinned === null ? "no machine with a checkout of " + project.name + " has room" : pinned + " has no room" }
+    return { kind: "waits", reason: placementWait(project.name, restriction?.machine, machines), machines }
   }
   return {
     kind: "place",
     machine: best.machine,
     checkout: best.checkout,
     delivery: deliveryFor(modeOf(project), task.spec.internal),
-    instructions: project.instructions ?? null
+    instructions: project.instructions ?? null,
+    machines
   }
 }

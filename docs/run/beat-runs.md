@@ -69,6 +69,14 @@ A runner task with no new output for 30 minutes reports a stall.
 Run `orc beat --json` for the `orc.beat.v1` action document.
 It reports starts, closures, parked questions, stalls, upstream changes, attention items, and the PRs the beat merged, is updating or did not merge, as `yolo-merged`, `yolo-updating` and `merge-refused`.
 
+`placements` lists the tasks that reached machine selection in the beat.
+Each entry names the `task` and lists its `machines` in dispatch configuration order.
+Each machine has a `machine` name and a `kind` of `eligible` or `rejected`.
+A rejected machine also has a `code` and a `reason` for the check that ruled it out, such as a different parked origin, an explicit pin, a missing checkout, no free slot, or load.
+More than one machine can be eligible even though only one is chosen.
+Eligibility uses the slots free when the beat considers that task, and does not mean the task started.
+The `actions` list still reports what the beat did.
+
 ## Updating Orc on dispatch machines
 
 After dispatching tasks, the beat runs [`orc update --json`](updating-orc.md) on the machine the beat runs on and through each `orc runner start -- <command>` in `dispatch.json`.
