@@ -120,6 +120,11 @@ shared=$HERDR_APP_HOME/shared.json
 [ -f "$shared" ] || echo '{}' > "$shared"
 jq '."frame.welcomed" = "finished"' "$shared" > "$shared.tmp" && mv "$shared.tmp" "$shared"
 echo '{"state":"windowed","bounds":[100,80,1400,900]}' > "$HERDR_APP_HOME/window.json"
+# A home with no update record shows the update note over the view.
+notes=$HERDR_APP_HOME/update-notes.json
+if [ ! -f "$notes" ] && version=$(plutil -extract CFBundleShortVersionString raw -o - "$bundle/Contents/Info.plist" 2>/dev/null); then
+  jq -n --arg version "$version" '{last_run: $version, presented: []}' > "$notes"
+fi
 if find_app_pid; then
   pid=
   echo "an App already runs with HERDR_APP_HOME=$HERDR_APP_HOME" >&2
