@@ -26,7 +26,30 @@ const lintPasses = async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 })
 const callLines = (calls: string): ReadonlyArray<string> => calls.split("\n").filter((line) => line !== "")
 
 describe("orc delivery", () => {
-  test("rebases onto the updated base before checks and opens a PR without review or no-mistakes", async () => {
+  test("malformed reviewer output fails the review step by name instead of opening a PR", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        await withOrigin(dir, async () => {
+          const baseBranch = git(dir, ["branch", "--show-current"])
+          git(dir, ["push", "-u", "origin", baseBranch])
+          git(dir, ["remote", "set-head", "origin", baseBranch])
+          const sha = await readyToCheck(dir, home)
+          git(dir, ["checkout", "-q", "orc/test"])
+          const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(async (run, sessionsDir) => {
+            if (run.agent.kind !== "reviewer") return sandboxResult(sha)(run, sessionsDir)
+            const sessionFile = join(sessionsDir, "review-invalid.jsonl")
+            await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: "[{}]" }], stopReason: "stop", usage: { input: 1, output: 1 } }))
+            return { sessionFile, commits: [] }
+          }, []), lintPasses)
+          expect(outcome.steps).toContainEqual({ name: "review", status: "failed" })
+          expect(outcome.report.endReason).toContain("OrcReviewOutputError")
+          expect(outcome.ghCalls).toBe("")
+        })
+      })
+    })
+  })
+
+  test("rebases before checks and records the reviewer findings instead of skipping review", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         await withOrigin(dir, async () => {
@@ -41,13 +64,23 @@ describe("orc delivery", () => {
           git(dir, ["push", "origin", baseBranch])
           git(dir, ["checkout", "-q", "orc/test"])
           const kinds: Array<string> = []
+          const finding = { id: "missing-check", file: "work.txt", line: 1, severity: "warning", action: "Add the check.", description: "The change accepts an invalid value." }
           let checkedBase = ""
-          const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), async () => {
+          const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(async (run, sessionsDir) => {
+            if (run.agent.kind !== "reviewer") return sandboxResult(sha)(run, sessionsDir)
+            const sessionFile = join(sessionsDir, "review.jsonl")
+            await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: JSON.stringify([finding]) }], stopReason: "stop", usage: { input: 1, output: 1 } }))
+            expect(checkedBase).not.toBe("")
+            return { sessionFile, commits: [] }
+          }, kinds), async () => {
             checkedBase = git(dir, ["rev-parse", "HEAD^"])
             return lintPasses()
           })
           expect(checkedBase).toBe(base)
-          expect(kinds).toEqual(["implementer"])
+          expect(kinds).toEqual(["implementer", "reviewer"])
+          expect(outcome.steps).toContainEqual({ name: "review", status: "passed" })
+          expect(outcome.signals).toContainEqual({ name: "review-findings", value: "1" })
+          expect(JSON.parse(await readFile(join(home, "runs", "step-run-1", "review.json"), "utf8"))).toEqual([finding])
           expect(outcome.nmCalls).toBe("")
           expect(outcome.ghCalls).toContain("pr create --head orc/test")
           expect(outcome.ghCalls).not.toContain("check-runs")

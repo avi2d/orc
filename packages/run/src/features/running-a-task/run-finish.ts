@@ -3,10 +3,10 @@ import { driveNoMistakes, waitForAnswers, type AllowWord, type QuestionAnswer } 
 import { type DirectPrRecord, openDirectPr, type PullRequestOpener } from "../../entities/pull-request/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
-import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
+import type { AgentFile, LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 import type { RunCheckpoints, SandboxOps } from "./run-ops"
-import { reviewSentence, reviewAtHead } from "./review-turn"
+import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import { beatReadsChecks } from "./checks"
 
 export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], priorDir: string | null): Effect.Effect<OrcRunReport, OrcRunError> =>
@@ -14,8 +14,13 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + (rounds.at(-1)?.passed === true ? ", and the checks passed. " : ". No local checks ran. ")
     const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
     if (run.delivery.kind === "orc") {
+      const review = yield* reviewOrc(run, run.delivery.reviewer, checkpoints, runAgent)
+      const reviewed = checked + reviewSentence(review)
+      if (review.status === "failed") {
+        return { ...settled, completed: false, prLink: null, endReason: reviewed }
+      }
       const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
-      return { ...settled, completed: pr.status === "opened", waitingOnCi: false, prLink: pr.prLink, endReason: checked + pr.result }
+      return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
       const reviewStarted = new Date().toISOString()
@@ -34,6 +39,15 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     )
     yield* checkpoints.noMistakesDone(noMistakes)
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
+  })
+
+const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]) =>
+  Effect.gen(function*() {
+    const started = new Date().toISOString()
+    yield* checkpoints.reviewStart(reviewer, started)
+    const review = yield* runReviewTurn(run, runAgent, reviewer, "orc")
+    yield* checkpoints.reviewDone(reviewer, { ...review, reusedFrom: null }, started, new Date().toISOString())
+    return review
   })
 
 const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>): string => {
