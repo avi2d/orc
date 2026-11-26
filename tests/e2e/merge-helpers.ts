@@ -45,6 +45,35 @@ export interface Forge {
 
 export const ghCalls = (fixture: Fixture): string => join(fixture.dir, "gh-calls")
 
+export const stubRunner = async (fixture: Fixture): Promise<void> => {
+  const runner = join(fixture.dir, "bin", "runner-stub")
+  const document = JSON.stringify({ schema: "orc.runner.v1", result: { task: "orc-1", status: "unknown", run: { id: "origin-run", status: "succeeded", prLink: prUrl, endReason: null, openQuestions: [] } } })
+  await writeFile(runner, "#!/bin/sh\ncat > /dev/null\necho '" + document + "'\n")
+  await chmod(runner, 0o755)
+  await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
+    machines: [{ name: "mac", slots: 1, start: ["true", "runner", "start", "--", runner] }],
+    quota: { provider: "acme", command: ["true"], accounts: [{ name: "main", tokenFile: "/x" }], floorPercent: 15 }
+  }))
+}
+
+export const taskFile = (fixture: Fixture): Promise<string> => readFile(join(fixture.home, "backlog", "closed", "orc-1.md"), "utf8")
+
+export const mergeCalls = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
+  (await readFile(ghCalls(fixture), "utf8")).split("\n").filter((line) => line.startsWith("pr merge"))
+
+export const foreignHead = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+export const red = (name: string): Rollup => ({ __typename: "CheckRun", workflowName: "ci", name, status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-11-02T10:05:00Z" })
+export const running = (name: string): Rollup => ({ __typename: "CheckRun", workflowName: "ci", name, status: "IN_PROGRESS", conclusion: "", startedAt: "2026-11-02T10:05:00Z" })
+
+export const updateCall = "api --hostname github.com -X PUT repos/acme/orc/pulls/8/update-branch -f expected_head_sha=" + head
+
+export const forgeSteps = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
+  (await readFile(ghCalls(fixture), "utf8")).split("\n").flatMap((line) =>
+    line.startsWith("pr view") ? ["view"] : line.includes("update-branch") ? ["update"] : line.startsWith("pr merge") ? [line] : [])
+
+export const sentBackTask = (fixture: Fixture): Promise<string> => readFile(join(fixture.home, "backlog", "new", "orc-1.md"), "utf8")
+
 export const viewJson = (state: string, view: HeadView): string =>
   JSON.stringify({ state, headRefOid: view.head, baseRefName: "main", statusCheckRollup: view.checks })
 
