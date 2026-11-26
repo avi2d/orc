@@ -32,21 +32,32 @@ const stopReport = (loop: ReviewLoop, endReason: string): OrcRunReport => ({
   fixes: loop.fixes, fixAttempts: loop.fixes.length, endReason
 })
 
-const checkAfterFix = (loop: ReviewLoop): Effect.Effect<string | null, OrcRunError> =>
+export const runRecordedChecks = (
+  run: HistoryRun,
+  ops: SandboxOps,
+  checkpoints: RunCheckpoints,
+  rounds: Array<ChecksRoundSummary>,
+  round: number,
+  readChecks: ReviewLoop["readChecks"]
+): Effect.Effect<ChecksRoundSummary, OrcRunError> =>
   Effect.gen(function*() {
-    const { run, ops, checkpoints, rounds } = loop
-    const round = rounds.length + 1
     const started = new Date().toISOString()
     yield* checkpoints.checksRoundStart(round, started)
-    const commands = yield* loop.readChecks(round)
+    const commands = yield* readChecks(round)
     const outcome = yield* runChecksRound(ops.execCheck, run.fs, run.path, run.piSessionDir, round, commands).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
     )
     const summary = summarizeChecksRound(outcome, started, new Date().toISOString())
-    const failed = summary.failed
     rounds.push(summary)
     yield* checkpoints.checksRoundDone(summary)
-    return failed.length === 0 ? null : "The " + failed.join(", ") + " check failed after the review fix. No PR opens."
+    return summary
+  })
+
+const checkAfterFix = (loop: ReviewLoop): Effect.Effect<string | null, OrcRunError> =>
+  Effect.gen(function*() {
+    const { run, ops, checkpoints, rounds, readChecks } = loop
+    const summary = yield* runRecordedChecks(run, ops, checkpoints, rounds, rounds.length + 1, readChecks)
+    return summary.failed.length === 0 ? null : "The " + summary.failed.join(", ") + " check failed after the review fix. No PR opens."
   })
 
 const runOneRound = (loop: ReviewLoop, findings: ReadonlyArray<ReviewFinding>, round: number): Effect.Effect<string | null, OrcRunError | RunStopped> =>
