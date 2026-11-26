@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
+import { answerDecision } from "../../packages/run/src/entities/backlog/index"
 import { chatSession } from "../../packages/run/src/features/chat/chat-tools"
 import { chatEnv, closeTask, type Fixture, orchestratorConfig, piFor, ranClosing, runOrc, sessionFor, until, waitPolls, withFixture } from "./chat-helpers"
 
@@ -33,6 +36,21 @@ describe("orc chat tools", () => {
       await chat.postClosed()
       await chat.postClosed()
       expect(chat.posted).toEqual(["orc-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7"])
+    })
+  }, 60_000)
+
+  test("posts an owner answer and an agent answer to two decisions under their own Decided by headings, with the agent's basis, instead of one mixed Owner or Agent tag", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const chat = sessionFor(fixture)
+      await chat.call("orc_backlog_add", { project: "orc", task: "# Which button goes first\n", kind: "decision" })
+      await chat.call("orc_backlog_add", { project: "orc", task: "# Which colour is the banner\n", kind: "decision" })
+      await chat.call("orc_backlog_answer", { id: "orc-1", words: "The blue one" })
+      await Effect.runPromise(answerDecision(join(fixture.home, "backlog"), "orc-2", "Green", "2026-11-03T10:00:00.000Z", "agent").pipe(Effect.provide(BunServices.layer)))
+      await chat.postClosed()
+      expect(chat.posted.toSorted()).toEqual([
+        "orc-1 Which button goes first closed done: answered\nDecided by the owner:\norc-1: The blue one",
+        "orc-2 Which colour is the banner closed done: answered\nDecided by the agent:\norc-2: Green\n  basis: not recorded"
+      ])
     })
   }, 60_000)
 

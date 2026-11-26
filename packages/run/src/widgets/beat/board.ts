@@ -5,7 +5,7 @@ import { type ChildCount, childCount, decisionAnswer, dependencyWaits, fullPrUrl
 import type { Project } from "../../shared/config/index"
 import { describeQuota } from "./quota"
 import type { ChatEvent, PrState } from "../../entities/events/index"
-import { type DecisionAnswer, deciderLabel } from "../../shared/lib/index"
+import { type DecisionAnswer, deciderHeadings, notRecordedBasis } from "../../shared/lib/index"
 import { updateLine } from "../../entities/attention/index"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
@@ -236,12 +236,24 @@ const closedCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: 
   if (record.state.kind !== "closed") {
     return record.spec.id
   }
-  const answer = decisionAnswer(record)
-  if (answer !== null) {
-    return deciderLabel(answer.decider) + " · " + named(record) + " answered: " + answer.words
-  }
   const { closing } = record.state
   return named(record) + doneOf(record, all, merged) + " " + (closing.outcome === "dropped" ? "dropped: " + closing.reason : closing.outcome)
+}
+
+const answeredCell = (record: TaskRecord, words: string): string => named(record) + " answered: " + words
+
+const closedCells = (closed: ReadonlyArray<TaskRecord>, all: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): ReadonlyArray<string> => {
+  const answered = closed.flatMap((record) => {
+    const answer = decisionAnswer(record)
+    return answer === null ? [] : [{ record, answer }]
+  })
+  const owner = answered.filter(({ answer }) => answer.decider === "owner").map(({ record, answer }) => answeredCell(record, answer.words))
+  const agent = answered.filter(({ answer }) => answer.decider === "agent").flatMap(({ record, answer }) => [answeredCell(record, answer.words), "  basis: " + notRecordedBasis])
+  return [
+    ...closed.filter((record) => decisionAnswer(record) === null).map((record) => closedCell(record, all, merged)),
+    ...(owner.length === 0 ? [] : [deciderHeadings.owner, ...owner]),
+    ...(agent.length === 0 ? [] : [deciderHeadings.agent, ...agent])
+  ]
 }
 
 const projectCells = (projects: ProjectList): ReadonlyArray<string> =>
@@ -259,7 +271,7 @@ export const formatBoard = (view: BacklogView): string => {
   return sideBySide([
     headed("NEW", inState("new").map((task) => newCell(task, view.tasks, view.merged))),
     headed("TAKEN", inState("taken", "started").map((task) => takenCell(task, view.tasks, view.merged))),
-    headed("CLOSED", inState("closed").map((task) => closedCell(task, view.tasks, view.merged))),
+    ["CLOSED (" + inState("closed").length + ")", ...closedCells(inState("closed"), view.tasks, view.merged)],
     ["PROJECTS", ...projectCells(view.projects), "", "MACHINES", ...roomCells(view.room)]
   ])
 }

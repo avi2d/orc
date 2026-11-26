@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { DecisionAnswer, deciderLabel } from "../../shared/lib/index"
+import { DecisionAnswer, deciderHeadings, notRecordedBasis } from "../../shared/lib/index"
 import { HoldJson, ParkedJson } from "./chat-parked"
 import { taskKinds } from "../../entities/backlog/index"
 
@@ -20,12 +20,15 @@ export const ClosedTask = Schema.Struct({
 })
 export type ClosedTask = typeof ClosedTask.Type
 
+const decidedPart = (id: string, answer: typeof DecisionAnswer.Type): string =>
+  "\n" + deciderHeadings[answer.decider] + ":\n" + id + ": " + answer.words + (answer.decider === "agent" ? "\n  basis: " + notRecordedBasis : "")
+
 const deliveredPart = (task: ClosedTask): string => {
   if (task.outcome === "dropped" || task.landedIn !== undefined) {
     return ""
   }
   if (task.kind === "decision") {
-    return task.answer === null ? "" : " (" + deciderLabel(task.answer.decider) + "): " + task.answer.words
+    return task.answer === null ? "" : decidedPart(task.id, task.answer)
   }
   if (task.kind !== "ship") {
     return task.report === null ? ", with no report" : ", report " + task.report

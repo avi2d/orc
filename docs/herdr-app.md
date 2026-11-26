@@ -75,6 +75,7 @@ A failed command shows the first line of its error on its card.
 Questions the agent owns, and the answered questions, stay in the collapsed **Agent attention** section at the end.
 The answers sit in two groups, **Decided by the owner** and **Decided by the agent**.
 Each agent answer shows its basis, or `Not recorded` when the item holds none.
+An agent decision with no agent answer, such as an escalation you then answered, also lists under the agent group with its basis.
 Where you replaced an agent's answer, your answer sits under the owner group and the replaced one under the agent group.
 
 ## Tab guides

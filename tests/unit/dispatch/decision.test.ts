@@ -83,19 +83,22 @@ const ShownBacklog = Schema.Struct({
 })
 
 describe("a decision", () => {
-  test("a long task prefix cannot push owner or agent attribution out of the closed column", async () => {
+  test("the closed column lists an owner answer and an agent answer under their own Decided by headings, with the agent's basis, instead of one mixed list", async () => {
     await withBacklog(async (root) => {
-      for (const decider of ["owner", "agent"] as const) {
-        const task = await run(addTask(root, { ...decisionSpec, project: "a-project-with-a-name-that-exceeds-the-board-column" }))
-        await run(answerDecision(root, task.spec.id, "yes", answeredAt, decider))
+      for (const [decider, words] of [["owner", "left"], ["agent", "right"]] as const) {
+        const task = await run(addTask(root, decisionSpec))
+        await run(answerDecision(root, task.spec.id, words, answeredAt, decider))
       }
       const board = formatBoard({
         tasks: await run(listTasks(root)), events: [], projects: { kind: "read", projects: [] },
         room: { kind: "read", room: [] }, merged: new Set(), prStates: new Map(), beatWaits: null,
         deciderOwns: () => false
       })
-      expect(board).toContain("Owner · ")
-      expect(board).toContain("Agent · ")
+      const rows = board.split("\n")
+      const row = (text: string): number => rows.findIndex((line) => line.includes(text))
+      expect(rows[0]).toContain("CLOSED (2)")
+      expect([row("Decided by the owner"), row("answered: left"), row("Decided by the agent"), row("answered: right"), row("basis: not recorded")]).toEqual([1, 2, 3, 4, 5])
+      expect(board).not.toContain("Owner · ")
     })
   })
 

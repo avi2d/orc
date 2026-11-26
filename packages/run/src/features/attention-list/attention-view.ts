@@ -1,7 +1,7 @@
 import { DateTime, Effect, type FileSystem } from "effect"
 import { ageMillis, answerItem, type DecidedEntry, type Decision, decisionGroups, decisionText, type AttentionItem, type DecidedItem, isOverdue, type OpenItem, type OwnerDecision, readAttention } from "../../entities/attention/index"
 import { listTasks, BacklogError, backlogPresent, noBacklog, type TaskFileError } from "../../entities/backlog/index"
-import { deciderHeadings, deciderLabel, formatTable } from "../../shared/lib/index"
+import { deciderHeadings, deciderLabel, formatTable, oneLine } from "../../shared/lib/index"
 
 const ATTENTION_JSON_SCHEMA = "orc.attention.v1"
 
@@ -54,13 +54,13 @@ const ageText = (seconds: number): string => {
 }
 
 const openText = (item: { readonly text: string; readonly decision?: Decision }): string => {
-  const text = item.text.replace(/\s+/g, " ").trim()
+  const text = oneLine(item.text)
   return item.decision === undefined ? text : text + " (" + deciderLabel(item.decision.decider) + " · " + decisionText(item.decision) + ")"
 }
 
 const decidedLines = (line: OwnerDecision): string =>
-  line.id + ": " + line.words + (line.replaced ? " (replaced)" : "") + (line.inferred ? " (attribution inferred)" : "") +
-  "\n  question: " + line.question.replace(/\s+/g, " ").trim()
+  line.id + ": " + oneLine(line.words) + (line.replaced ? " (replaced)" : "") + (line.inferred ? " (attribution inferred)" : "") +
+  "\n  question: " + oneLine(line.question)
 
 const formatAttention = (items: ReadonlyArray<OpenItem>, decided: ReadonlyArray<DecidedItem>, at: string): string => {
   const view = attentionJson(items, at, decided)
@@ -78,7 +78,7 @@ const formatAttention = (items: ReadonlyArray<OpenItem>, decided: ReadonlyArray<
   const groups = decisionGroups(view.decided)
   const sections = [
     ...(groups.owner.length === 0 ? [] : [deciderHeadings.owner + ":\n" + groups.owner.map(decidedLines).join("\n")]),
-    ...(groups.agent.length === 0 ? [] : [deciderHeadings.agent + ":\n" + groups.agent.map((line) => decidedLines(line) + "\n  basis: " + line.basis).join("\n")])
+    ...(groups.agent.length === 0 ? [] : [deciderHeadings.agent + ":\n" + groups.agent.map((line) => decidedLines(line) + "\n  basis: " + oneLine(line.basis)).join("\n")])
   ]
   return [open, ...choices, ...sections].join("\n\n")
 }

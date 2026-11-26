@@ -42,7 +42,9 @@ A task file stored before `decider` existed reads as an owner answer.
 To drop it instead, run `orc backlog close <task-id> failed [<reason>]`, which drops it as `orc backlog drop` does.
 `orc backlog close <task-id> done` refuses a decision, since only its answer closes it done.
 `orc backlog hold` and `orc merge` refuse a decision, and a decision never parks, since no run of it asks.
-`orc backlog` shows an answered decision as `Owner · <task> answered: <words>`, or `Agent · ` when the agent answered, and `orc backlog --json` gives it `kind: "decision"` and `answer` as its words, time and `decider`.
+`orc backlog` lists answered decisions at the end of the closed column as `<task> answered: <words>`, under **Decided by the owner** and **Decided by the agent**.
+An agent answer is followed by `basis: not recorded`, because a decision task keeps no basis.
+`orc backlog --json` gives it `kind: "decision"` and `answer` as its words, time and `decider`.
 Every other closed task carries `null` for `answer`.
 
 A task added with `--depends-on <decision-id>` waits until you answer the decision, as any dependency does.

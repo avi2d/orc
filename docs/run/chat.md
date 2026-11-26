@@ -51,6 +51,7 @@ See [Splitting at intake](task-kinds.md#splitting-at-intake).
 
 A task without a priority waits until you set one with `orc backlog priority <task-id> <0-4>`.
 The chat polls the backlog every 15 seconds and posts closed tasks, events, and alerts when Pi is idle.
+A closed decision's post puts its answer under **Decided by the owner** or **Decided by the agent**, and an agent answer ends with `basis: not recorded`.
 It marks posted closes and events so a later chat can report what happened while no chat was running.
 A close can repeat if a chat stops before marking it or two chats post at once.
 When a read or mark fails, the chat reports the error and keeps polling.
