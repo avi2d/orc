@@ -31,6 +31,7 @@
     "effect": "4.1.4"
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.120.0"
+    "@avi2dg/checks": "0.120.0",
+    "@avi2dg/orc-schema": "workspace:*"
   }
 }

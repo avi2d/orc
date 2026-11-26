@@ -1,4 +1,5 @@
 import { Config, DateTime, Duration, Effect, Result, Schema } from "effect";
+import { claimOf, startedOf, taskStateFields } from "../../../shared/task-front";
 import { CommandRunner } from "../../../shared/lib";
 import { decodeJson, decodeValue } from "../../../shared/lib";
 import { mapOutcome, type Outcome } from "../../../shared/lib";
@@ -39,14 +40,7 @@ export const TaskFields = Schema.Struct({
   depends_on: Schema.Array(Schema.String),
   created: Schema.String,
   kind: Schema.optional(Schema.Literals(["ship", "scout", "task", "parent", "decision"])),
-  beat: Schema.optional(Schema.String),
-  taken_for: Schema.optional(Schema.String),
-  account: Schema.optional(Schema.String),
-  taken_at: Schema.optional(Schema.String),
-  started_at: Schema.optional(Schema.String),
-  start_log: Schema.optional(Schema.String),
-  outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed", "dropped"])),
-  closed_at: Schema.optional(Schema.String),
+  ...taskStateFields,
   reason: Schema.optional(Schema.String),
 });
 
@@ -69,14 +63,6 @@ export const taskFields = (file: string, text: string): TaskFields | string => {
   const fields = decodeValue(TaskFields)(raw.success);
   return fields.kind === "ok" ? fields.value : file + ": its frontmatter holds no task orc can read";
 };
-
-const claimOf = (front: TaskFields): DispatchClaim | null =>
-  front.beat === undefined || front.taken_for === undefined || front.account === undefined || front.taken_at === undefined
-    ? null
-    : { beat: front.beat, machine: front.taken_for, account: front.account, takenAt: front.taken_at };
-
-const startedOf = (front: TaskFields): DispatchStarted | null =>
-  front.started_at === undefined ? null : { at: front.started_at, log: front.start_log ?? "" };
 
 const closingOf = (front: TaskFields, started: DispatchStarted | null): DispatchClosing | null => {
   const reason = front.reason ?? "";

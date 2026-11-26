@@ -169,6 +169,7 @@
       },
       "devDependencies": {
         "@avi2dg/checks": "0.120.0",
+        "@avi2dg/orc-schema": "workspace:*",
       },
     },
     "packages/schedules": {

@@ -1,3 +1,4 @@
+import { claimOf, startedOf, taskStateFields } from "@avi2dg/orc-schema"
 import { Data, Effect, Schema } from "effect"
 import { Decider } from "../../shared/lib/index"
 import { type Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-record-decision"
@@ -195,14 +196,7 @@ const Frontmatter = Schema.Struct({
   parked_at: Schema.optional(Schema.String),
   parked_sent_back_at: Schema.optional(Schema.String),
   parked_questions: Schema.optional(Schema.Array(QuestionFront)),
-  beat: Schema.optional(Schema.String),
-  taken_for: Schema.optional(Schema.String),
-  account: Schema.optional(Schema.String),
-  taken_at: Schema.optional(Schema.String),
-  started_at: Schema.optional(Schema.String),
-  start_log: Schema.optional(Schema.String),
-  outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed", "dropped"])),
-  closed_at: Schema.optional(Schema.String),
+  ...taskStateFields,
   landed_in: Schema.optional(Schema.String),
   reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),
@@ -214,14 +208,6 @@ const Frontmatter = Schema.Struct({
 type Frontmatter = typeof Frontmatter.Type
 
 export { fence } from "./task-record-parts"
-
-const claimOf = (front: Frontmatter): Claim | null =>
-  front.beat === undefined || front.taken_for === undefined || front.account === undefined || front.taken_at === undefined
-    ? null
-    : { beat: front.beat, machine: front.taken_for, account: front.account, takenAt: front.taken_at }
-
-const startedOf = (front: Frontmatter): Started | null =>
-  front.started_at === undefined ? null : { at: front.started_at, log: front.start_log ?? "" }
 
 const closingOf = (front: Frontmatter, started: Started | null): Closing | null => {
   const reason = front.reason ?? ""
