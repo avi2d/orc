@@ -89,6 +89,38 @@ describe("orc show", () => {
     })
   })
 
+  test("scout and task runs link agent-report.md rather than the ship report", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        for (const kind of ["scout", "task"]) {
+          await Effect.runPromise(recordRun(db, {
+            id: kind,
+            project: "orc",
+            branch: "orc/demo",
+            taskFile: "/tmp/show-home/runs/" + kind + "/task.md",
+            kind,
+            status: "succeeded",
+            started: "2026-10-18T10:00:00.000Z"
+          }))
+        }
+      } finally {
+        db.close()
+      }
+      for (const kind of ["scout", "task"]) {
+        const report = "/tmp/show-home/runs/" + kind + "/agent-report.md"
+        const result = await runOrc(["show", kind], home)
+        expect(result.exitCode).toBe(0)
+        expect(result.stdout).toContain("report: file://" + report)
+        const json = await runOrc(["show", kind, "--json"], home)
+        expect(json.exitCode).toBe(0)
+        const decoded = await Effect.runPromise(decodeShowJson(JSON.parse(json.stdout)))
+        expect(decoded.run.report).toBe(report)
+        expect(decoded.run.reportUrl).toBe("file://" + report)
+      }
+    })
+  })
+
   test("show --json prints the version first and reads back through the schema", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)
