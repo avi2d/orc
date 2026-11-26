@@ -319,6 +319,9 @@ const actionLine = (action: BeatAction): string => {
     case "pr-checks": {
       return "PR checks for " + action.task + ": " + action.reason
     }
+    case "rebase-queued": {
+      return "queued a rebase for " + action.task + " " + action.pr
+    }
     case "yolo-merged": {
       return "merged " + action.task + " " + action.pr + " on yolo-green"
     }
