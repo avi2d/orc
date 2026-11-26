@@ -187,7 +187,7 @@ test("pressing Status while Project is open switches lists instead of closing bo
   const agents = new OrcAgents()
   agents.menu = "project"
   press(agents, "filter-status")
-  expect(agents.menu).toBe("status")
+  expect(agents.menu).toEqual("status")
 })
 
 const cmd4 = { name: "layout.select", args: { stack: "orc-views", child: "orc-inbox" } }
