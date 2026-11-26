@@ -3,7 +3,7 @@ kind: reference
 ---
 # Running without a sandbox
 Queued tasks always pass `--sandbox none`, so [Pi](https://pi.dev) and the checks run directly on the host without a per-agent sandbox.
-A hand-typed `orc run task.md` uses the [nono](https://nono.sh) sandbox by default unless you pass `--sandbox none`.
+A run you start by hand with `orc run task.md` uses the [nono](https://nono.sh) sandbox by default unless you pass `--sandbox none`.
 
 The safety boundary is the isolated space that runs the whole agent system.
 Use a separate Linux system without admin rights or host drives, with narrow, revocable logins and a memory and CPU cap per task.

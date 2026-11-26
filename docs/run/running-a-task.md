@@ -10,7 +10,7 @@ A ship run creates an isolated worktree, asks [Pi](https://pi.dev) to make the c
 
 Install `git`, `pi`, `node`, and [`no-mistakes`](https://github.com/kunchenguid/no-mistakes) on the host `PATH`.
 A `direct-PR` or `orc` run does not need `no-mistakes`.
-Install [`nono`](https://nono.sh) for a hand-typed run unless you pass `--sandbox none`.
+Install [`nono`](https://nono.sh) for a run you start by hand unless you pass `--sandbox none`.
 For no-mistakes delivery, use version 1.90.0 or later.
 
 Configure the provider and models as [Configuring providers](configuring-providers.md) describes.
@@ -64,7 +64,7 @@ See [Delivery modes](delivery-modes.md) and [Task kinds](task-kinds.md).
 
 Orc creates `orc/<run-id>` unless you give `--branch <name>`.
 The name must pass `git check-ref-format --branch`.
-A hand-typed `orc run` uses the nono sandbox by default unless you pass `--sandbox none`.
+A run you start by hand with `orc run` uses the nono sandbox by default unless you pass `--sandbox none`.
 Queued tasks always pass `--sandbox none`, so Pi and the checks run on the host without a per-agent sandbox.
 Their safety boundary is the isolated space around the whole agent system, as [Running without a sandbox](running-without-a-sandbox.md) describes.
 
