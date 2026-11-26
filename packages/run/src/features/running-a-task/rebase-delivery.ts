@@ -31,3 +31,10 @@ export const rebaseDelivery = Effect.fnUntraced(function*(run: HistoryRun, opene
     return yield* new OrcRunError({ message: "orc: cannot rebase " + run.branch + " onto " + base + ": " + rebased.stderr.trim() })
   }
 })
+
+export const pushRebase = Effect.fnUntraced(function*(run: HistoryRun, head: string) {
+  const pushed = yield* runGit(run.spawner, run.git, ["push", "--force-with-lease=refs/heads/" + run.branch + ":" + head, "origin", run.branch], run.worktreeDir)
+  if (pushed.exitCode !== 0) {
+    return yield* new OrcRunError({ message: "orc: cannot push rebased " + run.branch + ": " + pushed.stderr.trim() })
+  }
+})
