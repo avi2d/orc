@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import type { GateResponse, QuestionAnswer } from "../../packages/run/src/entities/review-gate/no-mistakes-gate"
+import { respondArgs, type GateResponse, type QuestionAnswer } from "../../packages/run/src/entities/review-gate/no-mistakes-gate"
 import { askUserWord, driveNoMistakes, type AllowWord, type NoMistakesFinding, type NoMistakesRecord, type NoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import type { WaitResult } from "../../packages/run/src/entities/review-gate/answer-wait"
 import { parked } from "../lib/no-mistakes-fixture"
@@ -187,6 +187,40 @@ describe("driveNoMistakes", () => {
     const { record } = await driveIn(answering, [], [{ question: "r2", answer: "Keep the old behavior" }])
     expect(record.openQuestions).toEqual([])
     expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"], instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior" }])
+  })
+
+  test("a later warning-only gate with deferral approves follow-ups instead of parking", async () => {
+    const sent: Array<ReadonlyArray<string>> = []
+    const fixReview = parked.replace("awaiting_approval", "fix_review").replace("r2,error", "r2,info") + "\n  defer_non_errors: true"
+    const runner: NoMistakesRunner = {
+      ...endedSkippingPr,
+      start: () => Effect.succeed({ stdout: fixReview, stderr: "", exitCode: 0 }),
+      respond: (response) => {
+        sent.push(respondArgs(response))
+        return Effect.succeed({ stdout: ["recorded:", "  follow_ups[2]: r1,r2", skippedPr].join("\n"), stderr: "", exitCode: 0 })
+      }
+    }
+    const { record } = await driveIn(runner)
+    expect(sent).toEqual([["axi", "respond", "--action", "approve", "--follow-ups", "r1,r2"]])
+    expect(record.openQuestions).toEqual([])
+    expect(record.deferredFindingIds).toEqual(["r1", "r2"])
+    expect(record.result).toContain("Findings deferred to PR follow-ups: r1, r2")
+  })
+
+  test("a later warning-only gate without the deferral field still parks", async () => {
+    const fixReview = parked.replace("awaiting_approval", "fix_review").replace("r2,error", "r2,info")
+    const runner: NoMistakesRunner = { ...endedFailed, start: () => Effect.succeed({ stdout: fixReview, stderr: "", exitCode: 0 }) }
+    const { record } = await driveIn(runner)
+    expect(record.openQuestions.map((question) => question.id)).toEqual(["r2"])
+    expect(record.deferredFindingIds).toEqual([])
+  })
+
+  test("a later gate with deferral and an error still parks rather than approving follow-ups", async () => {
+    const fixReview = parked.replace("awaiting_approval", "fix_review") + "\n  defer_non_errors: true"
+    const runner: NoMistakesRunner = { ...endedFailed, start: () => Effect.succeed({ stdout: fixReview, stderr: "", exitCode: 0 }) }
+    const { record } = await driveIn(runner)
+    expect(record.openQuestions.map((question) => question.id)).toEqual(["r2"])
+    expect(record.deferredFindingIds).toEqual([])
   })
 
   test("a fix converted to follow-ups does not report the captain's answer as applied", async () => {
