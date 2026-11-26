@@ -66,7 +66,7 @@ const click = (element: Node | null): void => {
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node }))
 void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Input: { new: () => node() }, Avatar: node, AvatarFallback: node, AvatarImage: node,
+  h_flex: node, v_flex: node, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
   InputState: { new: () => {
     let typed = ""
@@ -255,7 +255,6 @@ test("a PR with no recorded state remains actionable across the Inbox, Board and
   const parsed = guardJson(JSON.stringify(backlog), taskDetails)
   if (parsed.kind !== "ok") throw new Error(parsed.reason)
   const detail = parsed.value[0]
-  if (detail === undefined) throw new Error("Missing task")
   expect(inbox.value.items.find((item) => item.task === closed.id)).toMatchObject({ kind: "pr", link: closed.pr, action: { kind: "merge" } })
   board.reading = reading
   expect(idsIn(find(board.render(), "cards-Awaiting you"))).toEqual(["card-garden-3"])
