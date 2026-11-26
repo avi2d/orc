@@ -72,7 +72,7 @@ const runHold = (
       const real = yield* ChildProcessSpawner.ChildProcessSpawner
       return ChildProcessSpawner.make((spawned) =>
         Effect.gen(function*() {
-          seen.push(ChildProcess.isStandardCommand(spawned) ? [...spawned.args] : [])
+          seen.push(ChildProcess.isStandardCommand(spawned) ? spawned.args.filter((word): word is string => typeof word === "string") : [])
           if (seen.length === 1) {
             yield* TestClock.adjust(Duration.seconds(61))
             yield* first(valueOf(seen[0] ?? [], attemptPrefix)).pipe(Effect.orDie)

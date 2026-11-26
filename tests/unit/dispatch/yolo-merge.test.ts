@@ -69,7 +69,7 @@ const ghLayer = (current: PullRequestView, files: string | null, merges: Array<s
       if (!ChildProcess.isStandardCommand(command) || command.command !== "gh") {
         return real.spawn(command)
       }
-      const args = command.args
+      const args = command.args.filter((word): word is string => typeof word === "string")
       const text = "gh " + args.join(" ")
       if (args[0] === "pr" && args[1] === "view") {
         return reply(forgeView(current))

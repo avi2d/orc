@@ -49,7 +49,7 @@ const recordingPueue = (calls: Array<ReadonlyArray<string>>): Layer.Layer<ChildP
     const real = yield* ChildProcessSpawner.ChildProcessSpawner
     return ChildProcessSpawner.make((command) => {
       if (ChildProcess.isStandardCommand(command) && command.command === "pueue") {
-        calls.push(command.args)
+        calls.push(command.args.filter((word): word is string => typeof word === "string"))
         const verb = command.args[0] ?? ""
         return real.spawn(ChildProcess.make("sh", ["-c", verb === "group" ? "echo '{\"orc\":{}}'" : verb === "status" ? "echo '{\"tasks\":{}}'" : verb === "parallel" ? "true" : "echo 77"]))
       }

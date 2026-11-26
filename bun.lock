@@ -5,7 +5,7 @@
     "": {
       "name": "orc",
       "devDependencies": {
-        "@avi2dg/checks": "0.119.0",
+        "@avi2dg/checks": "0.119.1",
         "@avi2dg/orc-alerts": "workspace:*",
         "@avi2dg/orc-attention": "workspace:*",
         "@avi2dg/orc-cli": "workspace:*",
@@ -21,7 +21,7 @@
         "@avi2dg/orc-tasks": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
         "@dagrejs/dagre": "3.1.3",
-        "@effect/platform-bun": "4.0.0",
+        "@effect/platform-bun": "4.1.4",
         "@effect/tsgo": "0.45.0",
         "@hughescr/stryker-bun-runner": "1.4.0",
         "@opentui/core": "0.6.5",
@@ -30,7 +30,7 @@
         "@types/bun": "^1.3.0",
         "@vue-flow/core": "1.48.2",
         "dependency-cruiser": "18.4.0",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
         "fast-check": "4.11.0",
         "jscpd": "5.3.2",
         "oxlint": "1.83.0",
@@ -46,9 +46,9 @@
       "dependencies": {
         "@avi2dg/orc-schema": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
-        "@effect/platform-bun": "4.0.0",
+        "@effect/platform-bun": "4.1.4",
         "@opentui/core": "0.6.5",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/attention": {
@@ -57,7 +57,7 @@
       "dependencies": {
         "@avi2dg/orc-schema": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/cli": {
@@ -80,9 +80,9 @@
         "@avi2dg/orc-session-quota": "workspace:*",
         "@avi2dg/orc-tasks": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
-        "@effect/platform-bun": "4.0.0",
+        "@effect/platform-bun": "4.1.4",
         "@opentui/core": "0.6.5",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/dashboard": {
@@ -91,9 +91,9 @@
       "dependencies": {
         "@avi2dg/orc-schema": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
-        "@effect/platform-bun": "4.0.0",
+        "@effect/platform-bun": "4.1.4",
         "@opentui/core": "0.6.5",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/dispatch": {
@@ -102,16 +102,16 @@
       "dependencies": {
         "@avi2dg/orc-schema": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
-        "@effect/platform-bun": "4.0.0",
+        "@effect/platform-bun": "4.1.4",
         "@opentui/core": "0.6.5",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/herdr-app": {
       "name": "@avi2dg/orc-herdr-app",
       "version": "0.0.0",
       "devDependencies": {
-        "@avi2dg/checks": "0.119.0",
+        "@avi2dg/checks": "0.119.1",
       },
     },
     "packages/ledger": {
@@ -120,7 +120,7 @@
       "dependencies": {
         "@avi2dg/orc-schema": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/queues": {
@@ -129,9 +129,9 @@
       "dependencies": {
         "@avi2dg/orc-schema": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
-        "@effect/platform-bun": "4.0.0",
+        "@effect/platform-bun": "4.1.4",
         "@opentui/core": "0.6.5",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/quota": {
@@ -140,9 +140,9 @@
       "dependencies": {
         "@avi2dg/orc-schema": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
-        "@effect/platform-bun": "4.0.0",
+        "@effect/platform-bun": "4.1.4",
         "@opentui/core": "0.6.5",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/resources": {
@@ -151,9 +151,9 @@
       "dependencies": {
         "@avi2dg/orc-schema": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
-        "@effect/platform-bun": "4.0.0",
+        "@effect/platform-bun": "4.1.4",
         "@opentui/core": "0.6.5",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/run": {
@@ -163,12 +163,12 @@
         "orc": "src/bin.ts",
       },
       "dependencies": {
-        "@effect/platform-bun": "4.0.0",
-        "@effect/platform-node-shared": "4.0.0",
-        "effect": "4.0.0",
+        "@effect/platform-bun": "4.1.4",
+        "@effect/platform-node-shared": "4.1.4",
+        "effect": "4.1.4",
       },
       "devDependencies": {
-        "@avi2dg/checks": "0.119.0",
+        "@avi2dg/checks": "0.119.1",
       },
     },
     "packages/schedules": {
@@ -177,14 +177,14 @@
       "dependencies": {
         "@avi2dg/orc-schema": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/schema": {
       "name": "@avi2dg/orc-schema",
       "version": "0.1.0",
       "dependencies": {
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/session-quota": {
@@ -196,9 +196,9 @@
       "dependencies": {
         "@avi2dg/orc-schema": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
-        "@effect/platform-bun": "4.0.0",
+        "@effect/platform-bun": "4.1.4",
         "@opentui/core": "0.6.5",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/tasks": {
@@ -207,9 +207,9 @@
       "dependencies": {
         "@avi2dg/orc-schema": "workspace:*",
         "@avi2dg/orc-ui": "workspace:*",
-        "@effect/platform-bun": "4.0.0",
+        "@effect/platform-bun": "4.1.4",
         "@opentui/core": "0.6.5",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
     "packages/ui": {
@@ -217,7 +217,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@opentui/core": "0.6.5",
-        "effect": "4.0.0",
+        "effect": "4.1.4",
       },
     },
   },
@@ -225,7 +225,7 @@
     "@swc/core",
   ],
   "overrides": {
-    "@effect/platform-node-shared": "4.0.0",
+    "@effect/platform-node-shared": "4.1.4",
     "minimatch": "11.0.3",
     "qs": "6.16.1",
   },
@@ -266,11 +266,11 @@
 
     "@algolia/requester-node-http": ["@algolia/requester-node-http@5.64.0", "", { "dependencies": { "@algolia/client-common": "5.64.0" } }, "sha512-pUOulw3Np129Sc/PqAPVw9gyO5hpEM9AdlAdG/YNhO69plNS3RK3YLuTv9rBHQmxO8DMmEze6qTppKJ1ihEQoQ=="],
 
-    "@avi2dg/checks": ["@avi2dg/checks@0.119.0", "", { "dependencies": { "@commitlint/cli": "21.2.3", "@commitlint/config-conventional": "21.2.3", "@effect/platform-bun": "4.0.0", "@effect/platform-node-shared": "4.0.0", "@total-typescript/ts-reset": "0.6.1", "commonmark": "0.31.2", "knip": "6.38.0", "minimatch": "11.0.3" }, "optionalDependencies": { "@avi2dg/checks-darwin-arm64": "0.119.0", "@avi2dg/checks-linux-x64": "0.119.0" }, "peerDependencies": { "@axe-core/playwright": "4.13.0", "@effect/tsgo": "0.45.0", "@swc/core": "1.16.2", "dependency-cruiser": "18.4.0", "effect": "4.0.0", "html-validate": "11.16.0", "jscpd": "5.3.2", "oxlint": "1.83.0", "oxlint-tsgolint": "7.0.2002", "playwright-core": "1.63.0", "postcss-html": "2.0.0", "postcss-value-parser": "4.2.0", "stylelint": "17.16.0", "stylelint-config-standard": "40.0.0", "stylelint-plugin-use-baseline": "1.4.7", "typescript": "7.0.2" }, "optionalPeers": ["@axe-core/playwright", "html-validate", "playwright-core", "postcss-html", "postcss-value-parser", "stylelint", "stylelint-config-standard", "stylelint-plugin-use-baseline"], "bin": { "checks-ci": "dist/bin/delivery/ci/main.ts", "checks-copy": "dist/bin/docs/copy.ts", "checks-docs": "dist/bin/docs/docs.ts", "checks-lint": "dist/bin/core/lint.ts", "checks-test": "dist/bin/testing/test.ts", "checks-flake": "dist/bin/testing/flake.ts", "checks-setup": "dist/bin/delivery/setup.ts", "checks-vendor": "dist/bin/dependencies/vendor.ts", "checks-browser": "dist/bin/quality/browser/browser.ts", "checks-pr-text": "dist/bin/delivery/pr-text.ts", "checks-secrets": "dist/bin/delivery/secrets.ts", "checks-css-size": "dist/bin/quality/css-size.ts", "checks-mutation": "dist/bin/testing/mutation.ts", "checks-adr-index": "dist/bin/docs/adr-index.ts", "checks-changelog": "dist/bin/delivery/changelog-write.ts", "checks-ci-wiring": "dist/bin/delivery/ci-wiring.ts", "checks-docs-only": "dist/bin/delivery/docs-only.ts", "checks-graphwalk": "dist/bin/complexity/graphwalk.ts", "checks-workflows": "dist/bin/delivery/workflows.ts", "checks-advisories": "dist/bin/dependencies/advisories.ts", "checks-release-pr": "dist/bin/delivery/release-pr.ts", "checks-repetition": "dist/bin/complexity/repetition.ts", "checks-local-tests": "dist/bin/testing/local-tests-command.ts", "checks-no-plain-js": "dist/bin/quality/no-plain-js.ts", "checks-plain-steps": "dist/bin/delivery/plain-steps.ts", "checks-release-tag": "dist/bin/delivery/release-tag.ts", "checks-test-layout": "dist/bin/testing/test-layout.ts", "checks-comment-gate": "dist/bin/quality/comment-gate.ts", "checks-commit-title": "dist/bin/delivery/commit-title.ts", "checks-effect-scope": "dist/bin/quality/effect-scope.ts", "checks-lint-coverage": "src/quality/lint-coverage.sh", "checks-release-notes": "dist/bin/delivery/release-notes.ts", "checks-mutation-merge": "dist/bin/testing/mutation-merge.ts", "checks-mutation-scope": "dist/bin/testing/mutation-scope.ts", "checks-release-report": "dist/bin/delivery/release-report.ts", "checks-subsumed-tests": "dist/bin/testing/subsumed-tests.ts", "checks-whole-tree-run": "dist/bin/testing/whole-tree-run.ts", "checks-commit-identity": "dist/bin/delivery/commit-identity.ts", "checks-frontend-syntax": "dist/bin/quality/frontend-syntax.ts", "checks-production-gate": "dist/bin/delivery/production-gate.ts", "checks-release-publish": "dist/bin/delivery/release-publish.ts", "checks-mutation-compare": "dist/bin/testing/mutation-compare.ts", "checks-no-mistakes-test": "dist/bin/delivery/no-mistakes-test.ts", "checks-quarantine-clock": "dist/bin/testing/quarantine-clock.ts", "checks-mutation-baseline": "dist/bin/testing/mutation-baseline.ts", "checks-release-preflight": "dist/bin/delivery/release-preflight.ts", "checks-suppressions-ratchet": "dist/bin/complexity/suppressions-ratchet.ts" } }, "sha512-cKBduqHMs2+Y+rV70fP1VJZtWpGMS3G/IDSAZ+8MppazH0TtOmXXMcASn2zbUNxhwalyLCHgkngd+NQYNKZQHA=="],
+    "@avi2dg/checks": ["@avi2dg/checks@0.119.1", "", { "dependencies": { "@commitlint/cli": "21.2.3", "@commitlint/config-conventional": "21.2.3", "@effect/platform-bun": "4.1.4", "@effect/platform-node-shared": "4.1.4", "@total-typescript/ts-reset": "0.6.1", "commonmark": "0.31.2", "knip": "6.38.0", "minimatch": "11.0.3" }, "optionalDependencies": { "@avi2dg/checks-darwin-arm64": "0.119.1", "@avi2dg/checks-linux-x64": "0.119.1" }, "peerDependencies": { "@axe-core/playwright": "4.13.0", "@effect/tsgo": "0.45.0", "@swc/core": "1.16.2", "dependency-cruiser": "18.4.0", "effect": "4.1.4", "html-validate": "11.16.0", "jscpd": "5.3.2", "oxlint": "1.83.0", "oxlint-tsgolint": "7.0.2002", "playwright-core": "1.63.0", "postcss-html": "2.0.0", "postcss-value-parser": "4.2.0", "stylelint": "17.16.0", "stylelint-config-standard": "40.0.0", "stylelint-plugin-use-baseline": "1.4.7", "typescript": "7.0.2" }, "optionalPeers": ["@axe-core/playwright", "html-validate", "playwright-core", "postcss-html", "postcss-value-parser", "stylelint", "stylelint-config-standard", "stylelint-plugin-use-baseline"], "bin": { "checks-ci": "dist/bin/delivery/ci/main.ts", "checks-copy": "dist/bin/docs/copy.ts", "checks-docs": "dist/bin/docs/docs.ts", "checks-lint": "dist/bin/core/lint.ts", "checks-test": "dist/bin/testing/test.ts", "checks-flake": "dist/bin/testing/flake.ts", "checks-setup": "dist/bin/delivery/setup.ts", "checks-vendor": "dist/bin/dependencies/vendor.ts", "checks-browser": "dist/bin/quality/browser/browser.ts", "checks-pr-text": "dist/bin/delivery/pr-text.ts", "checks-secrets": "dist/bin/delivery/secrets.ts", "checks-css-size": "dist/bin/quality/css-size.ts", "checks-mutation": "dist/bin/testing/mutation.ts", "checks-adr-index": "dist/bin/docs/adr-index.ts", "checks-changelog": "dist/bin/delivery/changelog-write.ts", "checks-ci-wiring": "dist/bin/delivery/ci-wiring.ts", "checks-docs-only": "dist/bin/delivery/docs-only.ts", "checks-graphwalk": "dist/bin/complexity/graphwalk.ts", "checks-workflows": "dist/bin/delivery/workflows.ts", "checks-advisories": "dist/bin/dependencies/advisories.ts", "checks-release-pr": "dist/bin/delivery/release-pr.ts", "checks-repetition": "dist/bin/complexity/repetition.ts", "checks-local-tests": "dist/bin/testing/local-tests-command.ts", "checks-no-plain-js": "dist/bin/quality/no-plain-js.ts", "checks-plain-steps": "dist/bin/delivery/plain-steps.ts", "checks-release-tag": "dist/bin/delivery/release-tag.ts", "checks-test-layout": "dist/bin/testing/test-layout.ts", "checks-comment-gate": "dist/bin/quality/comment-gate.ts", "checks-commit-title": "dist/bin/delivery/commit-title.ts", "checks-effect-scope": "dist/bin/quality/effect-scope.ts", "checks-lint-coverage": "src/quality/lint-coverage.sh", "checks-release-notes": "dist/bin/delivery/release-notes.ts", "checks-mutation-merge": "dist/bin/testing/mutation-merge.ts", "checks-mutation-scope": "dist/bin/testing/mutation-scope.ts", "checks-release-report": "dist/bin/delivery/release-report.ts", "checks-subsumed-tests": "dist/bin/testing/subsumed-tests.ts", "checks-whole-tree-run": "dist/bin/testing/whole-tree-run.ts", "checks-commit-identity": "dist/bin/delivery/commit-identity.ts", "checks-frontend-syntax": "dist/bin/quality/frontend-syntax.ts", "checks-production-gate": "dist/bin/delivery/production-gate.ts", "checks-release-publish": "dist/bin/delivery/release-publish.ts", "checks-mutation-compare": "dist/bin/testing/mutation-compare.ts", "checks-no-mistakes-test": "dist/bin/delivery/no-mistakes-test.ts", "checks-quarantine-clock": "dist/bin/testing/quarantine-clock.ts", "checks-mutation-baseline": "dist/bin/testing/mutation-baseline.ts", "checks-release-preflight": "dist/bin/delivery/release-preflight.ts", "checks-suppressions-ratchet": "dist/bin/complexity/suppressions-ratchet.ts" } }, "sha512-Cjguoi5Vdt2hR2aPL72Gz5XY9aUKiOzPtTyOp8SBDOU1qCJIfV2vraAHYRb/ixjnGIa9/vgT3c5J5M+ej8SQxw=="],
 
-    "@avi2dg/checks-darwin-arm64": ["@avi2dg/checks-darwin-arm64@0.119.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-ZSIo4WouQpkrigWFcviF7S2jx/TVaNJS4xrIKDQ0JZE0wyJk8Kr+A2+ICXb45D4FX5mJeMFFza4J/kGNKRUjpw=="],
+    "@avi2dg/checks-darwin-arm64": ["@avi2dg/checks-darwin-arm64@0.119.1", "", { "os": "darwin", "cpu": "arm64" }, "sha512-26lWgm5HL6cLJsBLWh44Zwn19R9t5uMs2fAWvJX6Q4U2FzFUNJsC5Tr9vTm9vFs3QIDJhjdW6scgMrDaz6xIMQ=="],
 
-    "@avi2dg/checks-linux-x64": ["@avi2dg/checks-linux-x64@0.119.0", "", { "os": "linux", "cpu": "x64" }, "sha512-6zrbINpYfDlYZfKdzird3/z77/5dTHKPC7wAcNDCcp9zEghvJ2a4FghKf7zm4y2y5sE1F7VZsTdPvDBPaVhIQA=="],
+    "@avi2dg/checks-linux-x64": ["@avi2dg/checks-linux-x64@0.119.1", "", { "os": "linux", "cpu": "x64" }, "sha512-7g9eT006Qr/IiZSkAXJDZk7jS4lw30oSG2cTHcfXhhvBj0X/wfctqFmjzIUKgSHGKjFW2UWBvnenWcBT7GJOtw=="],
 
     "@avi2dg/orc": ["@avi2dg/orc@workspace:packages/run"],
 
@@ -426,9 +426,9 @@
 
     "@docsearch/react": ["@docsearch/react@3.8.2", "", { "dependencies": { "@algolia/autocomplete-core": "1.17.7", "@algolia/autocomplete-preset-algolia": "1.17.7", "@docsearch/css": "3.8.2", "algoliasearch": "^5.14.2" }, "peerDependencies": { "@types/react": ">= 16.8.0 < 19.0.0", "react": ">= 16.8.0 < 19.0.0", "react-dom": ">= 16.8.0 < 19.0.0", "search-insights": ">= 1 < 3" }, "optionalPeers": ["@types/react", "react", "react-dom", "search-insights"] }, "sha512-xCRrJQlTt8N9GU0DG4ptwHRkfnSnD/YpdeaXe02iKfqs97TkZJv60yE+1eq/tjPcVnTW8dP5qLP7itifFVV5eg=="],
 
-    "@effect/platform-bun": ["@effect/platform-bun@4.0.0", "", { "dependencies": { "@effect/platform-node-shared": "^4.0.0" }, "peerDependencies": { "effect": "^4.0.0" } }, "sha512-g9O41Sub/+JKfLjvBNEoqR1Pg6wtc2bbYzv7Kw8YsMihbt/ypCn7ZoydEXaHvTTUvbVrXOQbVFlfplyo84Clug=="],
+    "@effect/platform-bun": ["@effect/platform-bun@4.1.4", "", { "dependencies": { "@effect/platform-node-shared": "4.1.4" }, "peerDependencies": { "effect": "^4.1.4" } }, "sha512-Vdq82GOrD5HVF43aXVwHeX+4uIOrgAnjju9MEyizzFZ3yt3A6x9prtmHej1q/zAOaeNddtkpPr2ExHEvZ13S6Q=="],
 
-    "@effect/platform-node-shared": ["@effect/platform-node-shared@4.0.0", "", { "dependencies": { "@types/ws": "^8.18.1", "ws": "^8.22.0" }, "peerDependencies": { "effect": "^4.0.0" } }, "sha512-VBXHJU9UXVZPdQGGDRjGXpo+TpOzRwZuMrdKAtIxi1qwcRftmacZ1zTgIrzBa0Z2RA2KVkoOecQUsTlt/nJZhw=="],
+    "@effect/platform-node-shared": ["@effect/platform-node-shared@4.1.4", "", { "dependencies": { "@types/ws": "^8.18.2", "ws": "^8.22.1" }, "peerDependencies": { "effect": "^4.1.4" } }, "sha512-DWdfphHGOFJNj/mYadgpT3jIm8aRXDcPrQiGXFBH4p2H4XmA7iYMrPsI8NxVgZ7kNX0q1+FGJZJama0tINHRAg=="],
 
     "@effect/tsgo": ["@effect/tsgo@0.45.0", "", { "optionalDependencies": { "@effect/tsgo-darwin-arm64": "0.45.0", "@effect/tsgo-darwin-x64": "0.45.0", "@effect/tsgo-linux-arm": "0.45.0", "@effect/tsgo-linux-arm64": "0.45.0", "@effect/tsgo-linux-x64": "0.45.0", "@effect/tsgo-win32-arm64": "0.45.0", "@effect/tsgo-win32-x64": "0.45.0" }, "bin": { "effect-tsgo": "dist/effect-tsgo.cjs" } }, "sha512-gPG0ixVHgtYBUe5DbKX9vzHlhqd9+ZEfs4m/XWy0808av0A2XqMzaG3F5rnPBN7EUJRPlo9TluIi8WHx/pBV+A=="],
 
@@ -1036,7 +1036,7 @@
 
     "dunder-proto": ["dunder-proto@1.0.1", "", { "dependencies": { "call-bind-apply-helpers": "^1.0.1", "es-errors": "^1.3.0", "gopd": "^1.2.0" } }, "sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A=="],
 
-    "effect": ["effect@4.0.0", "", {}, "sha512-ooc1TG5t+FfzgYnFz2ff6BBKyZ7EwBRVXC7c4RhQUAD6/TZ2gTXXMeb4WX7a19ozQo4J73/QW+S00YAIresoMQ=="],
+    "effect": ["effect@4.1.4", "", {}, "sha512-Tgrv/9FN+TZYyOn8XSli+fVqAfwDrDAkiX5Uu9vztINb675VTQdhD0gWI5Kzvhlh9QqzjZvw72iugqw5pwoghQ=="],
 
     "electron-to-chromium": ["electron-to-chromium@1.5.483", "", {}, "sha512-zkGOvf625oaZgK+mhTF4hl3aTAfIOOnR7Jey0e7fUktdJWrB/wsLnzPKvWaqZkMCJ1yzUkAh6IqDJ9GMr3pR2Q=="],
 
@@ -1480,7 +1480,7 @@
 
     "@commitlint/resolve-extends/global-directory": ["global-directory@5.0.0", "", { "dependencies": { "ini": "6.0.0" } }, "sha512-1pgFdhK3J2LeM+dVf2Pd424yHx2ou338lC0ErNP2hPx4j8eW1Sp0XqSjNxtk6Tc4Kr5wlWtSvz8cn2yb7/SG/w=="],
 
-    "@effect/platform-node-shared/ws": ["ws@8.22.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg=="],
+    "@effect/platform-node-shared/ws": ["ws@8.23.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-wCkmX8QMOrKjgO8HW2WyDbTSGeqkocxgDzS9iR79rEAexty6/2qzilx3Ag8Tqf9ykop3irLKle0MtVn5qjVnoQ=="],
 
     "@stryker-mutator/core/@stryker-mutator/api": ["@stryker-mutator/api@10.0.0", "", { "dependencies": { "mutation-testing-metrics": "3.8.4", "mutation-testing-report-schema": "3.8.4", "tslib": "~2.8.0", "typed-inject": "~5.0.0" } }, "sha512-ZtAJ0ZT3MVRCWJTBE2h90XB/6E+4lifHYtcTyNG6nU2nLekPgTo4gD5esjX6Okxo1b/JB4jJzyxYB54fwKAoJw=="],
 
