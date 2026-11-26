@@ -51,19 +51,24 @@ const press = (view: { render(cx: Context): object }, target: string): void => {
   if (under === undefined) throw new Error(`No element ${target}`)
   for (const path of rendered) {
     const made = path.at(-1)
-    if (made === undefined || under.includes(made)) continue
-    for (const call of made.calls) {
-      const handler = call.args[0]
-      if (call.name === "on_mouse_down_out" && typeof handler === "function") handler({}, cx)
-    }
+    if (made !== undefined && !under.includes(made)) mouseDownOut(made)
   }
-  for (const made of [...under].reverse()) {
-    for (const call of made.calls) {
-      const handler = call.args[1]
-      if (call.name === "on_mouse_down" && call.args[0] === "left" && typeof handler === "function") handler({}, cx)
-    }
-  }
+  for (const made of [...under].reverse()) mouseDown(made)
   click(find(view.render(cx), target))
+}
+
+const mouseDownOut = (made: Node): void => {
+  for (const call of made.calls) {
+    const handler = call.args[0]
+    if (call.name === "on_mouse_down_out" && typeof handler === "function") handler({}, cx)
+  }
+}
+
+const mouseDown = (made: Node): void => {
+  for (const call of made.calls) {
+    const handler = call.args[1]
+    if (call.name === "on_mouse_down" && call.args[0] === "left" && typeof handler === "function") handler({}, cx)
+  }
 }
 
 const documents = new Map<string, unknown>()
