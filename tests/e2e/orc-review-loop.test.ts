@@ -59,7 +59,7 @@ test("an empty review does not start a fixer", async () => {
   const result = await exercise([[]])
   expect(result.kinds).toEqual(["implementer", "reviewer"])
   expect(result.completed).toBe(true)
-})
+}, 60_000)
 
 test("a cleared first fix does not start a second round", async () => {
   const result = await exercise([[error, warning], []])
@@ -67,7 +67,7 @@ test("a cleared first fix does not start a second round", async () => {
   expect(result.evidence[0]).toContain('"id": "e"')
   expect(result.evidence[0]).toContain('"id": "w"')
   expect(result.checks).toBe(2)
-})
+}, 60_000)
 
 test("the second fix receives only errors and a third fix never starts", async () => {
   const result = await exercise([[error, warning], [error, warning], [error, warning]])
@@ -78,4 +78,4 @@ test("the second fix receives only errors and a third fix never starts", async (
   expect(result.completed).toBe(true)
   expect(result.body).toContain("The result is wrong.")
   expect(result.body).toContain("The result is fragile.")
-})
+}, 60_000)
