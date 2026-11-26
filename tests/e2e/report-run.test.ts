@@ -222,7 +222,7 @@ describe("the ship run report", () => {
   test("lists the owner decision and the agent decision a task carries under their own Decided by headings, the agent one with its basis, instead of one mixed list", async () => {
     await withReportFixture(true, async ({ repo, orcHome, env }) => {
       const taskFile = await decidedTaskFile(orcHome, repo)
-      await runOrc(["run", taskFile, "--branch", "orc/task-1", "--sandbox", "none"], repo, env)
+      await runOrc(["run", taskFile, "--branch", "orc/task-1", "--sandbox", "none", "--delivery", "direct-PR"], repo, env)
       const runIds = await readdir(join(orcHome, "runs"))
       expect(runIds).toHaveLength(1)
       const report = await readFile(join(orcHome, "runs", runIds[0] ?? "", "report.md"), "utf8")
