@@ -149,7 +149,31 @@ describe("the Pi agent folder after a run ends", () => {
     })
   })
 
-  test("a parked run keeps session/agent instead of dropping it, and the next run resumes its session", async () => {
+  test("opening a PR ends the run and removes its agent folder", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const run = await preparedRun(home, "run-pr", "2026-11-24T09:00:00.000Z")
+        await writeFile(join(run.projectDir, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
+        const session = await writeSession(run, "pr-1")
+        await writeFile(session, JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "ORC_COMPLETE" }] } }) + "\n")
+        const ok = Effect.succeed({ stdout: "", stderr: "", exitCode: 0 })
+        const opener = { fetch: ok, push: ok, existing: ok, create: () => Effect.succeed({ stdout: "https://example.com/project/pull/1", stderr: "", exitCode: 0 }) }
+        const report = await Effect.runPromise(runWithHistory(db, { ...run, delivery: { kind: "direct-PR", opener, reviewer: agentFile("implementer") } }, fakeOps({
+          runAgent: async () => ({ sessionId: "pr-1", commits: [{ sha: "abc1234" }] }),
+          execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
+        }, run.hostSessionsDir)))
+        expect(report.completed).toBe(true)
+        expect(report.prLink).toBe("https://example.com/project/pull/1")
+        expect(await exists(join(run.piSessionDir, "agent"))).toBe(false)
+        expect(await exists(session)).toBe(true)
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a resumed parked run removes its retained agent folder without removing the active run folder", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)
       try {
@@ -170,11 +194,13 @@ describe("the Pi agent folder after a run ends", () => {
         await Effect.runPromise(runWithHistory(db, next, fakeOps({
           runAgent: async ({ resumeSession }) => {
             resumed.push(resumeSession)
+            expect(await exists(join(next.piSessionDir, "agent", "models.json"))).toBe(true)
             return { commits: [] }
           },
           execCheck: async () => { throw new Error("checks must not run for an unverified implement") }
         }, next.hostSessionsDir)))
         expect(resumed).toEqual([join(next.hostSessionsDir, "2026-11-24T09-00-00-000Z_parked-1.jsonl")])
+        expect(await exists(join(parked.piSessionDir, "agent"))).toBe(false)
       } finally {
         db.close()
       }
