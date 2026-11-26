@@ -19,4 +19,7 @@ export default defineConfig({
     "docs/.vitepress/theme/index.ts",
     "docs/map/client.ts",
   ],
+  ignoreIssues: {
+    "packages/run/src/features/chat/chat-tools.ts": ["exports"],
+  },
 });

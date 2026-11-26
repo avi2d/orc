@@ -11,7 +11,7 @@ const withFixture = async (killFirst: boolean, use: (root: string) => Promise<vo
   const root = await mkdtemp(join(scratch, "e2e-bundle-"))
   try {
     await mkdir(join(root, "tests/e2e"), { recursive: true })
-    await copyFile(new URL("../e2e/bundle.ts", import.meta.url), join(root, "tests/e2e/bundle.ts"))
+    await copyFile(new URL("./bundle.ts", import.meta.url), join(root, "tests/e2e/bundle.ts"))
     await writeFile(join(root, "package.json"), JSON.stringify({ scripts: { bundle: "bun fixture-build.ts" } }))
     await writeFile(join(root, "entry.ts"), [
       'import { bundlePath, ensureBundle } from "./tests/e2e/bundle.ts"',
@@ -69,17 +69,6 @@ describe("ensureBundle", () => {
       expect((await readdir(join(root, "packages/run/dist"))).sort()).toEqual([...artifacts].sort())
     })
   }, 15_000)
-
-  test("returns existing artifacts instead of waiting for a live lock or rebuilding", async () => {
-    await withFixture(false, async (root) => {
-      const dist = join(root, "packages/run/dist")
-      await mkdir(join(dist, ".e2e-bundle-lock", String(process.pid)), { recursive: true })
-      for (const file of artifacts) await writeFile(join(dist, file), "fixture")
-      await expectBundle(root)
-      expect(await readFile(join(root, "builds"), "utf8").catch(() => "not built")).toBe("not built")
-      expect(await readdir(join(dist, ".e2e-bundle-lock"))).toEqual([String(process.pid)])
-    })
-  }, 10_000)
 
   test("releases a failed build's lock instead of blocking a successful retry", async () => {
     await withFixture(false, async (root) => {

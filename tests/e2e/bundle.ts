@@ -31,11 +31,11 @@ const removeAbandonedLock = (): void => {
     if (hasCode(error, "ENOENT")) return
     throw error
   }
-  const owner = owners[0]
-  if (owner === undefined) {
+  if (owners.length === 0) {
     releaseLock(undefined)
     return
   }
+  const owner = owners[0]
   const pid = Number(owner)
   if (owners.length !== 1 || !Number.isSafeInteger(pid) || pid <= 0) {
     throw new Error("invalid e2e bundle lock owner")
@@ -49,7 +49,6 @@ const removeAbandonedLock = (): void => {
 }
 
 export const ensureBundle = (): void => {
-  if (bundleExists()) return
   mkdirSync(dist, { recursive: true })
   const pending = mkdtempSync(join(dist, ".e2e-bundle-"))
   const owner = String(process.pid)
@@ -57,7 +56,6 @@ export const ensureBundle = (): void => {
     mkdirSync(join(pending, owner))
     const deadline = Date.now() + 120_000
     while (true) {
-      if (bundleExists()) return
       try {
         renameSync(pending, lock)
         break
