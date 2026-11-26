@@ -65,6 +65,7 @@ export default defineConfig({
   reach: {
     "packages/run/{agents,src}/**": bundleTests,
     "packages/run/scripts/bundle.ts": bundleTests,
+    "tests/e2e/bundle.ts": ["tests/unit/e2e-bundle.test.ts"],
   },
   releaseAssets: true,
 });
