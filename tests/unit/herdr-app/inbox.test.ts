@@ -84,7 +84,7 @@ test("a bare hold asks you once its ship child's PR merges instead of waiting on
 })
 
 test("a bare hold on a dropped child asks you instead of waiting on a task no beat reopens", () => {
-  const dropped: TaskDetail = { ...unmergedChild, state: { ...task.state, outcome: "dropped" } }
+  const dropped: TaskDetail = { ...unmergedChild, state: { status: "closed", account: null, started: null, outcome: "dropped", pr: null, report: null, closedAt: "2026-11-13T12:00:00.000Z" } }
   expect(holdsOnTasks([parent, dropped])).toEqual(new Map())
 })
 
