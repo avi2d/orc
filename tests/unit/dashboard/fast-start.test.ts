@@ -104,7 +104,8 @@ describe("the live dashboard's panes while their first read is in flight", () =>
         const first = await setup.frameWhere((text) => text.trim() !== "");
         expect(performance.now() - started).toBeLessThan(flowLimitMillis);
         for (const line of readingLines) expect(first).toContain(line);
-        await Promise.all([setup.nextFrame(), Effect.runPromise(clock.adjust("3 seconds"))]);
+        await Effect.runPromise(clock.adjust("3 seconds"));
+        await Promise.all([setup.nextFrame(), Effect.runPromise(clock.adjust("250 millis"))]);
         const later = await setup.frameWhere(() => true);
         for (const line of readingLines) expect(later).toContain(line);
       }, clock)), 15_000);
