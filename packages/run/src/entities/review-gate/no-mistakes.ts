@@ -24,6 +24,7 @@ import {
 } from "./no-mistakes-gate"
 import { appendGate, openDriveLog, type DriveLog, type Ending, type NoMistakesRecord } from "./no-mistakes-drive-log"
 import { settleFixResponse, type NoMistakesReply } from "./no-mistakes-response"
+import { approveFollowUps, canDeferFindings } from "./deferred-approval"
 import { hasTable, scalar } from "../../shared/lib/index"
 export { answerArgsFor, answerForGate, askUserWord, omittedQuestionIds, parseRun } from "./no-mistakes-gate"
 export type { AllowWord, NoMistakesFinding, QuestionAnswer } from "./no-mistakes-gate"
@@ -258,6 +259,9 @@ const advanceParked = (
       }
       supplied.delete(gateCapQuestionId)
       log.liftCap()
+    }
+    if (canDeferFindings(gate, parsed, stdout)) {
+      return yield* approveFollowUps(input, log, supplied, parsed, gate)
     }
     const open = openQuestionsIn(parsed.findings, omittedQuestionIds(stdout))
     const questions = [...open, ...askUserFindings(parsed.findings, input.allow ?? [])].map((finding): PendingFinding =>
