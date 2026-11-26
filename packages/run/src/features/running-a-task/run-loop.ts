@@ -1,6 +1,5 @@
 import { Console, Effect, FileSystem, Result } from "effect"
-import { beatReadsChecks, buildFixPrompt, localChecksOf, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
-import { distinctRefusals } from "../../entities/run-history/index"
+import { beatReadsChecks, buildFixPrompt, localChecksOf, maxFixAttempts, readChecksCommands, runChecksRound, summarizeChecksRound, type ChecksCommand } from "./checks"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { buildImplementPrompt, finalReplyError, finalReplyText, orcCompletionLine, orcSplitLine, sessionPrintedSignal, sumPiUsage, textAfterSignal, type PiTokenUse } from "../../entities/agent/index"
 import { readPlanDocument, splitReasonPrefix } from "../../entities/backlog/index"
@@ -196,7 +195,7 @@ const implement = (
     }
   })
 
-export const fixOnce = (
+const fixOnce = (
   run: HistoryRun,
   runAgent: SandboxOps["runAgent"],
   evidenceFile: string,
@@ -235,7 +234,7 @@ export const fixOnce = (
     }
   })
 
-export const readProjectChecks = (run: HistoryRun, round: number): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
+const readProjectChecks = (run: HistoryRun, round: number): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
   Effect.gen(function*() {
     const text = yield* run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the checks config .no-mistakes.yaml: " + readFailure(cause) }))
@@ -290,22 +289,12 @@ const runChecksFixLoop = (
       const outcome = yield* runChecksRound(ops.execCheck, run.fs, run.path, run.piSessionDir, round, commands).pipe(
         Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
       )
-      const ended = new Date().toISOString()
-      const failed = outcome.outcomes.filter((check) => !check.passed).map((check) => check.name)
-      const summary: ChecksRoundSummary = {
-        round,
-        file: outcome.file,
-        started,
-        ended,
-        passed: outcome.outcomes.length > 0 && failed.length === 0,
-        failed,
-        checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed })),
-        refusals: distinctRefusals(outcome.outcomes.flatMap((check) => check.refusals))
-      }
+      const summary = summarizeChecksRound(outcome, started, new Date().toISOString())
+      const failed = summary.failed
       rounds.push(summary)
       yield* checkpoints.checksRoundDone(summary)
       if (failed.length === 0) {
-        return yield* finishChecked({ run, ops, base, rounds, fixes, commits, plan, checkpoints, fixOnce, readProjectChecks })
+        return yield* finishChecked({ run, ops, base, rounds, fixes, commits, plan, checkpoints, fixReview: (evidence, attempt) => fixOnce(run, ops.runAgent, evidence, attempt, null, checkpoints, null, true), readChecks: (number) => readProjectChecks(run, number) })
       }
       if (fixes.length >= maxFixAttempts) {
         return {

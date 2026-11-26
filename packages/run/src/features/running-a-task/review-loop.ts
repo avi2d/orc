@@ -1,11 +1,9 @@
 import { Effect } from "effect"
-import { distinctRefusals } from "../../entities/run-history/index"
 import { OrcRunError } from "../../shared/lib/index"
-import { runChecksRound } from "./checks"
+import { runChecksRound, summarizeChecksRound, type ChecksCommand } from "./checks"
 import { finishAfterChecks, reviewOrc } from "./run-finish"
 import { runReviewTurn } from "./review-turn"
 import type { ReviewFinding, ReviewOutcome } from "./review-outcome"
-import type { fixOnce as fixReviewOnce, readProjectChecks as readReviewChecks } from "./run-loop"
 import type { RunStopped } from "./loop-pause"
 import type { ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
@@ -19,8 +17,8 @@ interface ReviewLoop {
   readonly commits: Array<OrcRunCommit>
   readonly plan: ResumePlan
   readonly checkpoints: RunCheckpoints
-  readonly fixOnce: typeof fixReviewOnce
-  readonly readProjectChecks: typeof readReviewChecks
+  readonly fixReview: (evidence: string, attempt: number) => Effect.Effect<{ readonly fix: RecordedFixAttempt; readonly commits: ReadonlyArray<OrcRunCommit>; readonly paused: string | null }, OrcRunError | RunStopped>
+  readonly readChecks: (round: number) => Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError>
 }
 
 const findingsForRound = (findings: ReadonlyArray<ReviewFinding>, round: number): ReadonlyArray<ReviewFinding> =>
@@ -40,17 +38,12 @@ const checkAfterFix = (loop: ReviewLoop): Effect.Effect<string | null, OrcRunErr
     const round = rounds.length + 1
     const started = new Date().toISOString()
     yield* checkpoints.checksRoundStart(round, started)
-    const commands = yield* loop.readProjectChecks(run, round)
+    const commands = yield* loop.readChecks(round)
     const outcome = yield* runChecksRound(ops.execCheck, run.fs, run.path, run.piSessionDir, round, commands).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
     )
-    const failed = outcome.outcomes.filter((check) => !check.passed).map((check) => check.name)
-    const summary: ChecksRoundSummary = {
-      round, file: outcome.file, started, ended: new Date().toISOString(),
-      passed: outcome.outcomes.length > 0 && failed.length === 0, failed,
-      checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed })),
-      refusals: distinctRefusals(outcome.outcomes.flatMap((check) => check.refusals))
-    }
+    const summary = summarizeChecksRound(outcome, started, new Date().toISOString())
+    const failed = summary.failed
     rounds.push(summary)
     yield* checkpoints.checksRoundDone(summary)
     return failed.length === 0 ? null : "The " + failed.join(", ") + " check failed after the review fix. No PR opens."
@@ -58,14 +51,14 @@ const checkAfterFix = (loop: ReviewLoop): Effect.Effect<string | null, OrcRunErr
 
 const runOneRound = (loop: ReviewLoop, findings: ReadonlyArray<ReviewFinding>, round: number): Effect.Effect<string | null, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
-    const { run, ops, checkpoints, fixes, commits } = loop
+    const { run, checkpoints, fixes, commits } = loop
     const evidence = run.path.join(run.runDir, "review-fix-" + round.toString() + ".json")
     yield* run.fs.writeFileString(evidence, JSON.stringify(findings, null, 2) + "\n").pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write review findings: " + String(cause) }))
     )
     const attempt = fixes.length + 1
     yield* checkpoints.fixStart(attempt, new Date().toISOString())
-    const fixed = yield* loop.fixOnce(run, ops.runAgent, evidence, attempt, null, checkpoints, null, true)
+    const fixed = yield* loop.fixReview(evidence, attempt)
     fixes.push(fixed.fix)
     yield* checkpoints.fixDone(fixed.fix)
     commits.push(...fixed.commits)
