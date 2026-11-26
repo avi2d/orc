@@ -39,7 +39,7 @@
     "tasks-sample": "bun packages/cli/src/bin.ts sample tasks"
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.119.0",
+    "@avi2dg/checks": "0.119.1",
     "@avi2dg/orc-alerts": "workspace:*",
     "@avi2dg/orc-attention": "workspace:*",
     "@avi2dg/orc-cli": "workspace:*",
