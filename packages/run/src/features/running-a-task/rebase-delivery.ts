@@ -1,7 +1,7 @@
 import { Effect } from "effect"
 import { runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
-import type { HistoryRun } from "./run-record"
+import { failedReport, type HistoryRun } from "./run-record"
 import type { PullRequestOpener } from "../../entities/pull-request/index"
 
 export const rebaseDelivery = Effect.fnUntraced(function*(run: HistoryRun, opener: PullRequestOpener) {
@@ -32,9 +32,18 @@ export const rebaseDelivery = Effect.fnUntraced(function*(run: HistoryRun, opene
   }
 })
 
-export const pushRebase = Effect.fnUntraced(function*(run: HistoryRun, head: string) {
+const pushRebase = Effect.fnUntraced(function*(run: HistoryRun, head: string) {
   const pushed = yield* runGit(run.spawner, run.git, ["push", "--force-with-lease=refs/heads/" + run.branch + ":" + head, "origin", run.branch], run.worktreeDir)
   if (pushed.exitCode !== 0) {
     return yield* new OrcRunError({ message: "orc: cannot push rebased " + run.branch + ": " + pushed.stderr.trim() })
   }
+})
+
+export const runRebase = Effect.fnUntraced(function*(run: HistoryRun, rebase: NonNullable<HistoryRun["rebase"]>) {
+  if (run.delivery.kind !== "orc") {
+    return yield* new OrcRunError({ message: "orc: a rebase run needs orc delivery" })
+  }
+  yield* rebaseDelivery(run, run.delivery.opener)
+  yield* pushRebase(run, rebase.head)
+  return { ...failedReport(run, "Rebased and pushed the existing PR branch."), completed: true, prLink: rebase.pr }
 })

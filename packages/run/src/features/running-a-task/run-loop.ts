@@ -11,12 +11,12 @@ import { askedNote, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, w
 import { holdReleaseGuidance, holdReleaseWordsOf } from "../../entities/review-gate/index"
 import { freshFixOf, releaseGuidanceOf, resumedFix } from "./fix-guidance"
 import { finishAfterChecks } from "./run-finish"
-import { pushRebase, rebaseDelivery } from "./rebase-delivery"
+import { rebaseDelivery, runRebase } from "./rebase-delivery"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
 import type { AgentOutcome, AgentRun, AgentRunResult, AgentStep, ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
 import { recordOpenAsks } from "./history-write"
-import { failedReport, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
+import { type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 
 const collectCommits = (
   run: HistoryRun,
@@ -332,12 +332,7 @@ const runChecksFixLoop = (
 const runFullReport = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, tracked: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     if (run.rebase !== undefined) {
-      if (run.delivery.kind !== "orc") {
-        return yield* new OrcRunError({ message: "orc: a rebase run needs orc delivery" })
-      }
-      yield* rebaseDelivery(run, run.delivery.opener)
-      yield* pushRebase(run, run.rebase.head)
-      return { ...failedReport(run, "Rebased and pushed the existing PR branch."), completed: true, prLink: run.rebase.pr }
+      return yield* runRebase(run, run.rebase)
     }
     const plan = resume
     const parkedLoop = loopAnswerOf(plan.answers)
