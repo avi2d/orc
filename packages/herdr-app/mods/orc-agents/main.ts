@@ -355,7 +355,7 @@ export default class OrcAgents extends View {
       .child(runsColumn(t, {
         cards: this.cards, filter: this.filter, menu: this.menu, selectedKey: card?.key ?? null, agents: this.agents, folded: this.folded,
         attention: (listed) => cardAttention(listed).map((item) => this.answers.item(t, item, (asked) => act.askMerge(listed, asked))),
-        agentAttention: this.agentAttention.render(t, this.agent)
+        ...(this.agentAttention.shows(this.agent) ? { agentAttention: () => this.agentAttention.render(t, this.agent) } : {})
       }, act))
       .child(stepsColumn(t, card, {
         reading: card === null ? null : this.currentSteps(card),

@@ -4,12 +4,20 @@ import { openOverlay } from "herdr"
 import { AgentAttentionSection } from "../../src/agent-attention-view"
 import { runMerge } from "../../src/agents-merge"
 import { listenFor } from "../../src/ask-view"
-import type { InboxApproval } from "../../src/inbox"
+import type { InboxApproval, InboxItem } from "../../src/inbox"
 import { type InboxDocuments, readInbox } from "../../src/inbox-read"
 import { InboxAnswers } from "../../src/inbox-view"
 import type { Reading } from "../../src/orc-read"
 import { palette } from "../../src/palette"
+import { rowsList } from "../../src/rows-list"
 import { refreshWhenShown, reloadNow } from "../../src/views"
+
+type InboxRow =
+  | { readonly kind: "item"; readonly item: InboxItem }
+  | { readonly kind: "none-awaits" }
+  | { readonly kind: "agent-attention" }
+
+const rowKey = (row: InboxRow): string => row.kind === "item" ? `item-${row.item.key}` : row.kind
 
 export default class OrcInbox extends View {
   reading: Reading<InboxDocuments> = { kind: "reading" }
@@ -66,9 +74,20 @@ export default class OrcInbox extends View {
     if (this.reading.kind === "failed") return root.child(div().p(16).text_color(t.blocked).child(this.reading.reason))
     if (this.reading.kind === "reading") return root.child(div().p(16).text_color(t.muted).child("Reading the inbox"))
     const { items, agent } = this.reading.value
-    const body = v_flex().id("items").flex_1().min_h_0().overflow_y_scrollbar().p(16).gap(12)
-    return root.child(body
-      .children(items.length === 0 ? [div().text_color(t.muted).child("No task awaits you")] : items.map((item) => this.answers.item(t, item, (approval) => this.askMerge(approval))))
-      .children(this.agentAttention.render(t, agent)))
+    const rows: ReadonlyArray<InboxRow> = [
+      ...(items.length === 0 ? [{ kind: "none-awaits" } as const] : items.map((item) => ({ kind: "item", item } as const))),
+      ...(this.agentAttention.shows(agent) ? [{ kind: "agent-attention" } as const] : [])
+    ]
+    const row = (shown: InboxRow): Element => {
+      switch (shown.kind) {
+        case "none-awaits":
+          return div().text_color(t.muted).child("No task awaits you")
+        case "agent-attention":
+          return v_flex().children(this.agentAttention.render(t, agent))
+        case "item":
+          return this.answers.item(t, shown.item, (approval) => this.askMerge(approval))
+      }
+    }
+    return root.child(rowsList("items", rows, rowKey, row, { x: 16, y: 16, gap: 12 }))
   }
 }

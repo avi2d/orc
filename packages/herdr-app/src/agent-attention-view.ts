@@ -32,6 +32,10 @@ const decidedCards = (t: Palette, items: AgentAttention["decided"]): ReadonlyArr
 export class AgentAttentionSection {
   expanded = false
 
+  shows(agent: AgentAttention): boolean {
+    return agent.pending.length + agent.decided.length > 0
+  }
+
   render(t: Palette, agent: AgentAttention): ReadonlyArray<Element> {
     const count = agent.pending.length + agent.decided.length
     if (count === 0) return []
