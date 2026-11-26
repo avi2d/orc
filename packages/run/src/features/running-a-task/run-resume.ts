@@ -197,6 +197,19 @@ const carrySession = (run: HistoryRun, source: string | null, sessionId: string 
     return { id: sessionId, file: target }
   })
 
+const retainedSessionIsSafe = (run: HistoryRun, priorDir: string, source: string | null, target: string | null): Effect.Effect<boolean> =>
+  Effect.gen(function*() {
+    if (source === null || !source.startsWith(run.path.join(priorDir, "session", "agent") + run.path.sep)) {
+      return true
+    }
+    if (target === null) {
+      return false
+    }
+    const original = yield* run.fs.readFileString(source).pipe(Effect.orElseSucceed(() => null))
+    const copy = yield* run.fs.readFileString(target).pipe(Effect.orElseSucceed(() => null))
+    return original !== null && copy === pointSessionAt(original, run.worktreeDir)
+  })
+
 interface FixCarry {
   readonly sessionId: string | null
   readonly sessionFile: string | null
@@ -253,7 +266,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
   Effect.gen(function*() {
     const allow = run.allow ?? []
     const answers = run.answers ?? []
-    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, inheritedImplement: null, skipImplement: false, skipChecks: false, allow, answers, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null }
+    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, inheritedImplement: null, skipImplement: false, skipChecks: false, allow, answers, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null, cleanupPriorDir: null }
     const prior = yield* checkedPriorRun(db, run.projectDir, run.branch, run.resumeRun)
     if (prior === null || prior.id === run.runId) {
       return empty
@@ -282,6 +295,8 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     const inherited = skipImplement
       ? yield* inheritedCompletion(db, run, progress.priorId, fixCarry.storedFixes)
       : { inheritedRounds: [], inheritedFixes: [] }
+    const implementSafe = yield* retainedSessionIsSafe(run, priorDir, progress.implementSource, carriedImplement?.file ?? null)
+    const fixSafe = yield* retainedSessionIsSafe(run, priorDir, progress.fixSource, fixCarry.sessionFile)
     return {
       implementSessionId: carriedImplement?.id ?? null,
       implementSessionFile: carriedImplement?.file ?? null,
@@ -296,6 +311,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       fixSessionFile: fixCarry.sessionFile,
       fixRunning: fixCarry.running,
       handover,
-      priorDir
+      priorDir,
+      cleanupPriorDir: implementSafe && fixSafe ? priorDir : null
     }
   })
