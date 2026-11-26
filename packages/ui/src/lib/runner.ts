@@ -32,7 +32,7 @@ const signalGroup = (leader: number, signal: "SIGTERM" | "SIGKILL"): Effect.Effe
 const killGrace = Duration.seconds(1);
 
 // Each command runs detached in its own group, so a group still in this set outlives the process unless it is killed.
-const spawn = ({ argv, cwd, stdin }: Command, groups: Set<number>) =>
+const spawn = ({ argv, cwd, stdin }: Command, groups: Set<number>, grace: Duration.Duration) =>
   Effect.tryPromise({
     try: (signal) => {
       // sh forks the command rather than exec'ing it, so a signal to sh alone leaves the command running.
@@ -45,7 +45,7 @@ const spawn = ({ argv, cwd, stdin }: Command, groups: Set<number>) =>
       });
       groups.add(child.pid);
       const stop = signalGroup(child.pid, "SIGTERM").pipe(
-        Effect.andThen(Effect.sleep(killGrace)),
+        Effect.andThen(Effect.sleep(grace)),
         Effect.andThen(signalGroup(child.pid, "SIGKILL")),
         Effect.ensuring(Effect.sync(() => groups.delete(child.pid))),
       );
@@ -62,10 +62,10 @@ const installed = (program: string): Effect.Effect<void, CommandAbsent> =>
     ? Effect.fail(new CommandAbsent({ reason: `${program} is not installed on the PATH` }))
     : Effect.void;
 
-const runnerOf = (groups: Set<number>): CommandRunner["Service"] => ({
+const runnerOf = (groups: Set<number>, grace: Duration.Duration): CommandRunner["Service"] => ({
   run: (command) =>
     installed(command.argv[0]).pipe(
-      Effect.andThen(spawn(command, groups)),
+      Effect.andThen(spawn(command, groups, grace)),
       Effect.timeoutOrElse({
         duration: command.timeout,
         orElse: () =>
@@ -83,11 +83,13 @@ const runnerOf = (groups: Set<number>): CommandRunner["Service"] => ({
     ),
 });
 
-export const liveCommandRunner: Layer.Layer<CommandRunner> = Layer.effect(
+export const commandRunnerWithGrace = (grace: Duration.Duration): Layer.Layer<CommandRunner> => Layer.effect(
   CommandRunner,
   Effect.gen(function* () {
     const groups = new Set<number>();
     yield* Effect.addFinalizer(() => Effect.forEach(groups, (leader) => signalGroup(leader, "SIGKILL"), { discard: true }));
-    return runnerOf(groups);
+    return runnerOf(groups, grace);
   }),
 );
+
+export const liveCommandRunner: Layer.Layer<CommandRunner> = commandRunnerWithGrace(killGrace);

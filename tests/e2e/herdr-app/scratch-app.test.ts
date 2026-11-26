@@ -117,12 +117,27 @@ test("does not start the App when HERDR_CORE_DIRS holds no herdr-core", async ()
   }
 }, 30000)
 
-test("times out after 35 seconds when the herdr-core socket never appears", async () => {
+test("waits 35 seconds in 175 steps of 0.2 seconds when no wait is set instead of the shortened test wait", async () => {
   const staged = await stage(true)
   try {
-    const result = await launch(staged.env)
+    const sleeps = join(staged.root, "sleeps")
+    await executable(join(staged.root, "bin", "sleep"), `#!/bin/bash\nprintf '%s\\n' "$*" >> "$STUB_SLEEPS"\n`)
+    await executable(join(staged.root, "Herdr.app", "Contents", "MacOS", "Herdr"), "#!/bin/bash\nexit 0\n")
+    const result = await launch({ ...staged.env, STUB_SLEEPS: sleeps })
     expect(result.code).toBe(1)
-    expect(result.stderr).toContain("timed out waiting 35 seconds for the herdr-core socket")
+    expect(result.stderr).toContain("timed out waiting 35 seconds for the App socket")
+    expect((await readFile(sleeps, "utf8")).trimEnd().split("\n")).toEqual(Array.from({ length: 175 }, () => "0.2"))
+  } finally {
+    await rm(staged.root, { recursive: true, force: true })
+  }
+}, 60000)
+
+test("times out after two seconds when the herdr-core socket never appears", async () => {
+  const staged = await stage(true)
+  try {
+    const result = await launch({ ...staged.env, HERDR_SCRATCH_WAIT_ATTEMPTS: "10" })
+    expect(result.code).toBe(1)
+    expect(result.stderr).toContain("timed out waiting 2 seconds for the herdr-core socket")
     expect(result.stderr).toContain(staged.env["HC_SOCKET"])
     expect(result.stderr).toContain("HERDR_CORE_DIRS=")
     expect(result.seconds).toBeLessThan(70)

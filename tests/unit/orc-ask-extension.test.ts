@@ -19,7 +19,7 @@ const loadAsk = (dir: string): { readonly tool: Registered; readonly afterTool: 
     getFlag: (name) => name === askDirFlag ? dir : undefined,
     registerTool: (tool) => tools.set(tool.name, tool),
     on: (_event, handler) => handlers.push(handler)
-  })
+  }, 10)
   const tool = tools.get(askToolName)
   const afterTool = handlers[0]
   if (tool === undefined || afterTool === undefined) {
@@ -58,7 +58,7 @@ describe("the orc_ask tool inside Pi", () => {
         settled = true
         return result
       })
-      await Bun.sleep(1500)
+      await new Promise((resolve) => setImmediate(resolve))
       expect(settled).toBe(false)
       await reply(dir, "call-1", "B")
       const result = await pending

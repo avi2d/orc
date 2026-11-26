@@ -6,7 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Deferred, Effect, Fiber, Layer, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { runChat } from "../../packages/run/src/features/chat/chat"
-import { binPath, type Fixture, orchestratorConfig, piFor, runOrc, sessionFor, until, withFixture } from "./chat-helpers"
+import { binPath, type Fixture, orchestratorConfig, piFor, runOrc, sessionFor, until, waitPolls, withFixture } from "./chat-helpers"
 
 const loginProvider = { id: "opencode-go", credential: "pi-login", nono: { upstream: "https://example.com/v1" } }
 
@@ -135,12 +135,12 @@ describe("orc chat tools", () => {
       const heldPost = { customType: "orc-held-decision", content: "orc-1 Pick the API is held for the captain: REST or gRPC, until 2026-12-01", display: true }
       first.fire("session_start", { isIdle: () => true })
       await until(() => first.sent.length > 0, 10_000)
-      await Bun.sleep(500)
+      await waitPolls(first)
       first.fire("session_shutdown")
       const reopened = piFor(fixture, 50)
       reopened.fire("session_start", { isIdle: () => true })
       await until(() => reopened.sent.length > 0, 10_000)
-      await Bun.sleep(500)
+      await waitPolls(reopened)
       reopened.fire("session_shutdown")
       expect([first.sent, reopened.sent]).toEqual([[{ message: heldPost, options: { triggerTurn: false } }], [{ message: heldPost, options: { triggerTurn: false } }]])
       expect((await runOrc(fixture, ["backlog", "priority", "orc-1", "0"])).exitCode).toBe(0)
@@ -158,12 +158,12 @@ describe("orc chat tools", () => {
       const parkedPost = { customType: "orc-parked-question", content: "orc-1 Pick the API is parked on orc/orc-1 for the captain's answer to question-4: REST or gRPC?", display: true }
       first.fire("session_start", { isIdle: () => true })
       await until(() => first.sent.length > 0, 10_000)
-      await Bun.sleep(500)
+      await waitPolls(first)
       first.fire("session_shutdown")
       const reopened = piFor(fixture, 50)
       reopened.fire("session_start", { isIdle: () => true })
       await until(() => reopened.sent.length > 0, 10_000)
-      await Bun.sleep(500)
+      await waitPolls(reopened)
       reopened.fire("session_shutdown")
       expect([first.sent, reopened.sent]).toEqual([[{ message: parkedPost, options: { triggerTurn: false } }], [{ message: parkedPost, options: { triggerTurn: false } }]])
       expect(await reopened.call("orc_backlog_answer", { id: "orc-1", question: "question-4", words: "REST, and keep v1" })).toBe("answered question-4 on orc-1, so the beat resumes it on orc/orc-1")
@@ -176,11 +176,11 @@ describe("orc chat tools", () => {
       const pi = piFor(fixture, 50)
       await pi.add({ project: "orc", task: "# Pick the API\n" })
       pi.fire("session_start", { isIdle: () => true })
-      await Bun.sleep(300)
+      await waitPolls(pi)
       expect(pi.sent).toEqual([])
       await parkTask(fixture, "orc-1", [{ id: "question-4", text: "REST or gRPC?" }, { id: "question-5", text: "" }])
       await until(() => pi.sent.length > 1, 10_000)
-      await Bun.sleep(500)
+      await waitPolls(pi)
       pi.fire("session_shutdown")
       expect(pi.sent.map((sent) => sent.message)).toEqual([
         { customType: "orc-parked-question", content: "orc-1 Pick the API is parked on orc/orc-1 for the captain's answer to question-4: REST or gRPC?", display: true },
@@ -196,11 +196,11 @@ describe("orc chat tools", () => {
       await pi.call("orc_backlog_hold", { id: "orc-1", reason: "REST or gRPC" })
       let idle = false
       pi.fire("session_start", { isIdle: () => idle })
-      await Bun.sleep(500)
+      await waitPolls(pi)
       expect(pi.sent).toEqual([])
       idle = true
       await until(() => pi.sent.length > 0, 10_000)
-      await Bun.sleep(500)
+      await waitPolls(pi)
       pi.fire("session_shutdown")
       expect(pi.sent.map((sent) => sent.message)).toEqual([{ customType: "orc-held-decision", content: "orc-1 Pick the API is held for the captain: REST or gRPC", display: true }])
     })
@@ -217,7 +217,7 @@ describe("orc chat tools", () => {
       expect(await pi.call("orc_backlog_answer", { id: "orc-1", words })).toBe("answered orc-1, so the beat may start it")
       pi.fire("session_start", { isIdle: () => true })
       await until(() => pi.sent.length > 0, 10_000)
-      await Bun.sleep(500)
+      await waitPolls(pi)
       pi.fire("session_shutdown")
       expect(pi.sent.map((sent) => sent.message)).toEqual([{ customType: "orc-held-decision", content: "orc-2 Pick the store is held for the captain: SQLite or Postgres", display: true }])
       expect(await readFile(join(fixture.home, "backlog", "new", "orc-1.md"), "utf8")).toContain("answer: " + JSON.stringify(words))

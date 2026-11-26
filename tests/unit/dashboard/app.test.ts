@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { createTestRenderer } from "@opentui/core/testing";
 import { Effect, Fiber } from "effect";
 import { fixture } from "../../lib/fixtures";
-import { dashboardSources, frameWhere, liveDashboard, recordedAnswer, tasksCommand } from "../../lib/dashboard-sources";
+import { dashboardSources, liveDashboard, recordedAnswer, tasksCommand } from "../../lib/dashboard-sources";
+import { createLiveTestRenderer } from "../../lib/live-screen";
 import { machineStdout } from "../../lib/machines-fixture";
 
 const remoteCommand = "ssh south.example.com orc-dash-session-quota --json";
@@ -79,10 +79,10 @@ const rowsOf = (frame: string) =>
 
 describe("the live dashboard", () => {
   test("names or counts every account, and shows the agents, the queues and a row per alert rule on one screen in a standard 84x24 terminal, in that order", async () => {
-    const setup = await createTestRenderer({ width: 84, height: 24 });
-    const fiber = Effect.runFork(liveDashboard(setup.renderer, recordedSources));
+    const setup = await createLiveTestRenderer({ width: 84, height: 24 });
+    const fiber = setup.start(liveDashboard(setup.renderer, recordedSources));
     try {
-      const standard = rowsOf(await frameWhere(setup, (frame) => frame.includes("\u25cf") && frame.includes("no agent flagged") && frame.includes("long-task")));
+      const standard = rowsOf(await setup.frameWhere((frame) => frame.includes("\u25cf") && frame.includes("no agent flagged") && frame.includes("long-task")));
       for (const header of ["\u25cf claude", "\u25cf codex", "\u25cf opencode-go"]) {
         expect(standard.some((row) => row.startsWith(header))).toBe(true);
       }
@@ -102,10 +102,10 @@ describe("the live dashboard", () => {
   });
 
   test("paints the settings file's limits and the verdict log's fires below the machine in a tall terminal", async () => {
-    const setup = await createTestRenderer({ width: 84, height: 60 });
-    const fiber = Effect.runFork(liveDashboard(setup.renderer, recordedSources));
+    const setup = await createLiveTestRenderer({ width: 84, height: 60 });
+    const fiber = setup.start(liveDashboard(setup.renderer, recordedSources));
     try {
-      const rows = rowsOf(await frameWhere(setup, (frame) => frame.includes("alert    long-task")));
+      const rows = rowsOf(await setup.frameWhere((frame) => frame.includes("alert    long-task")));
       expect(rows.indexOf("alert    quota-pace")).toBeGreaterThan(rows.findIndex((row) => row.startsWith("machine  cpu")));
       expect(rows).toContain("limits   north load ≥ 10 or memory used ≥ 90% · south load ≥ 16 or memory free < 15%");
       expect(rows).toContain("limits   quiet 20m, then every 10m · past 3h in total");
@@ -117,10 +117,10 @@ describe("the live dashboard", () => {
   }, 15_000);
 
   test("names the remote machine's flagged agent with its machine when a remote is configured", async () => {
-    const setup = await createTestRenderer({ width: 84, height: 40 });
-    const fiber = Effect.runFork(liveDashboard(setup.renderer, twoMachineSources));
+    const setup = await createLiveTestRenderer({ width: 84, height: 40 });
+    const fiber = setup.start(liveDashboard(setup.renderer, twoMachineSources));
     try {
-      const frame = await frameWhere(setup, (text) => text.includes("\u2691 api on south"));
+      const frame = await setup.frameWhere((text) => text.includes("\u2691 api on south"));
       expect(rowsOf(frame)).toContain("\u2691 api on south is spending over its share of claude work's week");
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));
@@ -130,19 +130,19 @@ describe("the live dashboard", () => {
 
   test("paints while the other machine's pueue has not answered, then paints its queue once it does", async () => {
     const { promise: remoteHeld, resolve: answerRemote } = Promise.withResolvers<void>();
-    const setup = await createTestRenderer({ width: 84, height: 30 });
+    const setup = await createLiveTestRenderer({ width: 84, height: 30 });
     const held = recordedSourcesWith(Effect.void, {
       env: { ORC_DASH_MACHINE: "north", ORC_DASH_REMOTE_MACHINE: "south", ORC_DASH_REMOTE_PUEUE: remotePueueCommand },
       stdout: () => "",
       pueue: Effect.promise(() => remoteHeld).pipe(Effect.as(fixture("pueue/status.json"))),
     });
-    const fiber = Effect.runFork(liveDashboard(setup.renderer, held));
+    const fiber = setup.start(liveDashboard(setup.renderer, held));
     try {
-      const first = rowsOf(await frameWhere(setup, (frame) => frame.includes("queue    north")));
+      const first = rowsOf(await setup.frameWhere((frame) => frame.includes("queue    north")));
       expect(first).toContain("queue    north \u00b7 2 running \u00b7 2 queued \u00b7 1 paused \u00b7 gpu group paused");
       expect(first).toContain("         south \u00b7 reading\u2026");
       answerRemote();
-      const read = rowsOf(await frameWhere(setup, (frame) => !frame.includes("reading\u2026")));
+      const read = rowsOf(await setup.frameWhere((frame) => !frame.includes("reading\u2026")));
       expect(read).toContain("         south \u00b7 2 running \u00b7 2 queued \u00b7 1 paused \u00b7 gpu group paused");
     } finally {
       answerRemote();
@@ -152,11 +152,11 @@ describe("the live dashboard", () => {
   }, 15_000);
 
   test("states each machine by its name, the remote machine's gpu under it, when a remote is configured", async () => {
-    const setup = await createTestRenderer({ width: 84, height: 40 });
-    const fiber = Effect.runFork(liveDashboard(setup.renderer, twoMachineSources));
+    const setup = await createLiveTestRenderer({ width: 84, height: 40 });
+    const fiber = setup.start(liveDashboard(setup.renderer, twoMachineSources));
     const northRow = process.platform === "darwin" ? "north    cpu 14% \u00b7 memory 8.4G of 32.0G" : "north    cpu 11% \u00b7 memory 5.5G of 31.3G";
     try {
-      const rows = rowsOf(await frameWhere(setup, (text) => text.includes("south    cpu")));
+      const rows = rowsOf(await setup.frameWhere((text) => text.includes("south    cpu")));
       const north = rows.indexOf(northRow);
       const south = rows.indexOf("south    cpu 42% \u00b7 memory 12.0G of 64.0G");
       expect(north).toBeGreaterThan(-1);
@@ -171,13 +171,13 @@ describe("the live dashboard", () => {
 
   test("paints the agents line as soon as a first session read that outlasted its patience lands", async () => {
     const { promise: herdrHeld, resolve: releaseHerdr } = Promise.withResolvers<void>();
-    const setup = await createTestRenderer({ width: 84, height: 24 });
+    const setup = await createLiveTestRenderer({ width: 84, height: 24 });
     const held = recordedSourcesHoldingHerdr(Effect.promise(() => herdrHeld));
-    const fiber = Effect.runFork(liveDashboard(setup.renderer, held));
+    const fiber = setup.start(liveDashboard(setup.renderer, held));
     try {
-      await frameWhere(setup, (frame) => frame.includes("reading the agents\u2026"));
+      await setup.frameWhere((frame) => frame.includes("reading the agents\u2026"));
       releaseHerdr();
-      const read = await frameWhere(setup, (frame) => !frame.includes("reading the agents\u2026"));
+      const read = await setup.frameWhere((frame) => !frame.includes("reading the agents\u2026"));
       expect(read).toContain("no agent flagged for spending a limit too fast");
     } finally {
       releaseHerdr();
@@ -189,10 +189,10 @@ describe("the live dashboard", () => {
   test("interrupts a first session read still in flight when the quit key is pressed", async () => {
     let herdrInterrupted = false;
     const herdrNever = Effect.never.pipe(Effect.onInterrupt(() => Effect.sync(() => (herdrInterrupted = true))));
-    const setup = await createTestRenderer({ width: 84, height: 24 });
-    const fiber = Effect.runFork(liveDashboard(setup.renderer, recordedSourcesHoldingHerdr(herdrNever)));
+    const setup = await createLiveTestRenderer({ width: 84, height: 24 });
+    const fiber = setup.start(liveDashboard(setup.renderer, recordedSourcesHoldingHerdr(herdrNever)));
     try {
-      await frameWhere(setup, (frame) => frame.includes("\u25cf claude") && frame.includes("reading the agents…"));
+      await setup.frameWhere((frame) => frame.includes("\u25cf claude") && frame.includes("reading the agents…"));
       setup.renderer.keyInput.processParsedKey({
         name: "q",
         ctrl: false,
@@ -214,10 +214,10 @@ describe("the live dashboard", () => {
   }, 15_000);
 
   test("ends the program when the quit key is pressed", async () => {
-    const setup = await createTestRenderer({ width: 84, height: 24 });
-    const fiber = Effect.runFork(liveDashboard(setup.renderer, recordedSources));
+    const setup = await createLiveTestRenderer({ width: 84, height: 24 });
+    const fiber = setup.start(liveDashboard(setup.renderer, recordedSources));
     try {
-      await frameWhere(setup, (frame) => frame.includes("\u25cf"));
+      await setup.frameWhere((frame) => frame.includes("\u25cf"));
       setup.renderer.keyInput.processParsedKey({
         name: "q",
         ctrl: false,
@@ -263,17 +263,17 @@ const topLineOf = (frame: string): string => (frame.split("\n").at(0) ?? "").tri
 
 describe("the live dashboard's levels", () => {
   test("open from the glance in a standard 84x24 terminal and close back to it", async () => {
-    const setup = await createTestRenderer({ width: 84, height: 24 });
-    const fiber = Effect.runFork(liveDashboard(setup.renderer, leveledSources));
+    const setup = await createLiveTestRenderer({ width: 84, height: 24 });
+    const fiber = setup.start(liveDashboard(setup.renderer, leveledSources));
     try {
-      await frameWhere(setup, (frame) => frame.includes("quota-pace"));
+      await setup.frameWhere((frame) => frame.includes("quota-pace"));
       setup.mockInput.pressArrow("down");
       setup.mockInput.pressEnter();
-      const projects = await frameWhere(setup, (frame) => frame.includes("projects · today"));
+      const projects = await setup.frameWhere((frame) => frame.includes("projects · today"));
       expect(projects).toContain("harbor");
       expect(projects).toContain("projects · today");
       setup.mockInput.pressEscape();
-      await frameWhere(setup, (frame) => frame.includes("quota-pace") && !frame.includes("projects · today"));
+      await setup.frameWhere((frame) => frame.includes("quota-pace") && !frame.includes("projects · today"));
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));
       await setup.dispose();
@@ -281,10 +281,10 @@ describe("the live dashboard's levels", () => {
   });
 
   test("step into the unified projects and back out on a 240x60 screen", async () => {
-    const setup = await createTestRenderer({ width: 240, height: 60 });
-    const fiber = Effect.runFork(liveDashboard(setup.renderer, leveledSources));
+    const setup = await createLiveTestRenderer({ width: 240, height: 60 });
+    const fiber = setup.start(liveDashboard(setup.renderer, leveledSources));
     try {
-      const first = await frameWhere(setup, (frame) => frame.includes("projects · today") && frame.includes("harbor") && frame.includes("south"));
+      const first = await setup.frameWhere((frame) => frame.includes("projects · today") && frame.includes("harbor") && frame.includes("south"));
       expect(topLineOf(first)).toMatch(/╭─ quota ─+ ↻ 10s ─╮/u);
       expect(first).toContain("scheduled");
       expect(first).not.toContain("┏");
@@ -293,11 +293,11 @@ describe("the live dashboard's levels", () => {
       setup.mockInput.pressArrow("up");
       setup.mockInput.pressEnter();
       setup.mockInput.pressEnter();
-      await frameWhere(setup, (frame) => frame.includes("harbor · tasks"));
+      await setup.frameWhere((frame) => frame.includes("harbor · tasks"));
       setup.mockInput.pressEscape();
-      await frameWhere(setup, (frame) => frame.includes("projects · today"));
+      await setup.frameWhere((frame) => frame.includes("projects · today"));
       setup.mockInput.pressEscape();
-      await frameWhere(setup, (frame) => frame.includes("projects · today") && frame.includes("harbor"));
+      await setup.frameWhere((frame) => frame.includes("projects · today") && frame.includes("harbor"));
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));
       await setup.dispose();
@@ -305,18 +305,18 @@ describe("the live dashboard's levels", () => {
   });
 
   test("switch the shared boxes' titles on s, u, a and g", async () => {
-    const setup = await createTestRenderer({ width: 240, height: 60 });
-    const fiber = Effect.runFork(liveDashboard(setup.renderer, leveledSources));
+    const setup = await createLiveTestRenderer({ width: 240, height: 60 });
+    const fiber = setup.start(liveDashboard(setup.renderer, leveledSources));
     try {
-      await frameWhere(setup, (frame) => frame.includes("queued in pueue") && frame.includes("over its share"));
+      await setup.frameWhere((frame) => frame.includes("queued in pueue") && frame.includes("over its share"));
       setup.mockInput.pressKey("a");
-      await frameWhere(setup, (frame) => frame.includes("quota-pace"));
+      await setup.frameWhere((frame) => frame.includes("quota-pace"));
       setup.mockInput.pressKey("s");
-      await frameWhere(setup, (frame) => frame.includes("nothing scheduled") && !frame.includes("queued in pueue"));
+      await setup.frameWhere((frame) => frame.includes("nothing scheduled") && !frame.includes("queued in pueue"));
       setup.mockInput.pressKey("u");
-      await frameWhere(setup, (frame) => frame.includes("queued in pueue"));
+      await setup.frameWhere((frame) => frame.includes("queued in pueue"));
       setup.mockInput.pressKey("g");
-      await frameWhere(setup, (frame) => !frame.includes("quota-pace"));
+      await setup.frameWhere((frame) => !frame.includes("quota-pace"));
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));
       await setup.dispose();
@@ -324,14 +324,14 @@ describe("the live dashboard's levels", () => {
   });
 
   test("step into the other machine's kelp on the unified board on a 240x60 screen", async () => {
-    const setup = await createTestRenderer({ width: 240, height: 60 });
-    const fiber = Effect.runFork(liveDashboard(setup.renderer, remoteLeveledSources));
+    const setup = await createLiveTestRenderer({ width: 240, height: 60 });
+    const fiber = setup.start(liveDashboard(setup.renderer, remoteLeveledSources));
     try {
-      await frameWhere(setup, (frame) => frame.includes("projects · today") && frame.includes("harbor") && frame.includes("kelp"));
+      await setup.frameWhere((frame) => frame.includes("projects · today") && frame.includes("harbor") && frame.includes("kelp"));
       setup.mockInput.pressArrow("down");
       setup.mockInput.pressEnter();
       setup.mockInput.pressEnter();
-      const kelp = await frameWhere(setup, (frame) => frame.includes("kelp · tasks"));
+      const kelp = await setup.frameWhere((frame) => frame.includes("kelp · tasks"));
       expect(kelp).toContain("tasks-kelp-tend");
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));
