@@ -44,7 +44,7 @@ The tabs refresh while visible and show a reason when a command fails.
 
 Select **Inbox** or press `cmd-4` to see everything Orc assigns to you in one list, oldest first.
 
-![Inbox tab with an overdue event and two decisions](images/herdr-inbox.png)
+![Inbox tab with an overdue event and decisions assigned across tasks](images/herdr-inbox.png)
 
 Each card shows the task ID and title, who asks, the subject, each option with its outcome, and the recommendation.
 An option with a picture shows as a tile, and others as buttons.
