@@ -7,19 +7,20 @@ import type { AgentFile, LongSessionCounts, PiTokenUse } from "../../entities/ag
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 import type { RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
+import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
 import { beatReadsChecks } from "./checks"
 
-export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], priorDir: string | null): Effect.Effect<OrcRunReport, OrcRunError> =>
+export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], priorDir: string | null, orcReview?: ReviewOutcome): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + (rounds.at(-1)?.passed === true ? ", and the checks passed. " : ". No local checks ran. ")
     const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
     if (run.delivery.kind === "orc") {
-      const review = yield* reviewOrc(run, run.delivery.reviewer, checkpoints, runAgent)
+      const review = orcReview ?? (yield* reviewOrc(run, run.delivery.reviewer, checkpoints, runAgent))
       const reviewed = checked + reviewSentence(review)
       if (review.status === "failed") {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
+      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, review.findings)
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
@@ -41,7 +42,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]) =>
+export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]) =>
   Effect.gen(function*() {
     const started = new Date().toISOString()
     yield* checkpoints.reviewStart(reviewer, started)
@@ -50,19 +51,21 @@ const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: RunCheckpo
     return review
   })
 
-const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>): string => {
+const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>, findings: ReadonlyArray<ReviewFinding>): string => {
   const passed = rounds.at(-1)?.checks.map((check) => check.name) ?? []
   const closing = passed.length === 0
     ? "orc opened this PR without local checks or no-mistakes. " + beatReadsChecks + "\n"
     : "orc opened this PR after " + passed.join(", ") + " passed, without no-mistakes.\n"
-  return subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing
+  const remaining = findings.length === 0 ? "" : "\nOpen review findings:\n" + findings.map((finding) => "- " + finding.severity + " " + finding.id + " (" + finding.file + (finding.line === null ? "" : ":" + finding.line.toString()) + "): " + finding.description + " " + finding.action).join("\n") + "\n"
+  return (subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing) + remaining
 }
 
 const openPullRequest = (
   run: HistoryRun,
   opener: PullRequestOpener,
   rounds: ReadonlyArray<ChecksRoundSummary>,
-  checkpoints: RunCheckpoints
+  checkpoints: RunCheckpoints,
+  findings: ReadonlyArray<ReviewFinding> = []
 ): Effect.Effect<DirectPrRecord, OrcRunError> =>
   Effect.gen(function*() {
     yield* checkpoints.pullRequestStart(new Date().toISOString())
@@ -74,7 +77,7 @@ const openPullRequest = (
     const subjects = listed.map((commit) => commit.subject.trim()).filter((subject) => subject !== "")
     const bodySubjects = subjects.length > 0 ? subjects : (head !== "" ? [head] : [])
     const bodyFile = run.path.join(run.runDir, prBodyFileName)
-    yield* run.fs.writeFileString(bodyFile, prBody(bodySubjects, rounds)).pipe(
+    yield* run.fs.writeFileString(bodyFile, prBody(bodySubjects, rounds, findings)).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
     )
     const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, bodyFile)
