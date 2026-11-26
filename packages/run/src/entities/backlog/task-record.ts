@@ -3,6 +3,7 @@ import { Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 import { deciderAnswerKinds, OverturnedFront, parkedAnswerOf } from "./task-record-answer"
 import { ChoicesFront, choicesOf, type ParkedQuestion } from "./task-record-question"
+import { fullPrUrl, isCalendarDate } from "./task-record-text"
 import { MergeRecord } from "./task-record-merge"
 import { closedWithUnansweredQuestion, heldWhileActive, priorPrOf, splitFrontmatter } from "./task-record-parts"
 
@@ -115,16 +116,20 @@ type TaskState =
   | { readonly kind: "started"; readonly claim: Claim; readonly started: Started }
   | ClosedState
 
+const CiRerun = Schema.Struct({ pr: Schema.String, runs: Schema.Array(Schema.String), at: Schema.String })
+export type CiRerun = typeof CiRerun.Type
 const Retry = Schema.Struct({ run: Schema.String.check(Schema.isNonEmpty()), at: Schema.String.check(Schema.isNonEmpty()) })
 export const Rebase = Schema.Struct({ pr: Schema.String.check(Schema.isNonEmpty()), head: Schema.String.check(Schema.isPattern(/^[0-9a-f]{40}$/)), at: Schema.String.check(Schema.isNonEmpty()) })
 export type Rebase = typeof Rebase.Type
 
 export interface TaskRecord {
+  readonly ciReruns?: ReadonlyArray<CiRerun>
   readonly merge?: MergeRecord
   readonly spec: TaskSpec
   readonly hold: Hold | null
   readonly retry?: typeof Retry.Type
   readonly rebase?: Rebase
+  readonly ciSentBack?: ReadonlyArray<string>
   readonly parked: Parked | null
   readonly priorPr?: string
   readonly state: TaskState
@@ -147,15 +152,6 @@ export const taskLandedIn = (task: TaskRecord): string | null =>
   task.state.kind === "closed" && "landedIn" in task.state.closing ? task.state.closing.landedIn : null
 
 export const taskPr = (task: TaskRecord): string | null => ranClosing(task)?.pr ?? null
-
-const prUrlPattern = /^https:\/\/[^/]+\/[^/]+\/[^/]+\/pull\/\d+$/
-
-export const fullPrUrl = (pr: string | null | undefined): string | null => pr !== null && pr !== undefined && prUrlPattern.test(pr) ? pr : null
-
-const datePattern = /^\d{4}-\d{2}-\d{2}$/
-
-export const isCalendarDate = (text: string): boolean =>
-  datePattern.test(text) && !Number.isNaN(Date.parse(text)) && new Date(text).toISOString().slice(0, 10) === text
 
 export class TaskFileError extends Data.TaggedError("TaskFileError")<{
   readonly file: string
@@ -200,6 +196,7 @@ const Frontmatter = Schema.Struct({
   answered_at: Schema.optional(Schema.String),
   retry: Schema.optional(Retry),
   rebase: Schema.optional(Rebase),
+  ci_sent_back: Schema.optional(Schema.Array(Schema.String)),
   parked_branch: Schema.optional(Schema.String),
   parked_origin: Schema.optional(ParkedOrigin),
   parked_at: Schema.optional(Schema.String),
@@ -218,6 +215,7 @@ const Frontmatter = Schema.Struct({
   pr: Schema.optional(Schema.String),
   report: Schema.optional(Schema.String),
   posted_at: Schema.optional(Schema.String),
+  ci_reruns: Schema.optional(Schema.Array(CiRerun)),
   merge: Schema.optional(MergeRecord)
 })
 type Frontmatter = typeof Frontmatter.Type
@@ -370,6 +368,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
       return yield* new TaskFileError({ file, detail: "a closed task carries an unanswered parked question" })
     }
     return {
+      ...(front.ci_reruns === undefined ? {} : { ciReruns: front.ci_reruns }),
       spec: {
         id: front.id,
         title: front.title,
@@ -387,6 +386,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
       hold,
       ...(front.retry === undefined ? {} : { retry: front.retry }),
       ...(front.rebase === undefined ? {} : { rebase: front.rebase }),
+      ...(front.ci_sent_back === undefined ? {} : { ciSentBack: front.ci_sent_back }),
       parked,
       ...(front.merge === undefined ? {} : { merge: front.merge }),
       ...priorPrOf(front.pr, state),

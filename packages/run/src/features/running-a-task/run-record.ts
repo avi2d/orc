@@ -17,7 +17,7 @@ export type { ChecksRoundSummary, OrcRunCommit, OrcRunReport, RecordedFixAttempt
 export type RunDeliverer =
   | { readonly kind: "no-mistakes"; readonly runner: NoMistakesRunner }
   | { readonly kind: "direct-PR"; readonly opener: PullRequestOpener; readonly reviewer: AgentFile }
-  | { readonly kind: "orc"; readonly opener: PullRequestOpener }
+  | { readonly kind: "orc"; readonly opener: PullRequestOpener; readonly reviewer: AgentFile }
 
 export const prBodyFileName = "pr-body.md"
 

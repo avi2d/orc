@@ -45,9 +45,9 @@ export const prepareRoles = Effect.fnUntraced(function*(
   const configModel = (model: string | undefined) => ({ file: config.file, model })
   const agent = yield* finishAgentFile(implementerFile, { configModel: configModel(configured.implementer), thinking: pins.implementerThinking })
   const fixer = yield* finishAgentFile(fixerFile, { configModel: configModel(configured.fixer), thinking: pins.fixerThinking })
-  const reviewer: PreparedReviewer = delivery === "direct-PR"
-    ? { kind: "direct-PR", reviewer: yield* resolveAgentFile("reviewer", { ...location, configModel: configModel(route?.reviewer ?? fixer.model) }) }
-    : delivery === "orc" ? { kind: "orc" } : { kind: "no-mistakes" }
+  const reviewer: PreparedReviewer = delivery === "direct-PR" || delivery === "orc"
+    ? { kind: delivery, reviewer: yield* resolveAgentFile("reviewer", { ...location, configModel: configModel(route?.reviewer ?? fixer.model) }) }
+    : { kind: "no-mistakes" }
   return { agent, fixer, reviewer }
 }, Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
 
@@ -77,7 +77,7 @@ export const prepareAgents = (
     const { agent, fixer, reviewer } = yield* prepareRoles({ projectDir: checkout.projectDir, orcHome: home, agentsDir }, config, delivery, pins, route)
     const piBinary = Bun.which("pi")
     const nodeBinary = Bun.which("node")
-    const models = reviewer.kind === "direct-PR" ? { agent: agent.model, fixer: fixer.model, reviewer: reviewer.reviewer.model } : { agent: agent.model, fixer: fixer.model }
+    const models = reviewer.kind !== "no-mistakes" ? { agent: agent.model, fixer: fixer.model, reviewer: reviewer.reviewer.model } : { agent: agent.model, fixer: fixer.model }
     const provider = yield* Effect.fromResult(routeOfAgents(config, models, pins.provider)).pipe(Effect.mapError((message) => new OrcRunError({ message })))
     if (piBinary === null) {
       return yield* refuse("orc: pi is not on the host PATH")

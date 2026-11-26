@@ -3,11 +3,12 @@ import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, ranClosing, taskPr, type TaskRecord } from "../../entities/backlog/index"
 import type { BeatAction, StalledAction } from "../../entities/attention/index"
 import type { ChatEvent, PrState } from "../../entities/events/index"
-import { pullRequestHeld, routePullRequest } from "../../entities/attention/index"
+import { pullRequestHeld, routePullRequestWithRetry } from "../../entities/attention/index"
 import { eventRecorded, readPrState, recordEvent, writePrState } from "../../entities/events/index"
-import { checkRefusals, greenChecks, type PullRequestView } from "../../entities/pull-request/index"
+import { checkRefusals, greenChecks, redCheckEvidence, type PullRequestView } from "../../entities/pull-request/index"
 import type { RunnerError } from "../../shared/process/index"
 import { isPendingUpdateHead, readPendingUpdate } from "../../features/merging-a-pr/index"
+import { sendBack } from "../../features/queueing-a-task/index"
 import { ownerWaits, yoloMerge } from "./yolo-merge"
 import { queueRebase } from "./beat-rebase"
 
@@ -75,14 +76,15 @@ const recordObservation = (
   at: string,
   waits: Result.Result<ReadonlyArray<string> | null, BacklogError | RunnerError>,
   prState: PrState
-): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    yield* routePullRequest(root, task.spec.id, pr, view, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
+    const holdingRed = yield* routePullRequestWithRetry(root, task, pr, view, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
     const event = prEvent(task, pr, view, at, yield* eventRecorded(root, task.spec.id + ".pr-ready"))
     if (event !== null) {
       yield* recordEvent(root, event)
     }
     yield* writePrState(root, task.spec.id, pr, prState)
+    return holdingRed
   })
 
 const heldAcrossUpdate = (root: string, id: string, pr: string, head: string) =>
@@ -94,6 +96,20 @@ const heldAcrossUpdate = (root: string, id: string, pr: string, head: string) =>
     return yield* isPendingUpdateHead(pr, pending.head, head)
   })
 
+const sendFreshRedChecks = (root: string, home: string, task: TaskRecord, view: PullRequestView, at: string, orcMode: boolean) =>
+  Effect.gen(function*() {
+    if (view.state !== "OPEN" || !orcMode || ranClosing(task)?.outcome !== "done") {
+      return false
+    }
+    const freshRed = redCheckEvidence(view).filter((check) => !(task.ciSentBack ?? []).includes(check.name))
+    if (freshRed.length === 0) {
+      return false
+    }
+    const evidence = freshRed.map((check) => check.name + (check.url === undefined ? "" : " " + check.url)).join(", ")
+    const sent = yield* sendBack(root, home, { kind: "SendBack", id: task.spec.id, words: "Fix the red CI check: " + evidence }, at, "cleared", freshRed.map((check) => check.name)).pipe(Effect.result)
+    return Result.isSuccess(sent)
+  })
+
 const observeShipPr = (
   root: string,
   task: TaskRecord,
@@ -102,12 +118,16 @@ const observeShipPr = (
   at: string,
   yolo: boolean,
   home: string,
-  prState: PrState
+  prState: PrState,
+  orcMode: boolean
 ): Effect.Effect<Option.Option<BeatAction>, BacklogError, Requirements> =>
   Effect.gen(function*() {
     const id = task.spec.id
     const waits = yield* readWaits(pr, view, yolo)
-    yield* recordObservation(root, task, pr, view, at, waits, prState)
+    const holdingRed = yield* recordObservation(root, task, pr, view, at, waits, prState)
+    if (holdingRed || (yield* sendFreshRedChecks(root, home, task, view, at, orcMode))) {
+      return Option.none()
+    }
     if (Result.isFailure(waits)) {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: waits.failure.detail })
     }
@@ -130,7 +150,8 @@ export const prEvents = (
   read: ReadPullRequest,
   at: string,
   yolo: boolean,
-  home: string
+  home: string,
+  orcMode = false
 ): Effect.Effect<Option.Option<BeatAction>, BacklogError, Requirements> =>
   Effect.gen(function*() {
     const pr = taskPr(task)
@@ -158,5 +179,5 @@ export const prEvents = (
       const queued = yield* queueRebase(root, home, task, view.success, at)
       return queued ? Option.some<BeatAction>({ kind: "rebase-queued", task: id, pr }) : Option.none()
     }
-    return yield* observeShipPr(root, task, pr, view.success, at, yolo, home, prState)
+    return yield* observeShipPr(root, task, pr, view.success, at, yolo, home, prState, orcMode)
   })
