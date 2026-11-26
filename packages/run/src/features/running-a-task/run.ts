@@ -53,6 +53,7 @@ export interface OrcRunRequest {
   readonly homeDir?: string | undefined
   readonly runId?: string | undefined
   readonly resumeRun?: string | undefined
+  readonly rebase?: HistoryRun["rebase"] | undefined
   readonly agentsDir?: string | undefined
 }
 
@@ -234,6 +235,7 @@ export const runAgentStep = (
       allow: request.allow ?? [],
       answers: request.answers ?? [],
       resumeRun: request.resumeRun,
+      rebase: request.rebase,
       answerWaitSeconds
     }
     return yield* Effect.acquireUseRelease(
