@@ -9,6 +9,7 @@ import { checkRefusals, gh, greenChecks, ownerWordChanges, readChangedFiles, prP
 import { approvedAt, type Approved, type Landing, recordStage, type SendBackForFix, writeMergeRecord, type MergeRequirements } from "./landing"
 import { branchUpdate, compare, refusal, refuse } from "./branch-update"
 import { clearPendingUpdate, readPendingUpdate, savePendingUpdate, type PendingUpdate } from "./pending-update"
+import { firstPollFromEnv, pollWaitSeconds } from "./merge-poll"
 
 const readView = (url: string) =>
   readPullRequest(url).pipe(Effect.mapError((error) => new BacklogError({ detail: "orc merge " + error.detail })))
@@ -29,7 +30,8 @@ export type MergeOutcome = { readonly kind: "merged" | "updating"; readonly mess
 
 const checksMinutes = 20
 const checksTimeout = Duration.minutes(checksMinutes)
-const longestPollSeconds = 15
+
+type Wait = { readonly kind: "no-wait" } | { readonly kind: "wait"; readonly firstPollSeconds: number }
 
 const commits = (count: number): string => String(count) + " commit" + (count === 1 ? "" : "s")
 
@@ -141,28 +143,29 @@ const judgeHead = (
 const awaitNewHead = (
   url: string,
   approved: Approved,
+  firstPollSeconds: number,
   poll: number,
   unreadable: Ref.Ref<string | null>,
   known?: Lineage
 ): Effect.Effect<PolledHead, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    yield* Effect.sleep(Duration.seconds(Math.min(2 ** poll, longestPollSeconds)))
+    yield* Effect.sleep(Duration.seconds(pollWaitSeconds(firstPollSeconds, poll)))
     const reading = yield* readView(url).pipe(
       Effect.map((view) => ({ ok: true as const, view })),
       Effect.catch((error) => Effect.succeed({ ok: false as const, said: error.detail }))
     )
     if (!reading.ok) {
       yield* Ref.set(unreadable, reading.said)
-      return yield* awaitNewHead(url, approved, poll + 1, unreadable, known)
+      return yield* awaitNewHead(url, approved, firstPollSeconds, poll + 1, unreadable, known)
     }
     yield* Ref.set(unreadable, null)
     const judged = yield* judgeHead(url, approved, reading.view, known)
     if (judged.kind === "unreadable") {
       yield* Ref.set(unreadable, judged.said)
-      return yield* awaitNewHead(url, approved, poll + 1, unreadable, known)
+      return yield* awaitNewHead(url, approved, firstPollSeconds, poll + 1, unreadable, known)
     }
     if (judged.kind === "waiting") {
-      return yield* awaitNewHead(url, approved, poll + 1, unreadable, judged.lineage)
+      return yield* awaitNewHead(url, approved, firstPollSeconds, poll + 1, unreadable, judged.lineage)
     }
     return judged
   })
@@ -215,12 +218,12 @@ const retryCommand = (landing: Landing): string => waitCommand(landing) + " --no
 const retryAdvice = (landing: Landing): string =>
   "run " + retryCommand(landing) + " again once the new head's checks have reported, or run " + waitCommand(landing) + " to wait for the new head's own checks instead of the ones saved before the update"
 
-const awaitUpdatedAndMerge = (landing: Landing, checked: PullRequestView, approved: Approved) =>
+const awaitUpdatedAndMerge = (landing: Landing, checked: PullRequestView, approved: Approved, firstPollSeconds: number) =>
   Effect.gen(function*() {
     yield* recordStage(landing, approved, "checks-running")
     yield* landing.progress("Checks running")
     const unreadable = yield* Ref.make<string | null>(null)
-    const settled = yield* awaitNewHead(landing.url, approved, 0, unreadable).pipe(
+    const settled = yield* awaitNewHead(landing.url, approved, firstPollSeconds, 0, unreadable).pipe(
       Effect.timeoutOrElse({
         duration: checksTimeout,
         orElse: () =>
@@ -243,17 +246,17 @@ const awaitUpdatedAndMerge = (landing: Landing, checked: PullRequestView, approv
     return yield* mergeAt(landing, view, approved).pipe(Effect.catchTag("MergeBehind", (error) => refuse(error.detail)))
   })
 
-const landUpdated = (landing: Landing, checked: PullRequestView, approved: Approved, noWait: boolean) =>
+const landUpdated = (landing: Landing, checked: PullRequestView, approved: Approved, wait: Wait) =>
   Effect.gen(function*() {
-    if (noWait) {
+    if (wait.kind === "no-wait") {
       yield* savePendingUpdate(landing.root, landing.id, { url: landing.url, ...approved })
     }
     yield* updateBranch(landing, checked, approved)
-    if (noWait) {
+    if (wait.kind === "no-wait") {
       yield* recordStage(landing, approved, "checks-running")
       return { kind: "updating", message: "requested branch update for " + landing.id + " " + landing.url + "; not merged. Run " + retryCommand(landing) + " again once the new head checks are green." } satisfies MergeOutcome
     }
-    return yield* awaitUpdatedAndMerge(landing, checked, approved)
+    return yield* awaitUpdatedAndMerge(landing, checked, approved, wait.firstPollSeconds)
   })
 
 const checkUpdatedHead = (landing: Landing, pending: PendingUpdate, view: PullRequestView) =>
@@ -315,7 +318,7 @@ const openPullRequest = (root: string, id: string, basis: MergeBasis) =>
     return { record, url, view }
   })
 
-const mergeChecked = (landing: Landing, view: PullRequestView, pending: PendingUpdate | null, noWait: boolean) =>
+const mergeChecked = (landing: Landing, view: PullRequestView, pending: PendingUpdate | null, wait: Wait) =>
   Effect.gen(function*() {
     const { id, url } = landing
     const reasons = checkRefusals(view)
@@ -330,13 +333,13 @@ const mergeChecked = (landing: Landing, view: PullRequestView, pending: PendingU
     const sameHead = pending?.head === checked.head ? pending : null
     const approved = sameHead === null ? checked : { ...checked, green: [...new Set([...sameHead.green, ...checked.green])] }
     if (update === "update") {
-      return yield* landUpdated(landing, view, approved, noWait)
+      return yield* landUpdated(landing, view, approved, wait)
     }
     if (update === "current" && sameHead !== null) {
       return yield* refuse(refusal(id, url, ["its branch update has not produced a new head, so " + retryAdvice(landing)]))
     }
     return yield* mergeAt(landing, view, approved).pipe(
-      Effect.catchTag("MergeBehind", (error) => update === "disjoint" ? landUpdated(landing, view, approved, noWait) : refuse(error.detail))
+      Effect.catchTag("MergeBehind", (error) => update === "disjoint" ? landUpdated(landing, view, approved, wait) : refuse(error.detail))
     )
   })
 
@@ -348,6 +351,7 @@ export const mergeTask = (
   options: { readonly noWait: boolean; readonly progress?: (message: string) => Effect.Effect<void> } = { noWait: false }
 ): Effect.Effect<MergeOutcome, MergeError, MergeRequirements> =>
   Effect.gen(function*() {
+    const wait: Wait = options.noWait ? { kind: "no-wait" } : { kind: "wait", firstPollSeconds: yield* firstPollFromEnv(Bun.env.ORC_MERGE_POLL_SECONDS) }
     const { record, url, view } = yield* openPullRequest(root, id, basis)
     const landing: Landing = { root, id, url, basis, sendBack, progress: options.progress ?? Console.log }
     if (record.merge !== undefined) {
@@ -361,15 +365,15 @@ export const mergeTask = (
     }
     const saved = yield* readPendingUpdate(root, id)
     const savedHere = saved?.url === url ? saved : null
-    if (!options.noWait && savedHere !== null) {
+    if (wait.kind === "wait" && savedHere !== null) {
       yield* clearPendingUpdate(root, id)
       if (savedHere.head !== view.headRefOid) {
-        return yield* awaitUpdatedAndMerge(landing, view, { head: savedHere.head, green: [] })
+        return yield* awaitUpdatedAndMerge(landing, view, { head: savedHere.head, green: [] }, wait.firstPollSeconds)
       }
     }
-    const pending = options.noWait ? savedHere : null
+    const pending = wait.kind === "no-wait" ? savedHere : null
     if (pending !== null && pending.head !== view.headRefOid) {
       yield* checkUpdatedHead(landing, pending, view)
     }
-    return yield* mergeChecked(landing, view, pending, options.noWait)
+    return yield* mergeChecked(landing, view, pending, wait)
   })
