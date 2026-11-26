@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { ConfigProvider, Effect, Layer } from "effect";
-import { type Command, CommandRunner, decodePueue, PueueMachines, pueueMachinesLayer, projectOf, pueueView } from "@avi2dg/orc-schema";
+import { ConfigProvider, DateTime, Effect, Layer } from "effect";
+import { type Command, CommandRunner, decodePueue, inQueueWindow, PueueMachines, pueueMachinesLayer, projectOf, pueueView } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { issueOf, valueOf } from "../../lib/outcomes";
 
@@ -127,5 +127,20 @@ describe("the pueue machines", () => {
       { name: "south", kind: "ok" },
     ]);
     expect(asked).toContainEqual(["sh", "-c", line]);
+  });
+});
+
+describe("the queue window over a recorded pueue status", () => {
+  const dayAfter = DateTime.makeUnsafe("2026-10-19T00:23:20Z");
+
+  test("drops the tasks that ended over a day ago, not every ended task", () => {
+    const view = pueueView(inQueueWindow(recorded(), dayAfter));
+    expect(view.ended.map((run) => run.id)).toEqual([4, 3]);
+  });
+
+  test("keeps the running, queued and paused tasks however long they have waited", () => {
+    const view = pueueView(inQueueWindow(recorded(), dayAfter));
+    expect(view.running.map((run) => run.command)).toEqual(["sleep 800", "sleep 1000"]);
+    expect([view.queued, view.paused]).toEqual([2, 1]);
   });
 });

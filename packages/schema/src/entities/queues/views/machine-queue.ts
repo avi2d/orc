@@ -1,5 +1,6 @@
 import { DateTime, Duration } from "effect";
 import type { CiRun } from "../sources/ci-runs";
+import type { PueueStatus } from "../sources/pueue";
 import type { EndedRow, PueueView, RunOwners, RunningRow } from "./queues";
 import { secondsFrom } from "../../../shared/lib";
 
@@ -84,6 +85,16 @@ const endedRow = (run: EndedRow, owners: RunOwners, machine: string | undefined)
 
 export const queueWindow = Duration.days(1);
 
+const windowStart = (now: DateTime.Utc): number => millis(now) - Duration.toMillis(queueWindow);
+
+export const inQueueWindow = (status: PueueStatus, now: DateTime.Utc): PueueStatus => {
+  const since = windowStart(now);
+  return {
+    ...status,
+    tasks: Object.fromEntries(Object.entries(status.tasks).filter(([, task]) => !("Done" in task.status) || millis(task.status.Done.end) >= since)),
+  };
+};
+
 const order: Readonly<Record<"running" | "waiting" | "ended", number>> = { running: 0, waiting: 1, ended: 2 };
 
 const placeOf = (row: QueueRow): number => (row.state === "running" || row.state === "waiting" ? order[row.state] : order.ended);
@@ -99,7 +110,7 @@ export interface QueueEntry {
 
 // The queue lists what runs and waits now and what ended in the last day, so a week of pueue history does not bury today's runs.
 export const machineQueue = (entries: ReadonlyArray<QueueEntry>, ci: ReadonlyArray<CiRun>, now: DateTime.Utc): MachineQueueView => {
-  const since = millis(now) - Duration.toMillis(queueWindow);
+  const since = windowStart(now);
   const rows = [
     ...entries.flatMap(({ machine, pueue, owners }) => [
       ...(pueue?.running ?? []).map((run) => runningRow(run, owners, machine, now)),
