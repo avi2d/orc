@@ -26,9 +26,9 @@ let packedFiles: ReadonlyArray<string> = []
 let packedTarballName = ""
 
 beforeAll(() => {
-  const result = Bun.spawnSync([process.execPath, "run", "build"], { cwd: repoRoot })
+  const result = Bun.spawnSync([process.execPath, "run", "build:pack"], { cwd: repoRoot })
   if (result.exitCode !== 0) {
-    throw new Error("bun run build failed: " + result.stdout.toString() + result.stderr.toString())
+    throw new Error("bun run build:pack failed: " + result.stdout.toString() + result.stderr.toString())
   }
   const packed = packedTarball()
   packedFiles = packed.files

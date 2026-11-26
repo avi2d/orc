@@ -10,7 +10,7 @@ import { binPath, type Fixture, orchestratorConfig, piFor, runOrc, sessionFor, u
 
 const loginProvider = { id: "opencode-go", credential: "pi-login", nono: { upstream: "https://example.com/v1" } }
 
-const chatToolsPath = new URL("../../packages/run/src/features/chat/chat-tools.ts", import.meta.url).pathname
+const chatToolsPath = new URL("../../packages/run/dist/chat-tools.ts", import.meta.url).pathname
 
 const BacklogJson = Schema.fromJsonString(Schema.Struct({
   tasks: Schema.Array(Schema.Struct({
