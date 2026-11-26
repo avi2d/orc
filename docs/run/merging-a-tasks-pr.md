@@ -30,6 +30,12 @@ It stops waiting early once a check on the new head is red.
 It reads the new head's parents and treats a head that leaves out the checked head as changed after the approval.
 Once the new head is green and no longer behind, orc runs `gh pr merge <url> --squash --match-head-commit <new sha>`.
 
+## Change the first wait
+
+Set `ORC_MERGE_POLL_SECONDS` to change the first wait before Orc reads an updated PR, such as `ORC_MERGE_POLL_SECONDS=0.5 orc merge orc-7`.
+Later waits still double up to 15 seconds.
+The value is a number of seconds above zero and at most 15, and Orc refuses any other value before it reads the PR.
+
 ## The recorded stage
 
 At each step of an `orc merge`, Orc writes a `merge` record into the closed task file.

@@ -1,7 +1,7 @@
 import { expect } from "bun:test"
-import { chmod, mkdir, writeFile } from "node:fs/promises"
-import { join } from "node:path"
-import { closeTask, type Fixture, ranClosing, sessionFor } from "./chat-helpers"
+import { chmod, mkdir, readdir, readFile, writeFile } from "node:fs/promises"
+import { join, relative } from "node:path"
+import { closeTask, type Fixture, orchestratorConfig, ranClosing, sessionFor, withFixture } from "./chat-helpers"
 
 export const prUrl = "https://github.com/acme/orc/pull/8"
 export const head = "0123456789abcdef0123456789abcdef01234567"
@@ -133,7 +133,43 @@ export const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
 export const writeProject = (fixture: Fixture, extra: Record<string, unknown>): Promise<void> =>
   writeFile(join(fixture.home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: fixture.dir }, ...extra }] }))
 
-export const closedWithPr = async (fixture: Fixture): Promise<void> => {
+export const withMergeFixture = (body: (fixture: Fixture) => Promise<void>): Promise<void> =>
+  withFixture(orchestratorConfig, 0, (fixture) => body({ ...fixture, env: { ...fixture.env, ORC_MERGE_POLL_SECONDS: "0.05" } }))
+
+interface AddedBacklog {
+  readonly folders: ReadonlyArray<string>
+  readonly files: ReadonlyArray<{ readonly path: string; readonly text: string }>
+}
+
+const backlogEntries = async (backlog: string) =>
+  (await readdir(backlog, { recursive: true, withFileTypes: true })).map((entry) => ({ entry, path: relative(backlog, join(entry.parentPath, entry.name)) }))
+
+let firstAdd: Promise<AddedBacklog> | undefined
+
+const addTask = async (fixture: Fixture): Promise<AddedBacklog> => {
+  const backlog = join(fixture.home, "backlog")
+  const before = new Set((await backlogEntries(backlog)).map(({ path }) => path))
   expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added orc-1 for orc")
+  const added = (await backlogEntries(backlog)).filter(({ path }) => !before.has(path))
+  return {
+    folders: added.filter(({ entry }) => entry.isDirectory()).map(({ path }) => path),
+    files: await Promise.all(added.filter(({ entry }) => entry.isFile()).map(async ({ path }) => ({ path, text: await readFile(join(backlog, path), "utf8") })))
+  }
+}
+
+const replayAdd = async (fixture: Fixture, added: AddedBacklog): Promise<void> => {
+  const backlog = join(fixture.home, "backlog")
+  await Promise.all(added.folders.map((folder) => mkdir(join(backlog, folder), { recursive: true })))
+  await Promise.all(added.files.map((file) => writeFile(join(backlog, file.path), file.text)))
+}
+
+// A real add starts one orc process per test, so only the first fixture adds the task and the rest replay the folders and files it wrote.
+export const closedWithPr = async (fixture: Fixture): Promise<void> => {
+  if (firstAdd === undefined) {
+    firstAdd = addTask(fixture)
+    await firstAdd
+  } else {
+    await replayAdd(fixture, await firstAdd)
+  }
   await closeTask(fixture, "orc-1", ranClosing("done", "", prUrl))
 }
