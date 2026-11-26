@@ -10,7 +10,7 @@ import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run
 import { openItems } from "../../../packages/run/src/entities/attention/index"
 import { flagStall } from "../../../packages/run/src/widgets/beat/stall"
 import { markEventPosted, unpostedEvents } from "../../../packages/run/src/entities/events/index"
-import { openDatabase, recordRun } from "../../../packages/run/src/entities/run-history/index"
+import { markRunStopped, openDatabase, recordRun } from "../../../packages/run/src/entities/run-history/index"
 import { runBeat } from "../../../packages/run/src/widgets/beat/beat"
 import { quietSources } from "../../lib/beat-sources"
 import { formatBeat } from "../../../packages/run/src/widgets/beat/board"
@@ -118,6 +118,23 @@ describe("a pueue run's stall", () => {
       const closed = (await run(listTasks(root))).find((entry) => entry.spec.id === "task-1")
       expect(closed).toMatchObject({ state: { kind: "closed", closing: { outcome: "failed" } }, retry: { run: "previous-run" } })
       expect((await run(openItems(root))).some((entry) => entry.item.kind === "run-died" && entry.item.text.includes("last diagnostic line"))).toBe(true)
+    })
+  })
+  test("an owner-stopped run is closed instead of retried while its queue still reports running", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await seedRun(root)
+      const db = await run(openDatabase(root))
+      try {
+        await run(markRunStopped(db, "run-1", "2026-10-27T11:01:00.000Z", "the run was stopped"))
+      } finally {
+        db.close()
+      }
+      await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
+      await beatAt(root, minutesAfterWrite(30), running, true)
+      const task = (await run(listTasks(root))).find((entry) => entry.spec.id === "task-1")
+      expect(task).toMatchObject({ state: { kind: "closed", closing: { outcome: "stopped" } } })
+      expect(task?.retry).toBeUndefined()
     })
   })
   test("output 30 minutes old flags the run instead of waiting longer", async () => {
