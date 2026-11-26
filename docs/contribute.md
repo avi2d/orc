@@ -9,12 +9,16 @@ To run the checks:
 1. Run `bun run typecheck` to typecheck it.
 1. Run `bun run test` to test it.
 
+The e2e tests start `orc` from the `packages/run/dist/bin.js` bundle, and `bun run test` builds it first through `bun run bundle`.
+To run one e2e file with `bun test`, run `bun run bundle` first and again after each change to `packages/run/src`.
+
 ## Run orc from a checkout
 
 To work on orc, run the `orc` command from a checkout instead of the [npm](https://www.npmjs.com) package:
 
 1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
 1. Run `cd orc && bun install --frozen-lockfile` to install the pinned dependencies.
+1. Run `bun run build:launcher` to build the npm launcher.
 1. Run `cd packages/run && bun link` to put the checkout's `orc` command on your PATH.
 1. Run `orc --version` to check it.
 

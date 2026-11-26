@@ -14,13 +14,25 @@ To update orc on a machine:
 1. Read the line it prints, which names the version it found and the version that runs.
 
 `orc update` reads the newest version of `@avi2dg/orc` from the registry `npm_config_registry` names, else from `https://registry.npmjs.org`.
-When that version is newer than the running one, a [Bun](https://bun.com) global install runs `bun add -g @avi2dg/orc@<version>`.
+When that version is newer than the running one, an npm global install runs `npm install -g @avi2dg/orc@<version>` in the same npm prefix.
+A [Bun](https://bun.com) global install runs `bun add -g @avi2dg/orc@<version>`.
 If the machine uses a launcher that reads `~/.local/share/orc/release`, Orc prepares the new release before changing that file.
-An `update.command` overrides both install methods.
+An `update.command` overrides the install method.
 When the versions are equal, or the running orc is newer, it installs nothing.
 A registry read that fails or takes more than 15 seconds installs nothing, and the command prints why.
 Run `orc update --json` for an `orc.update.v1` document.
-To upgrade by hand instead, run `bun add -g @avi2dg/orc`, the same command that installs orc.
+To upgrade by hand instead, repeat the install command for your package manager.
+
+## Update a root-owned npm prefix
+
+The beat's hourly update runs `npm install -g` as you, so it needs an npm prefix you can write to.
+Run `npm prefix -g` to see the prefix.
+If the prefix is owned by root, such as `/usr` with a distribution's Node, the hourly update fails each time a new version is published.
+
+To update orc in a root-owned prefix:
+
+1. Set `ORC_BEAT_UPDATE=off` on the beat process so the beat skips the update check.
+1. Run `sudo npm install -g @avi2dg/orc` when you want the new version.
 
 ## Update a versioned checkout
 

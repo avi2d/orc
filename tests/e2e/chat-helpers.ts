@@ -1,10 +1,12 @@
+import { bundlePath, ensureBundle } from "./bundle"
 import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { chatExtension, chatSession } from "../../packages/run/src/features/chat/chat-tools"
 import type { ChatTool } from "../../packages/run/src/features/chat/chat-run"
 
-export const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
+ensureBundle()
+export const binPath = bundlePath
 
 export interface Fixture {
   readonly dir: string

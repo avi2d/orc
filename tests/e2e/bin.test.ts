@@ -1,3 +1,4 @@
+import { bundlePath, ensureBundle } from "./bundle"
 import { describe, expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -8,7 +9,8 @@ import { Effect, Schema } from "effect"
 import packageJson from "../../package.json" with { type: "json" }
 import { openDatabase } from "../../packages/run/src/entities/run-history/index"
 
-const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
+ensureBundle()
+const binPath = bundlePath
 
 const resumeTimeout = 30_000
 
@@ -24,6 +26,14 @@ const runOrc = async (args: ReadonlyArray<string>, cwd?: string, env?: Record<st
 }
 
 describe("orc bin", () => {
+  test("the unbundled source prints the package version instead of failing to start", async () => {
+    const source = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
+    const proc = Bun.spawn([process.execPath, source, "--version"], { stdout: "pipe", stderr: "pipe" })
+    const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited])
+    expect(exitCode).toBe(0)
+    expect(stdout).toBe(`orc ${packageJson.version}\n`)
+  }, 60_000)
+
   test("--version prints the package version and exits 0", async () => {
     const result = await runOrc(["--version"])
     expect(result.exitCode).toBe(0)
