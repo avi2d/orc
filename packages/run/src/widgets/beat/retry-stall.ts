@@ -7,7 +7,7 @@ import { type DispatchConfig, throughFor } from "../../shared/config/index"
 import { closeFinished, retryDeadRun, type CloseContext } from "./beat-close"
 import { flagStall } from "./stall"
 
-export const retryStalled = (
+const retryStalled = (
   root: string,
   home: string,
   config: DispatchConfig,
