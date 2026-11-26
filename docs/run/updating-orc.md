@@ -14,12 +14,8 @@ To update orc on a machine:
 1. Read the line it prints, which names the version it found and the version that runs.
 
 `orc update` reads the newest version of `@avi2dg/orc` from the registry `npm_config_registry` names, else from `https://registry.npmjs.org`.
-<<<<<<< HEAD
 When that version is newer than the running one, an npm global install runs `npm install -g @avi2dg/orc@<version>` in the same npm prefix.
-A Bun global install runs `bun add -g @avi2dg/orc@<version>`.
-=======
-When that version is newer than the running one, a [Bun](https://bun.com) global install runs `bun add -g @avi2dg/orc@<version>`.
->>>>>>> origin/main
+A [Bun](https://bun.com) global install runs `bun add -g @avi2dg/orc@<version>`.
 If the machine uses a launcher that reads `~/.local/share/orc/release`, Orc prepares the new release before changing that file.
 An `update.command` overrides the install method.
 When the versions are equal, or the running orc is newer, it installs nothing.

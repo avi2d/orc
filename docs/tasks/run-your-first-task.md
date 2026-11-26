@@ -7,14 +7,8 @@ Run one task by hand, to see a run from the task file to its pull request before
 
 ## Before you begin
 
-<<<<<<< HEAD
-- Git 2.48 or later, and Node.
-- Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
-=======
-- [Bun](https://bun.com), at the version `.bun-version` pins.
 - [Git](https://git-scm.com) 2.48 or later, and [Node.js](https://nodejs.org).
 - [Pi](https://pi.dev), the `@earendil-works/pi-coding-agent` [npm](https://www.npmjs.com) package, logged in to a model provider.
->>>>>>> origin/main
 - [no-mistakes](https://github.com/kunchenguid/no-mistakes), installed as [Installing no-mistakes](../run/installing-no-mistakes.md) says.
 - A project in a git checkout with a remote that no-mistakes can open a pull request on, such as [GitHub](https://github.com).
 
