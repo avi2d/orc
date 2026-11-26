@@ -24,11 +24,11 @@ export interface OwnerDecision {
   readonly inferred: boolean
 }
 
-export interface AgentDecision extends OwnerDecision {
+interface AgentDecision extends OwnerDecision {
   readonly basis: string
 }
 
-export interface DecisionGroups {
+interface DecisionGroups {
   readonly owner: ReadonlyArray<OwnerDecision>
   readonly agent: ReadonlyArray<AgentDecision>
 }
