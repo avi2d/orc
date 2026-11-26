@@ -260,6 +260,13 @@ const advanceParked = (
       log.liftCap()
     }
     const open = openQuestionsIn(parsed.findings, omittedQuestionIds(stdout))
+    if (gate.step === "review" && gate.stage === "fix-review" && scalar(stdout, "defer_non_errors") === "true" &&
+      open.length === 0 && parsed.findings.length > 0 &&
+      parsed.findings.every((finding) => finding.id !== "" && (finding.severity === "warning" || finding.severity === "info"))) {
+      const current = yield* input.runner.respond({ kind: "approve", followUps: parsed.findings.map((finding) => finding.id) })
+      yield* settleFixResponse(input.runDir, log, supplied, [], current)
+      return { kind: "next", current, sent: { kind: "respond", gate } }
+    }
     const questions = [...open, ...askUserFindings(parsed.findings, input.allow ?? [])].map((finding): PendingFinding =>
       isUnknownAction(finding) ? { ...finding, owner: "user" } : finding)
     const { missing, asking, askedAt } = yield* awaitMissing(input, questions, supplied)
