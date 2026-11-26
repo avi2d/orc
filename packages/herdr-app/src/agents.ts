@@ -1,5 +1,5 @@
 import type { Backlog, Run, Runs, ShownStep, Step, Task } from "./guard"
-import type { InboxAnswer, InboxApproval, InboxItem } from "./inbox"
+import { type InboxAnswer, type InboxApproval, type InboxItem, waitsOnLabel } from "./inbox"
 import { sentBackLabel } from "./approval-stage"
 
 export const cardStatuses = ["Awaiting you", "Running", "Queued", "Failed", "Done"] as const
@@ -97,7 +97,7 @@ const stepLabel = (step: Pick<Step, "name" | "attempt">): string => {
 const taskBranches = (task: Task): ReadonlyArray<string> => [`orc/${task.id}`, `orc/${task.id}-parent`]
 
 const queuedWhere = (task: Task, awaited: ReadonlyArray<string> | undefined): string => {
-  if (awaited !== undefined) return `Waits on ${awaited.join(", ")}`
+  if (awaited !== undefined) return waitsOnLabel(awaited)
   return task.hold === null ? "Waiting to start" : "Held"
 }
 

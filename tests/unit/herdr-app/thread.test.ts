@@ -78,6 +78,12 @@ test("gives the current hold without questions one box instead of none", () => {
   expect(threadCards({ task: "orc-16", entries: [line("hold", "user", null, "waits")] }, held).map((card) => card.reply)).toEqual([{ kind: "hold" }])
 })
 
+test("names the awaited child of a bare hold instead of giving it an answer box an answer would not start", () => {
+  const held: TaskDetail = { ...started, id: "orc-74", kind: "parent", state: { status: "new" }, hold: { reason: "held until its parked child orc-78 is closed", until: null, at: null, questions: [], answer: null } }
+  const [card] = threadCards({ task: "orc-74", entries: [line("hold", "user", null, "held until its parked child orc-78 is closed")] }, held, ["orc-78"])
+  expect([card.reply, card.waitsOn]).toEqual([null, ["orc-78"]])
+})
+
 test("gives a closed task no answer box instead of one that always fails", () => {
   const closed: TaskDetail = { ...started, state: { status: "closed", account: "main", started: null, outcome: "done", pr: null, report: null, closedAt: "2026-11-13T12:00:00.000Z" } }
   expect(threadCards({ task: "orc-16", entries: [pictureAsk] }, closed).map((card) => card.reply)).toEqual([null])

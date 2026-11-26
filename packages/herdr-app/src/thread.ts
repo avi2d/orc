@@ -39,6 +39,7 @@ export interface ThreadCard {
   readonly delivered: boolean
   readonly notes: ReadonlyArray<ThreadLine>
   readonly reply: AnswerTarget | null
+  readonly waitsOn: ReadonlyArray<string>
 }
 
 const whoLabels: Readonly<Record<ThreadLine["who"], string>> = { user: "Captain", decider: "Decider", worker: "Worker", beat: "Beat" }
@@ -106,10 +107,10 @@ const startCard = (line: ThreadLine, index: number, open: boolean): ThreadCard =
   const reply = open && question !== null && answerable(line) ? { kind: "question" as const, id: question } : null
   const key = asked === null ? `${line.kind}-${line.at ?? index}` : `question-${asked}`
   const what = question === null ? kindLabels[line.kind] : `${kindLabels[line.kind]} ${question}`
-  return { key, line, what, ask: line.kind === "question" ? askText(line.text) : null, answers: [], delivered: false, notes: [], reply }
+  return { key, line, what, ask: line.kind === "question" ? askText(line.text) : null, answers: [], delivered: false, notes: [], reply, waitsOn: [] }
 }
 
-export const threadCards = (thread: Thread, task: TaskDetail): ReadonlyArray<ThreadCard> => {
+export const threadCards = (thread: Thread, task: TaskDetail, waitsOn: ReadonlyArray<string> = []): ReadonlyArray<ThreadCard> => {
   const open = task.state.status !== "closed"
   const cards: Array<ThreadCard> = []
   const questions = new Map<string, number>()
@@ -125,6 +126,8 @@ export const threadCards = (thread: Thread, task: TaskDetail): ReadonlyArray<Thr
     }
   }
   const hold = task.hold
-  if (open && lastHold !== -1 && hold !== null && hold.answer === null && hold.questions.length === 0) cards[lastHold] = { ...cards[lastHold], reply: { kind: "hold" } }
+  if (open && lastHold !== -1 && hold !== null && hold.answer === null && hold.questions.length === 0) {
+    cards[lastHold] = waitsOn.length === 0 ? { ...cards[lastHold], reply: { kind: "hold" } } : { ...cards[lastHold], waitsOn }
+  }
   return cards
 }

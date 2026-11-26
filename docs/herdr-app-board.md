@@ -39,6 +39,7 @@ The panel keeps its state when you switch tabs.
 Select an answer option, or type an answer and select Send.
 The panel shows an error if the answer command fails.
 A run event question has no answer box.
+A hold without questions on a task that waits on other tasks has no answer box and reads **Waits on** and their IDs.
 Select **Open run** to open the newest of this task's runs that this machine recorded, in Agents.
 The list comes from `orc runs --json --local`.
 While a task is queued, its queue position replaces that button.

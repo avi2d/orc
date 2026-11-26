@@ -66,10 +66,36 @@ test("a bare hold on a task that waits on an open dependency names that task ins
   expect(holdsOnTasks(backlog)).toEqual(new Map([[dependent.id, [openChild.id]]]))
 })
 
-test("a bare hold asks you again once its children are closed instead of staying hidden", () => {
-  const closedChild: TaskDetail = { ...openChild, state: task.state }
+test("a bare hold asks you again once its children are closed and merged instead of staying hidden", () => {
+  const closedChild: TaskDetail = { ...openChild, state: task.state, prState: "merged" }
   const card = inboxItems([parent, closedChild], []).find((item) => item.task === parent.id)
   expect(card).toMatchObject({ kind: "hold", action: { kind: "answer", target: { kind: "hold" } } })
+})
+
+const unmergedChild: TaskDetail = { ...task, id: "garden-23", parent: parent.id }
+
+test("a bare hold keeps waiting on a closed ship child whose PR is open instead of asking you before orc would start it", () => {
+  expect(inboxItems([parent, unmergedChild], []).filter((item) => item.task === parent.id)).toEqual([])
+  expect(holdsOnTasks([parent, unmergedChild])).toEqual(new Map([[parent.id, [unmergedChild.id]]]))
+})
+
+test("a bare hold asks you once its ship child's PR merges instead of waiting on it forever", () => {
+  expect(holdsOnTasks([parent, { ...unmergedChild, prState: "merged" }])).toEqual(new Map())
+})
+
+test("a bare hold on a dropped child asks you instead of waiting on a task no beat reopens", () => {
+  const dropped: TaskDetail = { ...unmergedChild, state: { ...task.state, outcome: "dropped" } }
+  expect(holdsOnTasks([parent, dropped])).toEqual(new Map())
+})
+
+test("a bare hold on a ship task waits on its closed ship dependency with an open PR, and on a dependency the backlog lacks", () => {
+  const dependent: TaskDetail = { ...parent, id: "garden-24", kind: "ship", dependsOn: ["garden-3", "garden-99"] }
+  expect(holdsOnTasks([dependent, task])).toEqual(new Map([[dependent.id, ["garden-3", "garden-99"]]]))
+})
+
+test("a bare hold on a parent does not wait on a closed ship dependency's PR, which orc only awaits between ship tasks", () => {
+  const dependent: TaskDetail = { ...parent, id: "garden-25", dependsOn: ["garden-3"] }
+  expect(holdsOnTasks([dependent, task])).toEqual(new Map())
 })
 
 test("a hold's own questions still ask you while its children are open instead of hiding with the bare hold", () => {
