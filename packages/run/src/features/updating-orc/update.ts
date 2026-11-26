@@ -1,6 +1,7 @@
 import { homedir } from "node:os"
 import { Effect, type FileSystem, type Path, Result, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
+import { startedByLauncher } from "../../entities/heavy-queue/index"
 import { UPDATE_JSON_SCHEMA, UpdateJson, installerError, isNewer, type UpdateDocument } from "../../entities/orc-update/index"
 import { readOrcConfig } from "../../shared/config/index"
 import { capture, selfCommand, type Command } from "../../shared/process/index"
@@ -16,9 +17,12 @@ const Version = Schema.String.check(Schema.isPattern(/^\d+\.\d+\.\d+(?:-[0-9A-Za
 
 const LatestManifest = Schema.Struct({ version: Version })
 
-export const installCommand = (configured: Command | undefined, version: string): Command => {
+export const installCommand = (configured: Command | undefined, version: string, npmPrefix?: string): Command => {
   if (configured === undefined) {
-    return ["bun", "add", "-g", packageName + "@" + version]
+    const release = packageName + "@" + version
+    return npmPrefix
+      ? ["npm", "install", "-g", "--prefix", npmPrefix, release]
+      : ["bun", "add", "-g", release]
   }
   const [program, ...args] = configured
   return [program, ...args.map((arg) => arg.replaceAll("{version}", version))]
@@ -96,7 +100,8 @@ export const runUpdate = (inputs: UpdateInputs): Effect.Effect<UpdateDocument, n
         )
       }
     }
-    const command = installCommand(configured, found)
+    const npmPrefix = startedByLauncher(env, executable, main) ? env.ORC_NPM_GLOBAL_PREFIX : undefined
+    const command = installCommand(configured, found, npmPrefix)
     return yield* capture(command, null).pipe(
       Effect.map((result) => {
         const output = (result.stdout + result.stderr).trim()

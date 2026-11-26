@@ -10,13 +10,15 @@
   "author": "avi2d <avi2dg@gmail.com>",
   "type": "module",
   "bin": {
-    "orc": "src/bin.ts"
+    "orc": "dist/launch"
   },
   "files": [
     "CHANGELOG.md",
     "README.md",
     "agents/",
     "dist/herdr-app/",
+    "dist/launch",
+    "dist/launch.js",
     "scripts/patch-knip-jiti.ts",
     "src/"
   ],

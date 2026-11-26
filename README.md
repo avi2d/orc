@@ -16,9 +16,8 @@ One chat to run your AI agent work on all your machines and models, with a backl
 
 ## Before you begin
 
-- Bun, at the version `.bun-version` pins.
 - Git 2.48 or later.
-- Node, which the agent runs on.
+- Node, which orc's npm launcher and the agent both run on.
 - nono from https://nono.sh, for a run you start by hand with `orc run` unless you pass `--sandbox none`.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
 - no-mistakes v1.90.0 or later, installed as [Installing no-mistakes](docs/run/installing-no-mistakes.md) says, for every run except `direct-PR` and `orc`.
@@ -26,14 +25,16 @@ One chat to run your AI agent work on all your machines and models, with a backl
 
 ## Install
 
-Orc runs on Bun, so install it with Bun.
 To install orc:
 
-1. Run `bun add -g @avi2dg/orc` to put the `orc` command on your PATH.
-1. Run `orc --version` to check it.
+1. Run `npm install -g @avi2dg/orc`.
+1. Run `orc --version`.
 
-Orc prints `orc` and its version.
-To upgrade orc, run `bun add -g @avi2dg/orc` again, or run `orc update`, as [Updating orc](docs/run/updating-orc.md) shows.
+Orc prints its version.
+The npm package runs without Bun on Apple silicon macOS and Linux x64 with glibc.
+If the compiled binary is missing, install Bun to run orc from source.
+To upgrade orc, run the same install command again or follow [Updating orc](docs/run/updating-orc.md).
+The beat's hourly update needs an npm prefix you can write to, and that page says how to turn it off for a root-owned one.
 To run orc from a checkout of this repository instead, follow [Contribute](docs/contribute.md#run-orc-from-a-checkout).
 
 ## Run your first task

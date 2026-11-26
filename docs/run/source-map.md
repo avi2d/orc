@@ -247,9 +247,10 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/heavy-queue/heavy-standin.ts` | The three line stand in launchers that start the helper for each heavy tool, and the `BASH_ENV` guard script |
 | `packages/run/src/entities/heavy-queue/heavy-agent-wrapper.ts` | The agent wrappers that start a no-mistakes review or fix agent under `HEAVY_TESTS_CI_ONLY=1` and the stand in folders |
 | `packages/run/src/entities/heavy-queue/heavy-classify.ts` | The per tool decision of which calls queue and which targeted calls take priority |
-| `packages/run/src/entities/heavy-queue/heavy-standin-main.ts` | The helper a stand in launcher starts by the real bun path, and the waiter a queued pueue task starts, and `isStandinInvocation` and `runStandinInvocation`, which the compiled orc entry uses to run a stand in call itself. `packages/run/scripts/build-heavy-standin.ts` compiles it with Bun bytecode into `packages/run/dist/heavy-standin` |
+| `packages/run/src/entities/heavy-queue/heavy-standin-main.ts` | The helper a stand in launcher starts, and the waiter a queued pueue task starts, and `isStandinInvocation` and `runStandinInvocation`, which the compiled orc entry uses to run a stand in call itself. `packages/run/scripts/build-heavy-standin.ts` compiles it with Bun bytecode into `packages/run/dist/heavy-standin` |
 | `packages/run/src/entities/heavy-queue/heavy-standin-exec.ts` | The helper's run of a call: the classify probe, the real tool as a child, the through command and the queued call waiter |
-| `packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts` | The stand in runtime: the helper command, which a compiled orc or stand in makes its own file, the real tool lookup, the bypass event, the plan of a call and the queue wait |
+| `packages/run/src/entities/heavy-queue/heavy-standin-helper.ts` | The helper command and the folders the sandbox reads to start it. The helper uses the [npm](https://www.npmjs.com) bin link for an npm install. |
+| `packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts` | The stand in runtime: the real tool lookup, the bypass event, the plan of a call and the queue wait |
 | `packages/run/src/entities/heavy-queue/heavy-standin-refusal.ts` | The refusal of a test run, of a test runner called by path, or of a Bun runtime override, under `HEAVY_TESTS_CI_ONLY=1` |
 | `packages/run/src/entities/heavy-queue/heavy-runner-entry.ts` | The reading of the script file a `bun` or `node` call starts, to find a test runner bin, and the check for Bun runtime overrides |
 | `packages/run/src/entities/heavy-queue/heavy-process-tree.ts` | The process tree walk that finds a call inside a held slot or under the through command |
@@ -364,6 +365,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
+| `packages/run/scripts/launch.sh` | The shell entry of the npm `orc` bin, which finds Node and starts `launch.js` |
+| `packages/run/scripts/launch.ts` | The Node launcher, which `bun run build:launcher` bundles into `packages/run/dist/launch.js`. It runs the compiled orc from the platform package, else the source entry with Bun |
 | `packages/run/agents` | The bundled agent files |
 | `packages/run/agents/decider-policy.md` | The written policy the decider answers under |
 | `packages/run/agents/reviewer.md` | The bundled reviewer prompt, which the project's `.orc/agents/reviewer.md` and then `$ORC_HOME/agents/reviewer.md` override |

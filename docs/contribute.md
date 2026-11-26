@@ -18,6 +18,7 @@ To work on orc, run the `orc` command from a checkout instead of the [npm](https
 
 1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
 1. Run `cd orc && bun install --frozen-lockfile` to install the pinned dependencies.
+1. Run `bun run build:launcher` to build the npm launcher.
 1. Run `cd packages/run && bun link` to put the checkout's `orc` command on your PATH.
 1. Run `orc --version` to check it.
 

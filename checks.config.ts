@@ -68,4 +68,5 @@ export default defineConfig({
     "tests/e2e/bundle.ts": ["tests/e2e/e2e-bundle.test.ts"],
   },
   releaseAssets: true,
+  platformPackages: { binary: "orc", platforms: ["darwin-arm64", "linux-x64"] },
 });

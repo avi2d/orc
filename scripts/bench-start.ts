@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { arch, cpus, platform, release } from "node:os"
 import { Console, Data, Effect } from "effect"
-import { helperCommand } from "../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
+import { helperCommand } from "../packages/run/src/entities/heavy-queue/heavy-standin-helper"
 
 class BenchStartError extends Data.TaggedError("BenchStartError")<{
   readonly message: string

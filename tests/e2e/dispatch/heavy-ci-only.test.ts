@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { ciOnlyMarker, ciOnlyWord, helperCommand, standinMarker, type StandinCall } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
+import { helperCommand } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-helper"
+import { ciOnlyMarker, ciOnlyWord, standinMarker, type StandinCall } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
 
 describe("CI-only runtime launchers", () => {
   let root: string

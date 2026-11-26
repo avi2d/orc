@@ -23,9 +23,31 @@ jobs:
       - name: run the full test suite on the release commit
         run: bun run test --full
 
+  binaries:
+    if: "startsWith(github.event.head_commit.message, 'chore: release ')"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        runner: [macos-latest, ubuntu-latest]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: build the release binaries
+        run: bun run release:assets
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: platform-binary-${{ matrix.runner }}
+          path: release-assets/orc-*
+          if-no-files-found: error
+
   release:
-    needs: suite
-    if: ${{ !cancelled() && (needs.suite.result == 'success' || needs.suite.result == 'skipped') }}
+    needs: [suite, binaries]
+    if: ${{ !cancelled() && (needs.suite.result == 'success' || needs.suite.result == 'skipped') && (needs.binaries.result == 'success' || needs.binaries.result == 'skipped') }}
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 15
     concurrency:
@@ -48,10 +70,18 @@ jobs:
         with:
           node-version: "24"
           registry-url: https://registry.npmjs.org
+      # The binaries job skips on a push that is no release commit, so there is nothing to download.
+      - if: needs.binaries.result == 'success'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: platform-binary-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/platform-binaries
       - id: release
         env:
           GH_TOKEN: ${{ github.token }}
           CHECKS_PUBLISH_WORKSPACES: "true"
+          CHECKS_PLATFORM_BINARIES: ${{ runner.temp }}/platform-binaries
         run: bunx checks-release-tag
 
   assets:
