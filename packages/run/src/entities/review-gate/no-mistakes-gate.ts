@@ -137,6 +137,37 @@ export const parseRun = (output: string): ParsedRun => {
   }
 }
 
+const recordedBlock = (output: string): ReadonlyArray<string> => {
+  const lines = output.split(/\r?\n/)
+  const start = lines.findIndex((line) => line.trimEnd() === "recorded:")
+  if (start === -1) {
+    return []
+  }
+  const rest = lines.slice(start + 1)
+  const end = rest.findIndex((line) => !line.startsWith(" "))
+  return end === -1 ? rest : rest.slice(0, end)
+}
+
+const recordedIds = (block: ReadonlyArray<string>, key: string): ReadonlyArray<string> | null => {
+  const header = new RegExp("^  " + key + "\\[(\\d+)\\]: *(.*)$")
+  for (const line of block) {
+    const match = header.exec(line)
+    if (match !== null) {
+      const ids = match[2] === "" ? [] : splitRow(match[2])
+      return ids.length === Number(match[1]) && ids.every((id) => id !== "") ? ids : null
+    }
+  }
+  return null
+}
+
+export const recordedResponse = (output: string) => {
+  const block = recordedBlock(output)
+  return {
+    followUps: recordedIds(block, "follow_ups") ?? [],
+    sentToFixer: recordedIds(block, "sent_to_fixer") ?? recordedIds(block, "fixed")
+  }
+}
+
 type Classified = Pick<NoMistakesFinding, "id" | "action">
 
 export const isQuestion = (finding: Pick<NoMistakesFinding, "id">): boolean => finding.id.startsWith("question-")

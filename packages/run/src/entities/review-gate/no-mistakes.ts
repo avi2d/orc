@@ -12,6 +12,7 @@ import {
   isUnknownAction,
   omittedQuestionIds,
   openQuestionsIn,
+  recordedResponse,
   respondArgs,
   stepsWithFindings,
   type AllowWord,
@@ -249,6 +250,30 @@ const awaitMissing = (
     return { missing: unanswered(), asking: waited.asked, askedAt: waited.askedAt }
   })
 
+const settleFixResponse = Effect.fnUntraced(function*(
+  runDir: string,
+  log: DriveLog,
+  supplied: Map<string, string>,
+  answeredIds: ReadonlyArray<string>,
+  reply: NoMistakesReply
+) {
+  const { followUps, sentToFixer } = recordedResponse(reply.stdout)
+  if (followUps.length > 0) {
+    const note = log.noteDeferrals({
+      findingIds: followUps,
+      skippedFixRound: sentToFixer?.length === 0,
+      unappliedAnswers: followUps.filter((id) => supplied.has(id))
+    })
+    yield* appendGate(runDir, note)
+  }
+  const legacyAccepted = reply.exitCode === 0 && scalar(reply.stdout, "error") === ""
+  for (const id of answeredIds) {
+    if (!followUps.includes(id) && (sentToFixer?.includes(id) ?? legacyAccepted)) {
+      supplied.delete(id)
+    }
+  }
+})
+
 type ParkedAdvance =
   | { readonly kind: "ending"; readonly ending: Ending }
   | { readonly kind: "next"; readonly current: NoMistakesReply; readonly sent: Sent }
@@ -295,9 +320,8 @@ const advanceParked = (
     }
     const current = yield* input.runner.respond(answer)
     if (answer.kind === "fix") {
-      for (const settled of answeredAskUser(parsed.findings, carried)) {
-        supplied.delete(settled.id)
-      }
+      const answeredIds = answeredAskUser(parsed.findings, carried).map((finding) => finding.id)
+      yield* settleFixResponse(input.runDir, log, supplied, answeredIds, current)
     }
     return { kind: "next", current, sent: { kind: "respond", gate } }
   })

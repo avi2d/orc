@@ -8,6 +8,7 @@ export interface NoMistakesRecord {
   readonly status: NoMistakesStatus
   readonly gate: string | null
   readonly findings: ReadonlyArray<NoMistakesFinding>
+  readonly deferredFindingIds: ReadonlyArray<string>
   readonly gatesAnswered: number
   readonly openQuestions: ReadonlyArray<OpenQuestion>
   readonly prLink: string | null
@@ -24,9 +25,22 @@ export interface Ending {
   readonly openQuestions: ReadonlyArray<OpenQuestion>
 }
 
+interface DeferredGate {
+  readonly findingIds: ReadonlyArray<string>
+  readonly skippedFixRound: boolean
+  readonly unappliedAnswers: ReadonlyArray<string>
+}
+
+const deferralNote = (gate: DeferredGate): string => [
+  "Findings deferred to PR follow-ups: " + gate.findingIds.join(", ") + ".",
+  ...(gate.skippedFixRound ? ["no-mistakes ran no fix round at that gate."] : []),
+  ...gate.unappliedAnswers.map((id) => "The captain's answer for " + id + " was not applied.")
+].join(" ")
+
 export interface DriveLog {
   readonly read: (output: string) => ParsedRun
   readonly remember: (step: string, findings: ReadonlyArray<NoMistakesFinding>) => void
+  readonly noteDeferrals: (gate: DeferredGate) => string
   readonly noteReviewer: (status: string) => void
   readonly runId: () => string
   readonly gatesAnswered: () => number
@@ -55,6 +69,7 @@ const endedReason = (parsed: ParsedRun): string =>
 export const openDriveLog = (started: string): DriveLog => {
   const findings: Array<NoMistakesFinding> = []
   const known = new Set<string>()
+  const deferredGates: Array<DeferredGate> = []
   let gatesAnswered = 0
   let capLifted = 0
   let prLink: string | null = null
@@ -84,6 +99,10 @@ export const openDriveLog = (started: string): DriveLog => {
       return parsed
     },
     remember,
+    noteDeferrals: (gate) => {
+      deferredGates.push(gate)
+      return deferralNote(gate)
+    },
     noteReviewer: (status) => {
       const named = scalar(status, "reviewer_agent")
       reviewer = named === "" ? reviewer : named
@@ -117,11 +136,12 @@ export const openDriveLog = (started: string): DriveLog => {
       status: ending.status,
       gate: ending.gate === null ? null : ending.gate.step,
       findings,
+      deferredFindingIds: [...new Set(deferredGates.flatMap((gate) => gate.findingIds))],
       gatesAnswered,
       openQuestions: ending.openQuestions,
       prLink,
       reviewer,
-      result: ending.result,
+      result: [ending.result, ...deferredGates.map(deferralNote)].join(" "),
       started,
       ended: new Date().toISOString()
     })
