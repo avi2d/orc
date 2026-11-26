@@ -7,6 +7,7 @@ import { Effect, Layer, Option } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { TestClock } from "effect/testing"
 import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
+import { openItems } from "../../../packages/run/src/entities/attention/index"
 import { flagStall } from "../../../packages/run/src/widgets/beat/stall"
 import { markEventPosted, unpostedEvents } from "../../../packages/run/src/entities/events/index"
 import { openDatabase, recordRun } from "../../../packages/run/src/entities/run-history/index"
@@ -102,6 +103,21 @@ describe("a pueue run's stall", () => {
       await beatAt(root, minutesAfterWrite(30), running, true)
       const task = (await run(listTasks(root))).find((entry) => entry.spec.id === "task-1")
       expect(task).toMatchObject({ state: { kind: "new" }, retry: { run: "run-1" }, parked: { branch: "orc/task-1", origin: { machine: "mac", run: "run-1" } } })
+    })
+  })
+  test("a second stall opens run-died with the log tail instead of retrying again", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await seedRun(root)
+      const task = (await run(listTasks(root))).find((entry) => entry.spec.id === "task-1")
+      if (task === undefined) throw new Error("missing task")
+      await run(writeTaken(root, { ...task, retry: { run: "previous-run", at: "2026-10-27T10:00:00.000Z" } }))
+      await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
+      await writeFile(join(root, "logs", "task-1.log"), "last diagnostic line\n")
+      await beatAt(root, minutesAfterWrite(30), running, true)
+      const closed = (await run(listTasks(root))).find((entry) => entry.spec.id === "task-1")
+      expect(closed).toMatchObject({ state: { kind: "closed", closing: { outcome: "failed" } }, retry: { run: "previous-run" } })
+      expect((await run(openItems(root))).some((entry) => entry.item.kind === "run-died" && entry.item.text.includes("last diagnostic line"))).toBe(true)
     })
   })
   test("output 30 minutes old flags the run instead of waiting longer", async () => {
