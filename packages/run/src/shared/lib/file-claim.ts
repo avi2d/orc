@@ -1,5 +1,5 @@
 import { dlopen, FFIType, read } from "bun:ffi"
-import { closeSync, ftruncateSync, openSync, writeSync } from "node:fs"
+import { open } from "node:fs/promises"
 import { hostname } from "node:os"
 import { Clock, Console, Effect, FileSystem, Option, PlatformError, Predicate, Schema } from "effect"
 
@@ -52,9 +52,8 @@ const dropClaim = (fs: FileSystem.FileSystem, file: string, held: string): Effec
 
 const libcPath = process.platform === "darwin" ? "/usr/lib/libSystem.B.dylib" : "libc.so.6"
 const libc = dlopen(libcPath, { flock: { args: [FFIType.i32, FFIType.i32], returns: FFIType.i32 } })
-const errno = process.platform === "darwin"
-  ? dlopen(libcPath, { __error: { args: [], returns: FFIType.ptr } }).symbols.__error
-  : dlopen(libcPath, { __errno_location: { args: [], returns: FFIType.ptr } }).symbols.__errno_location
+const errnoName = process.platform === "darwin" ? "__error" : "__errno_location"
+const errno = dlopen(libcPath, { [errnoName]: { args: [], returns: FFIType.ptr } }).symbols[errnoName]
 const processStartedAt = Date.now() - process.uptime() * 1000
 
 const lockFailure = (file: string, method: string, cause: unknown): PlatformError.PlatformError =>
@@ -62,29 +61,22 @@ const lockFailure = (file: string, method: string, cause: unknown): PlatformErro
 
 const withKernelLock = <A, E, R>(file: string, use: Effect.Effect<A, E, R>): Effect.Effect<Option.Option<A>, E | PlatformError.PlatformError, R> =>
   Effect.acquireUseRelease(
-    Effect.try({ try: () => openSync(file, "a+"), catch: (cause) => lockFailure(file, "open", cause) }),
-    (fd) => Effect.gen(function*() {
-      const locked = yield* Effect.try({
-        try: () => {
-          if (libc.symbols.flock(fd, 2 | 4) === 0) return true
-          const address = errno()
-          const code = address === null ? -1 : read.i32(address)
-          if (code === (process.platform === "darwin" ? 35 : 11)) return false
-          throw new Error("flock failed with errno " + code)
-        },
-        catch: (cause) => lockFailure(file, "flock", cause)
+    Effect.tryPromise({ try: () => open(file, "a+"), catch: (cause) => lockFailure(file, "open", cause) }),
+    (handle) => Effect.gen(function*() {
+      const code = yield* Effect.sync(() => {
+        if (libc.symbols.flock(handle.fd, 2 | 4) === 0) return 0
+        const address = errno()
+        return address === null ? -1 : read.i32(address)
       })
-      if (!locked) return Option.none<A>()
-      yield* Effect.try({
-        try: () => {
-          ftruncateSync(fd, 0)
-          writeSync(fd, JSON.stringify({ pid: process.pid, host: hostname(), startedAt: processStartedAt }), 0)
-        },
+      if (code === (process.platform === "darwin" ? 35 : 11)) return Option.none<A>()
+      if (code !== 0) return yield* Effect.fail(lockFailure(file, "flock", "errno " + code))
+      yield* Effect.tryPromise({
+        try: () => handle.truncate(0).then(() => handle.writeFile(JSON.stringify({ pid: process.pid, host: hostname(), startedAt: processStartedAt }))),
         catch: (cause) => lockFailure(file, "write", cause)
       })
       return yield* Effect.asSome(use)
     }),
-    (fd) => Effect.sync(() => closeSync(fd))
+    (handle) => Effect.promise(() => handle.close())
   )
 
 const takeClaim = (fs: FileSystem.FileSystem, file: string, mine: string): Effect.Effect<boolean, PlatformError.PlatformError> =>
