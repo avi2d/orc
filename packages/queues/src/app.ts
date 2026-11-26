@@ -8,7 +8,9 @@ import {
   type HeavyCheck,
   type HeavyMachine,
   HeavyMachines,
+  inQueueWindow,
   knownProjects,
+  mapOutcome,
   type Outcome,
   type PueueMachine,
   type PueueStatus,
@@ -111,12 +113,19 @@ export const readQueues: Effect.Effect<QueuesView, never, QueueSources> = Effect
   return queuesView((yield* Effect.provideService(readQueueReadings, HeavyMachines, [])).fresh, yield* knownProjects(machines));
 });
 
+const readRecentNamingCopies = (machine: PueueMachine, now: DateTime.Utc): Effect.Effect<Outcome<PueueStatus>> =>
+  Effect.flatMap(machine.read, (reading) => {
+    const recent = mapOutcome(reading, (status) => inQueueWindow(status, now));
+    return recent.kind === "ok" ? Effect.as(machine.projects.resolve(copyPathsOfStatus(recent.value)), recent) : Effect.succeed(recent);
+  });
+
 export const readQueuesReport: Effect.Effect<QueuesReport, never, QueueSources> = Effect.gen(function* () {
   const machines = yield* PueueMachines;
   const actions = yield* ActionsSource;
+  const now = yield* DateTime.now;
   const [statuses, runs] = yield* Effect.all(
     [
-      Effect.forEach(machines, (machine) => Effect.map(readNamingCopies(machine), (status) => ({ name: machine.name, status })), {
+      Effect.forEach(machines, (machine) => Effect.map(readRecentNamingCopies(machine, now), (status) => ({ name: machine.name, status })), {
         concurrency: "unbounded",
       }),
       actions.read,
