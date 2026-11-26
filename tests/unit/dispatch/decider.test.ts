@@ -42,16 +42,26 @@ const withAskingTask = async (body: (root: string) => Promise<void>, questions: 
   }
 }
 
-const replies = (byQuestion: Readonly<Record<string, string>>, heard: Array<DeciderRequest> = [], home = "/nonexistent/orc-home"): AskDecider => ({
-  home,
-  ask: (request) => {
-    heard.push(request)
-    const matching = Object.entries(byQuestion).filter(([text]) => request.prompt.includes(text))
-    matching.sort((a, b) => request.prompt.lastIndexOf(b[0]) - request.prompt.lastIndexOf(a[0]))
-    const first = matching.at(0)
-    return first === undefined ? Effect.fail(new DeciderUnheard({ reason: "no reply in this test" })) : Effect.succeed(first[1])
+const supports = JSON.stringify({ verdict: "supports" })
+
+const replies = (byQuestion: Readonly<Record<string, string>>, heard: Array<DeciderRequest> = [], home = "/nonexistent/orc-home", supportByAnswer: Readonly<Record<string, string>> = {}, checked: Array<DeciderRequest> = []): AskDecider => {
+  const decider = {
+    home,
+    ask: (request: DeciderRequest) => {
+      heard.push(request)
+      const matching = Object.entries(byQuestion).filter(([text]) => request.prompt.includes(text))
+      matching.sort((a, b) => request.prompt.lastIndexOf(b[0]) - request.prompt.lastIndexOf(a[0]))
+      const first = matching.at(0)
+      return first === undefined ? Effect.fail(new DeciderUnheard({ reason: "no reply in this test" })) : Effect.succeed(first[1])
+    },
+    checkSupport: (request: DeciderRequest) => {
+      checked.push(request)
+      const found = Object.entries(supportByAnswer).find(([answerWords]) => request.prompt.includes(answerWords))
+      return Effect.succeed(found === undefined ? supports : found[1])
+    }
   }
-})
+  return decider
+}
 
 const answer = JSON.stringify({ decision: "answer", answer: "Two retries", rule: "Retry a failed upload twice, then give up.", reason: "the intent says twice" })
 const escalate = JSON.stringify({ decision: "escalate", reason: "the intent leaves the flag name open" })
@@ -383,6 +393,22 @@ describe("the decider", () => {
       expect(await itemFile(root, r2Item)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
       expect(filedAt(await itemFile(root, r2Item), "decision", "reason")).toContain("in none of the rules it read")
       expect((await run(listTasks(root))).at(0)?.parked?.questions.find((question) => question.id === "r2")?.answer).toBeNull()
+    }, [r2])
+  })
+
+  test("an answer its genuine quoted rule contradicts, such as five retries on a rule of twice, escalates instead of answering", async () => {
+    const rule = "Retry a failed upload twice, then give up."
+    const fiveRetries = JSON.stringify({ decision: "answer", answer: "Five retries", rule, reason: "the intent covers retries" })
+    const refuted = JSON.stringify({ verdict: "does-not-support", reason: "the rule says twice, and the answer says five" })
+    const checked: Array<DeciderRequest> = []
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [r2.text]: fiveRetries }, [], undefined, { "Five retries": refuted }, checked))
+      expect(await itemFile(root, r2Item)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      expect((await run(listTasks(root))).at(0)?.parked?.questions.find((question) => question.id === "r2")?.answer).toBeNull()
+      expect(checked).toHaveLength(1)
+      for (const words of [rule, r2.text, "Five retries"]) {
+        expect(checked[0]?.prompt).toContain(words)
+      }
     }, [r2])
   })
 
