@@ -189,6 +189,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/agent/pi.ts` | The Pi prompt and the check of its final reply |
 | `packages/run/src/entities/agent/pi-run.ts` | The Pi process in JSON mode: its event lines, the agent log, the session file and the idle stop |
 | `packages/run/src/entities/agent/agents.ts` | The agent file parsing and lookup |
+| `packages/run/src/entities/agent/asset-path.ts` | `assetPath`, which turns a bundled file import such as `./implementer-<hash>.md` into a path beside the running bundle and passes an absolute path through |
 | `packages/run/src/entities/agent/long-session.ts` | The long session watch: the turn and compaction counts, the handover note and the handover prompt |
 | `packages/run/src/entities/agent/orc-ask-extension.ts` | The Pi extension orc copies into the run's Pi folder, which adds the `orc_ask` tool |
 | `packages/run/src/entities/agent/worker-ask.ts` | The orc side of `orc_ask`: the `ask-<n>` ids, the `asking.json` it writes, the answers it hands back, the corrected answers it hands on after Pi's next tool call and the 10 minute wait |
