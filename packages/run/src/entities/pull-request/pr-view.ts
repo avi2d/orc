@@ -77,14 +77,23 @@ export const redCheckLinks = (view: PullRequestView): ReadonlyArray<string> =>
 const unfinishedScopes = (view: PullRequestView): ReadonlySet<string> =>
   new Set(newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry)).filter((run) => run.status !== "COMPLETED").map(runScope))
 
-export const pendingRedRuns = (view: PullRequestView): boolean => {
+const pendingInFailedScopes = (view: PullRequestView): ReadonlyArray<CheckRun> => {
   const failedScopes = new Set(failedRuns(view).filter((run) => actionsRunId(run) !== undefined).map(runScope))
-  const pending = newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry))
+  return newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry))
     .filter((run) => run.status !== "COMPLETED" && failedScopes.has(runScope(run)))
-  return pending.length > 0 && pending.every((run) => run.status === "QUEUED" || run.status === "IN_PROGRESS")
+}
+
+const canHold = (run: CheckRun): boolean => run.status === "QUEUED" || run.status === "IN_PROGRESS"
+
+export const pendingRedRuns = (view: PullRequestView): boolean => {
+  const pending = pendingInFailedScopes(view)
+  return pending.length > 0 && pending.every(canHold)
 }
 
 export const redRuns = (view: PullRequestView): ReadonlyArray<{ readonly run: string; readonly name: string }> => {
+  if (pendingInFailedScopes(view).some((run) => !canHold(run))) {
+    return []
+  }
   const unfinished = unfinishedScopes(view)
   return failedRuns(view).flatMap((run) => {
     const id = actionsRunId(run)
