@@ -189,6 +189,35 @@ describe("driveNoMistakes", () => {
     expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"], instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior" }])
   })
 
+  test("a fix converted to follow-ups does not report the captain's answer as applied", async () => {
+    const sent: Array<GateResponse> = []
+    const fixReview = parked.replace("awaiting_approval", "fix_review").replace("r2,error", "r2,info")
+    const deferred = [
+      "recorded:",
+      "  fixed[0]:",
+      "  ignored[0]:",
+      "  kept[0]:",
+      "  follow_ups[2]: r1,r2",
+      skippedPr.replace("review,completed,0", "review,completed,2")
+    ].join("\n")
+    const runner: NoMistakesRunner = {
+      ...endedSkippingPr,
+      start: () => Effect.succeed({ stdout: fixReview, stderr: "", exitCode: 0 }),
+      respond: (response) => {
+        sent.push(response)
+        return Effect.succeed({ stdout: deferred, stderr: "", exitCode: 0 })
+      },
+      status: () => Effect.succeed({ stdout: skippedPr.replace("review,completed,0", "review,completed,2"), stderr: "", exitCode: 0 }),
+      logs: () => Effect.succeed({ stdout: fixReview, stderr: "", exitCode: 0 })
+    }
+    const { record, gate } = await driveIn(runner, [], [{ question: "r2", answer: "Keep the old behavior" }])
+    expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"], instructions: expect.stringContaining("r2: Keep the old behavior") }])
+    expect(record).toMatchObject({ deferredFindingIds: ["r1", "r2"] })
+    expect(gate).toContain("deferred to PR follow-ups: r1, r2")
+    expect(record.result).toContain("no-mistakes ran no fix round at that gate.")
+    expect(record.result).toContain("The captain's answer for r2 was not applied.")
+  })
+
   test("an ask-user finding answered within the wait is sent at the same gate instead of ending the run", async () => {
     const sent: Array<GateResponse> = []
     const waitedOn: Array<ReadonlyArray<string>> = []
