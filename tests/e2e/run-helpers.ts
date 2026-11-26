@@ -237,7 +237,7 @@ export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: Fak
   const gh = await stubGh(noCheckRuns)
   try {
     const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], (spawner, hostGit, pathEnv, worktreeDir) =>
-      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }) }), gh.dir + ":")
+      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer }), gh.dir + ":")
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
     await rm(gh.dir, { recursive: true, force: true })

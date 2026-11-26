@@ -26,9 +26,9 @@ export const decodeOrcReviewFindings = (input: string): Result.Result<typeof Orc
 
 export const ReviewFindings = Schema.Array(ReviewFinding)
 
-export type ReviewFinding = typeof ReviewFinding.Type
+export type ReviewFinding = typeof ReviewFinding.Type | typeof OrcReviewFinding.Type
 
-export const RecordedReview = Schema.Struct({ status: Schema.Literal("passed"), findings: ReviewFindings, file: Schema.String })
+export const RecordedReview = Schema.Struct({ status: Schema.Literal("passed"), findings: Schema.Array(Schema.Union([ReviewFinding, OrcReviewFinding])), file: Schema.String })
 
 export type ReviewOutcome = typeof RecordedReview.Type | { readonly status: "failed"; readonly reason: string }
 
