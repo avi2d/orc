@@ -5,7 +5,7 @@
     "": {
       "name": "orc",
       "devDependencies": {
-        "@avi2dg/checks": "0.117.0",
+        "@avi2dg/checks": "0.119.1",
         "@avi2dg/orc-alerts": "workspace:*",
         "@avi2dg/orc-attention": "workspace:*",
         "@avi2dg/orc-cli": "workspace:*",
@@ -111,7 +111,7 @@
       "name": "@avi2dg/orc-herdr-app",
       "version": "0.0.0",
       "devDependencies": {
-        "@avi2dg/checks": "0.117.0",
+        "@avi2dg/checks": "0.119.1",
       },
     },
     "packages/ledger": {
@@ -168,7 +168,7 @@
         "effect": "4.1.4",
       },
       "devDependencies": {
-        "@avi2dg/checks": "0.117.0",
+        "@avi2dg/checks": "0.119.1",
       },
     },
     "packages/schedules": {
@@ -225,9 +225,7 @@
     "@swc/core",
   ],
   "overrides": {
-    "@effect/platform-bun": "4.1.4",
     "@effect/platform-node-shared": "4.1.4",
-    "effect": "4.1.4",
     "minimatch": "11.0.3",
     "qs": "6.16.1",
   },
@@ -268,7 +266,11 @@
 
     "@algolia/requester-node-http": ["@algolia/requester-node-http@5.64.0", "", { "dependencies": { "@algolia/client-common": "5.64.0" } }, "sha512-pUOulw3Np129Sc/PqAPVw9gyO5hpEM9AdlAdG/YNhO69plNS3RK3YLuTv9rBHQmxO8DMmEze6qTppKJ1ihEQoQ=="],
 
-    "@avi2dg/checks": ["@avi2dg/checks@0.117.0", "", { "dependencies": { "@commitlint/cli": "21.2.3", "@commitlint/config-conventional": "21.2.3", "@effect/platform-bun": "4.0.0", "@effect/platform-node-shared": "4.0.0", "@total-typescript/ts-reset": "0.6.1", "commonmark": "0.31.2", "knip": "6.38.0", "minimatch": "11.0.3" }, "peerDependencies": { "@axe-core/playwright": "4.13.0", "@effect/tsgo": "0.45.0", "@swc/core": "1.16.2", "dependency-cruiser": "18.4.0", "effect": "4.0.0", "html-validate": "11.16.0", "jscpd": "5.3.2", "oxlint": "1.83.0", "oxlint-tsgolint": "7.0.2002", "playwright-core": "1.63.0", "postcss-html": "2.0.0", "postcss-value-parser": "4.2.0", "stylelint": "17.16.0", "stylelint-config-standard": "40.0.0", "stylelint-plugin-use-baseline": "1.4.7", "typescript": "7.0.2" }, "optionalPeers": ["@axe-core/playwright", "html-validate", "playwright-core", "postcss-html", "postcss-value-parser", "stylelint", "stylelint-config-standard", "stylelint-plugin-use-baseline"], "bin": { "checks-ci": "src/delivery/ci/main.ts", "checks-copy": "src/docs/copy.ts", "checks-docs": "src/docs/docs.ts", "checks-lint": "src/core/lint.ts", "checks-test": "src/testing/test.ts", "checks-flake": "src/testing/flake.ts", "checks-setup": "src/delivery/setup.ts", "checks-vendor": "src/dependencies/vendor.ts", "checks-browser": "src/quality/browser/browser.ts", "checks-pr-text": "src/delivery/pr-text.ts", "checks-secrets": "src/delivery/secrets.ts", "checks-css-size": "src/quality/css-size.ts", "checks-mutation": "src/testing/mutation.ts", "checks-adr-index": "src/docs/adr-index.ts", "checks-changelog": "src/delivery/changelog-write.ts", "checks-ci-wiring": "src/delivery/ci-wiring.ts", "checks-docs-only": "src/delivery/docs-only.ts", "checks-graphwalk": "src/complexity/graphwalk.ts", "checks-workflows": "src/delivery/workflows.ts", "checks-advisories": "src/dependencies/advisories.ts", "checks-release-pr": "src/delivery/release-pr.ts", "checks-repetition": "src/complexity/repetition.ts", "checks-local-tests": "src/testing/local-tests-command.ts", "checks-no-plain-js": "src/quality/no-plain-js.ts", "checks-plain-steps": "src/delivery/plain-steps.ts", "checks-release-tag": "src/delivery/release-tag.ts", "checks-test-layout": "src/testing/test-layout.ts", "checks-comment-gate": "src/quality/comment-gate.ts", "checks-commit-title": "src/delivery/commit-title.ts", "checks-effect-scope": "src/quality/effect-scope.ts", "checks-lint-coverage": "src/quality/lint-coverage.sh", "checks-release-notes": "src/delivery/release-notes.ts", "checks-mutation-merge": "src/testing/mutation-merge.ts", "checks-mutation-scope": "src/testing/mutation-scope.ts", "checks-release-report": "src/delivery/release-report.ts", "checks-subsumed-tests": "src/testing/subsumed-tests.ts", "checks-whole-tree-run": "src/testing/whole-tree-run.ts", "checks-commit-identity": "src/delivery/commit-identity.ts", "checks-frontend-syntax": "src/quality/frontend-syntax.ts", "checks-production-gate": "src/delivery/production-gate.ts", "checks-release-publish": "src/delivery/release-publish.ts", "checks-mutation-compare": "src/testing/mutation-compare.ts", "checks-no-mistakes-test": "src/delivery/no-mistakes-test.ts", "checks-quarantine-clock": "src/testing/quarantine-clock.ts", "checks-mutation-baseline": "src/testing/mutation-baseline.ts", "checks-release-preflight": "src/delivery/release-preflight.ts", "checks-suppressions-ratchet": "src/complexity/suppressions-ratchet.ts" } }, "sha512-pZS7PIF9rRM8Gq1Hey6b0avSd7V43CxIcKX2kQZA9XY/FtQYn67engbLPihzn7ARcEwc55LgD03PspWAQ9os9w=="],
+    "@avi2dg/checks": ["@avi2dg/checks@0.119.1", "", { "dependencies": { "@commitlint/cli": "21.2.3", "@commitlint/config-conventional": "21.2.3", "@effect/platform-bun": "4.1.4", "@effect/platform-node-shared": "4.1.4", "@total-typescript/ts-reset": "0.6.1", "commonmark": "0.31.2", "knip": "6.38.0", "minimatch": "11.0.3" }, "optionalDependencies": { "@avi2dg/checks-darwin-arm64": "0.119.1", "@avi2dg/checks-linux-x64": "0.119.1" }, "peerDependencies": { "@axe-core/playwright": "4.13.0", "@effect/tsgo": "0.45.0", "@swc/core": "1.16.2", "dependency-cruiser": "18.4.0", "effect": "4.1.4", "html-validate": "11.16.0", "jscpd": "5.3.2", "oxlint": "1.83.0", "oxlint-tsgolint": "7.0.2002", "playwright-core": "1.63.0", "postcss-html": "2.0.0", "postcss-value-parser": "4.2.0", "stylelint": "17.16.0", "stylelint-config-standard": "40.0.0", "stylelint-plugin-use-baseline": "1.4.7", "typescript": "7.0.2" }, "optionalPeers": ["@axe-core/playwright", "html-validate", "playwright-core", "postcss-html", "postcss-value-parser", "stylelint", "stylelint-config-standard", "stylelint-plugin-use-baseline"], "bin": { "checks-ci": "dist/bin/delivery/ci/main.ts", "checks-copy": "dist/bin/docs/copy.ts", "checks-docs": "dist/bin/docs/docs.ts", "checks-lint": "dist/bin/core/lint.ts", "checks-test": "dist/bin/testing/test.ts", "checks-flake": "dist/bin/testing/flake.ts", "checks-setup": "dist/bin/delivery/setup.ts", "checks-vendor": "dist/bin/dependencies/vendor.ts", "checks-browser": "dist/bin/quality/browser/browser.ts", "checks-pr-text": "dist/bin/delivery/pr-text.ts", "checks-secrets": "dist/bin/delivery/secrets.ts", "checks-css-size": "dist/bin/quality/css-size.ts", "checks-mutation": "dist/bin/testing/mutation.ts", "checks-adr-index": "dist/bin/docs/adr-index.ts", "checks-changelog": "dist/bin/delivery/changelog-write.ts", "checks-ci-wiring": "dist/bin/delivery/ci-wiring.ts", "checks-docs-only": "dist/bin/delivery/docs-only.ts", "checks-graphwalk": "dist/bin/complexity/graphwalk.ts", "checks-workflows": "dist/bin/delivery/workflows.ts", "checks-advisories": "dist/bin/dependencies/advisories.ts", "checks-release-pr": "dist/bin/delivery/release-pr.ts", "checks-repetition": "dist/bin/complexity/repetition.ts", "checks-local-tests": "dist/bin/testing/local-tests-command.ts", "checks-no-plain-js": "dist/bin/quality/no-plain-js.ts", "checks-plain-steps": "dist/bin/delivery/plain-steps.ts", "checks-release-tag": "dist/bin/delivery/release-tag.ts", "checks-test-layout": "dist/bin/testing/test-layout.ts", "checks-comment-gate": "dist/bin/quality/comment-gate.ts", "checks-commit-title": "dist/bin/delivery/commit-title.ts", "checks-effect-scope": "dist/bin/quality/effect-scope.ts", "checks-lint-coverage": "src/quality/lint-coverage.sh", "checks-release-notes": "dist/bin/delivery/release-notes.ts", "checks-mutation-merge": "dist/bin/testing/mutation-merge.ts", "checks-mutation-scope": "dist/bin/testing/mutation-scope.ts", "checks-release-report": "dist/bin/delivery/release-report.ts", "checks-subsumed-tests": "dist/bin/testing/subsumed-tests.ts", "checks-whole-tree-run": "dist/bin/testing/whole-tree-run.ts", "checks-commit-identity": "dist/bin/delivery/commit-identity.ts", "checks-frontend-syntax": "dist/bin/quality/frontend-syntax.ts", "checks-production-gate": "dist/bin/delivery/production-gate.ts", "checks-release-publish": "dist/bin/delivery/release-publish.ts", "checks-mutation-compare": "dist/bin/testing/mutation-compare.ts", "checks-no-mistakes-test": "dist/bin/delivery/no-mistakes-test.ts", "checks-quarantine-clock": "dist/bin/testing/quarantine-clock.ts", "checks-mutation-baseline": "dist/bin/testing/mutation-baseline.ts", "checks-release-preflight": "dist/bin/delivery/release-preflight.ts", "checks-suppressions-ratchet": "dist/bin/complexity/suppressions-ratchet.ts" } }, "sha512-Cjguoi5Vdt2hR2aPL72Gz5XY9aUKiOzPtTyOp8SBDOU1qCJIfV2vraAHYRb/ixjnGIa9/vgT3c5J5M+ej8SQxw=="],
+
+    "@avi2dg/checks-darwin-arm64": ["@avi2dg/checks-darwin-arm64@0.119.1", "", { "os": "darwin", "cpu": "arm64" }, "sha512-26lWgm5HL6cLJsBLWh44Zwn19R9t5uMs2fAWvJX6Q4U2FzFUNJsC5Tr9vTm9vFs3QIDJhjdW6scgMrDaz6xIMQ=="],
+
+    "@avi2dg/checks-linux-x64": ["@avi2dg/checks-linux-x64@0.119.1", "", { "os": "linux", "cpu": "x64" }, "sha512-7g9eT006Qr/IiZSkAXJDZk7jS4lw30oSG2cTHcfXhhvBj0X/wfctqFmjzIUKgSHGKjFW2UWBvnenWcBT7GJOtw=="],
 
     "@avi2dg/orc": ["@avi2dg/orc@workspace:packages/run"],
 

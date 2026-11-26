@@ -8,7 +8,7 @@ import { whileDrawerOpen } from "../../../packages/run/src/features/chat/chat-li
 
 const absent = Option.none()
 const fileInfo: FileSystem.File.Info = {
-  type: "File", mtime: absent, atime: absent, birthtime: absent, dev: 1, ino: absent,
+  type: "File", mtime: absent, atime: absent, birthtime: absent, dev: 1n, ino: absent,
   mode: 0o600, nlink: absent, uid: absent, gid: absent, rdev: absent, size: ByteSize.bytes(0), blksize: absent, blocks: absent
 }
 const ok = { code: 0, stdout: "", stderr: "" }
