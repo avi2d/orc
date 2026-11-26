@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { createTestRenderer, type TestRendererSetup } from "@opentui/core/testing";
-import { ConfigProvider, DateTime, Effect, Fiber, Layer } from "effect";
+import { ConfigProvider, DateTime, Deferred, Effect, Fiber, Layer } from "effect";
 import { TestClock, TestConsole } from "effect/testing";
+import { createLiveTestRenderer } from "../../lib/live-screen";
 import {
   type Command,
   CommandRunner,
@@ -26,6 +26,7 @@ import {
   SessionLogSource,
   sessionMachinesLayer,
   type TaskSampleRecord,
+  type TaskSamples,
   TaskSamplesSource,
   tasksMachinesLayer,
 } from "@avi2dg/orc-schema";
@@ -95,8 +96,6 @@ const recordedAnswers: ReadonlyArray<readonly [string, string]> = [
   ...queueAnswers,
 ];
 
-const appended: Array<TaskSampleRecord> = [];
-
 const recordedRun = (command: Command): Effect.Effect<string> => {
   if (command.argv[0] === "quota-axi") return Effect.succeed(fixture("quota-axi/full.json"));
   if (command.argv.join(" ") === "orc quota --json") return Effect.succeed(orcQuotaText(recordedOrcQuota));
@@ -105,7 +104,7 @@ const recordedRun = (command: Command): Effect.Effect<string> => {
   return Effect.succeed(recordedAnswers.find(([asked]) => command.argv.join(" ").startsWith(asked))?.[1] ?? "");
 };
 
-const sourcesAnswering = (run: (command: Command) => Effect.Effect<string>) => Layer.mergeAll(
+const sourcesAnswering = (run: (command: Command) => Effect.Effect<string>, append: TaskSamples["append"] = () => Effect.void) => Layer.mergeAll(
   quotaSourceLayer,
   orcQuotaSourceLayer,
   macHostSourceLayer,
@@ -148,23 +147,13 @@ const sourcesAnswering = (run: (command: Command) => Effect.Effect<string>) => L
   Layer.merge(
     Layer.succeed(TaskSamplesSource, {
       read: () => Effect.succeed([]),
-      append: (records) => Effect.sync(() => void appended.push(...records)),
+      append,
     }),
   ),
   Layer.provide(Layer.succeed(CommandRunner, { run })),
 );
 
 const recordedSources = sourcesAnswering(recordedRun);
-
-const frameWhere = async (setup: TestRendererSetup, matches: (frame: string) => boolean): Promise<string> => {
-  for (let attempt = 0; attempt < 200; attempt += 1) {
-    await Bun.sleep(25);
-    await setup.renderOnce();
-    const frame = setup.captureCharFrame();
-    if (matches(frame)) return frame;
-  }
-  throw new Error(`no frame matched, last was:\n${setup.captureCharFrame()}`);
-};
 
 const bothMachines = ConfigProvider.layer(
   ConfigProvider.fromEnvRecord({
@@ -179,8 +168,8 @@ const topLine = (frame: string): string => (frame.split("\n")[0] ?? "").trimEnd(
 
 describe("the live tasks screen", () => {
   test("moves through the levels by keys and clicks", async () => {
-    const setup = await createTestRenderer({ width: 120, height: 24 });
-    const fiber = Effect.runFork(
+    const setup = await createLiveTestRenderer({ width: 120, height: 24 });
+    const fiber = setup.start(
       Effect.gen(function* () {
         yield* TestClock.setTime(DateTime.toEpochMillis(screenNow));
         yield* liveTasksScreen(setup.renderer);
@@ -191,23 +180,23 @@ describe("the live tasks screen", () => {
       ),
     );
     try {
-      const first = await frameWhere(setup, (frame) => frame.includes("harbor") && frame.includes("notes"));
+      const first = await setup.frameWhere((frame) => frame.includes("harbor") && frame.includes("notes"));
       expect(topLine(first)).toMatch(/^ projects +\S/u);
       expect(first).toContain("╭─ harbor · tasks ");
       setup.mockInput.pressArrow("down");
-      await frameWhere(setup, (frame) => frame.includes("╭─ notes · tasks "));
+      await setup.frameWhere((frame) => frame.includes("╭─ notes · tasks "));
       setup.mockInput.pressEnter();
-      const notes = await frameWhere(setup, (frame) => topLine(frame).includes("projects › notes"));
+      const notes = await setup.frameWhere((frame) => topLine(frame).includes("projects › notes"));
       expect(notes).toContain("┏━ notes · tasks ");
       setup.mockInput.pressEscape();
-      await frameWhere(setup, (frame) => topLine(frame).includes("projects") && !topLine(frame).includes("›"));
+      await setup.frameWhere((frame) => topLine(frame).includes("projects") && !topLine(frame).includes("›"));
       await setup.mockMouse.click(10, 4);
-      const harbor = await frameWhere(setup, (frame) => topLine(frame).includes("projects › harbor"));
+      const harbor = await setup.frameWhere((frame) => topLine(frame).includes("projects › harbor"));
       expect(harbor).toContain("┏━ harbor · tasks ");
       await setup.mockMouse.click(10, 3);
-      await frameWhere(setup, (frame) => topLine(frame).includes("projects › harbor › tasks-bridge-plot"));
+      await setup.frameWhere((frame) => topLine(frame).includes("projects › harbor › tasks-bridge-plot"));
       await setup.mockMouse.click(4, 0);
-      await frameWhere(setup, (frame) => frame.includes("┏━ projects · today "));
+      await setup.frameWhere((frame) => frame.includes("┏━ projects · today "));
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));
       await setup.dispose();
@@ -215,20 +204,20 @@ describe("the live tasks screen", () => {
   });
 
   test("lists every machine's tasks on one screen, each row naming its machine", async () => {
-    const setup = await createTestRenderer({ width: 120, height: 24 });
-    const fiber = Effect.runFork(
+    const setup = await createLiveTestRenderer({ width: 120, height: 24 });
+    const fiber = setup.start(
       Effect.gen(function* () {
         yield* TestClock.setTime(DateTime.toEpochMillis(screenNow));
         yield* liveTasksScreen(setup.renderer);
       }).pipe(Effect.provide(Layer.mergeAll(recordedSources, bothMachines, TestClock.layer()))),
     );
     try {
-      const first = await frameWhere(setup, (frame) => ["harbor", "notes", "kelp"].every((project) => frame.includes(` ${project} `)));
+      const first = await setup.frameWhere((frame) => ["harbor", "notes", "kelp"].every((project) => frame.includes(` ${project} `)));
       expect(topLine(first)).not.toMatch(/orc-dash|north|south/u);
       let kelp = first;
       for (let step = 0; step < 3 && !kelp.includes("╭─ kelp · tasks "); step += 1) {
         setup.mockInput.pressArrow("down");
-        kelp = await frameWhere(setup, (frame) => frame !== kelp);
+        kelp = await setup.frameWhere((frame) => frame !== kelp);
       }
       const tendRow = kelp.split("\n").find((line) => line.includes("tasks-kelp-tend")) ?? "";
       expect(tendRow).toMatch(/tasks-kelp-tend.* south /u);
@@ -240,8 +229,8 @@ describe("the live tasks screen", () => {
   }, 15_000);
 
   test("reads the other machine's levels with the remote flag", async () => {
-    const setup = await createTestRenderer({ width: 120, height: 24 });
-    const fiber = Effect.runFork(
+    const setup = await createLiveTestRenderer({ width: 120, height: 24 });
+    const fiber = setup.start(
       Effect.gen(function* () {
         yield* TestClock.setTime(DateTime.toEpochMillis(screenNow));
         yield* liveTasksScreen(setup.renderer, true);
@@ -252,11 +241,11 @@ describe("the live tasks screen", () => {
       ),
     );
     try {
-      const first = await frameWhere(setup, (frame) => frame.includes("kelp") && frame.includes("south"));
+      const first = await setup.frameWhere((frame) => frame.includes("kelp") && frame.includes("south"));
       expect(first).toContain("┏━ projects · south · today ");
       expect(first).toContain("tasks-kelp-tend");
       setup.mockInput.pressEnter();
-      await frameWhere(setup, (frame) => topLine(frame).includes("projects › kelp"));
+      await setup.frameWhere((frame) => topLine(frame).includes("projects › kelp"));
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));
       await setup.dispose();
@@ -265,25 +254,32 @@ describe("the live tasks screen", () => {
 });
 
 describe("the sampler", () => {
-  const firstRound = async (sources: typeof recordedSources) => {
-    appended.length = 0;
-    const fiber = Effect.runFork(runSampler.pipe(Effect.provide(sources)));
-    try {
-      for (let attempt = 0; attempt < 200 && appended.length === 0; attempt += 1) await Bun.sleep(25);
-      return [...appended];
-    } finally {
-      await Effect.runPromise(Fiber.interrupt(fiber));
-    }
-  };
+  const firstRound = (run: (command: Command) => Effect.Effect<string>) =>
+    Effect.gen(function* () {
+      const sample = yield* Deferred.make<ReadonlyArray<TaskSampleRecord>>();
+      const sources = sourcesAnswering(run, (records) => Effect.asVoid(Deferred.succeed(sample, records)));
+      const fiber = yield* Effect.forkChild(runSampler.pipe(Effect.provide(sources)));
+      return yield* Effect.raceFirst(Deferred.await(sample), Fiber.join(fiber).pipe(Effect.andThen(Effect.die("the sampler exited before writing a sample"))));
+    });
 
   test("takes its sample while the session quota has not answered", async () => {
-    const quotaHangs = (command: Command) => (command.argv[0] === "quota-axi" ? Effect.never : recordedRun(command));
-    const records = await firstRound(sourcesAnswering(quotaHangs));
+    const records = await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(Date.now());
+        const quotaStarted = yield* Deferred.make<void>();
+        const quotaHangs = (command: Command) =>
+          command.argv[0] === "quota-axi" ? Deferred.succeed(quotaStarted, undefined).pipe(Effect.andThen(Effect.never)) : recordedRun(command);
+        const sampling = yield* Effect.forkChild(firstRound(quotaHangs));
+        yield* Deferred.await(quotaStarted);
+        yield* TestClock.adjust("1 second");
+        return yield* Fiber.join(sampling);
+      }).pipe(Effect.provide(TestClock.layer())),
+    );
     expect(records.map((record) => record.task.id)).toEqual(["tasks-bridge-plot", "tasks-inbox-sweep", "tasks-release-notes"]);
   });
 
   test("writes every listed task at once, with each task's own usage", async () => {
-    const records = await firstRound(recordedSources);
+    const records = await Effect.runPromise(firstRound(recordedRun));
     const cpuOf = (record: TaskSampleRecord) => record.usage?.processes.reduce((total, process) => total + process.ownSeconds, 0);
     expect(records.map((record) => [record.task.id, record.usage?.processes.length, cpuOf(record)])).toEqual([
       ["tasks-bridge-plot", 5, expect.closeTo(571.59, 9)],

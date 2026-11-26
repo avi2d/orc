@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createTestRenderer, type TestRendererSetup } from "@opentui/core/testing";
+import { createLiveTestRenderer } from "../../lib/live-screen";
 import { Effect, Fiber, Layer } from "effect";
 import { CommandRunner, HarvestLogSource, homeLogRoots, nothingCaptured, quotaSourceLayer } from "@avi2dg/orc-schema";
 import { livePanel } from "@avi2dg/orc-quota";
@@ -40,24 +40,14 @@ const rowsOf = (frame: string) =>
     .map((row) => row.trimEnd())
     .filter((row) => row !== "");
 
-const frameWhere = async (setup: TestRendererSetup, matches: (frame: string) => boolean): Promise<string> => {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    await Bun.sleep(10);
-    await setup.renderOnce();
-    const frame = setup.captureCharFrame();
-    if (matches(frame)) return frame;
-  }
-  throw new Error("no frame matched");
-};
-
 describe("the live panel", () => {
   test("paints its first reading at once, and lays it out again for a narrower terminal before the next read", async () => {
-    const setup = await createTestRenderer({ width: 84, height: 30 });
-    const fiber = Effect.runFork(livePanel(setup.renderer).pipe(Effect.provide(recordedSources)));
+    const setup = await createLiveTestRenderer({ width: 84, height: 30 });
+    const fiber = setup.start(livePanel(setup.renderer).pipe(Effect.provide(recordedSources)));
     try {
-      const wide = rowsOf(await frameWhere(setup, (frame) => frame.includes("\u25cf")));
+      const wide = rowsOf(await setup.frameWhere((frame) => frame.includes("\u25cf")));
       setup.resize(40, 30);
-      const narrow = rowsOf(await frameWhere(setup, (frame) => frame.split("\n")[0]?.length === 40));
+      const narrow = rowsOf(await setup.frameWhere((frame) => frame.split("\n")[0]?.length === 40));
       expect(narrow).toHaveLength(wide.length);
       const meteredRows = narrow.filter((row) => /[━╸─]/u.test(row));
       expect(meteredRows.length).toBeGreaterThan(0);
@@ -69,10 +59,10 @@ describe("the live panel", () => {
   });
 
   test("ends the program when the quit key is pressed", async () => {
-    const setup = await createTestRenderer({ width: 84, height: 30 });
-    const fiber = Effect.runFork(livePanel(setup.renderer).pipe(Effect.provide(recordedSources)));
+    const setup = await createLiveTestRenderer({ width: 84, height: 30 });
+    const fiber = setup.start(livePanel(setup.renderer).pipe(Effect.provide(recordedSources)));
     try {
-      await frameWhere(setup, (frame) => frame.includes("\u25cf"));
+      await setup.frameWhere((frame) => frame.includes("\u25cf"));
       setup.renderer.keyInput.processParsedKey({
         name: "q",
         ctrl: false,
@@ -93,12 +83,12 @@ describe("the live panel", () => {
   });
 
   test("clips rather than wraps its rows in a terminal narrower than its 30 column minimum", async () => {
-    const setup = await createTestRenderer({ width: 30, height: 30 });
-    const fiber = Effect.runFork(livePanel(setup.renderer).pipe(Effect.provide(recordedSources)));
+    const setup = await createLiveTestRenderer({ width: 30, height: 30 });
+    const fiber = setup.start(livePanel(setup.renderer).pipe(Effect.provide(recordedSources)));
     try {
-      const minimum = rowsOf(await frameWhere(setup, (frame) => frame.includes("\u25cf")));
+      const minimum = rowsOf(await setup.frameWhere((frame) => frame.includes("\u25cf")));
       setup.resize(25, 30);
-      const narrower = rowsOf(await frameWhere(setup, (frame) => frame.split("\n")[0]?.length === 25));
+      const narrower = rowsOf(await setup.frameWhere((frame) => frame.split("\n")[0]?.length === 25));
       expect(narrower).toEqual(minimum.map((row) => row.slice(0, 25).trimEnd()));
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));

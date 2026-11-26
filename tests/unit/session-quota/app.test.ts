@@ -17,7 +17,6 @@ import {
   sessionQuotaReport,
   inBackground,
 } from "@avi2dg/orc-schema";
-import { createTestRenderer } from "@opentui/core/testing";
 import {
   livePanel,
   harvestLogSourceLive,
@@ -28,6 +27,8 @@ import {
   streamSessionQuotaAlerts,
 } from "@avi2dg/orc-session-quota";
 import { fixture } from "../../lib/fixtures";
+import { createLiveTestRenderer } from "../../lib/live-screen";
+import { withTestClock } from "../../lib/test-clock";
 import { machineStdout } from "../../lib/machines-fixture";
 import {
   copyFixtureHome,
@@ -290,15 +291,10 @@ describe("inBackground", () => {
 
 describe("the live session quota panel", () => {
   test("paints the captioned session rows inside a standard 84x24 terminal, and ends on the quit key", async () => {
-    const setup = await createTestRenderer({ width: 84, height: 24 });
-    const fiber = Effect.runFork(livePanel(setup.renderer).pipe(Effect.provide(recordedReads())));
+    const setup = await createLiveTestRenderer({ width: 84, height: 24 });
+    const fiber = setup.start(livePanel(setup.renderer).pipe(Effect.provide(recordedReads())));
     try {
-      let frame = "";
-      for (let attempt = 0; attempt < 200 && !frame.includes("● claude"); attempt += 1) {
-        await Bun.sleep(25);
-        await setup.renderOnce();
-        frame = setup.captureCharFrame();
-      }
+      const frame = await setup.frameWhere((text) => text.includes("● claude"));
       const rows = frame.split("\n").map((row) => row.trimEnd());
       expect(rows[0]).toBe("estimates from local logs, upper bounds, never quota");
       expect(rows.some((row) => row.startsWith("● claude"))).toBe(true);
@@ -322,59 +318,59 @@ describe("the live session quota panel", () => {
     }
   }, 15_000);
 
-  test("paints the session rows as soon as a first read that outlasted its patience lands, ending scanning without waiting for the next refresh", async () => {
-    const { promise: herdrHeld, resolve: releaseHerdr } = Promise.withResolvers<void>();
-    const setup = await createTestRenderer({ width: 84, height: 24 });
-    const fiber = Effect.runFork(livePanel(setup.renderer).pipe(Effect.provide(recordedReads(Effect.promise(() => herdrHeld)))));
-    const frameOnce = async (shows: string) => {
-      for (let attempt = 0; attempt < 200; attempt += 1) {
-        await Bun.sleep(25);
-        await setup.renderOnce();
-        const frame = setup.captureCharFrame();
-        if (frame.includes(shows)) return frame;
+  test("paints the session rows as soon as a first read that outlasted its patience lands, ending scanning without waiting for the next refresh", () =>
+    withTestClock(async (clock) => {
+      const { promise: herdrHeld, resolve: releaseHerdr } = Promise.withResolvers<void>();
+      const { promise: herdrStarted, resolve: markStarted } = Promise.withResolvers<void>();
+      const herdr = Effect.sync(markStarted).pipe(Effect.andThen(Effect.promise(() => herdrHeld)));
+      const setup = await createLiveTestRenderer({ width: 84, height: 24 });
+      const fiber = setup.start(livePanel(setup.renderer).pipe(Effect.provide(recordedReads(herdr)), Effect.provideService(Clock.Clock, clock)));
+      try {
+        await herdrStarted;
+        await Effect.runPromise(clock.adjust("2 seconds"));
+        expect(await setup.frameWhere((frame) => frame.includes("reading local session logs…"))).toContain("reading local session logs…");
+        releaseHerdr();
+        await Effect.runPromise(clock.adjust("250 millis"));
+        expect(await setup.frameWhere((frame) => frame.includes("● claude"))).toContain("● claude");
+      } finally {
+        releaseHerdr();
+        await Effect.runPromise(Fiber.interrupt(fiber));
+        await setup.dispose();
       }
-      return setup.captureCharFrame();
-    };
-    try {
-      expect(await frameOnce("reading local session logs…")).toContain("reading local session logs…");
-      releaseHerdr();
-      expect(await frameOnce("● claude")).toContain("● claude");
-    } finally {
-      releaseHerdr();
-      await Effect.runPromise(Fiber.interrupt(fiber));
-      await setup.dispose();
-    }
-  }, 15_000);
+    }), 15_000);
 
   // The read is interrupted, not left on a detached fiber, so a herdr call cannot outlive the panel.
-  test("interrupts a first read still in flight when the quit key is pressed", async () => {
-    let herdrInterrupted = false;
-    const herdrNever = Effect.never.pipe(Effect.onInterrupt(() => Effect.sync(() => (herdrInterrupted = true))));
-    const setup = await createTestRenderer({ width: 84, height: 24 });
-    const fiber = Effect.runFork(livePanel(setup.renderer).pipe(Effect.provide(recordedReads(herdrNever))));
-    try {
-      for (let attempt = 0; attempt < 200 && !setup.captureCharFrame().includes("reading local session logs…"); attempt += 1) {
-        await Bun.sleep(25);
-        await setup.renderOnce();
+  test("interrupts a first read still in flight when the quit key is pressed", () =>
+    withTestClock(async (clock) => {
+      let herdrInterrupted = false;
+      const { promise: herdrStarted, resolve: markStarted } = Promise.withResolvers<void>();
+      const herdrNever = Effect.sync(markStarted).pipe(
+        Effect.andThen(Effect.never),
+        Effect.onInterrupt(() => Effect.sync(() => (herdrInterrupted = true))),
+      );
+      const setup = await createLiveTestRenderer({ width: 84, height: 24 });
+      const fiber = setup.start(livePanel(setup.renderer).pipe(Effect.provide(recordedReads(herdrNever)), Effect.provideService(Clock.Clock, clock)));
+      try {
+        await herdrStarted;
+        await Effect.runPromise(clock.adjust("2 seconds"));
+        expect(await setup.frameWhere((frame) => frame.includes("reading local session logs…"))).toContain("reading local session logs…");
+        setup.renderer.keyInput.processParsedKey({
+          name: "q",
+          ctrl: false,
+          meta: false,
+          shift: false,
+          option: false,
+          sequence: "q",
+          number: false,
+          raw: "q",
+          eventType: "press",
+          source: "raw",
+        });
+        await Effect.runPromise(Fiber.join(fiber).pipe(Effect.timeout("5 seconds")));
+        expect(herdrInterrupted).toBe(true);
+      } finally {
+        await Effect.runPromise(Fiber.interrupt(fiber));
+        await setup.dispose();
       }
-      expect(setup.captureCharFrame()).toContain("reading local session logs…");
-      setup.renderer.keyInput.processParsedKey({
-        name: "q",
-        ctrl: false,
-        meta: false,
-        shift: false,
-        option: false,
-        sequence: "q",
-        number: false,
-        raw: "q",
-        eventType: "press",
-        source: "raw",
-      });
-      await Effect.runPromise(Fiber.join(fiber).pipe(Effect.timeout("5 seconds")));
-      expect(herdrInterrupted).toBe(true);
-    } finally {
-      await Effect.runPromise(Fiber.interrupt(fiber));
-      await setup.dispose();
-    }
-  }, 15_000);
+    }), 15_000);
 });
