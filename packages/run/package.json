@@ -29,6 +29,6 @@
     "effect": "4.1.4"
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.119.1"
+    "@avi2dg/checks": "0.120.0"
   }
 }
