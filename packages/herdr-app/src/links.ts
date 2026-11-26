@@ -16,3 +16,6 @@ export const textParts = (text: string): ReadonlyArray<TextPart> => {
   if (from < text.length || parts.length === 0) parts.push({ text: text.slice(from), opens: null })
   return parts
 }
+
+export const lineWords = (line: string): ReadonlyArray<ReadonlyArray<TextPart>> =>
+  (line.match(/\S+\s*|\s+/g) ?? [""]).map(textParts)

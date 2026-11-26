@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import fixture from "../../fixtures/attention/herdr-app.json"
 import { guardJson } from "../../../packages/herdr-app/src/guard"
 import { attention } from "../../../packages/herdr-app/src/guard-attention"
-import { choice, inboxArgv, inboxItems } from "../../../packages/herdr-app/src/inbox"
+import { choice, holdsOnTasks, inboxArgv, inboxItems } from "../../../packages/herdr-app/src/inbox"
 import type { TaskDetail } from "../../../packages/herdr-app/src/task"
 
 const parsed = guardJson(JSON.stringify(fixture), attention)
@@ -11,7 +11,7 @@ const { items } = parsed.value
 
 const task: TaskDetail = {
   id: "garden-3", title: "Update the report", kind: "ship", body: "", created: "2026-11-13T10:00:00.000Z",
-  priority: null, dependsOn: [], prState: "open", hold: null, parked: null,
+  priority: null, parent: null, dependsOn: [], prState: "open", hold: null, parked: null,
   state: { status: "closed", account: null, started: null, outcome: "done", pr: "https://github.com/example/garden/pull/3", report: null, closedAt: "2026-11-13T12:00:00.000Z" }
 }
 
@@ -53,4 +53,27 @@ test("an unasked-question card sends nothing from the app instead of an orc atte
   if (card === undefined) throw new Error("Missing unasked-question card")
   expect(card.action).toEqual({ kind: "unavailable" })
   expect(inboxArgv(card, "two fields")).toBeNull()
+})
+
+const bareHold = { reason: "kept until its child closes", until: null, at: "2026-11-25T10:00:00.000Z", questions: [], answer: null }
+const parent: TaskDetail = { ...task, id: "garden-20", kind: "parent", prState: null, state: { status: "new" }, hold: bareHold }
+const openChild: TaskDetail = { ...task, id: "garden-21", parent: parent.id, prState: null, state: { status: "new" } }
+
+test("a bare hold on a task that waits on an open dependency names that task instead of asking you", () => {
+  const dependent: TaskDetail = { ...parent, id: "garden-22", kind: "ship", dependsOn: [openChild.id] }
+  const backlog = [dependent, { ...openChild, parent: null }]
+  expect(inboxItems(backlog, []).filter((item) => item.task === dependent.id)).toEqual([])
+  expect(holdsOnTasks(backlog)).toEqual(new Map([[dependent.id, [openChild.id]]]))
+})
+
+test("a bare hold asks you again once its children are closed instead of staying hidden", () => {
+  const closedChild: TaskDetail = { ...openChild, state: task.state }
+  const card = inboxItems([parent, closedChild], []).find((item) => item.task === parent.id)
+  expect(card).toMatchObject({ kind: "hold", action: { kind: "answer", target: { kind: "hold" } } })
+})
+
+test("a hold's own questions still ask you while its children are open instead of hiding with the bare hold", () => {
+  const asking: TaskDetail = { ...parent, hold: { ...bareHold, questions: [{ id: "question-1", text: "Ship both slices together?", asked: null, answer: null }] } }
+  const cards = inboxItems([asking, openChild], []).filter((item) => item.task === asking.id)
+  expect(cards.map((item) => item.action)).toEqual([{ kind: "answer", target: { kind: "question", id: "question-1" } }])
 })

@@ -11,6 +11,7 @@ const started: TaskDetail = {
   body: "",
   created: "2026-11-13T10:00:00.000Z",
   priority: null,
+  parent: null,
   dependsOn: [],
   prState: null,
   hold: null,

@@ -9,6 +9,7 @@ Press `cmd-k` to open or close the chat drawer.
 ## Follow a run in the Agents tab
 
 The list shows runs and queued tasks, grouped by status.
+A queued task that a hold keeps until other tasks close reads **Waits on** and their IDs.
 The **Project** select shows runs for configured projects by default.
 Choose **All runs** in it to include runs from other projects.
 Opening a run of another project from the Inbox switches the **Project** select to **All runs**.

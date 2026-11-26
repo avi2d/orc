@@ -84,9 +84,25 @@ const attentionCard = (item: AttentionItem, task: TaskDetail | undefined): Inbox
   return { ...base, kind: "event", action: { kind: "event", id: item.id } }
 }
 
-const holdCards = (task: TaskDetail, overdue: boolean): ReadonlyArray<InboxAnswer> => {
+const openTasksAwaited = (task: TaskDetail, backlog: ReadonlyArray<TaskDetail>): ReadonlyArray<string> => {
+  const byId = new Map(backlog.map((other) => [other.id, other]))
+  const children = backlog.filter((other) => other.parent === task.id)
+  const awaited = [...children, ...task.dependsOn.flatMap((id) => byId.get(id) ?? [])].filter((other) => other.state.status !== "closed")
+  return [...new Set(awaited.map((other) => other.id))]
+}
+
+// A bare hold only keeps its task from starting. While the task waits on open tasks, an answer would not start it either.
+export const holdsOnTasks = (backlog: ReadonlyArray<TaskDetail>): ReadonlyMap<string, ReadonlyArray<string>> =>
+  new Map(backlog.flatMap((task) => {
+    const hold = task.hold
+    if (task.state.status === "closed" || hold === null || hold.answer !== null || hold.questions.length > 0) return []
+    const awaited = openTasksAwaited(task, backlog)
+    return awaited.length === 0 ? [] : [[task.id, awaited] as const]
+  }))
+
+const holdCards = (task: TaskDetail, overdue: boolean, onTasks: boolean): ReadonlyArray<InboxAnswer> => {
   const hold = task.hold
-  if (task.state.status === "closed" || hold === null || hold.answer !== null) return []
+  if (task.state.status === "closed" || hold === null || hold.answer !== null || onTasks) return []
   const base = { task: task.id, title: task.title, who: "user", asked: hold.at, recommendation: null } as const
   if (hold.questions.length > 0) return hold.questions.filter((question) => question.answer === null).map((question) => ({
     ...base, key: `${task.id}/hold/${hold.at}/${question.id}`, kind: "hold", ask: askText(question.text),
@@ -105,9 +121,10 @@ export const inboxItems = (backlog: ReadonlyArray<TaskDetail>, items: ReadonlyAr
   const tasks = new Map(backlog.map((task) => [task.id, task]))
   const userItems = items.filter((item) => item.owner === "user")
   const overdue = new Set(userItems.filter((item) => item.kind === "overdue-wait").map((item) => item.task))
+  const onTasks = holdsOnTasks(backlog)
   return [
     ...userItems.map((item) => attentionCard(item, tasks.get(item.task))).filter((item) => item !== null),
-    ...backlog.flatMap((task) => holdCards(task, overdue.has(task.id)))
+    ...backlog.flatMap((task) => holdCards(task, overdue.has(task.id), onTasks.has(task.id)))
   ].sort((left, right) => millisOf(left) - millisOf(right))
 }
 

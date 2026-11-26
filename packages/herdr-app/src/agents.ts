@@ -96,7 +96,10 @@ const stepLabel = (step: Pick<Step, "name" | "attempt">): string => {
 
 const taskBranches = (task: Task): ReadonlyArray<string> => [`orc/${task.id}`, `orc/${task.id}-parent`]
 
-const queuedWhere = (task: Task): string => task.hold === null ? "Waiting to start" : "Held"
+const queuedWhere = (task: Task, awaited: ReadonlyArray<string> | undefined): string => {
+  if (awaited !== undefined) return `Waits on ${awaited.join(", ")}`
+  return task.hold === null ? "Waiting to start" : "Held"
+}
 
 type Place = Pick<Card, "standing" | "where">
 
@@ -207,10 +210,10 @@ const runCard = (run: Run, task: Task | undefined, place: Place, project: string
   ...(task?.merge === undefined ? {} : { merge: task.merge })
 })
 
-const taskCard = (task: Task, active: ReadonlySet<string>, pending: ReadonlyArray<InboxAnswer>): ReadonlyArray<Card> => {
+const taskCard = (task: Task, active: ReadonlySet<string>, pending: ReadonlyArray<InboxAnswer>, holdsOnTasks: ReadonlyMap<string, ReadonlyArray<string>>): ReadonlyArray<Card> => {
   const waiting = awaitingAnswer(pending)
   if (waiting === null && (active.has(task.id) || task.status === "closed")) return []
-  const place = waiting ?? { standing: { status: "Queued" } as const, where: queuedWhere(task) }
+  const place = waiting ?? { standing: { status: "Queued" } as const, where: queuedWhere(task, holdsOnTasks.get(task.id)) }
   return [{ key: task.id, id: task.id, kind: task.kind, delivery: null, title: task.title, project: task.project, known: true, ...place, runId: null, checkout: null, sendBack: null }]
 }
 
@@ -223,6 +226,7 @@ interface CardsInput {
   readonly approvals: ReadonlyMap<string, InboxApproval>
   readonly checkoutProject: ReadonlyMap<string, string>
   readonly known: (project: string) => boolean
+  readonly holdsOnTasks: ReadonlyMap<string, ReadonlyArray<string>>
 }
 
 const projectFor = (task: Task | undefined, run: Run, checkoutProject: ReadonlyMap<string, string>): string =>
@@ -249,7 +253,7 @@ const pendingFor = (task: Task, input: CardsInput): ReadonlyArray<InboxAnswer> =
 const remainingCards = (backlog: Backlog, active: ReadonlySet<string>, approvalsShown: ReadonlySet<string>, input: CardsInput): ReadonlyArray<Card> =>
   backlog.tasks.flatMap((task) => {
     const known = input.known(task.project)
-    const queued = taskCard(task, active, pendingFor(task, input)).map((card) => ({ ...card, known }))
+    const queued = taskCard(task, active, pendingFor(task, input), input.holdsOnTasks).map((card) => ({ ...card, known }))
     const approval = input.approvals.get(task.id)
     if (approval === undefined || approvalsShown.has(task.id) || task.prState === "closed" || task.prState === "merged" || input.merged.has(task.id)) return queued
     return [...queued, {
@@ -259,7 +263,7 @@ const remainingCards = (backlog: Backlog, active: ReadonlySet<string>, approvals
     }]
   })
 
-export const buildCards = (runs: Runs, backlog: Backlog, items: ReadonlyArray<InboxItem> = []): ReadonlyArray<Card> => {
+export const buildCards = (runs: Runs, backlog: Backlog, items: ReadonlyArray<InboxItem> = [], holdsOnTasks: ReadonlyMap<string, ReadonlyArray<string>> = new Map()): ReadonlyArray<Card> => {
   const byBranch = new Map(backlog.tasks.flatMap((task) => taskBranches(task).map((branch) => [branch, task] as const)))
   const input: CardsInput = {
     byBranch,
@@ -270,6 +274,7 @@ export const buildCards = (runs: Runs, backlog: Backlog, items: ReadonlyArray<In
     approvals: new Map(items.filter((item) => item.kind === "pr").map((item) => [item.task, item])),
     checkoutProject: new Map((backlog.projects ?? []).flatMap((project) => project.paths.map((path) => [path, project.name] as const))),
     known: (project: string): boolean => backlog.projects === null || backlog.projects.some((configured) => configured.name === project),
+    holdsOnTasks
   }
   const active = new Set<string>()
   const approvalsShown = new Set<string>()
