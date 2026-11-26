@@ -79,7 +79,8 @@ Where you replaced an agent's answer, your answer shows beside it as **Decided b
 
 A hold without questions on a task that waits on other tasks has no Inbox card, because an answer would not start it.
 Its Agents card and task panel read **Waits on** and those task IDs instead.
-The hold returns once Orc no longer waits, or as an overdue card once its date passes.
+The hold returns once those tasks are done, merged where they ship, or closed without being done, since no beat reopens them.
+A dated hold also returns as an overdue card once its date passes.
 
 ## Tab guides
 
