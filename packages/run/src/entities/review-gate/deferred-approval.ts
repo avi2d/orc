@@ -1,9 +1,8 @@
 import { Effect, FileSystem } from "effect"
 import { scalar } from "../../shared/lib/index"
-import { omittedQuestionIds, openQuestionsIn, type ParkedGate, type ParsedRun } from "./no-mistakes-gate"
+import { omittedQuestionIds, openQuestionsIn, type GateResponse, type ParkedGate, type ParsedRun } from "./no-mistakes-gate"
 import { settleFixResponse, type NoMistakesReply } from "./no-mistakes-response"
 import type { DriveLog } from "./no-mistakes-drive-log"
-import type { NoMistakesInput } from "./no-mistakes"
 
 export const canDeferFindings = (gate: ParkedGate, parsed: ParsedRun, stdout: string): boolean =>
   gate.step === "review" && gate.stage === "fix-review" && scalar(stdout, "defer_non_errors") === "true" &&
@@ -11,7 +10,7 @@ export const canDeferFindings = (gate: ParkedGate, parsed: ParsedRun, stdout: st
   parsed.findings.every((finding) => finding.id !== "" && (finding.severity === "warning" || finding.severity === "info"))
 
 export const approveFollowUps = (
-  input: NoMistakesInput,
+  input: { readonly runDir: string; readonly runner: { readonly respond: (response: GateResponse) => Effect.Effect<NoMistakesReply> } },
   log: DriveLog,
   supplied: Map<string, string>,
   parsed: ParsedRun
