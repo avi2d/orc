@@ -1,36 +1,20 @@
 import { Console, Duration, Effect, FileSystem, Schema } from "effect"
 import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
 import { OrcRunError } from "../../shared/lib/index"
-import type { NoMistakesFinding, OpenQuestion, QuestionAnswer } from "./no-mistakes-gate"
+import type { NoMistakesFinding } from "./no-mistakes-gate"
+import { findingContext, OpenQuestion, QuestionAnswer, type QuestionContext } from "./question"
 
 export const askingFileName = "asking.json"
 export const answersFileName = "answers.json"
 export const correctionsFileName = "corrections.json"
 
-export const AskOption = Schema.Struct({ text: Schema.String, outcome: Schema.optional(Schema.String), picture: Schema.optional(Schema.String) })
-
-export type AskOption = typeof AskOption.Type
-
-const AskingQuestion = Schema.Struct({
-  id: Schema.String,
-  text: Schema.String,
-  options: Schema.optional(Schema.Array(AskOption)),
-  recommendation: Schema.optional(Schema.String),
-  asks: Schema.optional(Schema.String),
-  blocks: Schema.optional(Schema.Boolean),
-  asked: Schema.optional(Schema.String),
-  owner: Schema.optional(Schema.Literal("user"))
-})
-
-type AskingQuestion = typeof AskingQuestion.Type
-
 export const Asking = Schema.Struct({
   asked: Schema.String,
   until: Schema.String,
-  questions: Schema.Array(AskingQuestion)
+  questions: Schema.Array(OpenQuestion)
 })
 
-const RelayedAnswers = Schema.Array(Schema.Struct({ question: Schema.String, answer: Schema.String.check(Schema.isNonEmpty()) }))
+const RelayedAnswers = Schema.Array(QuestionAnswer)
 
 export const AnswersFile = Schema.Struct({ asking: Schema.String, answers: RelayedAnswers })
 
@@ -88,7 +72,7 @@ const readRelayed = (file: string, asked: string): Effect.Effect<ReadonlyArray<Q
   )
 
 export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: string) =>
-  (missing: ReadonlyArray<Pick<NoMistakesFinding, "id" | "description" | "asks"> & Pick<OpenQuestion, "owner">>): Effect.Effect<WaitResult, never, FileSystem.FileSystem> =>
+  (missing: ReadonlyArray<Pick<NoMistakesFinding, "id" | "description" | "asks"> & Pick<OpenQuestion, "owner"> & QuestionContext>): Effect.Effect<WaitResult, never, FileSystem.FileSystem> =>
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
       const asking = runDir + "/" + askingFileName
@@ -102,7 +86,18 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
       const asked = previous?.asked ?? now
       const deadline = Date.now() + waitSeconds * 1000
       const until = new Date(deadline).toISOString()
-      const fresh: ReadonlyArray<AskingQuestion> = missing.map((finding) => ({ id: finding.id, text: finding.description, ...(finding.asks === undefined ? {} : { asks: finding.asks }), blocks: true, asked: now, ...(finding.owner === undefined ? {} : { owner: finding.owner }) }))
+      const fresh: ReadonlyArray<OpenQuestion> = missing.map((finding) => ({
+        ...findingContext(waiter, finding.id, finding.description),
+        ...(finding.subject === undefined ? {} : { subject: finding.subject }),
+        ...(finding.options === undefined ? {} : { options: finding.options }),
+        ...(finding.recommendation === undefined ? {} : { recommendation: finding.recommendation }),
+        id: finding.id,
+        text: finding.description,
+        ...(finding.asks === undefined ? {} : { asks: finding.asks }),
+        blocks: true,
+        asked: now,
+        ...(finding.owner === undefined ? {} : { owner: finding.owner })
+      }))
       const kept = (previous?.questions ?? []).filter((question) => !missing.some((finding) => finding.id === question.id))
       const merged = [...kept, ...fresh]
       if (!(yield* writeWhole(asking, JSON.stringify({ asked, until, questions: merged })))) {

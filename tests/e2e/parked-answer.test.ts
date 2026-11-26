@@ -96,7 +96,7 @@ describe("a parked run", () => {
       const relayed = await orcOk(fixture, ["beat"])
       expect(relayed).toContain("handed r2 to the run of orc-1 on linux")
       expect(relayed).not.toContain("parked orc-1")
-      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({ asking: firstAsking.asked, answers: [{ question: "r2", answer: "Keep it behind a flag" }] })
+      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({ asking: firstAsking.asked, answers: [{ question: "r2", answer: "Keep it behind a flag", decider: "owner" }] })
       expect(await backlogTaskOne(fixture)).toMatchObject({ id: "orc-1", status: "started" })
       expect(await queuedSince(fixture)).toBeNull()
     })
@@ -114,7 +114,7 @@ describe("a parked run", () => {
       expect(await orcOk(fixture, ["beat"])).toContain("handed r3 to the run of orc-1 on linux")
       expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({
         asking: firstAsking.asked,
-        answers: [{ question: "r2", answer: "Keep it" }, { question: "r3", answer: "Drop them" }]
+        answers: [{ question: "r2", answer: "Keep it", decider: "owner" }, { question: "r3", answer: "Drop them", decider: "owner" }]
       })
     })
   }, runnerTimeout)
@@ -139,7 +139,7 @@ describe("a parked run", () => {
       if (!isRecord(first.answer)) {
         throw new Error("parked question holds no answer")
       }
-      expect(Object.keys(first.answer).sort()).toEqual(["at", "words"])
+      expect(Object.keys(first.answer).sort()).toEqual(["at", "decider", "words"])
     })
   }, runnerTimeout)
 
@@ -159,7 +159,7 @@ describe("a parked run", () => {
       expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Restore", "it"])).toBe("answered r2 on orc-1, so the next beat hands it to the run waiting on orc/orc-1\n")
       const relayed = await orcOk(fixture, ["beat"])
       expect(relayed).toContain("handed r2 to the run of orc-1 on linux")
-      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({ asking: reasking.asked, answers: [{ question: "r2", answer: "Restore it" }] })
+      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({ asking: reasking.asked, answers: [{ question: "r2", answer: "Restore it", decider: "owner" }] })
     })
   }, runnerTimeout)
 

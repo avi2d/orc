@@ -1,4 +1,5 @@
 import { Effect, FileSystem, Option, Schema } from "effect"
+import type { Decider } from "../../shared/lib/index"
 import { assetPath } from "./asset-path"
 import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
 import { AnswersFile, answersFileName, Asking, AskOption, askingFileName, CorrectionsFile, correctionsFileName, hasBlockingQuestion, isBlockingQuestion, type OpenQuestion, type QuestionAnswer } from "../review-gate/index"
@@ -118,6 +119,7 @@ export const liveAskQuestions = (setup: AskSetup): ReadonlyArray<OpenQuestion> =
   setup.state.asks.filter((ask) => !ask.replied).map((ask) => ({
     id: ask.id,
     text: ask.text,
+    subject: ask.question,
     asked: ask.askedAt,
     blocks: ask.deadline !== null,
     ...(ask.options === undefined ? {} : { options: [...ask.options] }),
@@ -195,6 +197,7 @@ const writeAsking = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<
       ...open.map((ask) => ({
         id: ask.id,
         text: ask.text,
+        subject: ask.question,
         ...(ask.options === undefined ? {} : { options: [...ask.options] }),
         ...(ask.recommendation === undefined ? {} : { recommendation: ask.recommendation }),
         blocks: ask.deadline !== null,
@@ -230,11 +233,11 @@ const relayReplies = (fs: FileSystem.FileSystem, setup: AskSetup, asked: string)
       if (ask.replied) {
         const known = setup.state.corrected.get(ask.id)
         if (known !== undefined && known !== answer.answer) {
-          yield* deliverCorrection(fs, setup, ask.id, ask.question, answer.answer)
+          yield* deliverCorrection(fs, setup, ask.id, ask.question, answer.answer, answer.decider ?? null)
         }
         continue
       }
-      if (yield* provideFs(fs, writeReply(setup, ask, { kind: "answer", id: ask.id, question: ask.question, words: answer.answer }))) {
+      if (yield* provideFs(fs, writeReply(setup, ask, { kind: "answer", id: ask.id, question: ask.question, words: answer.answer, decider: answer.decider ?? null }))) {
         ask.replied = true
         setup.state.corrected.set(ask.id, answer.answer)
         changed = true
@@ -244,11 +247,11 @@ const relayReplies = (fs: FileSystem.FileSystem, setup: AskSetup, asked: string)
   })
 
 // The worker already acted on the answer it got, so a replaced answer reaches it as a correction after its next tool call rather than as a reply.
-const deliverCorrection = (fs: FileSystem.FileSystem, setup: AskSetup, id: string, question: string, words: string): Effect.Effect<void> =>
+const deliverCorrection = (fs: FileSystem.FileSystem, setup: AskSetup, id: string, question: string, words: string, decider: Decider | null): Effect.Effect<void> =>
   Effect.gen(function*() {
     setup.state.correctionsSent += 1
     const stem = "correction-" + id.replace(/[^A-Za-z0-9_-]/g, "_") + "-" + String(setup.state.correctionsSent)
-    if (yield* provideFs(fs, writeWhole(setup.askDir + "/" + stem + replySuffix, JSON.stringify({ kind: "correction", id, question, words } satisfies AskReply)))) {
+    if (yield* provideFs(fs, writeWhole(setup.askDir + "/" + stem + replySuffix, JSON.stringify({ kind: "correction", id, question, words, decider } satisfies AskReply)))) {
       setup.state.corrected.set(id, words)
     }
   })
@@ -261,7 +264,7 @@ const relayCorrections = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Ef
         continue
       }
       const ask = setup.state.asks.find((candidate) => candidate.id === correction.question)
-      yield* deliverCorrection(fs, setup, correction.question, ask?.question ?? "", correction.answer)
+      yield* deliverCorrection(fs, setup, correction.question, ask?.question ?? "", correction.answer, correction.decider ?? "owner")
     }
   })
 
@@ -291,6 +294,7 @@ export const openWorkerAsks = (fs: FileSystem.FileSystem, setup: AskSetup): Work
     return timedOut === null ? null : {
       id: timedOut.id,
       text: timedOut.text,
+      subject: timedOut.question,
       asked: timedOut.askedAt,
       blocks: timedOut.deadline !== null,
       ...(timedOut.options === undefined ? {} : { options: [...timedOut.options] }),

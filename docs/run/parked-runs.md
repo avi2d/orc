@@ -117,7 +117,8 @@ An answer within the wait is the tool's result, and Pi carries on.
 When no answer comes, the tool tells Pi so, and orc stops Pi at the end of that turn with `orc stopped Pi when no answer to its question ask-<n> came in time` in the end reason.
 A ship run then parks its task on its branch for every open question.
 Answer it with `orc backlog answer <task-id> ask-<n>=<text>`, and the beat resumes the task on the same machine and branch.
-The resumed run hands your answer to the same Pi session as `The captain answered your question ask-<n>: <text>`.
+The resumed run hands your answer to the same Pi session as `Owner answered your question ask-<n>: <text>`, or `Agent answered` when the decider answered it.
+An answer stored with no recorded author reads `An answer was recorded for your question ask-<n>: <text>`.
 A scout or task run has no branch to park on, so it ends failed with the question in its end reason.
 
 ### Ask without blocking

@@ -175,7 +175,7 @@ const serveAsking = (
       return null
     }
     // answers.json is replaced whole, so each relay carries every answer of the asking and not only the new ones.
-    return yield* relay({ asking: asking.asked, answers: answered.map((question) => ({ question: question.id, answer: question.answer.words })) }).pipe(
+    return yield* relay({ asking: asking.asked, answers: answered.map((question) => ({ question: question.id, answer: question.answer.words, decider: question.answer.decider })) }).pipe(
       Effect.andThen(markAnswersRelayed(context.root, id, asking.asked, fresh.map((question) => ({ id: question.id, asked: question.asked, words: question.answer.words }))).pipe(
         Effect.catchTag("BacklogError", () => Effect.void)
       )),
@@ -199,7 +199,7 @@ export const serveCorrections = (
     return Effect.succeed(null)
   }
   const id = task.spec.id
-  return correct(due.map((question) => ({ question: question.id, answer: question.answer.words }))).pipe(
+  return correct(due.map((question) => ({ question: question.id, answer: question.answer.words, decider: question.answer.decider }))).pipe(
     Effect.andThen(markCorrectionsQueued(root, id, due).pipe(Effect.catchTags({ BacklogError: () => Effect.void, TaskFileError: () => Effect.void }))),
     Effect.as<BeatAction>({ kind: "answer-failed", task: id, machine, reason: "the correction was queued, but delivery to the run is not confirmed" }),
     Effect.catchTag("RunnerError", (error) => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: error.detail })),

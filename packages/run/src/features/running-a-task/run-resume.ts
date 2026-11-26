@@ -9,7 +9,7 @@ import type { HistoryRun } from "./run-record"
 import type { ResumePlan } from "./run-ops"
 import { handoverFileName, inheritedHandoverFileName } from "../../entities/agent/index"
 import { OrcRunError } from "../../shared/lib/index"
-import { sentBackWordsOf } from "./worker-question"
+import { sentBackAnswersOf } from "./worker-question"
 import { isNewHoldRelease } from "../../entities/review-gate/index"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
@@ -288,7 +288,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     }
     const fresh = !progress.implementPassed && (own !== null || (forwarded !== null && progress.implementSessionId === null))
     const carriedImplement = fresh ? null : yield* carrySession(run, progress.implementSource, progress.implementSessionId)
-    const sentBack = sentBackWordsOf(answers).length > 0
+    const sentBack = sentBackAnswersOf(answers).length > 0
     const fixCarry = yield* fixCarryOf(run, progress, sentBack || isNewHoldRelease(answers))
     const skipImplement = progress.implementPassed && !sentBack
     const skipChecks = skipImplement && progress.checksComplete

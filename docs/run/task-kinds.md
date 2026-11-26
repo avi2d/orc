@@ -37,11 +37,12 @@ Add it with `orc backlog add <project> <file|-> --kind decision`, whose body is 
 Orc refuses `--priority` and `--machine` on a decision, and `orc backlog priority` refuses one, since a decision never starts.
 The beat never starts a decision, and each beat prints `waits <task-id>: decision for the captain` for it.
 To answer it, run `orc backlog answer <task-id> <words>`.
-The answer closes the decision done with the reason `answered`, and its task file keeps the words as `answer` and the time as `answered_at`.
+The answer closes the decision done with the reason `answered`, and its task file keeps the words as `answer`, the time as `answered_at` and who answered as `decider`, which is `owner` for `orc backlog answer`.
+A task file stored before `decider` existed reads as an owner answer.
 To drop it instead, run `orc backlog close <task-id> failed [<reason>]`, which drops it as `orc backlog drop` does.
 `orc backlog close <task-id> done` refuses a decision, since only its answer closes it done.
 `orc backlog hold` and `orc merge` refuse a decision, and a decision never parks, since no run of it asks.
-`orc backlog` shows an answered decision as `answered: <words>`, and `orc backlog --json` gives it `kind: "decision"` and `answer` as its words and time.
+`orc backlog` shows an answered decision as `Owner · <task> answered: <words>`, or `Agent · ` when the agent answered, and `orc backlog --json` gives it `kind: "decision"` and `answer` as its words, time and `decider`.
 Every other closed task carries `null` for `answer`.
 
 A task added with `--depends-on <decision-id>` waits until you answer the decision, as any dependency does.
@@ -50,13 +51,13 @@ When it starts, the runner appends the decision's question and your answer after
 ```text
 # Build the button
 
-The captain's decision orc-1 asked:
+Decision orc-1 asked:
 
 # Which button goes first
 
 The left one or the right one?
 
-The captain answered: use the left one
+Owner answered: use the left one
 ```
 
 In chat, `orc_backlog_add` takes `kind: "decision"`, and `orc_backlog_answer` answers the decision.

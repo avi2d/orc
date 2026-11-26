@@ -1,8 +1,8 @@
-import { Schema } from "effect"
+import { type Decider, DecisionAnswer } from "../../shared/lib/index"
 
 export const answeredReason = "answered"
 
-export const Answer = Schema.Struct({ words: Schema.String, at: Schema.String })
+export const Answer = DecisionAnswer
 
 export type Answer = typeof Answer.Type
 
@@ -12,27 +12,31 @@ export interface AnsweredClosing {
   readonly answer: Answer
 }
 
-export const answerOf = (front: { readonly answer?: string | undefined; readonly answered_at?: string | undefined }): Answer | null | string => {
-  if (front.answer === undefined && front.answered_at === undefined) {
+interface AnswerFront {
+  readonly answer?: string | undefined
+  readonly answered_at?: string | undefined
+  readonly decider?: Decider | undefined
+}
+
+export const answerOf = (front: AnswerFront, legacyDecider: Decider): Answer | null | string => {
+  if (front.answer === undefined && front.answered_at === undefined && front.decider === undefined) {
     return null
   }
   if (front.answer === undefined || front.answered_at === undefined || Number.isNaN(Date.parse(front.answered_at))) {
     return "an answer names no words or no time"
   }
-  return { words: front.answer, at: front.answered_at }
+  return { words: front.answer, at: front.answered_at, decider: front.decider ?? legacyDecider }
 }
 
-export interface DecisionFront {
+export interface DecisionFront extends AnswerFront {
   readonly reason?: string | undefined
   readonly closed_at?: string | undefined
   readonly outcome?: string | undefined
-  readonly answer?: string | undefined
-  readonly answered_at?: string | undefined
   readonly posted_at?: string | undefined
 }
 
 const answeredOf = (front: DecisionFront): { readonly kind: "closed"; readonly claim: null; readonly closing: AnsweredClosing; readonly closedAt: string; readonly postedAt: string | null } | string => {
-  const answer = answerOf(front)
+  const answer = answerOf(front, "owner")
   if (answer === null || typeof answer === "string" || front.reason !== answeredReason || front.closed_at === undefined) {
     return "a closed decision names no answer, answer time or close time"
   }

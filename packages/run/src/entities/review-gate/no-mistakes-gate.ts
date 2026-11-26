@@ -1,11 +1,8 @@
-import { scalar, splitRow, table, trimmedLines, workerCiInstructions } from "../../shared/lib/index"
+import { deciderLabel, scalar, splitRow, table, trimmedLines, workerCiInstructions } from "../../shared/lib/index"
+import type { OpenQuestion, QuestionAnswer } from "./question"
 
 export const askUserWord = "ask-user"
 export type AllowWord = typeof askUserWord
-export interface QuestionAnswer {
-  readonly question: string
-  readonly answer: string
-}
 
 export const holdReleaseId = "hold-release"
 export const carriedHoldReleaseId = "hold-release-carried"
@@ -18,18 +15,6 @@ export const isNewHoldRelease = (answers: ReadonlyArray<QuestionAnswer>): boolea
 
 export const holdReleaseGuidance = (words: ReadonlyArray<string>): string =>
   "The captain released the repeat hold with: " + words.join("\nThe captain also wrote: ") + "\nFollow that guidance as you retry the task."
-
-export interface OpenQuestion {
-  readonly id: string
-  readonly text: string
-  readonly asked?: string | undefined
-  readonly asking?: string | undefined
-  readonly blocks?: boolean | undefined
-  readonly options?: ReadonlyArray<{ readonly text: string; readonly outcome?: string | undefined; readonly picture?: string | undefined }> | undefined
-  readonly recommendation?: string | undefined
-  readonly asks?: string | undefined
-  readonly owner?: "user" | undefined
-}
 
 export interface NoMistakesFinding {
   readonly id: string
@@ -182,8 +167,11 @@ export const answerArgsFor = (question: string, answer: string): ReadonlyArray<s
   ["axi", "answer", "--question", question, "--answer", answer]
 
 const answeredGuidance = (settled: ReadonlyArray<NoMistakesFinding>, answers: ReadonlyArray<QuestionAnswer>): string =>
-  ["The captain answered these findings; fix each as the answer says:",
-    ...settled.map((finding) => finding.id + ": " + (answers.find((entry) => entry.question === finding.id)?.answer ?? ""))].join("\n")
+  ["These findings were answered; fix each as the answer says:",
+    ...settled.map((finding) => {
+      const given = answers.find((entry) => entry.question === finding.id)
+      return finding.id + (given?.decider === undefined ? "" : " (" + deciderLabel(given.decider) + " answer)") + ": " + (given?.answer ?? "")
+    })].join("\n")
 
 export const answeredAskUser = (
   findings: ReadonlyArray<NoMistakesFinding>,

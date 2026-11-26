@@ -74,7 +74,9 @@ describe("a decider overturn", () => {
       expect(task.parked?.questions.at(0)?.answer).toMatchObject({ words: "Three retries", overturned: { words: "Two retries", by: "decider" } })
       expect(correctionsDue(task)).toEqual([])
       expect(await itemFile(root, r2Item)).toMatchObject({ state: { kind: "closed", answer: { words: "Three retries" }, overturned: { words: "Two retries" } } })
-      expect(await run(attentionText(false, root))).toContain("answered " + r2Item + ": Three retries (the captain replaced the decider's answer \"Two retries\")")
+      const shown = await run(attentionText(false, root))
+      expect(shown).toContain("Decided by owner:\n" + r2Item + ": Three retries")
+      expect(shown).toContain("Decided by agent:\n" + r2Item + ": Two retries (replaced)")
     }, [r2])
   })
 
@@ -117,7 +119,7 @@ describe("a decider overturn", () => {
         seen = corrections
         return Effect.succeed("queued")
       }))
-      expect(seen).toEqual([{ question: "r2", answer: "Three retries" }])
+      expect(seen).toEqual([{ question: "r2", answer: "Three retries", decider: "owner" }])
       expect(result).toMatchObject({ kind: "answer-failed", task: "orc-1" })
       expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)?.answer?.relayedTo).toBeNull()
     }, [r2])
@@ -138,7 +140,7 @@ describe("a decider overturn", () => {
       const firstTask = (await run(listTasks(root))).at(0)
       assert.ok(firstTask)
       expect(await run(serveCorrections(root, firstTask, "linux", correct))).toMatchObject({ kind: "answer-failed", task: "orc-1" })
-      expect(seen).toEqual([{ question: "r2", answer: "Three retries" }])
+      expect(seen).toEqual([{ question: "r2", answer: "Three retries", decider: "owner" }])
       const queued = (await run(listTasks(root))).at(0)
       assert.ok(queued)
       expect(correctionsDue(queued)).toEqual([])

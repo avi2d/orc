@@ -17,7 +17,7 @@ describe("chat backlog decoding", () => {
         hold: {
           reason: "two choices",
           until: null,
-          questions: [{ id: "question-1", text: "REST or gRPC?", answer: { words: "gRPC", at: "2026-11-02T12:00:00.000Z" } }],
+          questions: [{ id: "question-1", text: "REST or gRPC?", answer: { decider: "owner" as const, words: "gRPC", at: "2026-11-02T12:00:00.000Z" } }],
           answer: null
         },
         parked: null,
@@ -50,7 +50,7 @@ describe("chat backlog decoding", () => {
         reason: "answered",
         pr: null,
         report: null,
-        answer: { words: "The blue one", at: "2026-11-03T10:00:00.000Z" },
+        answer: { decider: "owner" as const, words: "The blue one", at: "2026-11-03T10:00:00.000Z" },
         postedAt: null
       }],
       events: []
@@ -59,6 +59,6 @@ describe("chat backlog decoding", () => {
     if (task === undefined || task.status !== "closed") {
       throw new Error("expected one closed decision, got " + JSON.stringify(backlog.tasks))
     }
-    expect(closedLine(task)).toBe("orc-1 Which button goes first closed done: answered: The blue one")
+    expect(closedLine(task)).toBe("orc-1 Which button goes first closed done: answered (Owner): The blue one")
   })
 })

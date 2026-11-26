@@ -54,7 +54,8 @@ const recordedAsk = (item: AttentionItem): AskText => {
     context: subject && subject !== text ? text : null,
     options: item.options.map((option, index) => ({
       letter: String.fromCharCode(65 + index), text: option.text, picture: option.picture,
-      ...(option.outcome ? { outcome: option.outcome } : {})
+      ...(option.outcome ? { outcome: option.outcome } : {}),
+      ...(option.action === null ? {} : { action: option.action })
     }))
   }
 }
@@ -121,7 +122,8 @@ type Choice =
 
 export const choice = (item: InboxItem, option: AskOption): Choice => {
   if (item.action.kind === "merge" && option.text === "merge") return { kind: "merge" }
-  if (item.action.kind === "unavailable") return { kind: "unavailable" }
+  if (item.action.kind === "unavailable" || option.action === "wait") return { kind: "unavailable" }
+  if (item.action.kind === "answer" && option.action === "write-answer") return { kind: "write", prefix: "", label: "Write an answer to the question" }
   if (item.action.kind === "overdue-hold") return { kind: "write", prefix: option.text, label: option.text === "drop" ? "Give a reason for dropping the task" : "Write an answer to the hold" }
   return { kind: "reply", words: option.text }
 }

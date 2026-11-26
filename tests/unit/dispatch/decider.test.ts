@@ -249,7 +249,7 @@ describe("the decider", () => {
     })
   })
 
-  test("a decider answer lists under decided with its words, and leaves the list once its task closes, while a user answer never lists there", async () => {
+  test("a decider answer lists under decided by agent and an owner answer under decided by owner, and both leave the list once the task closes", async () => {
     await withAskingTask(async (root) => {
       const before = new Date().toISOString()
       await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }))
@@ -257,11 +257,11 @@ describe("the decider", () => {
       await run(answerTask(root, "orc-1", "r3=Keep the old flag", "2026-11-02T10:22:00.000Z"))
       await run(routeTaskItems(root, await run(listTasks(root)), "2026-11-02T10:22:00.000Z"))
       const decided = (await run(readAttention(root, await run(listTasks(root))))).decided
-      expect(decided.map((entry) => entry.id)).toEqual([r2Item])
+      expect(decided.map((entry) => entry.id).toSorted()).toEqual([r2Item, r3Item].toSorted())
       const view = attentionJson(await run(openItems(root)), "2026-11-02T10:30:00.000Z", decided)
       expect(view.items).toEqual([])
-      expect(view.decided).toHaveLength(1)
-      const entry = view.decided.at(0)
+      expect(view.decided).toHaveLength(2)
+      const entry = view.decided.find((candidate) => candidate.id === r2Item)
       expect(entry).toMatchObject({
         id: r2Item,
         kind: "review-question",
@@ -272,10 +272,11 @@ describe("the decider", () => {
         decision: { kind: "answered", reason: "the intent says twice" },
         answer: { words: "Two retries" }
       })
-      for (const at of [entry?.decision.at, entry?.answer.at]) {
+      for (const at of [entry?.decision?.at, entry?.answer.at]) {
         expect(at !== undefined && at >= before && at <= after).toBe(true)
       }
-      expect(await run(attentionText(false, root))).toContain("Decided:\nanswered " + r2Item + ": Two retries (the intent says twice, quoting task orc-1: \"Retry a failed upload twice, then give up.\")")
+      expect(await run(attentionText(false, root))).toContain("Decided by agent:\n" + r2Item + ": Two retries\n" + r2Item + ": the intent says twice, quoting task orc-1: \"Retry a failed upload twice, then give up.\"")
+      expect(await run(attentionText(false, root))).toContain("Decided by owner:\n" + r3Item + ": Keep the old flag")
       await run(closeStartedTask(root, "orc-1", "done", "the upload retries", { pr: null, report: null }, "2026-11-02T10:40:00.000Z"))
       expect((await run(readAttention(root, await run(listTasks(root))))).decided).toEqual([])
     })
@@ -514,7 +515,7 @@ describe("the decider", () => {
       const stored = (await run(listTasks(root))).at(0)?.parked?.questions.find((question) => question.id === "ask-1")?.answer
       expect(stored).toMatchObject({ by: "asked-back" })
       expect(stored?.words).toContain("Does the upload run in CI?")
-      expect(await run(attentionText(false, root))).toContain("(asked the worker back: Does the upload run in CI?)")
+      expect(await run(attentionText(false, root))).toContain("(Agent · asked the worker back: Does the upload run in CI?)")
     }, [ask1])
   })
 

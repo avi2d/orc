@@ -8,7 +8,11 @@ const loopQuestion = { id: "looping", text: "Pi failed bun run test 6 times in a
 
 const workerAsk = {
   text: "Keep the old flag?\nA) Keep the old flag\nB) Drop the old flag (picture: docs/flag.png)",
-  options: [{ text: "Keep the old flag" }, { text: "Drop the old flag", picture: "docs/flag.png" }]
+  options: [
+    { text: "Keep the old flag", outcome: "Existing scripts keep working." },
+    { text: "Drop the old flag", outcome: "Existing scripts must change.", picture: "docs/flag.png" }
+  ],
+  recommendation: "Keep the old flag"
 }
 
 const openAttention = async (fixture: Fixture): Promise<unknown> => {
@@ -30,7 +34,7 @@ describe("a parked run", () => {
       expect(await openAttention(fixture)).toMatchObject([asked])
       await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep it"])
       expect(await openAttention(fixture)).toEqual([])
-      expect(await orcOk(fixture, ["attention"])).toBe("nothing needs anyone\n")
+      expect(await orcOk(fixture, ["attention"])).toContain("Decided by owner:")
     })
   }, runnerTimeout)
 
@@ -48,7 +52,7 @@ describe("a parked run", () => {
       expect(await backlogTaskOne(fixture)).toMatchObject({ parked: { questions: [{ id: "r2", answer: { words: "Keep it" } }] } })
       expect(beaten).toContain("handed r2 to the run of orc-1 on linux")
       expect(beaten).not.toContain("asking orc-1 on linux")
-      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({ asking: firstAsking.asked, answers: [{ question: "r2", answer: "Keep it" }] })
+      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({ asking: firstAsking.asked, answers: [{ question: "r2", answer: "Keep it", decider: "agent" }] })
       expect((await readFile(join(fixture.dir, "pi-args"), "utf8")).split("\n")).toEqual(expect.arrayContaining(["--no-tools", "--model", "acme/small", "--system-prompt"]))
       expect(await readFile(join(fixture.dir, "pi-prompt"), "utf8")).toContain("Keep the old flag?")
     })
@@ -68,9 +72,9 @@ describe("a parked run", () => {
       await startOnLinux(fixture)
       await refuseOnQuestions(fixture)
       await orcOk(fixture, ["beat"])
-      expect(await openAttention(fixture)).toMatchObject([{ task: "orc-1", text: "Which retries are allowed?" }, { task: "orc-1", text: "" }])
+      expect(await openAttention(fixture)).toMatchObject([{ task: "orc-1", text: "Which retries are allowed?" }, { task: "orc-1", text: "No text was supplied for question-5. Check the run before answering." }])
       await orcOk(fixture, ["backlog", "answer", "orc-1", "question-4=Two retries"])
-      expect(await openAttention(fixture)).toMatchObject([{ task: "orc-1", text: "" }])
+      expect(await openAttention(fixture)).toMatchObject([{ task: "orc-1", text: "No text was supplied for question-5. Check the run before answering." }])
     })
   }, runnerTimeout)
 
@@ -132,20 +136,21 @@ describe("a parked run", () => {
   test("a worker's mid-run ask shows in orc attention as a worker-question with its options, instead of a bare review question", async () => {
     await withFixture(async (fixture) => {
       await startOnLinux(fixture)
-      await askWhileRunning(fixture, { ...firstAsking, questions: [{ id: "ask-1", text: workerAsk.text, options: workerAsk.options }] })
+      await askWhileRunning(fixture, { ...firstAsking, questions: [{ id: "ask-1", text: workerAsk.text, options: workerAsk.options, recommendation: workerAsk.recommendation }] })
       await orcOk(fixture, ["beat"])
-      expect(await openAttention(fixture)).toMatchObject([{ kind: "worker-question", task: "orc-1", text: workerAsk.text, options: workerAsk.options, asked: firstAsking.asked }])
+      expect(await openAttention(fixture)).toMatchObject([{ kind: "worker-question", task: "orc-1", text: workerAsk.text, options: workerAsk.options, recommendation: workerAsk.recommendation, asked: firstAsking.asked }])
     })
   }, runnerTimeout)
 
   test("a worker's answered ask is handed to its run and the thread marks it delivered, instead of leaving it only answered", async () => {
     await withFixture(async (fixture) => {
       await startOnLinux(fixture)
-      const runDir = await askWhileRunning(fixture, { ...firstAsking, questions: [{ id: "ask-1", text: workerAsk.text, options: workerAsk.options }] })
+      const runDir = await askWhileRunning(fixture, { ...firstAsking, questions: [{ id: "ask-1", text: workerAsk.text, options: workerAsk.options, recommendation: workerAsk.recommendation }] })
       await orcOk(fixture, ["beat"])
+      expect(await openAttention(fixture)).toMatchObject([{ kind: "worker-question", options: workerAsk.options, recommendation: workerAsk.recommendation }])
       await orcOk(fixture, ["backlog", "answer", "orc-1", "ask-1=B"])
       expect(await orcOk(fixture, ["beat"])).toContain("handed ask-1 to the run of orc-1 on linux")
-      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({ asking: firstAsking.asked, answers: [{ question: "ask-1", answer: "B" }] })
+      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({ asking: firstAsking.asked, answers: [{ question: "ask-1", answer: "B", decider: "owner" }] })
       const thread: unknown = JSON.parse(await orcOk(fixture, ["backlog", "thread", "orc-1", "--json"]))
       const entries = isRecord(thread) && Array.isArray(thread.entries) ? thread.entries : []
       expect(entries.filter((entry) => isRecord(entry) && entry.kind !== "decision")).toMatchObject([

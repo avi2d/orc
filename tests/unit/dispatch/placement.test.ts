@@ -83,7 +83,7 @@ describe("placeTask", () => {
   test("a task parked on a full machine rejects the idle mac even when the task pins it", () => {
     const parked: TaskRecord = {
       ...newTask("mac"),
-      parked: { origin: { machine: "linux", run: "run-1" }, branch: "orc/task-1", questions: [{ id: "ask-1", text: "Which one?", asked: "2026-10-27T10:05:00.000Z", blocks: true, answer: { words: "Keep it", at: "2026-10-27T10:06:00.000Z", relayedTo: null } }] }
+      parked: { origin: { machine: "linux", run: "run-1" }, branch: "orc/task-1", questions: [{ id: "ask-1", text: "Which one?", asked: "2026-10-27T10:05:00.000Z", blocks: true, answer: { decider: "owner" as const, words: "Keep it", at: "2026-10-27T10:06:00.000Z", relayedTo: null } }] }
     }
     expect(placeTask(parked, config, projects, linuxFull)).toMatchObject({
       kind: "waits",
@@ -133,7 +133,7 @@ describe("the beat over linux-parked tasks", () => {
       }
       const parkedRecord = await run(addTask(root, spec))
       await run(rewriteNew(root, parkedRecord.spec.id, (fresh) =>
-        Effect.succeed({ kind: "write" as const, record: { ...fresh, parked: { origin: { machine: "linux", run: "run-1" }, branch: "orc/" + parkedRecord.spec.id, questions: [{ id: "ask-1", text: "Which one?", asked: "2026-10-27T10:05:00.000Z", blocks: true, answer: { words: "Keep it", at: "2026-10-27T10:06:00.000Z", relayedTo: null } }] } }, result: null })
+        Effect.succeed({ kind: "write" as const, record: { ...fresh, parked: { origin: { machine: "linux", run: "run-1" }, branch: "orc/" + parkedRecord.spec.id, questions: [{ id: "ask-1", text: "Which one?", asked: "2026-10-27T10:05:00.000Z", blocks: true, answer: { decider: "owner" as const, words: "Keep it", at: "2026-10-27T10:06:00.000Z", relayedTo: null } }] } }, result: null })
       ))
       const beat = () => Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaAnswering))))
       const first = await beat()

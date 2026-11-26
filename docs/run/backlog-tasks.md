@@ -127,7 +127,7 @@ The beat reports `waits <task-id>: held for the captain: <reason>`, with the dat
 The date is a reminder, not an automatic release.
 
 Run `orc backlog answer <task-id> <words>` to release the hold.
-Orc records the answer and `answered_at`, and a later beat may start the task.
+Orc records the answer, `answered_at` and `decider: owner`, and a later beat may start the task.
 The run receives the task body followed by hold reasons and answers in chronological order.
 A hold the beat places on a [resume that parks again](parked-runs.md#a-resume-that-parks-again) is the exception.
 Its releases travel with the resume as guidance instead of in the body.
@@ -153,6 +153,7 @@ A note does not hold a task or answer a question.
 
 Run `orc backlog thread <task-id>` to read a task's questions, answers, decisions, and notes in time order.
 Add `--json` for an `orc.thread.v1` document.
+Each answer and decision entry names who decided it: the owner or the agent.
 A decision entry for an escalated question carries the decider's recommended option as `recommendation`.
 Its fields are defined in `packages/run/src/features/task-thread/thread.ts`.
 The thread includes closed tasks.

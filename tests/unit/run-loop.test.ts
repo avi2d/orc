@@ -163,7 +163,7 @@ describe("a run sent back with the captain's review", () => {
         await seedRefusedPrior(db, priorDir, project)
         const bin = await stubNoMistakesBin(home)
         const base = await Effect.runPromise(historyFor("next-b", home, project, "2026-10-19T10:00:00.000Z", git, bin + ":" + (process.env.PATH ?? "")))
-        const run: HistoryRun = { ...base, answers: [{ question: "send-back", answer: "rename the flag" }, { question: "send-back-2", answer: "and its help" }] }
+        const run: HistoryRun = { ...base, answers: [{ question: "send-back", answer: "rename the flag", decider: "owner" }, { question: "send-back-2", answer: "and its help", decider: "owner" }] }
         await mkdir(run.runDir, { recursive: true })
         await writeFile(run.taskPath, "Do the thing.\n")
         const plan = await Effect.runPromise(buildResumePlan(db, run))
@@ -189,7 +189,7 @@ describe("a run sent back with the captain's review", () => {
         expect(report.checksRounds?.length).toBe(1)
         expect(runs.length).toBe(1)
         expect(runs[0]?.resumeSession).toBe(plan.implementSessionFile ?? "")
-        expect(runs[0]?.prompt).toContain("sent it back: rename the flag\nThe captain also wrote: and its help\n")
+        expect(runs[0]?.prompt).toContain("Owner sent back the pull request this branch opened: rename the flag\nOwner also wrote: and its help\n")
         expect(checks).toBeGreaterThan(0)
       } finally {
         db.close()
