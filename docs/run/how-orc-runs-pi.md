@@ -2,7 +2,7 @@
 kind: reference
 ---
 # How orc runs Pi
-Orc runs only [Pi](https://pi.dev), and it starts Pi itself as `pi -p --mode json` in the task copy, inside [`nono run`](https://nono.sh) by default or on the host with `--sandbox none`.
+Orc runs only [Pi](https://pi.dev), and it starts Pi itself as `pi -p --mode json` in the task copy, on the host by default or inside [`nono run`](https://nono.sh) with `--sandbox nono`.
 
 ## Pi sessions and output
 

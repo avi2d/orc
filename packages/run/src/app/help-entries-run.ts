@@ -15,7 +15,7 @@ export const runHelp: HelpEntry = {
     { flag: "--kind " + choice(runKinds), meaning: "What the task ends in. ship ends in a PR, scout and task end in a report, and parent runs a parent's final check. Defaults to ship." },
     { flag: "--delivery " + choice(runDeliveries), meaning: "How a ship task reaches its PR. Defaults to no-mistakes. direct-PR records a review before opening the PR, and orc rebases and records a review before opening the PR without a CI verdict." },
     { flag: "--branch <name>", meaning: "The branch to commit to, or to resume. Defaults to orc/<run-id>." },
-    { flag: "--sandbox " + choice(sandboxKinds), meaning: "Where the agent runs. Defaults to nono, and none runs it on the host as you." },
+    { flag: "--sandbox " + choice(sandboxKinds), meaning: "Where the agent runs. Defaults to none, which runs it on the host as you." },
     { flag: "--token-file <path>", meaning: "A file holding the provider token the run uses." },
     { flag: "--provider <id>", meaning: "The provider id from config.json the run must use." },
     { flag: "--implementer-model <model>", meaning: "The implementer model, used instead of the one config.json names." },

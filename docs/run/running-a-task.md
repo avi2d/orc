@@ -8,8 +8,9 @@ A ship run creates an isolated worktree, asks [Pi](https://pi.dev) to make the c
 
 ## Before you run
 
-Install `git`, [`nono`](https://nono.sh), `pi`, `node`, and [`no-mistakes`](https://github.com/kunchenguid/no-mistakes) on the host `PATH`.
-A `direct-PR` or `orc` run does not need `no-mistakes`, and `--sandbox none` does not need `nono`.
+Install `git`, `pi`, `node`, and [`no-mistakes`](https://github.com/kunchenguid/no-mistakes) on the host `PATH`.
+A `direct-PR` or `orc` run does not need `no-mistakes`.
+Install [`nono`](https://nono.sh) if you choose `--sandbox nono`.
 For no-mistakes delivery, use version 1.90.0 or later.
 
 Configure the provider and models as [Configuring providers](configuring-providers.md) describes.
@@ -20,7 +21,7 @@ nono reads that login with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_A
 In the sandbox, Pi and the checks get those same variables beside the temp folder, [git](https://git-scm.com) config and Pi folder orc sets for the run.
 On the host they get a short list that adds the shell, the temp folder, `XDG_RUNTIME_DIR` and the proxy and the certificate variables.
 No `ORC_` variable reaches Pi or the checks.
-With the default sandbox, if nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc names that error in the result.
+With the nono sandbox, if nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc names that error in the result.
 
 Orc refuses a checkout with uncommitted changes or unsafe local git configuration.
 Set `ORC_REFUSE_MARKERS` to comma-separated names to reject a marker in the checkout or its parent.
@@ -63,8 +64,9 @@ See [Delivery modes](delivery-modes.md) and [Task kinds](task-kinds.md).
 
 Orc creates `orc/<run-id>` unless you give `--branch <name>`.
 The name must pass `git check-ref-format --branch`.
-By default Pi runs in a nono sandbox.
-Use `--sandbox none` to run Pi and the checks on the host.
+By default Pi and the checks run on the host without a per-agent sandbox.
+Use `--sandbox nono` to run them in the nono sandbox.
+Run the whole agent system in an isolated space, as [Running without a sandbox](running-without-a-sandbox.md) describes.
 
 Before Pi starts, orc runs the project's `prepare` command in the same sandbox.
 If it fails, read `prepare.log` in the run folder.
@@ -134,9 +136,9 @@ The implementer and the fixer must use a configured provider, and both must use 
 The reviewer runs only in direct-PR delivery, on the fixer model unless its file names a model, and it must use the same provider.
 Orc runs the reviewer with read, grep, find, and ls, regardless of the tools named in its agent file.
 Orc refuses models absent from Pi or with a context window of 150,000 tokens or less.
-Pi compacts context at 150,000 tokens in the default sandbox.
+Pi compacts context at 150,000 tokens in the nono sandbox.
 For `--sandbox none` with a Pi login provider, Pi uses your own compaction settings.
-With the default sandbox, orc pins each agent model window in `models.json` as that provider model override `contextWindow`.
+With the nono sandbox, orc pins each agent model window in `models.json` as that provider model override `contextWindow`.
 
 Orc puts its worktrees under `$ORC_HOME/worktrees/<project>-<hash>/<branch>`, where `<hash>` is the first 8 hex digits of the SHA-256 of the checkout path.
 A resumed run can also reuse an older worktree found by Git.

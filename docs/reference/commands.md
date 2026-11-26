@@ -79,8 +79,8 @@ Options:
                             before opening the PR without a CI verdict.
   --branch <name>           The branch to commit to, or to resume. Defaults to
                             orc/<run-id>.
-  --sandbox <nono|none>     Where the agent runs. Defaults to nono, and none
-                            runs it on the host as you.
+  --sandbox <nono|none>     Where the agent runs. Defaults to none, which runs
+                            it on the host as you.
   --token-file <path>       A file holding the provider token the run uses.
   --provider <id>           The provider id from config.json the run must use.
   --implementer-model <model>
