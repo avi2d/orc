@@ -17,7 +17,7 @@ export type { ChecksRoundSummary, OrcRunCommit, OrcRunReport, RecordedFixAttempt
 export type RunDeliverer =
   | { readonly kind: "no-mistakes"; readonly runner: NoMistakesRunner }
   | { readonly kind: "direct-PR"; readonly opener: PullRequestOpener; readonly reviewer: AgentFile }
-  | { readonly kind: "orc"; readonly opener: PullRequestOpener }
+  | { readonly kind: "orc"; readonly opener: PullRequestOpener; readonly reviewer: AgentFile }
 
 export const prBodyFileName = "pr-body.md"
 
@@ -29,6 +29,7 @@ export interface HistoryRun {
   readonly projectDir: string
   readonly runId: string
   readonly resumeRun?: string | undefined
+  readonly rebase?: { readonly head: string; readonly pr: string } | undefined
   readonly runDir: string
   readonly piSessionDir: string
   readonly hostSessionsDir: string
