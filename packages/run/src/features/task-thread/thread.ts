@@ -1,7 +1,7 @@
 import { Effect, type FileSystem } from "effect"
-import { decisionText, deciderHeadings, notRecordedBasis, reviewQuestionId, taskItems, type Decision, type OpenItem } from "../../entities/attention/index"
+import { decisionText, reviewQuestionId, taskItems, type Decision, type OpenItem } from "../../entities/attention/index"
 import { decisionAnswer, findTask, isDeciderAnswer, readNotes, type BacklogError, type Hold, type HoldQuestion, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
-import { type Decider, deciderLabel, formatTable } from "../../shared/lib/index"
+import { type Decider, deciderHeadings, deciderLabel, formatTable, notRecordedBasis } from "../../shared/lib/index"
 
 const THREAD_JSON_SCHEMA = "orc.thread.v1" as const
 

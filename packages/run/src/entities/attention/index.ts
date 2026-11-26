@@ -1,5 +1,5 @@
 export { decisionText } from "./attention-item"
-export { DecidedEntry, decisionGroups, deciderHeadings, notRecordedBasis } from "./decision-groups"
+export { DecidedEntry, decisionGroups } from "./decision-groups"
 export type { AgentDecision, DecisionGroups, OwnerDecision } from "./decision-groups"
 export { reviewQuestionId, readItem, answerItem, readAttention, routeTaskItems, withdrawTaskItems, deciderTimeoutMillis, claimDeciding, openItems, taskItems, recordDecision, openReviewQuestions } from "./attention"
 export { openRunDeaths, openUnreachedMachine, pullRequestHeld, routePullRequest, withdrawUnreachedMachine } from "./beat-items"

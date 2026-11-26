@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import type { Decider } from "../../shared/lib/index"
+import { notRecordedBasis } from "../../shared/lib/index"
 import { AttentionItem, Decision, decisionText, ItemAnswer } from "./attention-item"
 
 export const DecidedEntry = Schema.Struct({
@@ -14,8 +14,6 @@ export const DecidedEntry = Schema.Struct({
   overturned: Schema.optionalKey(ItemAnswer)
 })
 export type DecidedEntry = typeof DecidedEntry.Type
-
-export const deciderHeadings = { owner: "Decided by the owner", agent: "Decided by the agent" } as const satisfies Record<Decider, string>
 
 export interface OwnerDecision {
   readonly id: string
@@ -34,8 +32,6 @@ export interface DecisionGroups {
   readonly owner: ReadonlyArray<OwnerDecision>
   readonly agent: ReadonlyArray<AgentDecision>
 }
-
-export const notRecordedBasis = "not recorded"
 
 const agentBasis = (decision: Decision | undefined): string => decision?.decider === "agent" ? decisionText(decision) : notRecordedBasis
 

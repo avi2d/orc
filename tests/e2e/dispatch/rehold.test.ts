@@ -46,9 +46,10 @@ test("answering an earlier hold does not prevent a new hold or erase its prior d
       ORC_TASK_CHECKOUT: fixture.checkout, ORC_TASK_PROVIDER: "acme", ORC_TASK_TOKEN_FILE: ""
     })
     expect(await readFile(join(fixture.home, "runner", "orc-1.md"), "utf8")).toEndWith([
+      "Decided by the owner:", "",
       "Held for the captain: Choose the format", "The captain answered: Which format?: JSON", "",
       "Held for the captain: Wait for the merge", "The captain answered: Merged", "",
-      "Held for the captain: Wait for deployment", "The captain answered: Deployed"
+      "Held for the captain: Wait for deployment", "The captain answered: Deployed", ""
     ].join("\n"))
   })
 }, runnerTimeout)

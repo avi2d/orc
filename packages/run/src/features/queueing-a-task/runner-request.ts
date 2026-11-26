@@ -1,7 +1,7 @@
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { AbsolutePath, readDispatchConfig, readFailure } from "../../shared/config/index"
 import { ModelRef, ProviderId, RoutedModels, RoutedModelsJson } from "../../shared/config/index"
-import { Rebase, TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type Parked, type TaskRecord, withDecisions } from "../../entities/backlog/index"
+import { Rebase, TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type DecidedNote, decisionNotes, type Parked, type TaskRecord, withDecided } from "../../entities/backlog/index"
 import { isSendBackQuestion, latestPerId } from "../../entities/parked-runs/index"
 import { carriedHoldReleaseId, holdReleaseId, QuestionAnswer } from "../../entities/review-gate/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
@@ -74,16 +74,17 @@ const readSlots = (path: Path.Path, file: string, env: Readonly<Record<string, s
 
 const decidedBody = (path: Path.Path, file: string, record: TaskRecord): Effect.Effect<string, RunnerError, FileSystem.FileSystem> =>
   readAnsweredDependencies(backlogOfTaken(path, file), record).pipe(
-    Effect.map((decisions) => withDecisions(takenBody(record), decisions)),
+    Effect.map((decisions) => withDecided(record.spec.body, [...holdNotes(record), ...decisionNotes(decisions)])),
     Effect.mapError((error) => new RunnerError({ detail: "cannot read the decisions " + record.spec.id + " waits on: " + ("file" in error ? error.file + ": " : "") + error.detail }))
   )
 
-const takenBody = (record: TaskRecord): string => {
+const holdNotes = (record: TaskRecord): ReadonlyArray<DecidedNote> => {
   const hold = record.hold
   const decisions = hold === null ? [] : [...hold.history ?? [], hold]
-  return record.spec.body + decisions.flatMap((decision) => decision.answer === null || decision.repeat === true ? [] : [
-    "\n\nHeld for the captain: " + decision.reason + "\n" + (decision.answer.decider === "owner" ? "The captain" : "The agent") + " answered: " + decision.answer.words
-  ]).join("")
+  return decisions.flatMap((decision) => decision.answer === null || decision.repeat === true ? [] : [{
+    decider: decision.answer.decider,
+    text: "Held for the captain: " + decision.reason + "\n" + (decision.answer.decider === "owner" ? "The captain" : "The agent") + " answered: " + decision.answer.words
+  }])
 }
 
 const timeOf = (at: string): number => {
