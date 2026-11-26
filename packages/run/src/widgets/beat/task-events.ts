@@ -82,7 +82,6 @@ const recoverMerged = (root: string, task: TaskRecord, pr: string, view: PullReq
         result: undefined
       })
     }).pipe(
-      Effect.uninterruptible,
       Effect.mapError((error) => new BacklogError({ detail: "cannot record merge of " + pr + ": " + error.detail }))
     )
   })
