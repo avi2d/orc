@@ -28,9 +28,7 @@ To run orc from a checkout of the repository instead, follow [Contribute](https:
 ## Run a task
 
 To run one task, enter a clean checkout of the target project and run `orc run <task-file>`.
-A hand-typed run uses the nono sandbox by default unless you pass `--sandbox none`.
-Queued tasks always pass `--sandbox none` and run without a per-agent sandbox.
-Their safety boundary is the isolated space around the whole agent system, as [Running without a sandbox](https://github.com/avi2d/orc/blob/main/docs/run/running-without-a-sandbox.md) describes.
+Queued tasks run without a per-agent sandbox, inside the isolated space around the whole agent system, as [Running without a sandbox](https://github.com/avi2d/orc/blob/main/docs/run/running-without-a-sandbox.md) describes.
 [Running a task](https://github.com/avi2d/orc/blob/main/docs/run/running-a-task.md) names every flag and resume option.
 
 ## Print the version
