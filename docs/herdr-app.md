@@ -44,10 +44,10 @@ The tabs refresh while visible and show a reason when a command fails.
 
 Select **Inbox** or press `cmd-4` to see everything Orc assigns to you in one list, oldest first.
 
-![Inbox tab with an event and questions assigned across tasks](images/herdr-inbox.png)
+![Inbox tab with an overdue event and two decisions](images/herdr-inbox.png)
 
 Each card shows the task ID and title, who asks, the subject, each option with its outcome, and the recommendation.
-An option with a picture shows as a tile, and any other option shows as a button.
+An option with a picture shows as a tile, and others as buttons.
 The Inbox outlines the recommended option.
 If Orc did not record options, the card shows the original text and says **No options recorded**.
 An overdue card shows how long it has waited.
@@ -55,7 +55,7 @@ The Agents tab shows the same cards under each run in **Awaiting you**.
 
 To answer a question, a decision, a hold or an event:
 
-1. Click an option, or type your own answer and press Enter or **Send**.
+1. Click an option, or type an answer and press Enter or **Send**.
 1. The Inbox runs the command for that item, and the card shows **Answer recorded**:
    - `orc backlog answer <task> <id>=<answer>` for a question or a decision.
    - `orc backlog answer <task> <answer>` for a hold.
@@ -70,7 +70,7 @@ To merge a PR that waits:
 1. Confirm the dialog, and the Inbox runs `orc merge <task> --basis captain-word`.
 
 Click **hold** to leave the PR open, and the Inbox runs `orc attention answer <item> hold`.
-When a command fails, the card shows it with the first line of its error.
+A failed command shows on its card with the first line of its error.
 
 Questions the agent owns, and its answers, stay in the collapsed **Agent attention** section at the end, each with its basis.
 Where you replaced an agent's answer, your answer shows beside it as **Decided by you**.
