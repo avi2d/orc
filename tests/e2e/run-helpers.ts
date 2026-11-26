@@ -210,9 +210,9 @@ const unexpectedNoMistakes: ReadonlyArray<NoMistakesReply> = [{ stdout: "", stde
 const fixtureGit: typeof hostGitShim = (fs, path, realGit) =>
   Effect.gen(function*() {
     const dir = yield* fs.makeTempDirectoryScoped({ prefix: "orc-fixture-git-" })
-    const git = path.join(dir, "git")
-    yield* fs.symlink(realGit, git)
-    return git
+    const link = path.join(dir, "git")
+    yield* fs.symlink(realGit, link)
+    return link
   })
 
 type DelivererFor = (spawner: ChildProcessSpawner.ChildProcessSpawner["Service"], hostGit: string, pathEnv: string, dir: string) => RunDeliverer
