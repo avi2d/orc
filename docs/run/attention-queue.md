@@ -161,6 +161,7 @@ The beat opens these items for a closed ship task's PR, owned by the user:
 A run is confirmed failed when [pueue](https://github.com/Nukesor/pueue) reports its task failed, not killed, and the runner holds a run ID for it.
 The beat returns that task to `new` once, keeping its branch and origin run, so the next beat resumes the run.
 It records the `retry` mark in the task file and a chat event `<task-id>.retry.<run-id>`.
+`orc backlog --json` carries the mark as the task's `retry`, with the retried run ID as `run` and the retry time as `at`.
 A failure after the retry closes the task and opens a `run-died` item with the task log tail.
 Sending a closed task back clears the retry mark and gives the task another retry.
 A run you stop never retries.

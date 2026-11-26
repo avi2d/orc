@@ -38,7 +38,8 @@ The command writes only names beginning with `orc`, leaving Herdr's own mods and
 | Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps, step output and changes |
 | Inbox | `cmd-4` | Every open question, decision, hold, event and PR that Orc assigns to you, across all tasks |
 
-The tabs refresh while visible and show a reason when a command fails.
+The Resources tab refreshes in the background, and the other tabs refresh while visible.
+Each tab shows a reason when a command fails.
 
 ## Answer in the Inbox
 

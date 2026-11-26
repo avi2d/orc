@@ -30,8 +30,7 @@ export const openInbox = (cx: Context): void => {
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
-export interface ShownRefresh<T> {
-  visible: boolean
+export interface Refreshed<T> {
   lastRead: number
   busy: boolean
   stale?: boolean
@@ -39,22 +38,35 @@ export interface ShownRefresh<T> {
   load: () => Promise<T>
 }
 
+export interface ShownRefresh<T> extends Refreshed<T> {
+  visible: boolean
+}
+
+const refreshInto = <T>(host: Refreshed<T>, spot: AsyncContext): void => {
+  if (host.busy) return
+  host.busy = true
+  host.lastRead = Date.now()
+  spot.spawn((task) => host.load().then((reading) => {
+    host.reading = reading
+    host.busy = false
+    if (host.stale === true) {
+      host.stale = false
+      refreshInto(host, task)
+    } else {
+      task.notify()
+    }
+  }))
+}
+
+export const refreshInBackground = <T>(everyMs: number, cx: AsyncContext, host: Refreshed<T>): void => {
+  cx.timer.every(1000, (tick) => {
+    if (Date.now() - host.lastRead >= everyMs) refreshInto(host, tick)
+  })
+  refreshInto(host, cx)
+}
+
 export const refreshWhenShown = <T>(view: string, everyMs: number, cx: AsyncContext, host: ShownRefresh<T>): void => {
-  const refresh = (spot: AsyncContext): void => {
-    if (host.busy) return
-    host.busy = true
-    host.lastRead = Date.now()
-    spot.spawn((task) => host.load().then((reading) => {
-      host.reading = reading
-      host.busy = false
-      if (host.stale === true) {
-        host.stale = false
-        refresh(task)
-      } else {
-        task.notify()
-      }
-    }))
-  }
+  const refresh = (spot: AsyncContext): void => refreshInto(host, spot)
   const shown = (): boolean => {
     const active = activeChild(layout(), viewsStack)
     return active === null || active === view

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { Schema } from "effect"
-import { SnapshotReport } from "@avi2dg/orc-schema"
-import { guardJson } from "../../../packages/herdr-app/src/guard"
-import { type QuotaWindow, type ResourcesSnapshot, countdown, machineRows, unreadLines, pastPace, resourcesSnapshot, runsOutAt, subscriptionRows } from "../../../packages/herdr-app/src/resources"
+import { type SnapshotFields, SnapshotReport } from "@avi2dg/orc-schema"
+import { type Guard, guardJson } from "../../../packages/herdr-app/src/guard"
+import { type AccountRows, type QuotaWindow, type Subscriptions, type WindowRow, countdown, machineRows, machinesSnapshot, unreadLines, pastPace, runsOutAt, subscriptionRows, subscriptionsSnapshot } from "../../../packages/herdr-app/src/resources"
 
 const fixture = await Bun.file(`${import.meta.dir}/../../fixtures/herdr-resources/two-machines.json`).text()
 
@@ -10,8 +10,8 @@ const minute = 60_000
 const hour = 60 * minute
 const day = 24 * hour
 
-const guarded = (text: string): ResourcesSnapshot => {
-  const result = guardJson(text, resourcesSnapshot)
+const guarded = <A>(text: string, guard: Guard<A>): A => {
+  const result = guardJson(text, guard)
   if (result.kind === "refused") throw new Error(result.reason)
   return result.value
 }
@@ -22,9 +22,29 @@ const read = <A>(known: { readonly kind: "ok"; readonly value: A } | { readonly 
 }
 
 const rowsOf = (text: string) => {
-  const snapshot = guarded(text)
+  const snapshot = guarded(text, machinesSnapshot)
   return machineRows(read(snapshot.machines), snapshot.queues)
 }
+
+const subscriptionsOf = (text: string): Subscriptions => read(guarded(text, subscriptionsSnapshot))
+
+type QuotaStatus = SnapshotFields<"quota">["report"]["accounts"][number]["quota"]
+
+const claudeUnread = (quota: QuotaStatus): string => {
+  const document = Schema.decodeUnknownSync(SnapshotReport)(JSON.parse(fixture))
+  const source = document.sources.quota
+  if (source?.status !== "ok") throw new Error("the fixture holds no quota report")
+  const report = {
+    ...source.report,
+    accounts: source.report.accounts.map((account) => account.title === "claude" ? { ...account, quota } : account),
+    windows: source.report.windows.filter((window) => window.account.title !== "claude")
+  }
+  return JSON.stringify({ ...document, sources: { ...document.sources, quota: { ...source, report } } })
+}
+
+const windowsOf = (group: AccountRows | undefined): ReadonlyArray<WindowRow> => group?.kind === "windows" ? group.windows : []
+
+const only = (windows: ReadonlyArray<QuotaWindow>): Subscriptions => ({ accounts: [], windows })
 
 const remoteUnreachable = fixture.replace(
   /("name": "build-box",\s*"reading": )\{[\s\S]*?"gpu": null\s*\}\s*\}/,
@@ -67,17 +87,17 @@ describe("runs out", () => {
   test("is hidden when the pace empties the window only after the reset", () => {
     const slow = { ...week, usedPoints: 20, leftPoints: 80 }
     expect(runsOutAt(slow)).toBeNull()
-    expect(subscriptionRows([slow], Date.parse(week.startsAt) + 1.75 * day)[0]?.windows[0]?.runsOut).toBeNull()
+    expect(windowsOf(subscriptionRows(only([slow]), Date.parse(week.startsAt) + 1.75 * day)[0])[0]?.runsOut).toBeNull()
   })
 
   test("is hidden once the reset has passed, not shown as a red now for a window that is gone", () => {
-    const rows = subscriptionRows([week], Date.parse(week.resetsAt) + hour)
-    expect(rows[0]?.windows[0]).toMatchObject({ resets: "now", runsOut: null })
+    const rows = subscriptionRows(only([week]), Date.parse(week.resetsAt) + hour)
+    expect(windowsOf(rows[0])[0]).toMatchObject({ resets: "now", runsOut: null })
   })
 
   test("counts down to when the pace empties the window, not to the reset", () => {
     expect(runsOutAt(week)).toBe(Date.parse(week.startsAt) + 3.5 * day)
-    expect(subscriptionRows([week], Date.parse(week.startsAt) + 1.75 * day)[0]?.windows[0]).toMatchObject({ resets: "5d 6h", runsOut: "1d 18h" })
+    expect(windowsOf(subscriptionRows(only([week]), Date.parse(week.startsAt) + 1.75 * day)[0])[0]).toMatchObject({ resets: "5d 6h", runsOut: "1d 18h" })
   })
 })
 
@@ -94,17 +114,34 @@ describe("a bar", () => {
 
 describe("the subscriptions table", () => {
   test("names an account once over all its windows, not on every row", () => {
-    const groups = subscriptionRows(read(guarded(fixture).windows), Date.parse("2026-03-02T12:00:00.000Z"))
-    expect(groups.map((group) => [group.account, group.windows.map((row) => row.label)])).toEqual([
+    const groups = subscriptionRows(subscriptionsOf(fixture), Date.parse("2026-03-02T12:00:00.000Z"))
+    expect(groups.map((group) => [group.account, windowsOf(group).map((row) => row.label)])).toEqual([
       ["claude", ["session", "week"]],
       ["codex", ["week"]]
     ])
-    expect(groups[0]?.windows[0]).toMatchObject({ usedPercent: 60, red: true, resets: "3h 0m", runsOut: "1h 20m" })
+    expect(windowsOf(groups[0])[0]).toMatchObject({ usedPercent: 60, red: true, resets: "3h 0m", runsOut: "1h 20m" })
+  })
+
+  test("keeps an account whose quota read failed, with the report's reason, instead of dropping its row", () => {
+    const text = claudeUnread({ status: "unreachable", detail: "quota-axi read no claude usage" })
+    expect(() => Schema.decodeUnknownSync(SnapshotReport)(JSON.parse(text))).not.toThrow()
+    expect(subscriptionRows(subscriptionsOf(text), Date.parse("2026-03-02T12:00:00.000Z")).map((group) => group.kind === "unread" ? [group.account, group.reason] : [group.account])).toEqual([
+      ["claude", "quota-axi read no claude usage"],
+      ["codex"]
+    ])
+  })
+
+  test("keeps an account the report reads as ok but holds no window for, instead of dropping its row", () => {
+    const text = claudeUnread({ status: "ok" })
+    expect(() => Schema.decodeUnknownSync(SnapshotReport)(JSON.parse(text))).not.toThrow()
+    expect(subscriptionRows(subscriptionsOf(text), Date.parse("2026-03-02T12:00:00.000Z"))[0]).toEqual({
+      kind: "unread", account: "claude", reason: "the quota report holds no window for it"
+    })
   })
 
   test("refuses a window with no elapsedFraction rather than drawing a bar with no notch", () => {
     const text = fixture.replace('"elapsedFraction": 0.4,', "")
-    expect(guardJson(text, resourcesSnapshot)).toEqual({ kind: "refused", reason: "sources.quota.report.windows[0].elapsedFraction is missing" })
+    expect(guardJson(text, subscriptionsSnapshot)).toEqual({ kind: "refused", reason: "sources.quota.report.windows[0].elapsedFraction is missing" })
   })
 })
 
@@ -154,6 +191,6 @@ describe("the machines table", () => {
 
   test("refuses a running task with no group rather than counting it as an orc run", () => {
     const text = fixture.replace('"group": "orc",', "")
-    expect(guardJson(text, resourcesSnapshot)).toEqual({ kind: "refused", reason: "sources.queues.machines[0].pueue.value.running[0].group is missing" })
+    expect(guardJson(text, machinesSnapshot)).toEqual({ kind: "refused", reason: "sources.queues.machines[0].pueue.value.running[0].group is missing" })
   })
 })
