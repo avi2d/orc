@@ -11,9 +11,9 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "bun run bundle && bun run build:launcher && bun packages/run/scripts/build-heavy-standin.ts && (cd packages/session-quota && bun run build) && (cd packages/cli && bun run build) && checks-effect-scope && checks-changelog && bun run build:pack && bun scripts/docs-commands.ts && bun scripts/docs-diagrams.ts",
+    "build": "bun run bundle && bun packages/run/scripts/build-heavy-standin.ts && (cd packages/session-quota && bun run build) && (cd packages/cli && bun run build) && checks-effect-scope && checks-changelog && bun run build:pack && bun scripts/docs-commands.ts && bun scripts/docs-diagrams.ts",
     "bundle": "bun packages/run/scripts/sync-run-version.ts && bun packages/run/scripts/bundle.ts",
-    "build:pack": "(cd packages/herdr-app && bun run build) && rm -rf packages/run/dist/herdr-app && cp -R packages/herdr-app/dist packages/run/dist/herdr-app && cp CHANGELOG.md packages/run/CHANGELOG.md",
+    "build:pack": "bun run build:launcher && (cd packages/herdr-app && bun run build) && rm -rf packages/run/dist/herdr-app && cp -R packages/herdr-app/dist packages/run/dist/herdr-app && cp CHANGELOG.md packages/run/CHANGELOG.md",
     "build:launcher": "bun build packages/run/scripts/launch.ts --target node --outfile packages/run/dist/launch.js && install -m 755 packages/run/scripts/launch.sh packages/run/dist/launch",
     "compile": "bun packages/run/scripts/compile.ts",
     "release:assets": "bun scripts/release-assets.ts",
