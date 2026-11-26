@@ -67,6 +67,7 @@ const expectedFiles = [
   "scripts/patch-knip-jiti.ts",
   "src/shared/sandbox/agent-exec.ts",
   "src/entities/agent/agents.ts",
+  "src/entities/agent/asset-path.ts",
   "src/entities/agent/failure-streak.ts",
   "src/entities/review-gate/answer-wait.ts",
   "src/features/installing-the-app/app-install.ts",
