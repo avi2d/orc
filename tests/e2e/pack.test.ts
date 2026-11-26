@@ -207,6 +207,7 @@ const expectedFiles = [
   "src/shared/process/pueue-status.ts",
   "src/widgets/beat/quota-command.ts",
   "src/widgets/beat/quota.ts",
+  "src/widgets/beat/retry-stall.ts",
   "src/entities/task-copy/refresh.ts",
   "src/shared/process/runner-error.ts",
   "src/shared/process/runner-exec.ts",
