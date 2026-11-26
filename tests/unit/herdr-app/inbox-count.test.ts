@@ -39,6 +39,7 @@ const find = (element: object | string, id: string): Node | null => {
 }
 
 const documents = new Map<string, unknown>()
+let attentionPending: Promise<{ code: number; stdout: string; stderr: string }> | null = null
 const executed: Array<string> = []
 const spawned: Array<Promise<unknown>> = []
 const ran: Array<{ readonly name: string; readonly args: unknown }> = []
@@ -78,6 +79,7 @@ void mock.module("herdr", () => ({
   exec: (command: string, args: ReadonlyArray<string>) => {
     const line = [command, ...args].join(" ")
     executed.push(line)
+    if (line === "orc attention --json" && attentionPending !== null) return attentionPending
     const document = documents.get(line)
     return Promise.resolve(document === undefined
       ? { code: 1, stdout: "", stderr: `Unexpected command: ${line}` }
@@ -106,6 +108,30 @@ const loadAttention = async () => {
   if (inbox.kind !== "ok") throw new Error(inbox.kind === "failed" ? inbox.reason : inbox.kind)
   return { agents: agents.value, inbox: inbox.value }
 }
+
+test("a stalled remote question request does not hold back local steps and log refresh", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const runId = "20261126-090000-aaaaaa"
+  const step = { id: 1, name: "implement", attempt: 1, status: "running", model: null, thinking: null, piSessionFile: null, from: null }
+  documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [{ id: runId, project: "/work/garden", branch: "orc/garden-1", status: "running", prLink: null, title: "Local run", step: null, questions: 0, endReason: null, kind: null, delivery: null, worktree: null }] })
+  documents.set("orc backlog --json", { schema: "orc.backlog.v1", tasks: [] })
+  documents.set(`orc show ${runId} --json`, { schema: "orc.show.v1", run: { taskFile: "/work/garden/task.md" }, steps: [step] })
+  documents.set(`orc log ${runId} 1`, "local output")
+  let release = (): void => undefined
+  attentionPending = new Promise((resolve) => { release = () => resolve({ code: 0, stdout: JSON.stringify(fixture), stderr: "" }) })
+  const agents = new OrcAgents()
+  agents.pane = "raw"
+  try {
+    agents.refresh(cx)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(agents.steps?.reading.kind).toBe("ok")
+    expect(agents.output.log?.reading).toEqual({ kind: "ok", value: JSON.stringify("local output") })
+  } finally {
+    release()
+    attentionPending = null
+    documents.clear()
+  }
+})
 
 const cmd4 = { name: "layout.select", args: { stack: "orc-views", child: "orc-inbox" } }
 
