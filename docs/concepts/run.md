@@ -19,7 +19,9 @@ Before [Pi](https://pi.dev) starts, a ship run runs the `prepare` command from t
 ## The agent
 
 Orc runs only the Pi agent, and it starts Pi itself.
-A run you start by hand works inside the [nono](https://nono.sh) sandbox by default, and `--sandbox none` runs it on the host.
+A run you start by hand uses the [nono](https://nono.sh) sandbox by default unless you pass `--sandbox none`.
+Queued tasks always pass `--sandbox none` and run without a per-agent sandbox.
+Their safety boundary is the isolated space around the whole agent system, as [Running without a sandbox](../run/running-without-a-sandbox.md) describes.
 The agent file `implementer.md` holds Pi's instructions, and `config.json` names the model.
 The prompt is the task, and it asks Pi to print `ORC_COMPLETE` on its own line once the work is committed.
 
