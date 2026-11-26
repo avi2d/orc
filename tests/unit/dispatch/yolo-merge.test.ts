@@ -58,6 +58,12 @@ const taskOf = async (root: string) => {
   return task
 }
 
+const forgeView = (current: PullRequestView) => JSON.stringify({
+  ...current,
+  mergeCommit: current.state === "MERGED" ? { oid: "1".repeat(40) } : null,
+  mergedAt: current.state === "MERGED" ? "2026-11-18T11:09:00Z" : null
+})
+
 const ghLayer = (current: PullRequestView, files: string | null, merges: Array<string>, parent = "0".repeat(40)): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> =>
   Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
     const real = yield* ChildProcessSpawner.ChildProcessSpawner
@@ -70,7 +76,7 @@ const ghLayer = (current: PullRequestView, files: string | null, merges: Array<s
       const args = command.args
       const text = "gh " + args.join(" ")
       if (args[0] === "pr" && args[1] === "view") {
-        return reply(JSON.stringify({ state: current.state, headRefOid: current.headRefOid, baseRefName: current.baseRefName, statusCheckRollup: current.statusCheckRollup, mergeCommit: current.state === "MERGED" ? { oid: "1".repeat(40) } : null, mergedAt: current.state === "MERGED" ? "2026-11-18T11:09:00Z" : null }))
+        return reply(forgeView(current))
       }
       if (text.includes("/pulls/") && text.includes("/files")) {
         return files === null ? refusal() : reply(files)
