@@ -15,7 +15,7 @@ import {
 import { bytesBetween, decodedLines, type Grown, grownRecords, wholeLines } from "../../../shared/lib";
 
 const listedLedger = (fs: FileSystem.FileSystem, directory: string) =>
-  fs.readDirectory(directory).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
+  fs.readDirectory(directory).pipe(Effect.catchTag("PlatformError", () => Effect.succeed<ReadonlyArray<string>>([])));
 
 export interface DayFile<R> {
   readonly path: string;

@@ -180,7 +180,7 @@ const instructionsFile = <T extends ParsedInstructions>(file: string, project: T
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const resolved = path.resolve(path.dirname(file), project.instructions)
-    const info = yield* fs.stat(resolved).pipe(Effect.orElseSucceed(() => null))
+    const info = yield* fs.stat(resolved).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     if (info?.type !== "File") {
       return yield* new ConfigError({ file, detail: "the project " + project.name + " names the instructions file " + resolved + ", which is no file" })
     }

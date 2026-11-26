@@ -79,7 +79,7 @@ const homePaths = (home: string): ReadonlyArray<string> => [`${home}/state`, `${
 const isStateHome = (fs: FileSystem.FileSystem, home: string): Effect.Effect<boolean> =>
   fs.stat(`${home}/state`).pipe(
     Effect.map((info) => info.type === "Directory"),
-    Effect.orElseSucceed(() => false),
+    Effect.catchTag("PlatformError", () => Effect.succeed(false)),
   );
 
 const derivedWatchPaths = (
@@ -92,7 +92,7 @@ const derivedWatchPaths = (
     if (taskHomes !== undefined) return [...new Set(splitWatch(taskHomes))].flatMap(homePaths);
     const found: Array<string> = [];
     if (home !== undefined) {
-      const entries = yield* fs.readDirectory(home).pipe(Effect.orElseSucceed((): Array<string> => []));
+      const entries = yield* fs.readDirectory(home).pipe(Effect.catchTag("PlatformError", () => Effect.succeed<Array<string>>([])));
       for (const entry of entries.filter((name) => name.startsWith("fm-")).toSorted()) {
         const candidate = `${home}/${entry}`;
         if (yield* isStateHome(fs, candidate)) found.push(candidate);
@@ -115,7 +115,7 @@ const fileStamp = (path: string, info: FileSystem.File.Info): string =>
 const entryStamp = (fs: FileSystem.FileSystem, path: string): Effect.Effect<string> =>
   fs.stat(path).pipe(
     Effect.map((info) => fileStamp(path, info)),
-    Effect.orElseSucceed(() => `${path}\tabsent`),
+    Effect.catchTag("PlatformError", () => Effect.succeed(`${path}\tabsent`)),
   );
 
 // A folder's own time moves when a hidden entry comes or goes, so a folder is stamped by its shown entries alone.
@@ -124,7 +124,7 @@ const pathStamp = (fs: FileSystem.FileSystem, path: string): Effect.Effect<strin
     const info = yield* Effect.option(fs.stat(path));
     if (Option.isNone(info)) return `${path}\tabsent`;
     if (info.value.type !== "Directory") return fileStamp(path, info.value);
-    const entries = yield* fs.readDirectory(path).pipe(Effect.orElseSucceed((): Array<string> => []));
+    const entries = yield* fs.readDirectory(path).pipe(Effect.catchTag("PlatformError", () => Effect.succeed<Array<string>>([])));
     const shown = entries.filter((name) => !name.startsWith(".")).toSorted();
     const stamps = yield* Effect.forEach(shown, (name) => entryStamp(fs, `${path}/${name}`));
     return [path, ...stamps].join("\n");

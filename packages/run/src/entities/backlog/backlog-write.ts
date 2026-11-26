@@ -123,7 +123,7 @@ const procStarttime = (pid: number): Effect.Effect<string | null, never, FileSys
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => fs.readFileString("/proc/" + pid + "/stat")),
     Effect.map(starttimeOf),
-    Effect.orElseSucceed(() => null)
+    Effect.catchTag("PlatformError", () => Effect.succeed(null))
   )
 
 const psStart = (pid: number): Effect.Effect<string | null> =>
@@ -142,7 +142,7 @@ const psStart = (pid: number): Effect.Effect<string | null> =>
       const text = start.trim()
       return text === "" ? null : Buffer.from(text).toString("hex")
     }),
-    Effect.orElseSucceed(() => null)
+    Effect.catchTag("BacklogError", () => Effect.succeed(null))
   )
 
 const processStart = (pid: number): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
@@ -150,7 +150,7 @@ const processStart = (pid: number): Effect.Effect<string | null, never, FileSyst
     const ticks = yield* procStarttime(pid)
     if (ticks !== null) return ticks
     const fs = yield* FileSystem.FileSystem
-    const self = yield* fs.readFileString("/proc/self/stat").pipe(Effect.orElseSucceed(() => null))
+    const self = yield* fs.readFileString("/proc/self/stat").pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     if (self !== null) return null
     return yield* psStart(pid)
   })

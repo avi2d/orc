@@ -122,7 +122,7 @@ export const readyBundledApp = (source: string | null, bundled: string): Effect.
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    if (source === null || !(yield* fs.exists(path.join(source, "mods")).pipe(Effect.orElseSucceed(() => false)))) {
+    if (source === null || !(yield* fs.exists(path.join(source, "mods")).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(false))))) {
       return bundled
     }
     const built = yield* capture([process.execPath, path.join(source, "scripts", "build.ts"), bundled], null).pipe(

@@ -27,7 +27,7 @@ interface StandinHelper {
 }
 
 const existingRealPaths = (fs: FileSystem.FileSystem, paths: ReadonlyArray<string>) =>
-  Effect.forEach(paths, (candidate) => fs.realPath(candidate).pipe(Effect.orElseSucceed(() => null))).pipe(
+  Effect.forEach(paths, (candidate) => fs.realPath(candidate).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))).pipe(
     Effect.map((found) => [...new Set(found.filter((real) => real !== null))])
   )
 

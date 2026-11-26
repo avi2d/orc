@@ -284,7 +284,7 @@ export const decideReviewQuestions = (
 ): Effect.Effect<ReadonlyArray<Decided>, BacklogError | TaskFileError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    const readPolicy = (file: string) => Effect.cached(fs.readFileString(file).pipe(Effect.orElseSucceed(() => "")))
+    const readPolicy = (file: string) => Effect.cached(fs.readFileString(file).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(""))))
     const policies: Policies = { decider: yield* readPolicy(bundledDeciderPolicyFile), supportCheck: yield* readPolicy(bundledSupportCheckPolicyFile) }
     const decided: Array<Decided> = []
     const byId = new Map(tasks.map((task) => [task.spec.id, task] as const))

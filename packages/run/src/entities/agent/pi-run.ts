@@ -133,10 +133,10 @@ export const stillRunningLines = (running: Iterable<Pick<RunningTool, "label" | 
 
 const findSessionFile = (fs: FileSystem.FileSystem, path: Path.Path, sessionDir: string, id: string, named: string): Effect.Effect<string | null> =>
   Effect.gen(function*() {
-    if (yield* fs.exists(named).pipe(Effect.orElseSucceed(() => false))) {
+    if (yield* fs.exists(named).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(false)))) {
       return named
     }
-    const files = yield* fs.readDirectory(sessionDir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
+    const files = yield* fs.readDirectory(sessionDir).pipe(Effect.catchTag("PlatformError", () => Effect.succeed([] as ReadonlyArray<string>)))
     const found = files.find((file) => file.endsWith("_" + id + ".jsonl"))
     return found === undefined ? null : path.join(sessionDir, found)
   })
@@ -154,7 +154,7 @@ interface FailureSink {
 }
 
 const clearFailing = (fs: FileSystem.FileSystem, failingFile: string): Effect.Effect<void> =>
-  fs.remove(failingFile, { force: true }).pipe(Effect.orElseSucceed(() => undefined))
+  fs.remove(failingFile, { force: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)))
 
 const countFailure = (watch: FailureWatch, sink: FailureSink, tool: { readonly label: string; readonly command: string }, failed: boolean): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
@@ -308,6 +308,7 @@ export const runPi = (
     )
     const pollAsks = asks.tick.pipe(Effect.delay(askPollMillis), Effect.forever)
     const watchers = [yield* Effect.forkScoped(report), yield* Effect.forkScoped(stopWhenIdle(idle)), yield* Effect.forkScoped(pollAsks)]
+    const exited = handle.exitCode.pipe(Effect.map((code): number => code), Effect.catchTag("PlatformError", () => Effect.succeed(128)))
     const [, , exitCode] = yield* Effect.all([
       handle.stdout.pipe(
         Stream.decodeText(),
@@ -321,7 +322,7 @@ export const runPi = (
         Stream.mapError((cause) => new OrcRunError({ message: "orc: cannot read pi's errors: " + String(cause) })),
         Stream.runForEach((line) => line.trim() === "" ? Effect.void : log("pi: " + line))
       ),
-      handle.exitCode.pipe(Effect.map((code): number => code), Effect.orElseSucceed(() => 128))
+      exited
     ], { concurrency: "unbounded" })
     yield* Fiber.interruptAll(watchers)
     const session = progress.session

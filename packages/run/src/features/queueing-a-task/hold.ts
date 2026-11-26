@@ -80,9 +80,9 @@ const advancedPin = (
     }
     const recorded = yield* Effect.acquireUseRelease(
       openDatabase(home),
-      (db) => runById(db, attempt).pipe(Effect.orElseSucceed(() => null)),
+      (db) => runById(db, attempt),
       (db) => Effect.sync(() => db.close())
-    ).pipe(Effect.orElseSucceed(() => null))
+    ).pipe(Effect.catchTag(["PlatformError", "SchemaError", "SqliteFailure", "UnsupportedSchemaVersion"], () => Effect.succeed(null)))
     return recorded === null ? run : withResumePin(run, recorded.id)
   })
 

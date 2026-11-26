@@ -27,7 +27,7 @@ export const rebaseDelivery = Effect.fnUntraced(function*(run: HistoryRun, opene
     : []
   const rebased = yield* git([...identity, "rebase", base])
   if (rebased.exitCode !== 0) {
-    yield* git(["rebase", "--abort"]).pipe(Effect.orElseSucceed(() => ({ stdout: "", stderr: "", exitCode: 1 })))
+    yield* git(["rebase", "--abort"]).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed(({ stdout: "", stderr: "", exitCode: 1 }))))
     return yield* new OrcRunError({ message: "orc: cannot rebase " + run.branch + " onto " + base + ": " + rebased.stderr.trim() })
   }
 })

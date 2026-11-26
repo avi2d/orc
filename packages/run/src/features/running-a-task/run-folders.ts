@@ -11,7 +11,7 @@ export const runInstructions = (fs: FileSystem.FileSystem, path: Path.Path, cwd:
       return null
     }
     const file = path.resolve(cwd, named)
-    const info = yield* fs.stat(file).pipe(Effect.orElseSucceed(() => null))
+    const info = yield* fs.stat(file).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     if (info?.type !== "File") {
       return yield* new OrcRunError({ message: "orc run found no instructions file at " + file })
     }
@@ -49,7 +49,7 @@ export const dropPiAgentDir = (fs: FileSystem.FileSystem, path: Path.Path, runDi
 const endsParked = (db: Database, runId: string, report: OrcRunReport): Effect.Effect<boolean> =>
   report.completed
     ? Effect.succeed(false)
-    : openQuestionsForRun(db, runId).pipe(Effect.map((open) => open.length > 0), Effect.orElseSucceed(() => true))
+    : openQuestionsForRun(db, runId).pipe(Effect.map((open) => open.length > 0), Effect.catchTag(["SchemaError", "SqliteFailure"], () => Effect.succeed(true)))
 
 export const dropEndedPiAgentDir = (db: Database, run: Pick<HistoryRun, "fs" | "path" | "runDir" | "runId">, report: OrcRunReport): Effect.Effect<void> =>
   Effect.gen(function*() {
@@ -64,7 +64,7 @@ export const dropResumedPiAgentDir = (db: Database, run: HistoryRun, priorDir: s
     if (priorDir === null) {
       return
     }
-    const runs = yield* runsForBranch(db, run.projectDir, run.branch).pipe(Effect.orElseSucceed(() => []))
+    const runs = yield* runsForBranch(db, run.projectDir, run.branch).pipe(Effect.catchTag(["SchemaError", "SqliteFailure"], () => Effect.succeed([])))
     const prior = runs.find((entry) => entry.id === run.path.basename(priorDir))
     if (prior === undefined || prior.status === "running") {
       return

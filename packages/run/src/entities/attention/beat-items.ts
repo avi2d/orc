@@ -33,7 +33,7 @@ export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, 
     (action.kind === "closed" && action.outcome === "failed") || action.kind === "start-failed"
       ? Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
-        const log = yield* fs.readFileString(backlogPaths(root).logFile(action.task)).pipe(Effect.orElseSucceed(() => ""))
+        const log = yield* fs.readFileString(backlogPaths(root).logFile(action.task)).pipe(Effect.catchTag("PlatformError", () => Effect.succeed("")))
         const tail = log.slice(-4096).trim()
         yield* openItem(root, itemId(action.task, "run-died", at), {
           kind: "run-died",

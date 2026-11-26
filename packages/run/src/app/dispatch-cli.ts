@@ -118,7 +118,7 @@ const requireBacklog = (root: string) =>
 const defaultKind = (place: DispatchPlace, task: string) =>
   findTask(backlogRoot(place), task).pipe(
     Effect.map((record) => record.spec.kind),
-    Effect.orElseSucceed(() => undefined)
+    Effect.catchTag(["BacklogError", "TaskFileError"], () => Effect.succeed(undefined))
   )
 
 const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult" }>, place: DispatchPlace) =>

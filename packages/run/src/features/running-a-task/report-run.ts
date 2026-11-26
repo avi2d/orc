@@ -132,7 +132,7 @@ export const runReport = (
     const piEnd = yield* runReportPi(run).pipe(Effect.catchTag("OrcRunError", (error) => Effect.succeed({ kind: "ended", reason: error.message } as const)))
     const written = yield* writtenReport(run.runDir)
     const fs = yield* FileSystem.FileSystem
-    const report = written === null ? null : { path: written, text: yield* fs.readFileString(written).pipe(Effect.orElseSucceed(() => "")) }
+    const report = written === null ? null : { path: written, text: yield* fs.readFileString(written).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(""))) }
     const outcome = outcomeOf(run, report, piEnd)
     yield* updateStep(db, run.runId, "implement", 1, { status: outcome.kind === "reported" ? "passed" : "failed", ended: new Date().toISOString() }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the step in", cause)))
     yield* updateRun(db, run.runId, {

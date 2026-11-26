@@ -73,7 +73,7 @@ export const openTaskCopy = (
       return { dir, removable: madeByOrc(path, realHome, dir) }
     }
     const dir = taskCopyDir(path, realHome, realProjectDir, branch)
-    if (yield* fs.exists(dir).pipe(Effect.orElseSucceed(() => true))) {
+    if (yield* fs.exists(dir).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(true)))) {
       return yield* refuse("orc: " + dir + " already exists and is no copy of " + projectDir + ", so orc leaves it alone; move it aside and rerun")
     }
     yield* fs.makeDirectory(path.dirname(dir), { recursive: true }).pipe(
@@ -103,7 +103,7 @@ const hostIdentity = (spawner: Spawner, realGit: string, projectDir: string, key
   Effect.scoped(spawner.spawn(ChildProcess.make(realGit, ["config", "--get", key], { cwd: projectDir })).pipe(
     Effect.flatMap(collectOutput),
     Effect.map((result) => result.exitCode === 0 ? result.stdout.trim() : "")
-  )).pipe(Effect.orElseSucceed(() => ""))
+  )).pipe(Effect.catchTag("PlatformError", () => Effect.succeed("")))
 
 // The agent's git reads this file as its global config, so commits in the copy carry the operator's identity without the operator's other settings.
 export const writeAgentGitConfig = (

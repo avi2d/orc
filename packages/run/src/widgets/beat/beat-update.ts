@@ -48,9 +48,9 @@ const readUpdate = ({ machine, command }: UpdateTarget) => {
   return capture([...command, "update", "--json"], null).pipe(
     Effect.flatMap(({ exitCode, stdout, stderr }) => decodeUpdate(stdout.trim()).pipe(
       Effect.map(action),
-      Effect.orElseSucceed(() => exitCode === 0
+      Effect.catchTag("SchemaError", () => Effect.succeed(exitCode === 0
         ? unread("the update command did not print an orc.update.v1 document", false)
-        : unread("the update command exited " + String(exitCode) + ": " + (stderr.trim() || stdout.trim()), true))
+        : unread("the update command exited " + String(exitCode) + ": " + (stderr.trim() || stdout.trim()), true)))
     )),
     Effect.catchTag("RunnerError", (error) => Effect.succeed(unread(error.detail, true))),
     Effect.timeoutOrElse({ duration: "5 minutes", orElse: () => Effect.succeed(unread("the update command did not answer within 5 minutes", true)) })

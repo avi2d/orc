@@ -36,8 +36,8 @@ export const stopNow = (
       ? yield* killHeld(home, id, label)
       : yield* killHeldThrough(through, id, label)
     const after = through === null
-      ? yield* readResult(id, home, label).pipe(Effect.orElseSucceed(() => null))
-      : yield* readResultThrough(through, id, label).pipe(Effect.orElseSucceed(() => null))
+      ? yield* readResult(id, home, label).pipe(Effect.catchTag("RunnerError", () => Effect.succeed(null)))
+      : yield* readResultThrough(through, id, label).pipe(Effect.catchTag("RunnerError", () => Effect.succeed(null)))
     const closed = after?.run ?? null
     const at = DateTime.formatIso(yield* DateTime.now)
     yield* closeStartedTask(root, id, "stopped", closed?.endReason ?? "the captain stopped " + id, { pr: closed?.prLink ?? null, report: null }, at)

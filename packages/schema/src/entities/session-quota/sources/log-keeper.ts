@@ -36,7 +36,7 @@ const keptReads = (raw: string): ReadonlyMap<string, LogRead> => {
 export const fileLogKeeper = (fs: FileSystem.FileSystem, directory: string, name: string): LogKeeper => {
   const file = `${directory}/${name}`;
   return {
-    load: fs.readFileString(file).pipe(Effect.map(keptReads), Effect.orElseSucceed((): ReadonlyMap<string, LogRead> => new Map())),
+    load: fs.readFileString(file).pipe(Effect.map(keptReads), Effect.catchTag("PlatformError", () => Effect.succeed<ReadonlyMap<string, LogRead>>(new Map()))),
     keep: (reads) =>
       Effect.gen(function* () {
         const encoded = yield* Schema.encodeEffect(KeptLogs)({ version: formatVersion, files: Object.fromEntries(reads) });

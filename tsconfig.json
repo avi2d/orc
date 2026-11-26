@@ -22,11 +22,13 @@
           "unknownInEffectCatch": "error",
           "globalErrorInEffectFailure": "error",
           "catchUnfailableEffect": "error",
-          "catchAllToMapError": "error",
+          "catchAllToMapError": "off",
           "missingReturnYieldStar": "error",
           "floatingEffect": "error",
           "outdatedApi": "error",
-          "globalErrorInEffectCatch": "error"
+          "globalErrorInEffectCatch": "error",
+          "catchToIgnore": "off",
+          "catchToOrElseSucceed": "off"
         },
         "overrides": [
           {

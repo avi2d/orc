@@ -102,17 +102,17 @@ export const resolveProjectDir = (checkout: string): Effect.Effect<string, never
         ], { concurrency: "unbounded" })
         return { stdout, exitCode }
       })
-    ).pipe(Effect.orElseSucceed(() => null))
+    ).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     if (top === null || top.exitCode !== 0 || top.stdout.trim() === "") {
       return checkout
     }
-    return yield* fs.realPath(top.stdout.trim()).pipe(Effect.orElseSucceed(() => top.stdout.trim()))
+    return yield* fs.realPath(top.stdout.trim()).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(top.stdout.trim())))
   })
 
 const requireFolder = (checkout: string): Effect.Effect<void, RunnerError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    const info = yield* fs.stat(checkout).pipe(Effect.orElseSucceed(() => null))
+    const info = yield* fs.stat(checkout).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     if (info?.type !== "Directory") {
       return yield* refuse("the checkout " + checkout + " is no folder on this machine")
     }

@@ -1,4 +1,4 @@
-import { Config, Context, DateTime, Duration, Effect, FileSystem, Layer, Option } from "effect";
+import { Config, Context, DateTime, Duration, Effect, FileSystem, Layer, Option, type PlatformError } from "effect";
 import { type AgentReplies, saidOfTurns, saidToday, type SaidMessage } from "./ledger";
 import { CommandRunner, selector } from "@avi2dg/orc-schema";
 import { liveCommandRunner } from "@avi2dg/orc-ui";
@@ -28,7 +28,7 @@ const ledgerSettings: Config.Config<LedgerSettings> = Config.all({
 
 const readChunk = 65536;
 
-const readTail = (fs: FileSystem.FileSystem, path: string, offset: number): Effect.Effect<string, Error> =>
+const readTail = (fs: FileSystem.FileSystem, path: string, offset: number): Effect.Effect<string, PlatformError.PlatformError> =>
   Effect.scoped(
     Effect.gen(function* () {
       const file = yield* fs.open(path);
@@ -53,10 +53,10 @@ const readTail = (fs: FileSystem.FileSystem, path: string, offset: number): Effe
 // A classifier that cannot run keeps the turn: a noisy row beats a question nobody sees.
 const isOperational = (runner: Runner, command: string, text: string): Effect.Effect<boolean> =>
   Effect.map(
-    Effect.orElseSucceed(
-      runner.run({ argv: ["sh", "-c", command], stdin: text, timeout: Duration.seconds(10), exitCodes: [0, 1] }),
-      () => "",
-    ),
+    Effect.catchTags(runner.run({ argv: ["sh", "-c", command], stdin: text, timeout: Duration.seconds(10), exitCodes: [0, 1] }), {
+      CommandUnreachable: () => Effect.succeed(""),
+      CommandAbsent: () => Effect.succeed(""),
+    }),
     (out) => out !== "",
   );
 
@@ -94,7 +94,7 @@ export const makeConversationReader = (runner: Runner): ConversationReader => {
   ): Effect.Effect<ReadonlyArray<SaidMessage>> =>
     Effect.gen(function* () {
       const path = `${directory}/${name}`;
-      const stat = yield* Effect.orElseSucceed(fs.stat(path), () => undefined);
+      const stat = yield* Effect.catchTag(fs.stat(path), "PlatformError", () => Effect.succeed(undefined));
       const size = stat === undefined ? undefined : Number(stat.size);
       const modified =
         stat === undefined ? Number.POSITIVE_INFINITY : Option.match(stat.mtime, { onNone: () => Number.POSITIVE_INFINITY, onSome: (date) => date.getTime() });
@@ -105,7 +105,7 @@ export const makeConversationReader = (runner: Runner): ConversationReader => {
       const kept = states.get(path) ?? { offset: 0, lines: 0, said: [] };
       const from = size < kept.offset ? { offset: 0, lines: 0, said: [] as ReadonlyArray<SaidMessage> } : kept;
       if (size === from.offset) return from.said;
-      const tail = yield* Effect.orElseSucceed(readTail(fs, path, from.offset), () => undefined);
+      const tail = yield* Effect.catchTag(readTail(fs, path, from.offset), "PlatformError", () => Effect.succeed(undefined));
       if (tail === undefined) return from.said;
       const cut = tail.lastIndexOf("\n");
       if (cut === -1) return from.said;
@@ -131,7 +131,7 @@ export const makeConversationReader = (runner: Runner): ConversationReader => {
         const directory = settings?.sessions;
         if (settings === undefined || directory === undefined) return { sessions: "unset" } as const;
         const start = DateTime.toEpochMillis(DateTime.startOf(DateTime.setZone(now, zone), "day"));
-        const names = yield* Effect.orElseSucceed(fs.readDirectory(directory), (): ReadonlyArray<string> => []);
+        const names = yield* Effect.catchTag(fs.readDirectory(directory), "PlatformError", () => Effect.succeed<ReadonlyArray<string>>([]));
         const files = names.filter((name) => name.endsWith(".jsonl")).toSorted();
         const said = yield* Effect.forEach(files, (name) => readFile(fs, settings, directory, name, start), { concurrency: 8 });
         return { sessions: "set", said: saidToday(said.flat(), now, zone) } as const;

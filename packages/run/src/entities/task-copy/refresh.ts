@@ -55,7 +55,7 @@ const refusedMarker = (
   Effect.gen(function*() {
     for (const marker of parseRefuseMarkers(Bun.env.ORC_REFUSE_MARKERS)) {
       for (const candidate of [path.join(projectDir, marker), path.join(path.dirname(projectDir), marker)]) {
-        const found = yield* fs.exists(candidate).pipe(Effect.orElseSucceed(() => false))
+        const found = yield* fs.exists(candidate).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(false)))
         if (found) {
           return kept(candidate + " marks this checkout as refused")
         }
@@ -192,7 +192,7 @@ export const refreshCheckout = (projectDir: string): Effect.Effect<Refresh, neve
     if (marked !== null) {
       return marked
     }
-    const shim = yield* hostGitShim(fs, path, Bun.which("git") ?? "git").pipe(Effect.orElseSucceed(() => null))
+    const shim = yield* hostGitShim(fs, path, Bun.which("git") ?? "git").pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     if (shim === null) {
       return kept("cannot write the host git shim")
     }

@@ -10,7 +10,7 @@ export const appendGate = (runDir: string, step: string): Effect.Effect<void, ne
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     yield* fs.writeFileString(runDir + "/" + gateLogFileName, new Date().toISOString() + " " + step + "\n", { flag: "a" }).pipe(
-      Effect.orElseSucceed(() => undefined)
+      Effect.catchTag("PlatformError", () => Effect.succeed(undefined))
     )
   })
 

@@ -59,7 +59,7 @@ const rerunPrompt = (problem: string): string =>
 const readReply = (run: Pick<HistoryRun, "fs">, sessionFile: string | null): Effect.Effect<string | null> =>
   sessionFile === null
     ? Effect.succeed(null)
-    : run.fs.readFileString(sessionFile).pipe(Effect.map(finalReplyText), Effect.orElseSucceed(() => null))
+    : run.fs.readFileString(sessionFile).pipe(Effect.map(finalReplyText), Effect.catchTag("PlatformError", () => Effect.succeed(null)))
 
 const recordReview = (
   run: Pick<HistoryRun, "fs" | "path" | "runDir">,
@@ -113,9 +113,9 @@ export const reviewAtHead = (
   Effect.gen(function*() {
     const head = yield* runGit(run.spawner, run.git, ["rev-parse", "--verify", run.branch], run.worktreeDir).pipe(
       Effect.map((result) => result.exitCode === 0 ? result.stdout.trim() : ""),
-      Effect.orElseSucceed(() => "")
+      Effect.catchTag("OrcRunError", () => Effect.succeed(""))
     )
-    const saved = priorDir === null ? null : yield* run.fs.readFileString(run.path.join(priorDir, checkpointFileName)).pipe(Effect.orElseSucceed(() => null))
+    const saved = priorDir === null ? null : yield* run.fs.readFileString(run.path.join(priorDir, checkpointFileName)).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
     const decoded = saved === null ? Option.none() : decodeCheckpoint(saved)
     const reusable = head !== "" && Option.isSome(decoded) && decoded.value.head === head ? decoded.value : null
     const reusedFrom = reusable !== null && priorDir !== null ? run.path.basename(priorDir) : null

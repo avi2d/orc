@@ -204,13 +204,14 @@ const withRunDatabase = <A, E>(home: string, use: (db: Database) => Effect.Effec
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
 
-const liveFilesOf = (run: RunRecord, home: string): Effect.Effect<LiveFiles, never, FileSystem.FileSystem> =>
-  run.status === "running"
-    ? Effect.all({
-      asking: readJsonFileIfPresent(runDirFor(home, run.id) + "/" + askingFileName, Asking).pipe(Effect.orElseSucceed(() => null)),
-      failing: readJsonFileIfPresent(runDirFor(home, run.id) + "/" + failingFileName, FailingMark).pipe(Effect.orElseSucceed(() => null))
-    })
-    : Effect.succeed({ asking: null, failing: null })
+const liveFilesOf = (run: RunRecord, home: string): Effect.Effect<LiveFiles, never, FileSystem.FileSystem> => {
+  if (run.status !== "running") {
+    return Effect.succeed({ asking: null, failing: null })
+  }
+  const asking = readJsonFileIfPresent(runDirFor(home, run.id) + "/" + askingFileName, Asking).pipe(Effect.catchTag("ConfigError", () => Effect.succeed(null)))
+  const failing = readJsonFileIfPresent(runDirFor(home, run.id) + "/" + failingFileName, FailingMark).pipe(Effect.catchTag("ConfigError", () => Effect.succeed(null)))
+  return Effect.all({ asking, failing })
+}
 
 const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
@@ -231,13 +232,13 @@ const runLogAt = (home: string, runId: string): Effect.Effect<string | null, nev
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const dir = runDirFor(home, runId)
-    const names = yield* fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
+    const names = yield* fs.readDirectory(dir).pipe(Effect.catchTag("PlatformError", () => Effect.succeed([] as ReadonlyArray<string>)))
     let latest: string | null = null
     for (const name of names) {
       if (name !== "agent.log" && name !== gateLogFileName && !/^fix-.*\.log$/.test(name) && !/^review-\d+\.log$/.test(name) && !/^checks-.*\.txt$/.test(name)) {
         continue
       }
-      const info = yield* fs.stat(dir + "/" + name).pipe(Effect.orElseSucceed(() => null))
+      const info = yield* fs.stat(dir + "/" + name).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
       const at = info === null ? null : Option.match(info.mtime, { onNone: () => null, onSome: (mtime) => mtime.toISOString() })
       if (at !== null && (latest === null || Date.parse(at) > Date.parse(latest))) {
         latest = at

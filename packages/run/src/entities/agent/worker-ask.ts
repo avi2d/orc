@@ -139,11 +139,11 @@ const provideFs = <A>(fs: FileSystem.FileSystem, effect: Effect.Effect<A, never,
 
 const readAskFile = (fs: FileSystem.FileSystem, setup: AskSetup, stem: string): Effect.Effect<AskArgs | null> =>
   Effect.gen(function*() {
-    const text = yield* provideFs(fs, fs.readFileString(setup.askDir + "/" + stem + askSuffix).pipe(Effect.orElseSucceed(() => null)))
+    const text = yield* provideFs(fs, fs.readFileString(setup.askDir + "/" + stem + askSuffix).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null))))
     if (text === null) {
       return null
     }
-    const parsed: unknown = yield* Effect.try((): unknown => JSON.parse(text)).pipe(Effect.orElseSucceed(() => null))
+    const parsed: unknown = yield* Effect.try((): unknown => JSON.parse(text)).pipe(Effect.catchTag("UnknownError", () => Effect.succeed(null)))
     if (parsed === null) {
       return null
     }
@@ -154,7 +154,7 @@ const readAskFile = (fs: FileSystem.FileSystem, setup: AskSetup, stem: string): 
 const registerNew = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<boolean> =>
   Effect.gen(function*() {
     const shared = setup.state
-    const names = yield* provideFs(fs, fs.readDirectory(setup.askDir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>)))
+    const names = yield* provideFs(fs, fs.readDirectory(setup.askDir).pipe(Effect.catchTag("PlatformError", () => Effect.succeed([] as ReadonlyArray<string>))))
     let added = false
     for (const stem of names.filter((name) => name.endsWith(askSuffix)).map((name) => name.slice(0, -askSuffix.length)).toSorted()) {
       if (shared.asks.some((ask) => ask.stem === stem)) {
@@ -187,7 +187,7 @@ const writeAsking = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<
     const askingFile = setup.runDir + "/" + askingFileName
     const answersFile = setup.runDir + "/" + answersFileName
     const shared = setup.state
-    const previous = yield* provideFs(fs, readJsonFileIfPresent(askingFile, Asking).pipe(Effect.orElseSucceed(() => null)))
+    const previous = yield* provideFs(fs, readJsonFileIfPresent(askingFile, Asking).pipe(Effect.catchTag("ConfigError", () => Effect.succeed(null))))
     const asked = shared.asked ?? previous?.asked ?? new Date().toISOString()
     shared.asked = asked
     const open = shared.asks.filter((ask) => !ask.replied)
@@ -205,8 +205,8 @@ const writeAsking = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<
       }))
     ]
     if (questions.length === 0) {
-      yield* provideFs(fs, fs.remove(askingFile, { force: true }).pipe(Effect.orElseSucceed(() => undefined)))
-      yield* provideFs(fs, fs.remove(answersFile, { force: true }).pipe(Effect.orElseSucceed(() => undefined)))
+      yield* provideFs(fs, fs.remove(askingFile, { force: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined))))
+      yield* provideFs(fs, fs.remove(answersFile, { force: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined))))
       return true
     }
     const deadlines = open.flatMap((ask) => ask.deadline !== null ? [ask.deadline] : [])
@@ -222,7 +222,7 @@ const writeAsking = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<
 const relayReplies = (fs: FileSystem.FileSystem, setup: AskSetup, asked: string): Effect.Effect<boolean> =>
   Effect.gen(function*() {
     const answersFile = setup.runDir + "/" + answersFileName
-    const relayed = yield* provideFs(fs, readJsonFileIfPresent(answersFile, AnswersFile).pipe(Effect.orElseSucceed(() => null)))
+    const relayed = yield* provideFs(fs, readJsonFileIfPresent(answersFile, AnswersFile).pipe(Effect.catchTag("ConfigError", () => Effect.succeed(null))))
     const answers = relayed === null || relayed.asking !== asked ? [] : relayed.answers
     let changed = false
     for (const ask of setup.state.asks) {
@@ -258,7 +258,7 @@ const deliverCorrection = (fs: FileSystem.FileSystem, setup: AskSetup, id: strin
 
 const relayCorrections = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<void> =>
   Effect.gen(function*() {
-    const file = yield* provideFs(fs, readJsonFileIfPresent(setup.runDir + "/" + correctionsFileName, CorrectionsFile).pipe(Effect.orElseSucceed(() => null)))
+    const file = yield* provideFs(fs, readJsonFileIfPresent(setup.runDir + "/" + correctionsFileName, CorrectionsFile).pipe(Effect.catchTag("ConfigError", () => Effect.succeed(null))))
     for (const correction of file?.corrections ?? []) {
       if (setup.state.corrected.get(correction.question) === correction.answer) {
         continue

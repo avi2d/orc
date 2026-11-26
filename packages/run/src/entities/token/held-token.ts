@@ -37,7 +37,7 @@ const acquireLock = (fs: FileSystem.FileSystem, lock: string) =>
       }
       waits += 1
       if (waits % 250 === 0) {
-        yield* fs.remove(lock, { recursive: true, force: true }).pipe(Effect.orElseSucceed(() => undefined as void))
+        yield* fs.remove(lock, { recursive: true, force: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined as void)))
       }
       yield* Effect.sleep(Duration.millis(20))
     }
@@ -47,7 +47,7 @@ const withTaskLock = <A, E>(fs: FileSystem.FileSystem, dir: string, use: Effect.
   Effect.acquireUseRelease(
     acquireLock(fs, lockFor(dir)),
     () => use,
-    () => fs.remove(lockFor(dir), { recursive: true, force: true }).pipe(Effect.orElseSucceed(() => undefined as void))
+    () => fs.remove(lockFor(dir), { recursive: true, force: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined as void)))
   )
 
 const makeOwnerOnlyDir = (fs: FileSystem.FileSystem, dir: string) =>

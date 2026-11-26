@@ -23,7 +23,7 @@ const readState = (run: RunRecord, runFolderOf: (runId: string) => string): Effe
     case "running":
       return readJsonFileIfPresent(runFolderOf(run.id) + "/" + askingFileName, Asking).pipe(
         Effect.map((asking): RunState => asking !== null && hasBlockingQuestion(asking) ? "waiting" : "running"),
-        Effect.orElseSucceed((): RunState => "running")
+        Effect.catchTag("ConfigError", () => Effect.succeed<RunState>("running"))
       )
     case "succeeded":
       return Effect.succeed("succeeded")

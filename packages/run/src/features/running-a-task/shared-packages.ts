@@ -51,18 +51,18 @@ export const sharedGitSources = (path: Path.Path, orcHome: string, piAgentDir: s
   })
 
 const isLink = (fs: FileSystem.FileSystem, file: string): Effect.Effect<boolean> =>
-  fs.readLink(file).pipe(Effect.as(true), Effect.orElseSucceed(() => false))
+  fs.readLink(file).pipe(Effect.as(true), Effect.catchTag("PlatformError", () => Effect.succeed(false)))
 
 const exists = (fs: FileSystem.FileSystem, file: string): Effect.Effect<boolean> =>
-  fs.exists(file).pipe(Effect.orElseSucceed(() => false))
+  fs.exists(file).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(false)))
 
 const linkOne = (fs: FileSystem.FileSystem, path: Path.Path, source: SharedGitSource): Effect.Effect<void> =>
   Effect.gen(function*() {
     if (!(yield* exists(fs, source.shared)) || (yield* isLink(fs, source.own)) || (yield* exists(fs, source.own))) {
       return
     }
-    yield* fs.makeDirectory(path.dirname(source.own), { recursive: true }).pipe(Effect.orElseSucceed(() => undefined))
-    yield* fs.symlink(source.shared, source.own).pipe(Effect.orElseSucceed(() => undefined))
+    yield* fs.makeDirectory(path.dirname(source.own), { recursive: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)))
+    yield* fs.symlink(source.shared, source.own).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)))
   })
 
 export const linkSharedGit = (fs: FileSystem.FileSystem, path: Path.Path, sources: ReadonlyArray<SharedGitSource>): Effect.Effect<void> =>
@@ -75,13 +75,13 @@ const shareOne = (fs: FileSystem.FileSystem, path: Path.Path, source: SharedGitS
     if ((yield* isLink(fs, source.own)) || !(yield* exists(fs, source.own))) {
       return
     }
-    yield* fs.makeDirectory(path.dirname(source.shared), { recursive: true }).pipe(Effect.orElseSucceed(() => undefined))
-    yield* fs.rename(source.own, source.shared).pipe(Effect.orElseSucceed(() => undefined))
+    yield* fs.makeDirectory(path.dirname(source.shared), { recursive: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)))
+    yield* fs.rename(source.own, source.shared).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)))
     if (!(yield* exists(fs, source.shared))) {
       return
     }
-    yield* fs.remove(source.own, { recursive: true, force: true }).pipe(Effect.orElseSucceed(() => undefined))
-    yield* fs.symlink(source.shared, source.own).pipe(Effect.orElseSucceed(() => undefined))
+    yield* fs.remove(source.own, { recursive: true, force: true }).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)))
+    yield* fs.symlink(source.shared, source.own).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)))
   })
 
 export const shareInstalledGit = (fs: FileSystem.FileSystem, path: Path.Path, sources: ReadonlyArray<SharedGitSource>): Effect.Effect<void> =>
