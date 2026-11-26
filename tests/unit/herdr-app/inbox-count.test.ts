@@ -166,28 +166,29 @@ test("a stalled remote question request does not hold back local steps and log r
   }
 })
 
-test("pressing the open Project trigger closes its list instead of reopening it after repaint", async () => {
+const openedOn = async (menu: "project" | "status") => {
   const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
   const agents = new OrcAgents()
-  agents.menu = "project"
+  agents.menu = menu
+  return agents
+}
+
+test("pressing the open Project trigger closes its list instead of reopening it after repaint", async () => {
+  const agents = await openedOn("project")
   press(agents, "filter-project")
   expect(agents.menu).toBeNull()
 })
 
 test("pressing the open Status trigger closes its list instead of reopening it after repaint", async () => {
-  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
-  const agents = new OrcAgents()
-  agents.menu = "status"
+  const agents = await openedOn("status")
   press(agents, "filter-status")
   expect(agents.menu).toBeNull()
 })
 
 test("pressing Status while Project is open switches lists instead of closing both", async () => {
-  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
-  const agents = new OrcAgents()
-  agents.menu = "project"
+  const agents = await openedOn("project")
   press(agents, "filter-status")
-  expect(agents.menu).toEqual("status")
+  expect(agents.menu).toBe("status")
 })
 
 const cmd4 = { name: "layout.select", args: { stack: "orc-views", child: "orc-inbox" } }
