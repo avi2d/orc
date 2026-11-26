@@ -29,7 +29,9 @@ The run history records the turn as the `review` step with its start and end tim
 A passed `review` step names `review.json` as evidence and gives the finding count as the `review-findings` signal.
 A failed `review` step gives the failure as the `review-failure` signal.
 The review turn fixes nothing and blocks nothing, so the PR opens after it either way.
-A resumed direct-PR run reuses a completed review when the branch head is unchanged and writes its findings to `review.json` in the current run folder.
+After a successful review, if orc can read the branch head, it writes `review-checkpoint.json` in the run folder with the head and findings.
+A resumed direct-PR run reads the previous run's checkpoint and reuses the completed review when the branch head is unchanged.
+It writes the findings to `review.json` and a new checkpoint in the current run folder.
 If the head changed or no completed review was recorded, orc runs the review turn.
 Failed review turns are not recorded for reuse, so a resume retries them.
 A checkpoint write failure does not block the PR, but the next resume runs the review again.
