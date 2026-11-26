@@ -2,7 +2,10 @@
 kind: reference
 ---
 # How orc runs Pi
-Orc runs only [Pi](https://pi.dev), and it starts Pi itself as `pi -p --mode json` in the task copy, on the host by default or inside [`nono run`](https://nono.sh) with `--sandbox nono`.
+Orc runs only [Pi](https://pi.dev), and it starts Pi itself as `pi -p --mode json` in the task copy.
+A run you start by hand uses [`nono run`](https://nono.sh) by default unless you pass `--sandbox none`.
+Queued tasks always pass `--sandbox none` and run without a per-agent sandbox.
+Their safety boundary is the isolated space around the whole agent system, as [Running without a sandbox](running-without-a-sandbox.md) describes.
 
 ## Pi sessions and output
 

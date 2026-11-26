@@ -500,7 +500,7 @@ describe("resume reads the sandbox kind from the run history", () => {
     })
   })
 
-  test("a resume without the flag after a no-sandbox start retains none", async () => {
+  test("a resume without the flag after a no-sandbox start takes none instead of the nono default", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)
       try {
@@ -560,11 +560,11 @@ describe("resume reads the sandbox kind from the run history", () => {
     })
   })
 
-  test("a branch with no prior run takes the flag, and none without one, instead of refusing for want of a record", async () => {
+  test("a branch with no prior run takes the flag, and nono without one, instead of refusing for want of a record", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)
       try {
-        expect([await sandboxOutcome(db, join(home, "repo"), "nono"), await sandboxOutcome(db, join(home, "repo"), undefined)]).toEqual(["nono", "none"])
+        expect([await sandboxOutcome(db, join(home, "repo"), "none"), await sandboxOutcome(db, join(home, "repo"), undefined)]).toEqual(["none", "nono"])
       } finally {
         db.close()
       }
@@ -576,7 +576,7 @@ describe("resume reads the sandbox kind from the run history", () => {
       const db = await openDb(home)
       try {
         await seedSandboxRun(db, "prior-1", join(home, "repo"), null)
-        expect([await sandboxOutcome(db, join(home, "repo"), "nono"), await sandboxOutcome(db, join(home, "repo"), undefined)]).toEqual(["nono", "none"])
+        expect([await sandboxOutcome(db, join(home, "repo"), "none"), await sandboxOutcome(db, join(home, "repo"), undefined)]).toEqual(["none", "nono"])
       } finally {
         db.close()
       }

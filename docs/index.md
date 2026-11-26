@@ -95,7 +95,7 @@ Its state is files on disk and queues in pueue, so a restart picks up where it s
 | Pi | The coding agent orc runs, and the only one |
 | no-mistakes | The review tool that takes a checked branch to a pull request |
 | pueue | The queue on each machine that holds the runs |
-| [nono](https://nono.sh) | An optional sandbox for a run you start by hand |
+| [nono](https://nono.sh) | The default sandbox for a run you start by hand, bypassed with `--sandbox none` |
 | Decider | The model that answers a run's routine questions from written instructions |
 
 ## Related topics

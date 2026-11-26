@@ -1,3 +1,3 @@
 export const sandboxKinds = ["nono", "none"] as const
 export type SandboxKind = typeof sandboxKinds[number]
-export const defaultSandbox: SandboxKind = "none"
+export const defaultSandbox: SandboxKind = "nono"
