@@ -1,5 +1,5 @@
 import { Data, Duration, Effect, FileSystem, type Path } from "effect"
-import { refusalsIn, type GateRefusal } from "../../entities/run-history/index"
+import { distinctRefusals, refusalsIn, type ChecksRoundSummary, type GateRefusal } from "../../entities/run-history/index"
 import type { AgentFile } from "../../entities/agent/index"
 import { orcCompletionLine } from "../../entities/agent/index"
 import type { CommandResult } from "../../shared/sandbox/index"
@@ -25,6 +25,16 @@ export interface ChecksRound {
   readonly round: number
   readonly file: string
   readonly outcomes: ReadonlyArray<CheckOutcome>
+}
+
+export const summarizeChecksRound = (outcome: ChecksRound, started: string, ended: string): ChecksRoundSummary => {
+  const failed = outcome.outcomes.filter((check) => !check.passed).map((check) => check.name)
+  return {
+    round: outcome.round, file: outcome.file, started, ended,
+    passed: outcome.outcomes.length > 0 && failed.length === 0, failed,
+    checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed })),
+    refusals: distinctRefusals(outcome.outcomes.flatMap((check) => check.refusals))
+  }
 }
 
 export const maxFixAttempts = 3

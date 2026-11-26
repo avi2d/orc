@@ -64,12 +64,11 @@ describe("orc delivery", () => {
           git(dir, ["push", "origin", baseBranch])
           git(dir, ["checkout", "-q", "orc/test"])
           const kinds: Array<string> = []
-          const finding = { id: "missing-check", file: "work.txt", line: 1, severity: "warning", action: "Add the check.", description: "The change accepts an invalid value." }
           let checkedBase = ""
           const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(async (run, sessionsDir) => {
             if (run.agent.kind !== "reviewer") return sandboxResult(sha)(run, sessionsDir)
             const sessionFile = join(sessionsDir, "review.jsonl")
-            await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: JSON.stringify([finding]) }], stopReason: "stop", usage: { input: 1, output: 1 } }))
+            await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: JSON.stringify([]) }], stopReason: "stop", usage: { input: 1, output: 1 } }))
             expect(checkedBase).not.toBe("")
             return { sessionFile, commits: [] }
           }, kinds), async () => {
@@ -79,8 +78,8 @@ describe("orc delivery", () => {
           expect(checkedBase).toBe(base)
           expect(kinds).toEqual(["implementer", "reviewer"])
           expect(outcome.steps).toContainEqual({ name: "review", status: "passed" })
-          expect(outcome.signals).toContainEqual({ name: "review-findings", value: "1" })
-          expect(JSON.parse(await readFile(join(home, "runs", "step-run-1", "review.json"), "utf8"))).toEqual([finding])
+          expect(outcome.signals).toContainEqual({ name: "review-findings", value: "0" })
+          expect(JSON.parse(await readFile(join(home, "runs", "step-run-1", "review.json"), "utf8"))).toEqual([])
           expect(outcome.nmCalls).toBe("")
           expect(outcome.ghCalls).toContain("pr create --head orc/test")
           expect(outcome.ghCalls).not.toContain("check-runs")

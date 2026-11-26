@@ -153,6 +153,9 @@ export const askUserFindings = (findings: ReadonlyArray<NoMistakesFinding>, allo
 const questionReason = (question: NoMistakesFinding): string => {
   const quoted = question.description === "" ? "" : ` "${question.description}"`
   if (isQuestion(question)) {
+    if (question.description.trim() === "") {
+      return `no-mistakes omitted the question text for ${question.id}, so orc needs your answer on a rerun with --answer ${question.id}="<answer>"`
+    }
     return `finding ${question.id} is a question${quoted} and needs your answer on a rerun with --answer ${question.id}="<answer>"`
   }
   return question.action === "ask-user"

@@ -93,16 +93,25 @@ describe("a machine's five-minute load limit", () => {
       })
     })
   })
-  test("an overloaded machine sends an unpinned task to another with room instead of holding it", async () => {
+  test("reports an overloaded machine instead of dropping it when another machine starts the task", async () => {
     await withBacklog(async (root) => {
       await writeFile(join(root, "dispatch.json"), JSON.stringify({
         machines: [{ name: "ridge", slots: 4, start: runnerStart, loadLimit: 16 }, { name: "mac", slots: 1, start: runnerStart }],
         quota
       }))
       await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { ridge: "/home/a/orc", mac: "/Users/a/orc" } }] }))
-      await run(addTask(root, spec))
+      const task = await run(addTask(root, spec))
       const report = await Effect.runPromise(runBeat(root, root, quietSources(loadOf(20))).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
       expect(report.actions.map((action) => action.kind === "started" ? action.machine : action.kind)).toEqual(["mac"])
+      expect(report).toMatchObject({
+        placements: [{
+          task: task.spec.id,
+          machines: [
+            { machine: "ridge", kind: "rejected", code: "load", reason: "ridge's five-minute load is 20, above its limit of 16" },
+            { machine: "mac", kind: "eligible" }
+          ]
+        }]
+      })
     })
   })
 })

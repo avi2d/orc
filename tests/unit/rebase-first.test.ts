@@ -9,7 +9,7 @@ import { runFull } from "../../packages/run/src/features/running-a-task/run-loop
 import { fakeOps } from "../lib/fake-ops"
 import { historyFor, openDb, runLoopCheckpoints, stubGit, withHome } from "../lib/run-loop-helpers"
 
-const freshPlan = { implementSessionId: null, implementSessionFile: null, inheritedImplement: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null }
+const freshPlan = { implementSessionId: null, implementSessionFile: null, inheritedImplement: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null, cleanupPriorDir: null }
 
 const withLoopRun = async (answerWaitSeconds: number, use: (db: Database, run: HistoryRun) => Promise<void>): Promise<void> => {
   await withHome(async (home) => {
@@ -117,4 +117,3 @@ describe("a rebase-first run", () => {
     })
   })
 })
-
