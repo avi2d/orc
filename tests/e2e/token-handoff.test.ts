@@ -55,8 +55,13 @@ const holdToken = async (fixture: Fixture, task: string, token: string, expiresA
   }
 }
 
-const hold = (fixture: Fixture, task: string, script: string): Promise<OrcResult> =>
-  runOrc(fixture, ["runner", "hold", task, "--", "sh", "-c", script, "orc-test-run", join(tokenDir(fixture, task), "token")])
+const holdArgs = (fixture: Fixture, task: string, script: string): ReadonlyArray<string> =>
+  ["runner", "hold", task, "--", "sh", "-c", script, "orc-test-run", join(tokenDir(fixture, task), "token")]
+
+const hold = (fixture: Fixture, task: string, script: string): Promise<OrcResult> => runOrc(fixture, holdArgs(fixture, task, script))
+
+const spawnHold = (fixture: Fixture, task: string, script: string) =>
+  Bun.spawn([...orc, ...holdArgs(fixture, task, script)], { env: { ...process.env, ...fixture.env }, cwd: fixture.dir, stdout: "pipe", stderr: "inherit" })
 
 const writeMachine = async (fixture: Fixture, session: string, renew: boolean): Promise<void> => {
   await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
@@ -321,14 +326,25 @@ describe("orc runner hold", () => {
       await holdToken(fixture, "orc-9", placeholder, past)
       await runsInPueue(fixture, "orc-9")
       const seen = join(fixture.dir, "seen")
-      const holding = hold(fixture, "orc-9", "cat \"$1\" > '" + seen + "'")
-      await Bun.sleep(1_000)
+      const child = spawnHold(fixture, "orc-9", "cat \"$1\" > '" + seen + "'")
+      const output = child.stdout.getReader()
+      const decoder = new TextDecoder()
+      let printed = ""
+      while (!printed.includes("waits for a fresh token")) {
+        const chunk = await output.read()
+        if (chunk.done) throw new Error("the holder exited without waiting for a token")
+        printed += decoder.decode(chunk.value, { stream: true })
+      }
       expect(await readFile(seen, "utf8").catch(() => null)).toBeNull()
       const fresh = hoursFromNowIso(4)
       const renewal = await runOrc(fixture, ["runner", "renew"], {}, JSON.stringify({ task: "orc-9", token: renewedPlaceholder, expiresAt: fresh }))
       expect(renewal.stdout).toBe("renewed the token for orc-9 until " + fresh + "\n")
-      const result = await holding
-      expect(result.stdout).toBe("orc-9 waits for a fresh token from the machine that runs the beat: the one held here runs out at " + past + "\nthe run of orc-9 finished\n")
+      for (let chunk = await output.read(); !chunk.done; chunk = await output.read()) {
+        printed += decoder.decode(chunk.value, { stream: true })
+      }
+      printed += decoder.decode()
+      expect(await child.exited).toBe(0)
+      expect(printed).toBe("orc-9 waits for a fresh token from the machine that runs the beat: the one held here runs out at " + past + "\nthe run of orc-9 finished\n")
       expect(await readFile(seen, "utf8")).toBe(renewedPlaceholder)
       expect(await gone(tokenDir(fixture, "orc-9"))).toBe(true)
     })
@@ -336,10 +352,11 @@ describe("orc runner hold", () => {
 
   test("a run that fails as its token runs out reruns on the renewed token instead of failing", async () => {
     await withFixture(async (fixture) => {
-      const lapsesAt = Date.now() + 10_000
-      const soon = new Date(lapsesAt + 5 * 60_000).toISOString()
-      await holdToken(fixture, "orc-9", placeholder, soon)
+      await holdToken(fixture, "orc-9", placeholder, hoursFromNowIso(2))
       await runsInPueue(fixture, "orc-9")
+      const lapsesAt = Date.now() + 2_000
+      const soon = new Date(lapsesAt + 5 * 60_000).toISOString()
+      await writeFile(join(tokenDir(fixture, "orc-9"), "expires-at"), soon)
       const runs = join(fixture.dir, "runs")
       const renewed = "[ \"$(cat \"$1\")\" = " + renewedPlaceholder + " ]"
       const holding = hold(fixture, "orc-9", "cat \"$1\" >> '" + runs + "'; echo >> '" + runs + "'; " + renewed + " && exit 0; until " + renewed + "; do sleep 0.2; done; exit 1")

@@ -91,7 +91,7 @@ describe("the compiled heavy stand-in", () => {
   test("a queued call whose stand-in is gone stops instead of holding the slot", () => {
     const gone = Bun.spawnSync(["true"]).pid
     const started = Date.now()
-    const child = Bun.spawnSync([compiled, waiterWord, String(gone), "sleep", "30"], { stdout: "pipe", stderr: "pipe", timeout: 20_000 })
+    const child = Bun.spawnSync([compiled, waiterWord, String(gone), "sleep", "30"], { env: { ...process.env, ORC_HEAVY_OWNER_POLL_MILLIS: "50" }, stdout: "pipe", stderr: "pipe", timeout: 20_000 })
     expect(Date.now() - started).toBeLessThan(15_000)
     expect(child.exitCode).toBe(143)
   }, 30_000)

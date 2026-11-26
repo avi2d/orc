@@ -268,7 +268,7 @@ export const chatSession = (
 
 export const chatToolNames: ReadonlyArray<string> = chatSession({}, () => false, () => undefined).tools.map((tool) => tool.name)
 
-export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): void => {
+export const chatExtension = (env: Env, pollMillis: number, onPoll: () => void = () => {}) => (pi: ChatHost): void => {
   let stopped = true
   let idle: (() => boolean) | null = null
   const session = chatSession(env, () => !stopped && (idle?.() ?? false), (text, kind) => {
@@ -311,6 +311,7 @@ export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): v
         if (current === run) {
           current = null
         }
+        onPoll()
       }
       run.then(clear, clear)
     }
