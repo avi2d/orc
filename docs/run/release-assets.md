@@ -6,14 +6,15 @@ kind: reference
 Each Orc release on [GitHub](https://github.com) carries an archive with `orc`, `orc-dash`, `orc-dash-capture`, and the heavy tool stand-in.
 The executables are [Bun](https://bun.com) bytecode builds that run without Bun installed.
 The archive also holds the bundled [Herdr App](https://herdr.dev), which Herdr loads as mods.
+Each release also carries the bare `orc` executable for each platform, with its checksum, for a download that needs no archive.
 
 ## Asset names
 
 | File | What it holds |
 | --- | --- |
-| `orc-darwin-arm64` | The macOS executable for the npm platform package |
+| `orc-darwin-arm64` | The bare `orc` executable for macOS on Apple silicon |
 | `orc-darwin-arm64.sha256` | The SHA-256 checksum of the macOS executable |
-| `orc-linux-x64` | The Linux executable for the npm platform package |
+| `orc-linux-x64` | The bare `orc` executable for Linux on x64 |
 | `orc-linux-x64.sha256` | The SHA-256 checksum of the Linux executable |
 | `orc-<version>-darwin-arm64.tar.gz` | The release archive for macOS on Apple silicon |
 | `orc-<version>-darwin-arm64.tar.gz.sha256` | The SHA-256 checksum of the macOS archive |
@@ -40,13 +41,15 @@ Unpack it into one folder, such as `tar -xzf orc-0.21.0-linux-x64.tar.gz -C ~/.o
 
 Each `.sha256` file holds one line in the `sha256sum` format: the SHA-256 of the file it names in lowercase hex, two spaces and that file's name.
 Check a downloaded file in its folder with `sha256sum -c orc-0.21.0-linux-x64.tar.gz.sha256`, or with `shasum -a 256 -c` on macOS.
+The checksums verify the files downloaded from the GitHub release.
+The `orc` executable that npm installs comes from a separate build, so its bytes can differ from the GitHub file.
 
 ## How CI builds the assets
 
 The `assets` job of `.github/workflows/main.yml` runs after the `release` job has written the GitHub release.
 Both the `binaries` and `assets` jobs run `bun run release:assets` on macOS arm64 and Linux x64.
 The `binaries` job runs before `release` so [npm](https://www.npmjs.com) can publish the platform packages before `@avi2dg/orc`.
-The `assets` job attaches the files to the GitHub release.
+The `assets` job builds the files again from the tag and attaches them to the GitHub release.
 The build runs both dashboard executables with `--help`.
 The `@avi2dg/checks` kit writes these jobs from the release settings in `checks.config.ts`.
 

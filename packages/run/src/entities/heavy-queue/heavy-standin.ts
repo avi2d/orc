@@ -74,6 +74,9 @@ const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, ne
     return ""
   })
 
+const missingHelper = (runtime: string, main: string): string =>
+  runtime === main ? "no orc launcher at " + runtime : "no runtime at " + runtime + " or no stand-in helper at " + main
+
 export const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 
 const launcher = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, real: string, timing?: StandinTiming): string => {
@@ -81,7 +84,7 @@ const launcher = (tool: string, settings: StandinSettings, commands: ReadonlyArr
   const runtime = helperCommand[0] ?? ""
   const main = helperEntry
   const fallback = call.real === "" ? "running the nearest node_modules/.bin/" + call.tool + " unqueued" : "running " + call.real + " unqueued"
-  const warning = "orc heavy: no runtime at " + runtime + " or no stand-in helper at " + main + "; " + fallback + ", rerun orc to rewrite the stand-ins"
+  const warning = "orc heavy: " + missingHelper(runtime, main) + "; " + fallback + ", rerun orc to rewrite the stand-ins"
   const project = quoteSingle("/node_modules/.bin/" + call.tool)
   const direct = call.real === ""
     ? 'd=$PWD; while [ -n "$d" ]; do [ -x "$d"' + project + ' ] && exec "$d"' + project + ' "$@"; d=${d%/*}; done; exit 127'
@@ -114,7 +117,7 @@ fi
 export const ciOnlyScript = (tool: string): string => {
   const runtime = helperCommand[0] ?? ""
   const main = helperEntry
-  const missing = "orc heavy: no runtime at " + runtime + " or no stand-in helper at " + main + "; rerun orc to rewrite the stand-ins"
+  const missing = "orc heavy: " + missingHelper(runtime, main) + "; rerun orc to rewrite the stand-ins"
   return `#!/bin/sh
 # ${ciOnlyMarker}. Regenerated on every run of that command.
 [ -x ${quoteSingle(runtime)} ] && [ -f ${quoteSingle(main)} ] || { echo ${quoteSingle(missing)} >&2; exit 127; }

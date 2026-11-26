@@ -27,7 +27,7 @@ The helper runs the real tool once the queue hands it the turn.
 The helper finds the tool, decides whether the call queues, and runs, queues or waits for it, and never decides through itself.
 The helper stays the caller's process for the whole call, passes the tool's exit code back, and passes on a stop or hangup signal to the tool.
 It reads no `.env` or `bunfig.toml` from the caller's folder.
-For an npm install, the launcher passes the caller's `NODE_OPTIONS`, `NODE_PATH` and the other Node settings it names on to the helper.
+For an npm install, the Node launcher skips the caller's `NODE_OPTIONS`, `NODE_PATH` and other Node settings it names, and the real tool gets them unchanged.
 If the runtime or helper is gone, the launcher warns once on stderr to rerun orc and runs the recorded tool with no queue, or the nearest node_modules/.bin copy above the working folder when orc recorded no path.
 A queued call runs under the same helper in its pueue task, which stops the call once the stand in that queued it is gone.
 A stand in runs the first copy of the tool on its caller's PATH that is not an orc stand in, then the absolute path recorded when orc wrote it, then the nearest node_modules/.bin copy above the working folder that is not an orc stand in, and refuses with exit 127 when none exists.

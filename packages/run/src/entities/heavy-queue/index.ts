@@ -1,5 +1,5 @@
 export { ciOnlyBashFile, heavyBinDir, runStepPath, withHeavyPath } from "./heavy"
 export { ensureHeavyQueue, ensureHeavySetup, readHeavySettings } from "./heavy-setup"
 export { standinTools } from "./heavy-standin"
-export { launcherCommand, standinHelper } from "./heavy-standin-helper"
+export { launcherCommand, standinHelper, startedByLauncher } from "./heavy-standin-helper"
 export { isStandinInvocation, runStandinInvocation } from "./heavy-standin-main"

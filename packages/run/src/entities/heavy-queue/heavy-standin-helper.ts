@@ -8,11 +8,16 @@ const embeddedRoot = /^(?:\/\$bunfs\/|[A-Za-z]:[\\/]~BUN[\\/])/
 export const helperCommandOf = (runtime: string, modulePath: string, main: string): ReadonlyArray<string> =>
   embeddedRoot.test(modulePath) ? [runtime] : [runtime, "--no-env-file", "--config=/dev/null", main]
 
+type LauncherEnv = Readonly<Record<string, string | undefined>>
+
 // Children inherit these variables, so require the binary or source file the launcher started.
-export const launcherCommand = (env: Readonly<Record<string, string | undefined>>, executable: string, main: string): readonly [string] | null => {
-  const { ORC_LAUNCHER_ENTRY: entry, ORC_LAUNCHED_BINARY: binary, ORC_LAUNCHED_MAIN: source } = env
+export const startedByLauncher = (env: LauncherEnv, executable: string, main: string): boolean =>
+  env.ORC_LAUNCHED_BINARY === undefined ? env.ORC_LAUNCHED_MAIN === main : env.ORC_LAUNCHED_BINARY === executable
+
+export const launcherCommand = (env: LauncherEnv, executable: string, main: string): readonly [string] | null => {
+  const entry = env.ORC_LAUNCHER_ENTRY
   if (entry === undefined || !isAbsolute(entry)) return null
-  return (binary === undefined ? source === main : binary === executable) ? [entry] : null
+  return startedByLauncher(env, executable, main) ? [entry] : null
 }
 
 const launched = launcherCommand(Bun.env, process.execPath, Bun.main)

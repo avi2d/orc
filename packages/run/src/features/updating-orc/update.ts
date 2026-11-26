@@ -1,6 +1,7 @@
 import { homedir } from "node:os"
 import { Effect, type FileSystem, type Path, Result, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
+import { startedByLauncher } from "../../entities/heavy-queue/index"
 import { UPDATE_JSON_SCHEMA, UpdateJson, installerError, isNewer, type UpdateDocument } from "../../entities/orc-update/index"
 import { readOrcConfig } from "../../shared/config/index"
 import { capture, selfCommand, type Command } from "../../shared/process/index"
@@ -99,11 +100,7 @@ export const runUpdate = (inputs: UpdateInputs): Effect.Effect<UpdateDocument, n
         )
       }
     }
-    const npmPrefix = (env.ORC_LAUNCHED_BINARY === undefined
-      ? env.ORC_LAUNCHED_MAIN === main
-      : env.ORC_LAUNCHED_BINARY === executable)
-      ? env.ORC_NPM_GLOBAL_PREFIX
-      : undefined
+    const npmPrefix = startedByLauncher(env, executable, main) ? env.ORC_NPM_GLOBAL_PREFIX : undefined
     const command = installCommand(configured, found, npmPrefix)
     return yield* capture(command, null).pipe(
       Effect.map((result) => {
