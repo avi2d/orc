@@ -39,7 +39,7 @@ export const routePullRequestWithRetry = (
   view: PullRequestView,
   at: string,
   waits: ReadonlyArray<string> = []
-): Effect.Effect<void, BacklogError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const runs = redRuns(view)
     const repo = pr.match(prPattern)
@@ -47,7 +47,7 @@ export const routePullRequestWithRetry = (
     const rerunRecorded = task.ciReruns?.some((entry) => entry.pr === pr) === true
     if (shipPr && !rerunRecorded && pendingRedRuns(view)) {
       yield* routePullRequest(root, task.spec.id, pr, view, at, waits, true)
-      return
+      return true
     }
     if (shipPr && runs.length > 0 && repo !== null && !rerunRecorded) {
       const ids = [...new Set(runs.map((run) => run.run))]
@@ -60,8 +60,9 @@ export const routePullRequestWithRetry = (
       )
       if (recorded && (yield* rerunFailed(root, task, pr, repo[1] + "/" + repo[2] + "/" + repo[3], runs, at))) {
         yield* routePullRequest(root, task.spec.id, pr, view, at, waits, true)
-        return
+        return true
       }
     }
     yield* routePullRequest(root, task.spec.id, pr, view, at, waits)
+    return false
   })

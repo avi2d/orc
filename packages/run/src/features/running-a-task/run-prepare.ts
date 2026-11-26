@@ -47,7 +47,7 @@ export const prepareRoles = Effect.fnUntraced(function*(
   const fixer = yield* finishAgentFile(fixerFile, { configModel: configModel(configured.fixer), thinking: pins.fixerThinking })
   const reviewer: PreparedReviewer = delivery === "direct-PR"
     ? { kind: "direct-PR", reviewer: yield* resolveAgentFile("reviewer", { ...location, configModel: configModel(route?.reviewer ?? fixer.model) }) }
-    : { kind: "no-mistakes" }
+    : delivery === "orc" ? { kind: "orc" } : { kind: "no-mistakes" }
   return { agent, fixer, reviewer }
 }, Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
 

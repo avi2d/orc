@@ -3,7 +3,7 @@ import { arrow, bullets, card, svg, tall, text, zone, type Drawing, type Part } 
 const title = "Checks and review: the two gates a code change passes"
 
 const desc =
-  "After Pi commits, orc runs the project's checks. When one fails, a fixer repairs it and the checks run again, and after three fixes with a check still red the run fails and no pull request opens. Once the checks are green, no-mistakes reviews the branch. Orc has it fix a finding marked auto-fix, ignores no-op, and treats a finding marked ask-user or with any other action as a question that waits at the gate for 30 minutes before the task parks on its branch. After orc answers 20 gates without an outcome it asks gate-cap before it answers more. Then no-mistakes pushes the branch, opens the pull request and waits for green CI. The project's mode decides which of these a ship task goes through."
+  "After Pi commits, orc runs the project's checks. When one fails, a fixer repairs it and the checks run again, and after three fixes with a check still red the run fails and no pull request opens. Once the checks are green, no-mistakes reviews the branch. Orc has it fix a finding marked auto-fix, ignores no-op, and treats a finding marked ask-user or with any other action as a question that waits at the gate for 30 minutes before the task parks on its branch. After orc answers 20 gates without an outcome it asks gate-cap before it answers more. Then no-mistakes pushes the branch and opens the pull request, and the beat reads its checks. The project's mode decides which of these a ship task goes through."
 
 const branch: Part = { title: "The branch", text: "Pi's commits, in the run's copy of the project.", href: "run" }
 const gate: Part = { title: "The checks", text: "The commands the project names in `.no-mistakes.yaml`." }
@@ -21,10 +21,10 @@ const question: Part = {
   cls: "card-ask",
   href: "attention",
 }
-const deliver: Part = { title: "no-mistakes delivers", text: "It pushes the branch, opens the pull request and waits for green CI." }
+const deliver: Part = { title: "no-mistakes delivers", text: "It pushes the branch and opens the pull request. The beat reads its checks." }
 
 const modes: readonly Part[] = [
-  { title: "`no-mistakes`", text: "The default. Checks, then the review, then a pull request with green CI." },
+  { title: "`no-mistakes`", text: "The default. Checks, then the review, then a pull request." },
   { title: "`direct-PR`", text: "Checks, then a review turn that only records findings, then orc opens the pull request." },
   { title: "`no-mistakes-prod-only`", text: "`direct-PR` for a task marked internal, `no-mistakes` for the rest." }
 ]

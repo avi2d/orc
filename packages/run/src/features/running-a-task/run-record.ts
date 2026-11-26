@@ -17,6 +17,7 @@ export type { ChecksRoundSummary, OrcRunCommit, OrcRunReport, RecordedFixAttempt
 export type RunDeliverer =
   | { readonly kind: "no-mistakes"; readonly runner: NoMistakesRunner }
   | { readonly kind: "direct-PR"; readonly opener: PullRequestOpener; readonly reviewer: AgentFile }
+  | { readonly kind: "orc"; readonly opener: PullRequestOpener }
 
 export const prBodyFileName = "pr-body.md"
 
@@ -129,7 +130,6 @@ export const failedReport = (run: HistoryRun, reason: string): OrcRunReport => (
   tokens: null,
   sessionSize: null,
   completed: false,
-  waitingOnCi: false,
   markerVerified: false,
   implementPassed: false,
   checksRounds: null,

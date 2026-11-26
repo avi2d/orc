@@ -5,9 +5,10 @@ import type { BeatAction, StalledAction } from "../../entities/attention/index"
 import type { ChatEvent, PrState } from "../../entities/events/index"
 import { pullRequestHeld, routePullRequestWithRetry } from "../../entities/attention/index"
 import { eventRecorded, readPrState, recordEvent, writePrState } from "../../entities/events/index"
-import { checkRefusals, greenChecks, type PullRequestView } from "../../entities/pull-request/index"
+import { checkRefusals, greenChecks, redCheckEvidence, type PullRequestView } from "../../entities/pull-request/index"
 import type { RunnerError } from "../../shared/process/index"
 import { isPendingUpdateHead, readPendingUpdate } from "../../features/merging-a-pr/index"
+import { sendBack } from "../../features/queueing-a-task/index"
 import { ownerWaits, yoloMerge } from "./yolo-merge"
 
 export type ReadPullRequest = (url: string) => Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner>
@@ -74,14 +75,15 @@ const recordObservation = (
   at: string,
   waits: Result.Result<ReadonlyArray<string> | null, BacklogError | RunnerError>,
   prState: PrState
-): Effect.Effect<void, BacklogError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    yield* routePullRequestWithRetry(root, task, pr, view, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
+    const holdingRed = yield* routePullRequestWithRetry(root, task, pr, view, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
     const event = prEvent(task, pr, view, at, yield* eventRecorded(root, task.spec.id + ".pr-ready"))
     if (event !== null) {
       yield* recordEvent(root, event)
     }
     yield* writePrState(root, task.spec.id, pr, prState)
+    return holdingRed
   })
 
 const heldAcrossUpdate = (root: string, id: string, pr: string, head: string) =>
@@ -93,13 +95,28 @@ const heldAcrossUpdate = (root: string, id: string, pr: string, head: string) =>
     return yield* isPendingUpdateHead(pr, pending.head, head)
   })
 
+const sendFreshRedChecks = (root: string, home: string, task: TaskRecord, view: PullRequestView, at: string, orcMode: boolean) =>
+  Effect.gen(function*() {
+    if (view.state !== "OPEN" || !orcMode || ranClosing(task)?.outcome !== "done") {
+      return false
+    }
+    const freshRed = redCheckEvidence(view).filter((check) => !(task.ciSentBack ?? []).includes(check.name))
+    if (freshRed.length === 0) {
+      return false
+    }
+    const evidence = freshRed.map((check) => check.name + (check.url === undefined ? "" : " " + check.url)).join(", ")
+    const sent = yield* sendBack(root, home, { kind: "SendBack", id: task.spec.id, words: "Fix the red CI check: " + evidence }, at, "cleared", freshRed.map((check) => check.name)).pipe(Effect.result)
+    return Result.isSuccess(sent)
+  })
+
 export const prEvents = (
   root: string,
   task: TaskRecord,
   read: ReadPullRequest,
   at: string,
   yolo: boolean,
-  home: string
+  home: string,
+  orcMode = false
 ): Effect.Effect<Option.Option<BeatAction>, BacklogError, Requirements> =>
   Effect.gen(function*() {
     const pr = taskPr(task)
@@ -124,9 +141,16 @@ export const prEvents = (
       return Option.none()
     }
     const waits = yield* readWaits(pr, view.success, yolo)
-    yield* recordObservation(root, task, pr, view.success, at, waits, prState)
+    const holdingRed = yield* recordObservation(root, task, pr, view.success, at, waits, prState)
+    if (holdingRed || (yield* sendFreshRedChecks(root, home, task, view.success, at, orcMode))) {
+      return Option.none()
+    }
     if (Result.isFailure(waits)) {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: waits.failure.detail })
+    }
+    const refusals = checkRefusals(view.success)
+    if (view.success.state === "OPEN" && refusals.length > 0) {
+      return Option.some<BeatAction>({ kind: "pr-checks", task: id, reason: refusals.join("; ") })
     }
     if (waits.success === null || waits.success.length > 0) {
       return Option.none()

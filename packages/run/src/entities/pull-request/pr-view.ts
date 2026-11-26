@@ -26,7 +26,7 @@ export type PullRequestView = typeof PullRequestView.Type
 type CheckRun = typeof CheckRun.Type
 
 type CheckVerdict = "green" | "red" | "unreported"
-type NamedVerdict = { readonly name: string; readonly verdict: CheckVerdict }
+type NamedVerdict = { readonly name: string; readonly verdict: CheckVerdict; readonly url?: string }
 
 const greenConclusions = new Set(["SUCCESS", "NEUTRAL", "SKIPPED"])
 const unreportedStates = new Set(["PENDING", "EXPECTED"])
@@ -57,7 +57,7 @@ const checkVerdicts = (view: PullRequestView): ReadonlyArray<NamedVerdict> => {
   const runs = view.statusCheckRollup.filter((entry) => "status" in entry)
   const contexts = view.statusCheckRollup.filter((entry) => "context" in entry)
   return [
-    ...newestRuns(runs).map((run) => ({ name: run.workflowName === undefined || run.workflowName === "" ? run.name : run.workflowName + "/" + run.name, verdict: runVerdict(run) })),
+    ...newestRuns(runs).map((run) => ({ name: run.workflowName === undefined || run.workflowName === "" ? run.name : run.workflowName + "/" + run.name, verdict: runVerdict(run), ...(run.detailsUrl === undefined ? {} : { url: run.detailsUrl }) })),
     ...contexts.map((context): NamedVerdict => ({
       name: context.context,
       verdict: context.state === "SUCCESS" ? "green" : unreportedStates.has(context.state) ? "unreported" : "red"
@@ -70,9 +70,6 @@ const namesWith = (verdicts: ReadonlyArray<NamedVerdict>, verdict: CheckVerdict)
 
 const failedRuns = (view: PullRequestView): ReadonlyArray<CheckRun> =>
   newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry)).filter((run) => runVerdict(run) === "red")
-
-export const redCheckLinks = (view: PullRequestView): ReadonlyArray<string> =>
-  failedRuns(view).flatMap((run) => run.detailsUrl === undefined || run.detailsUrl === "" ? [] : [run.detailsUrl])
 
 const unfinishedScopes = (view: PullRequestView): ReadonlySet<string> =>
   new Set(newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry)).filter((run) => run.status !== "COMPLETED").map(runScope))
@@ -104,6 +101,9 @@ export const redRuns = (view: PullRequestView): ReadonlyArray<{ readonly run: st
 export const greenChecks = (view: PullRequestView): ReadonlyArray<string> => namesWith(checkVerdicts(view), "green")
 
 export const redChecks = (view: PullRequestView): ReadonlyArray<string> => namesWith(checkVerdicts(view), "red")
+
+export const redCheckEvidence = (view: PullRequestView): ReadonlyArray<{ readonly name: string; readonly url?: string }> =>
+  checkVerdicts(view).filter((entry) => entry.verdict === "red").map((entry) => ({ name: entry.name || "(unnamed check)", ...(entry.url === undefined ? {} : { url: entry.url }) }))
 
 export const checkRefusals = (view: PullRequestView): ReadonlyArray<string> => {
   const verdicts = checkVerdicts(view)

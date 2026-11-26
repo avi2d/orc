@@ -114,6 +114,8 @@ export const renderTaskFile = (record: TaskRecord): string =>
     field("created", record.spec.created),
     ...(record.ciReruns === undefined ? [] : [field("ci_reruns", record.ciReruns)]),
     ...holdFields(record.hold),
+    ...(record.retry === undefined ? [] : [field("retry", record.retry)]),
+    ...(record.ciSentBack === undefined ? [] : [field("ci_sent_back", record.ciSentBack)]),
     ...parkedFields(record.parked),
     ...(record.merge === undefined ? [] : [field("merge", record.merge)]),
     ...(ranClosing(record) === null && record.priorPr !== undefined ? [field("pr", record.priorPr)] : []),

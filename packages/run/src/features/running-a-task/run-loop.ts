@@ -1,5 +1,5 @@
 import { Console, Effect, FileSystem, Result } from "effect"
-import { buildFixPrompt, localChecksOf, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
+import { beatReadsChecks, buildFixPrompt, localChecksOf, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
 import { distinctRefusals } from "../../entities/run-history/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { buildImplementPrompt, finalReplyError, finalReplyText, orcCompletionLine, orcSplitLine, sessionPrintedSignal, sumPiUsage, textAfterSignal, type PiTokenUse } from "../../entities/agent/index"
@@ -11,6 +11,7 @@ import { askedNote, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, w
 import { holdReleaseGuidance, holdReleaseWordsOf } from "../../entities/review-gate/index"
 import { freshFixOf, releaseGuidanceOf, resumedFix } from "./fix-guidance"
 import { finishAfterChecks } from "./run-finish"
+import { rebaseDelivery } from "./rebase-delivery"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
 import type { AgentOutcome, AgentRun, AgentRunResult, AgentStep, ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
@@ -243,7 +244,7 @@ const readProjectChecks = (run: HistoryRun, round: number): Effect.Effect<Readon
     const local = localChecksOf(commands)
     const skipped = commands.filter((check) => check.name !== "prepare" && !local.includes(check)).map((check) => check.name)
     if (round === 1 && (skipped.length > 0 || local.length === 0)) {
-      yield* Console.warn("orc: warning: " + (skipped.length === 0 ? "" : "skipped local commands: " + skipped.join(", ") + ". ") + (local.length === 0 ? "No local checks ran. " : "") + "GitHub CI decides completion.")
+      yield* Console.warn("orc: warning: " + (skipped.length === 0 ? "" : "skipped local commands: " + skipped.join(", ") + ". ") + (local.length === 0 ? "No local checks ran. " : "") + beatReadsChecks)
     }
     return local
   })
@@ -262,7 +263,7 @@ const retryParkedFix = (run: HistoryRun, ops: SandboxOps, base: ImplementBase, r
     fixes.push(retried.fix)
     yield* checkpoints.fixDone(retried.fix)
     commits.push(...retried.commits)
-    return retried.paused === null ? null : { ...base, commits, completed: false, waitingOnCi: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: retried.paused }
+    return retried.paused === null ? null : { ...base, commits, completed: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: retried.paused }
   })
 
 const runChecksFixLoop = (
@@ -309,7 +310,6 @@ const runChecksFixLoop = (
           ...base,
           commits,
           completed: false,
-          waitingOnCi: false,
           checksRounds: rounds,
           fixes,
           fixAttempts: fixes.length,
@@ -323,7 +323,7 @@ const runChecksFixLoop = (
       yield* checkpoints.fixDone(fixed.fix)
       commits.push(...fixed.commits)
       if (fixed.paused !== null) {
-        return { ...base, commits, completed: false, waitingOnCi: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: fixed.paused }
+        return { ...base, commits, completed: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: fixed.paused }
       }
     }
     return yield* new OrcRunError({ message: "orc: the checks loop ended without a result" })
@@ -362,12 +362,15 @@ const runFullReport = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, tra
       noMistakes: null
     }
     if (!done.completed) {
-      return { ...base, commits: done.commits, completed: false, waitingOnCi: false, checksRounds: null, fixes: [], fixAttempts: 0, endReason: done.endReason }
+      return { ...base, commits: done.commits, completed: false, checksRounds: null, fixes: [], fixAttempts: 0, endReason: done.endReason }
+    }
+    if (run.delivery.kind === "orc") {
+      yield* rebaseDelivery(run, run.delivery.opener)
     }
     const rounds: Array<ChecksRoundSummary> = [...plan.inheritedRounds]
     const fixes: Array<RecordedFixAttempt> = [...plan.inheritedFixes]
     const commits = [...done.commits]
-    if (plan.skipChecks) {
+    if (plan.skipChecks && run.delivery.kind !== "orc") {
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, tracked, ops.runAgent, plan.priorDir)
     }
     return yield* runChecksFixLoop(run, ops, base, rounds, fixes, commits, plan, tracked)

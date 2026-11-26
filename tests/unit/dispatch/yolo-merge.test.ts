@@ -290,7 +290,7 @@ describe("the beat gate around the merge", () => {
       await closeWith(root, "done")
       const merges: Array<string> = []
       const action = await beatAction(root, view("FAILURE"), true, noFiles, merges)
-      expect(Option.isNone(action)).toBe(true)
+      expect(Option.getOrNull(action)).toMatchObject({ kind: "pr-checks", task: "task-1" })
       expect(merges).toEqual([])
     })
   })

@@ -1,4 +1,4 @@
-import { Array as Arr, Data, Effect, Schema } from "effect"
+import { Data, Effect, Schema } from "effect"
 import { Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-record-decision"
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 import { deciderAnswerKinds, OverturnedFront, parkedAnswerOf } from "./task-record-answer"
@@ -83,7 +83,7 @@ export interface Parked {
   readonly at?: string
   readonly sentBackAt?: string
   readonly branch: string
-  readonly questions: Arr.NonEmptyReadonlyArray<ParkedQuestion>
+  readonly questions: ReadonlyArray<ParkedQuestion>
 }
 
 export interface RanClosing {
@@ -118,12 +118,15 @@ type TaskState =
 
 const CiRerun = Schema.Struct({ pr: Schema.String, runs: Schema.Array(Schema.String), at: Schema.String })
 export type CiRerun = typeof CiRerun.Type
+const Retry = Schema.Struct({ run: Schema.String.check(Schema.isNonEmpty()), at: Schema.String.check(Schema.isNonEmpty()) })
 
 export interface TaskRecord {
   readonly ciReruns?: ReadonlyArray<CiRerun>
   readonly merge?: MergeRecord
   readonly spec: TaskSpec
   readonly hold: Hold | null
+  readonly retry?: typeof Retry.Type
+  readonly ciSentBack?: ReadonlyArray<string>
   readonly parked: Parked | null
   readonly priorPr?: string
   readonly state: TaskState
@@ -188,6 +191,8 @@ const Frontmatter = Schema.Struct({
   hold_history: Schema.optional(Schema.Array(AnsweredHold)),
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
+  retry: Schema.optional(Retry),
+  ci_sent_back: Schema.optional(Schema.Array(Schema.String)),
   parked_branch: Schema.optional(Schema.String),
   parked_origin: Schema.optional(ParkedOrigin),
   parked_at: Schema.optional(Schema.String),
@@ -266,7 +271,7 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (typeof questions === "string") {
     return questions
   }
-  return Arr.isReadonlyArrayNonEmpty(questions)
+  return questions.length > 0 || (front.retry !== undefined && front.parked_origin !== undefined)
     ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }), ...(front.parked_at === undefined ? {} : { at: front.parked_at }), ...(front.parked_sent_back_at === undefined ? {} : { sentBackAt: front.parked_sent_back_at }) }
     : "a parked task names no question"
 }
@@ -325,6 +330,9 @@ const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => 
   return { kind: "closed", claim, closing, closedAt: front.closed_at, postedAt: front.posted_at ?? null }
 }
 
+const unlessRefused = <A extends object | null>(file: string, value: A | string): Effect.Effect<A, TaskFileError> =>
+  typeof value === "string" ? Effect.fail(new TaskFileError({ file, detail: value })) : Effect.succeed(value)
+
 export const parseTaskFile = (file: string, folder: TaskFolder, text: string): Effect.Effect<TaskRecord, TaskFileError> =>
   Effect.gen(function*() {
     const parts = splitFrontmatter(text)
@@ -346,21 +354,12 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (front.id !== stem) {
       return yield* new TaskFileError({ file, detail: "the frontmatter id " + front.id + " is not the file " + (stem ?? file) })
     }
-    const state = kind === "decision" ? decisionStateOf(folder, front, stateOf) : stateOf(folder, front)
-    if (typeof state === "string") {
-      return yield* new TaskFileError({ file, detail: state })
-    }
-    const hold = kind === "decision" ? holdOf({ ...front, answer: undefined, answered_at: undefined }) : holdOf(front)
-    if (typeof hold === "string") {
-      return yield* new TaskFileError({ file, detail: hold })
-    }
+    const state = yield* unlessRefused(file, kind === "decision" ? decisionStateOf(folder, front, stateOf) : stateOf(folder, front))
+    const hold = yield* unlessRefused(file, kind === "decision" ? holdOf({ ...front, answer: undefined, answered_at: undefined }) : holdOf(front))
     if (heldWhileActive(hold, state)) {
       return yield* new TaskFileError({ file, detail: "a " + state.kind + " task carries an unanswered hold" })
     }
-    const parked = parkedOf(front)
-    if (typeof parked === "string") {
-      return yield* new TaskFileError({ file, detail: parked })
-    }
+    const parked = yield* unlessRefused(file, parkedOf(front))
     if (closedWithUnansweredQuestion(parked, state)) {
       return yield* new TaskFileError({ file, detail: "a closed task carries an unanswered parked question" })
     }
@@ -381,6 +380,8 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
         body: parts.body
       },
       hold,
+      ...(front.retry === undefined ? {} : { retry: front.retry }),
+      ...(front.ci_sent_back === undefined ? {} : { ciSentBack: front.ci_sent_back }),
       parked,
       ...(front.merge === undefined ? {} : { merge: front.merge }),
       ...priorPrOf(front.pr, state),

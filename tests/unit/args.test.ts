@@ -224,7 +224,7 @@ describe("parseArgs run flags", () => {
     expect(parseArgs(["run", "task.md", "--delivery", "direct-PR"])).toMatchObject({ kind: "RunAgent", taskFile: "task.md", delivery: "direct-PR" })
   })
   test("run rejects a delivery it does not know instead of falling back to no-mistakes", () => {
-    expect(parseArgs(["run", "task.md", "--delivery", "no-mistakes-prod-only"])).toEqual({ kind: "UsageError", detail: "orc run takes --delivery once, with no-mistakes or direct-PR" })
+    expect(parseArgs(["run", "task.md", "--delivery", "no-mistakes-prod-only"])).toEqual({ kind: "UsageError", detail: "orc run takes --delivery once, with no-mistakes or direct-PR or orc" })
   })
   test("run rejects --delivery on a scout instead of opening a PR for a report", () => {
     expect(parseArgs(["run", "task.md", "--kind", "scout", "--delivery", "direct-PR"]).kind).toBe("UsageError")
