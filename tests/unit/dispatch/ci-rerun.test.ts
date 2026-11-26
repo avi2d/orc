@@ -194,6 +194,25 @@ describe("a red check on a ship task's PR", () => {
     })
   })
 
+  test.each(["WAITING", "PENDING"])("opens the red item instead of rerunning a different run when a sibling is %s", async (status) => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      const asked: Array<ReadonlyArray<string>> = []
+      const pending: PullRequestView = {
+        ...red,
+        statusCheckRollup: [
+          ...red.statusCheckRollup,
+          { workflowName: "ci", detailsUrl: details, name: "parallel", status, conclusion: "", startedAt: "2026-10-27T11:10:00.000Z" },
+          { workflowName: "ci", detailsUrl: "https://github.com/acme/orc/actions/runs/5252/job/1", name: "other", status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-10-27T11:10:00.000Z" }
+        ]
+      }
+      await route(root, asked, pending)
+      expect(asked).toEqual([])
+      expect((await run(findTask(root, "orc-1"))).ciReruns).toBeUndefined()
+      expect((await run(openItems(root)))[0]?.item.text).toContain(details)
+    })
+  })
+
   test("interrupts a stalled rerun after 30 seconds instead of blocking the beat", async () => {
     await withBacklog(async (root) => {
       await closeWithPr(root)
