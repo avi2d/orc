@@ -189,6 +189,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/agent/pi.ts` | The Pi prompt and the check of its final reply |
 | `packages/run/src/entities/agent/pi-run.ts` | The Pi process in JSON mode: its event lines, the agent log, the session file and the idle stop |
 | `packages/run/src/entities/agent/agents.ts` | The agent file parsing and lookup |
+| `packages/run/src/entities/agent/asset-path.ts` | `assetPath`, which turns a bundled file import such as `./implementer-<hash>.md` into a path beside the running bundle and passes an absolute path through |
 | `packages/run/src/entities/agent/long-session.ts` | The long session watch: the turn and compaction counts, the handover note and the handover prompt |
 | `packages/run/src/entities/agent/orc-ask-extension.ts` | The Pi extension orc copies into the run's Pi folder, which adds the `orc_ask` tool |
 | `packages/run/src/entities/agent/worker-ask.ts` | The orc side of `orc_ask`: the `ask-<n>` ids, the `asking.json` it writes, the answers it hands back, the corrected answers it hands on after Pi's next tool call and the 10 minute wait |
@@ -376,7 +377,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `tests/unit` | The in-process unit tests at the workspace root |
-| `tests/e2e` | The tests that run `packages/run/src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1`, at the workspace root |
+| `tests/e2e` | Tests that run the `packages/run/dist/bin.js` bundle, git, or nono as a process. Run `bun run bundle` after changing the source. Set `ORC_PI_E2E=1` for the live Pi run. |
 | `tests/fixtures/runner/pueue` | The pueue 4 status JSON the runner tests read |
 | `tests/live` | The tests that run a real nono sandbox with `ORC_NONO_E2E=1` set, or the host's Pi, through the `test:live` script at the workspace root |
 | `.no-mistakes.yaml` | The check commands no-mistakes and CI run at the workspace root |

@@ -25,4 +25,7 @@ export default defineConfig({
   ".": { entry: [...rootEntry, ...DEFAULT_ENTRY] },
   "packages/run": { entry: ["scripts/launch.ts"] },
   },
+  ignoreIssues: {
+    "packages/run/src/features/chat/chat-tools.ts": ["exports"],
+  },
 });

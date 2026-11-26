@@ -1,4 +1,5 @@
 import { Effect, FileSystem, Option, Schema } from "effect"
+import { assetPath } from "./asset-path"
 import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
 import { AnswersFile, answersFileName, Asking, AskOption, askingFileName, CorrectionsFile, correctionsFileName, hasBlockingQuestion, isBlockingQuestion, type OpenQuestion, type QuestionAnswer } from "../review-gate/index"
 import askExtensionFile from "./orc-ask-extension.ts" with { type: "file" }
@@ -11,7 +12,7 @@ export const isWorkerQuestion = (id: string): boolean => workerQuestionPattern.t
 const longestAskWaitSeconds = 10 * 60
 
 // TypeScript types a file import of a .ts module as its default export, while Bun hands over the file's path, so orc decodes it as a string.
-export const askExtensionSource = Schema.decodeUnknownEffect(Schema.String)(askExtensionFile)
+export const askExtensionSource = Schema.decodeUnknownEffect(Schema.String)(askExtensionFile).pipe(Effect.map(assetPath))
 
 // Bun bundles a module either as code or as an embedded file, so these copy the names orc-ask-extension.ts exports and must stay equal to them.
 export const askToolName = "orc_ask"
