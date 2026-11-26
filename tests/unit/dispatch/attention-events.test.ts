@@ -132,7 +132,7 @@ describe("run events in the attention queue", () => {
     await withBacklog(async (root) => {
       await closeWithPr(root)
       await beat(root, "2026-10-27T12:00:00.000Z", checked("SUCCESS"))
-      await beat(root, "2026-10-27T12:01:00.000Z", { ...checked("SUCCESS"), state: "MERGED" })
+      await beat(root, "2026-10-27T12:01:00.000Z", { ...checked("SUCCESS"), state: "MERGED", mergeCommit: { oid: "1".repeat(40) }, mergedAt: "2026-10-27T12:00:30.000Z" })
       expect(await run(openItems(root))).toEqual([])
       expect(await itemFiles(root)).toMatchObject([{ kind: "pr-ready", state: { kind: "closed", answer: { words: "merged", at: "2026-10-27T12:01:00.000Z" } } }])
     })

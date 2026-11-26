@@ -1,6 +1,6 @@
 import { Duration, Effect, type FileSystem, Option, type Path, Result } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { BacklogError, ranClosing, taskPr, type TaskRecord } from "../../entities/backlog/index"
+import { BacklogError, ranClosing, rewriteClosed, taskPr, type TaskRecord } from "../../entities/backlog/index"
 import type { BeatAction, StalledAction } from "../../entities/attention/index"
 import type { ChatEvent, PrState } from "../../entities/events/index"
 import { pullRequestHeld, routePullRequestWithRetry } from "../../entities/attention/index"
@@ -56,7 +56,7 @@ export const taskPrState = (root: string, task: TaskRecord): Effect.Effect<PrSta
     return yield* readPrState(root, task.spec.id, pr)
   })
 
-const readPrView = (pr: string, read: ReadPullRequest) =>
+const readPrViewRaw = (pr: string, read: ReadPullRequest) =>
   read(pr).pipe(Effect.result, Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed(Result.fail(new BacklogError({ detail: "cannot read " + pr + ": the read timed out after " + prSeconds + " seconds" }))) }))
 
 const readWaits = (pr: string, view: PullRequestView, yolo: boolean) =>
@@ -64,6 +64,35 @@ const readWaits = (pr: string, view: PullRequestView, yolo: boolean) =>
 
 const mergeTimed = (root: string, id: string, pr: string, home: string) =>
   yoloMerge(root, id, pr, home).pipe(Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed<BeatAction>({ kind: "merge-refused", task: id, reason: "cannot merge " + pr + ": the merge timed out after " + prSeconds + " seconds" }) }))
+
+const recoverMerged = (root: string, task: TaskRecord, pr: string, view: PullRequestView) =>
+  Effect.gen(function*() {
+    const commit = view.mergeCommit?.oid
+    const at = view.mergedAt
+    if (commit == null || at == null) {
+      return yield* new BacklogError({ detail: "cannot read merge of " + pr + ": the merge commit or time is missing" })
+    }
+    yield* rewriteClosed(root, task.spec.id, (fresh) => {
+      if (taskPr(fresh) !== pr) {
+        return Effect.fail(new BacklogError({ detail: task.spec.id + " changed while reading " + pr }))
+      }
+      return Effect.succeed({
+        kind: "write" as const,
+        record: { ...fresh, merge: { basis: fresh.merge?.basis ?? "observed" as const, head: view.headRefOid, green: greenChecks(view), stage: "merged" as const, mergeCommit: commit, mergedAt: at } },
+        result: undefined
+      })
+    }).pipe(
+      Effect.uninterruptible,
+      Effect.mapError((error) => new BacklogError({ detail: "cannot record merge of " + pr + ": " + error.detail }))
+    )
+  })
+
+const readPrView = (root: string, task: TaskRecord, pr: string, read: ReadPullRequest) =>
+  readPrViewRaw(pr, read).pipe(Effect.flatMap((view) =>
+    Result.isSuccess(view) && task.spec.kind === "ship" && view.success.state === "MERGED"
+      ? recoverMerged(root, task, pr, view.success).pipe(Effect.as(view), Effect.catch((error) => Effect.succeed(Result.fail(error))))
+      : Effect.succeed(view)
+  ))
 
 const prStateOf = (state: string): PrState | null =>
   state === "OPEN" ? "open" : state === "CLOSED" ? "closed" : state === "MERGED" ? "merged" : null
@@ -163,7 +192,7 @@ export const prEvents = (
     if (recorded === "merged" || recorded === "closed") {
       return Option.none()
     }
-    const view = yield* readPrView(pr, read)
+    const view = yield* readPrView(root, task, pr, read)
     if (Result.isFailure(view)) {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: view.failure.detail })
     }
