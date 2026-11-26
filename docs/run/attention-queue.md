@@ -208,7 +208,10 @@ Answering the hold closes the item with the hold's answer.
 
 Each beat reads the queue before it starts a new task, and prints one `needs the <owner> <item-id>: <text>` line per open item, oldest first, with `, overdue` after the owner for an overdue one.
 Run `orc attention` to see open items in age order.
-The text view separates decisions made by the owner from those made by the agent.
+The text view lists answered items under two headings, **Decided by the owner** and **Decided by the agent**.
+Each entry names its item, the answer and the question.
+An agent entry also shows its basis: the decider's reason and the rule it quoted, or `not recorded` when the item holds no agent decision.
+An answer the owner replaced stays under the agent heading, marked `(replaced)`.
 Run `orc attention --json` for an `orc.attention.v1` document with `at`, `items`, and `decided`.
 Each decision and answer carries a `decider` of `owner` or `agent`.
 A new question needs a subject, the outcome of each option, and a recommendation that names one of the options.

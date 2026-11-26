@@ -7,7 +7,7 @@ const AttentionOption = Schema.Struct({
   picture: Schema.optionalKey(Schema.String),
   action: Schema.optionalKey(Schema.Literals(["write-answer", "wait"]))
 })
-const Answer = Schema.Struct({ ...DecisionAnswer.fields, inferred: Schema.optionalKey(Schema.Literal(true)) })
+export const ItemAnswer = Schema.Struct({ ...DecisionAnswer.fields, inferred: Schema.optionalKey(Schema.Literal(true)) })
 const QuotedRule = Schema.Struct({ quote: Schema.String, source: Schema.String })
 
 const answered = { kind: Schema.Literal("answered"), reason: Schema.String, rule: Schema.optionalKey(QuotedRule), at: Schema.String }
@@ -53,12 +53,12 @@ export const AttentionItem = Schema.Struct({
   decision: Schema.optionalKey(Decision),
   state: Schema.Union([
     Open,
-    Schema.Struct({ kind: Schema.Literal("closed"), answer: Answer, overturned: Schema.optionalKey(Answer) }),
+    Schema.Struct({ kind: Schema.Literal("closed"), answer: ItemAnswer, overturned: Schema.optionalKey(ItemAnswer) }),
     Withdrawn
   ])
 })
 
-const StoredAnswer = Schema.Struct({ ...AnswerWords.fields, decider: Schema.optionalKey(Decider), inferred: Answer.fields.inferred })
+const StoredAnswer = Schema.Struct({ ...AnswerWords.fields, decider: Schema.optionalKey(Decider), inferred: ItemAnswer.fields.inferred })
 
 export const StoredAttentionItem = Schema.Struct({
   ...AttentionItem.fields,
@@ -90,7 +90,7 @@ export const NewItem = Schema.Union([
 export type AttentionItem = typeof AttentionItem.Type
 export type Asked = Omit<AttentionItem, "state" | "decision" | "deciding">
 export type AttentionOption = typeof AttentionOption.Type
-export type ItemAnswer = typeof Answer.Type
+export type ItemAnswer = typeof ItemAnswer.Type
 export type Decision = typeof Decision.Type
 
 export const decisionText = (decision: Decision): string => {

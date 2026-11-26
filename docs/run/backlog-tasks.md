@@ -154,6 +154,9 @@ A note does not hold a task or answer a question.
 Run `orc backlog thread <task-id>` to read a task's questions, answers, decisions, and notes in time order.
 Add `--json` for an `orc.thread.v1` document.
 Each answer and decision entry names who decided it: the owner or the agent.
+Below the timeline, the text view lists the answers again under **Decided by the owner** and **Decided by the agent**.
+An agent answer shows its basis, the decider's decision on the same question.
+An agent decision with no answer, such as an escalation, lists under the agent heading with its reason.
 A decision entry for an escalated question carries the decider's recommended option as `recommendation`.
 Its fields are defined in `packages/run/src/features/task-thread/thread.ts`.
 The thread includes closed tasks.

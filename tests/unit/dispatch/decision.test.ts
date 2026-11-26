@@ -83,19 +83,22 @@ const ShownBacklog = Schema.Struct({
 })
 
 describe("a decision", () => {
-  test("a long task prefix cannot push owner or agent attribution out of the closed column", async () => {
+  test("the closed column lists an owner answer and an agent answer under their own Decided by headings, with the agent's basis, instead of one mixed list", async () => {
     await withBacklog(async (root) => {
-      for (const decider of ["owner", "agent"] as const) {
-        const task = await run(addTask(root, { ...decisionSpec, project: "a-project-with-a-name-that-exceeds-the-board-column" }))
-        await run(answerDecision(root, task.spec.id, "yes", answeredAt, decider))
+      for (const [decider, words] of [["owner", "left"], ["agent", "right"]] as const) {
+        const task = await run(addTask(root, decisionSpec))
+        await run(answerDecision(root, task.spec.id, words, answeredAt, decider))
       }
       const board = formatBoard({
         tasks: await run(listTasks(root)), events: [], projects: { kind: "read", projects: [] },
         room: { kind: "read", room: [] }, merged: new Set(), prStates: new Map(), beatWaits: null,
         deciderOwns: () => false
       })
-      expect(board).toContain("Owner · ")
-      expect(board).toContain("Agent · ")
+      const rows = board.split("\n")
+      const row = (text: string): number => rows.findIndex((line) => line.includes(text))
+      expect(rows[0]).toContain("CLOSED (2)")
+      expect([row("Decided by the owner"), row("answered: left"), row("Decided by the agent"), row("answered: right"), row("basis: not recorded")]).toEqual([1, 2, 3, 4, 5])
+      expect(board).not.toContain("Owner · ")
     })
   })
 
@@ -136,7 +139,24 @@ describe("a decision", () => {
       expect(after.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["started:orc-2"])
       const env = { ORC_TASK_ID: "orc-2", ORC_TASK_FILE: join(root, "taken", "orc-2.md"), ORC_TASK_CHECKOUT: "/checkout", ORC_TASK_PROVIDER: "keyed" }
       const request = await run(readRequest(env, Effect.succeed("")))
-      expect(request.body).toBe("# Build the button\n\nDecision orc-1 asked:\n\n# Which button goes first\n\nThe left one or the right one?\n\nOwner answered: use the left one\n")
+      expect(request.body).toBe("# Build the button\n\nDecided by the owner:\n\nDecision orc-1 asked:\n\n# Which button goes first\n\nThe left one or the right one?\n\nOwner answered: use the left one\n")
+    })
+  })
+  test("a run's task text puts an owner decision and an agent decision under their own Decided by headings, the agent one with its basis, rather than in one mixed list", async () => {
+    await withBacklog(async (root) => {
+      await decisionBacklog(root)
+      await run(addTask(root, { ...decisionSpec, title: "Which colour", body: "# Which colour\n\nBlue or green?\n" }))
+      await run(addTask(root, { ...spec, title: "Build the button", dependsOn: ["orc-2", "orc-1"], body: "# Build the button\n" }))
+      await run(answerTask(root, "orc-2", "green", answeredAt, undefined, "decider"))
+      await run(answerTask(root, "orc-1", "use the left one", answeredAt))
+      await beatWith(root, noPueueTasks())
+      const env = { ORC_TASK_ID: "orc-3", ORC_TASK_FILE: join(root, "taken", "orc-3.md"), ORC_TASK_CHECKOUT: "/checkout", ORC_TASK_PROVIDER: "keyed" }
+      const request = await run(readRequest(env, Effect.succeed("")))
+      expect(request.body).toBe(
+        "# Build the button\n\n" +
+        "Decided by the owner:\n\nDecision orc-1 asked:\n\n# Which button goes first\n\nThe left one or the right one?\n\nOwner answered: use the left one\n\n" +
+        "Decided by the agent:\n\nDecision orc-2 asked:\n\n# Which colour\n\nBlue or green?\n\nAgent answered: green\nBasis: not recorded\n"
+      )
     })
   })
   test("hold and merge refuse a decision instead of holding it or looking for its PR", async () => {

@@ -107,8 +107,10 @@ export {
   answerDecision,
   decisionRefusal,
   newTaskRefusal,
+  type DecidedNote,
+  decisionNotes,
   readAnsweredDependencies,
-  withDecisions,
+  withDecided,
 } from "./decision"
 export {
   reportKinds,

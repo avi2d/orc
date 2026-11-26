@@ -67,7 +67,7 @@ export const taskTools = (env: Env): ReadonlyArray<ChatTool> => [
     name: "orc_backlog_thread",
     label: "Read an orc task's conversation",
     description:
-      "Returns orc backlog thread: a task's holds, questions, decisions, answers, deliveries, withdrawals and notes, oldest first. It works on a closed task too, and orc refuses an id the backlog does not hold.",
+      "Returns orc backlog thread: a task's holds, questions, decisions, answers, deliveries, withdrawals and notes, oldest first, then its answers under Decided by the owner and Decided by the agent, each agent answer with its basis. It works on a closed task too, and orc refuses an id the backlog does not hold.",
     parameters: Schema.toJsonSchemaDocument(ThreadInput).schema,
     execute: (_toolCallId, params) => runTool(ThreadInput, "orc_backlog_thread", params, env, (input) => ["backlog", "thread", input.id])
   }

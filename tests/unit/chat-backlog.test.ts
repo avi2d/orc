@@ -59,6 +59,6 @@ describe("chat backlog decoding", () => {
     if (task === undefined || task.status !== "closed") {
       throw new Error("expected one closed decision, got " + JSON.stringify(backlog.tasks))
     }
-    expect(closedLine(task)).toBe("orc-1 Which button goes first closed done: answered (Owner): The blue one")
+    expect(closedLine(task)).toBe("orc-1 Which button goes first closed done: answered\nDecided by the owner:\norc-1: The blue one")
   })
 })

@@ -197,6 +197,32 @@ describe("orc backlog thread", () => {
       })
     }))
 
+  test("the thread text lists the owner's answer and the agent's answer under their own headings rather than only in the mixed timeline", () =>
+    withBacklog(async (root) => {
+      await startedTask(root)
+      const asked = "2026-11-02T10:20:00.000Z"
+      const retries = reviewQuestionId("orc-1", "question-2", asked)
+      const merge = reviewQuestionId("orc-1", "question-3", asked)
+      await run(askStartedTask(root, "orc-1", { asked, questions: [{ id: "question-2", text: "How many retries?" }, { id: "question-3", text: "Merge the PR once it is green?" }] }))
+      await run(routeTaskItems(root, await run(listTasks(root)), asked))
+      const ask: AskDecider = {
+        home: "/nonexistent/orc-home",
+        ask: (request) =>
+          request.prompt.includes("How many retries?")
+            ? Effect.succeed(JSON.stringify({ decision: "answer", answer: "Two retries", rule: "Retry a failed upload twice, then give up.", reason: "the intent says twice" }))
+            : Effect.fail(new DeciderUnheard({ reason: "no reply in this test" })),
+        checkSupport: () => supportsEveryAnswer
+      }
+      await run(decideReviewQuestions(root, await run(listTasks(root)), ask))
+      await run(answerTask(root, "orc-1", "question-3=Yes, merge it", "2099-01-01T00:00:00.000Z"))
+      const groups = (await run(threadText(root, "orc-1", false))).split("\n\n").slice(1)
+      expect(groups).toEqual([
+        "Decided by the owner:\n" + merge + ": Yes, merge it",
+        "Decided by the agent:\n" + retries + ": Two retries\n  basis: answered: the intent says twice, quoting task orc-1: \"Retry a failed upload twice, then give up.\"\n" +
+          merge + ": escalated: orc never hands the decider a question about merging, and this one says \"Merge\""
+      ])
+    }))
+
   test("an escalated decision's JSON entry names the decider's recommended option instead of only its reason", () =>
     withBacklog(async (root) => {
       await startedTask(root)

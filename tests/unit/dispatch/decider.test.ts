@@ -249,7 +249,7 @@ describe("the decider", () => {
     })
   })
 
-  test("a decider answer lists under decided by agent and an owner answer under decided by owner, and both leave the list once the task closes", async () => {
+  test("orc attention lists an owner answer and an agent answer under their own headings, not in one mixed list, and both leave once the task closes", async () => {
     await withAskingTask(async (root) => {
       const before = new Date().toISOString()
       await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }))
@@ -275,8 +275,13 @@ describe("the decider", () => {
       for (const at of [entry?.decision?.at, entry?.answer.at]) {
         expect(at !== undefined && at >= before && at <= after).toBe(true)
       }
-      expect(await run(attentionText(false, root))).toContain("Decided by agent:\n" + r2Item + ": Two retries\n" + r2Item + ": the intent says twice, quoting task orc-1: \"Retry a failed upload twice, then give up.\"")
-      expect(await run(attentionText(false, root))).toContain("Decided by owner:\n" + r3Item + ": Keep the old flag")
+      const shown = await run(attentionText(false, root))
+      const ownerGroup = shown.slice(shown.indexOf("Decided by the owner:"), shown.indexOf("Decided by the agent:"))
+      const agentGroup = shown.slice(shown.indexOf("Decided by the agent:"))
+      expect(ownerGroup).toBe("Decided by the owner:\n" + r3Item + ": Keep the old flag\n  question: " + r3.text + "\n\n")
+      expect(agentGroup).toContain(r2Item + ": Two retries\n  question: " + r2.text + "\n  basis: the intent says twice, quoting task orc-1: \"Retry a failed upload twice, then give up.\"")
+      expect(agentGroup).toContain(r3Item + ": escalated\n  question: " + r3.text + "\n  basis: the intent leaves the flag name open")
+      expect(agentGroup).not.toContain(": Keep the old flag\n")
       await run(closeStartedTask(root, "orc-1", "done", "the upload retries", { pr: null, report: null }, "2026-11-02T10:40:00.000Z"))
       expect((await run(readAttention(root, await run(listTasks(root))))).decided).toEqual([])
     })

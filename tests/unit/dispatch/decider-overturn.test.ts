@@ -75,8 +75,8 @@ describe("a decider overturn", () => {
       expect(correctionsDue(task)).toEqual([])
       expect(await itemFile(root, r2Item)).toMatchObject({ state: { kind: "closed", answer: { words: "Three retries" }, overturned: { words: "Two retries" } } })
       const shown = await run(attentionText(false, root))
-      expect(shown).toContain("Decided by owner:\n" + r2Item + ": Three retries")
-      expect(shown).toContain("Decided by agent:\n" + r2Item + ": Two retries (replaced)")
+      expect(shown).toContain("Decided by the owner:\n" + r2Item + ": Three retries\n")
+      expect(shown).toContain("Decided by the agent:\n" + r2Item + ": Two retries (replaced)\n  question: " + r2.text + "\n  basis: the intent says twice")
     }, [r2])
   })
 
