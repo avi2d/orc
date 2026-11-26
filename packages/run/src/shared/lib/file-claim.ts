@@ -1,5 +1,4 @@
 import { dlopen, FFIType, read } from "bun:ffi"
-import { open } from "node:fs/promises"
 import { hostname } from "node:os"
 import { Clock, Console, Effect, FileSystem, Option, PlatformError, Predicate, Schema } from "effect"
 
@@ -51,7 +50,11 @@ const dropClaim = (fs: FileSystem.FileSystem, file: string, held: string): Effec
   Effect.flatMap(readClaim(fs, file), (current) => Option.contains(current, held) ? fs.remove(file) : Effect.void)
 
 const libcPath = process.platform === "darwin" ? "/usr/lib/libSystem.B.dylib" : "libc.so.6"
-const libc = dlopen(libcPath, { flock: { args: [FFIType.i32, FFIType.i32], returns: FFIType.i32 } })
+const libc = dlopen(libcPath, {
+  open: { args: [FFIType.ptr, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
+  close: { args: [FFIType.i32], returns: FFIType.i32 },
+  flock: { args: [FFIType.i32, FFIType.i32], returns: FFIType.i32 }
+})
 const errnoName = process.platform === "darwin" ? "__error" : "__errno_location"
 const errno = dlopen(libcPath, { [errnoName]: { args: [], returns: FFIType.ptr } }).symbols[errnoName]
 const processStartedAt = Date.now() - process.uptime() * 1000
@@ -59,25 +62,26 @@ const processStartedAt = Date.now() - process.uptime() * 1000
 const lockFailure = (file: string, method: string, cause: unknown): PlatformError.PlatformError =>
   PlatformError.systemError({ _tag: "Unknown", module: "FileSystem", method, pathOrDescriptor: file, cause })
 
-const withKernelLock = <A, E, R>(file: string, use: Effect.Effect<A, E, R>): Effect.Effect<Option.Option<A>, E | PlatformError.PlatformError, R> =>
-  Effect.acquireUseRelease(
-    Effect.tryPromise({ try: () => open(file, "a+"), catch: (cause) => lockFailure(file, "open", cause) }),
-    (handle) => Effect.gen(function*() {
-      const code = yield* Effect.sync(() => {
-        if (libc.symbols.flock(handle.fd, 2 | 4) === 0) return 0
-        const address = errno()
-        return address === null ? -1 : read.i32(address)
-      })
-      if (code === (process.platform === "darwin" ? 35 : 11)) return Option.none<A>()
-      if (code !== 0) return yield* Effect.fail(lockFailure(file, "flock", "errno " + code))
-      yield* Effect.tryPromise({
-        try: () => handle.truncate(0).then(() => handle.writeFile(JSON.stringify({ pid: process.pid, host: hostname(), startedAt: processStartedAt }))),
-        catch: (cause) => lockFailure(file, "write", cause)
-      })
-      return yield* Effect.asSome(use)
-    }),
-    (handle) => Effect.promise(() => handle.close())
-  )
+const withKernelLock = <A, E, R>(file: string, use: Effect.Effect<A, E, R>): Effect.Effect<Option.Option<A>, E | PlatformError.PlatformError, R | FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    return yield* Effect.acquireUseRelease(
+      Effect.flatMap(Effect.sync(() => libc.symbols.open(Buffer.from(file + "\0"), 2 | (process.platform === "darwin" ? 0x1000200 : 0x80040), 0o600)), (fd) =>
+        fd < 0 ? Effect.fail(lockFailure(file, "open", "cannot open lock file")) : Effect.succeed(fd)),
+      (fd) => Effect.gen(function*() {
+        const code = yield* Effect.sync(() => {
+          if (libc.symbols.flock(fd, 2 | 4) === 0) return 0
+          const address = errno()
+          return address === null ? -1 : read.i32(address)
+        })
+        if (code === (process.platform === "darwin" ? 35 : 11)) return Option.none<A>()
+        if (code !== 0) return yield* Effect.fail(lockFailure(file, "flock", "errno " + code))
+        yield* fs.writeFileString(file, JSON.stringify({ pid: process.pid, host: hostname(), startedAt: processStartedAt }))
+        return yield* Effect.asSome(use)
+      }),
+      (fd) => Effect.sync(() => { libc.symbols.close(fd) })
+    )
+  })
 
 const takeClaim = (fs: FileSystem.FileSystem, file: string, mine: string): Effect.Effect<boolean, PlatformError.PlatformError> =>
   Effect.gen(function*() {
