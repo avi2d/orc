@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { chmod, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { type Fixture, isRecord, orcOk, queuedArgs, runnerTimeout, withFixture } from "./runner-helpers"
+import { chatSession } from "../../packages/run/src/features/chat/chat-tools"
+import { orcCommandVar } from "../../packages/run/src/features/chat/chat-run"
+import { binPath, type Fixture, isRecord, orcOk, queuedArgs, runnerTimeout, withFixture } from "./runner-helpers"
 import { askWhileRunning, backlogTaskOne, firstAsking, refuseOnQuestions, startOnLinux } from "./parked-helpers"
 
 const loopQuestion = { id: "looping", text: "Pi failed bun run test 6 times in a row, so orc paused the run. Answer continue, with any guidance for Pi after it, to resume Pi, or stop to end the run." }
@@ -35,6 +37,26 @@ describe("a parked run", () => {
       await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep it"])
       expect(await openAttention(fixture)).toEqual([])
       expect(await orcOk(fixture, ["attention"])).toContain("Decided by the owner:")
+    })
+  }, runnerTimeout)
+
+  test("the chat thread tool lists the owner's answer and the agent's escalation under their own Decided by headings, rather than in one mixed list", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      await askWhileRunning(fixture)
+      await orcOk(fixture, ["beat"])
+      await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep it"])
+      const session = chatSession({ ...process.env, ...fixture.env, [orcCommandVar]: JSON.stringify([process.execPath, binPath]) }, () => true, () => undefined)
+      const thread = session.tools.find((tool) => tool.name === "orc_backlog_thread")
+      const shown = thread === undefined ? "" : (await thread.execute("call-1", { id: "orc-1" })).content.map((block) => block.text).join("")
+      expect(shown).toContain("Decided by the owner:\n")
+      expect(shown).toContain("Decided by the agent:\n")
+      const owner = shown.slice(shown.indexOf("Decided by the owner:"), shown.indexOf("Decided by the agent:"))
+      const agent = shown.slice(shown.indexOf("Decided by the agent:"))
+      expect(owner).toContain(": Keep it")
+      expect(owner).not.toContain("escalated")
+      expect(agent).toContain(": escalated: ")
+      expect(agent).not.toContain("Keep it")
     })
   }, runnerTimeout)
 
