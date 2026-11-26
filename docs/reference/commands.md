@@ -934,11 +934,12 @@ Examples:
 Usage: orc update [--json]
 
 Reads the newest version of @avi2dg/orc from the npm registry and installs it
-only when it is newer than the running orc. A global install uses the package
-manager that installed orc. A versioned launcher prepares a release before
-switching its release file: a checkout when run from source, a release archive
-when compiled. An update.command in config.json overrides the install method. A
-registry read that fails or takes more than 15 seconds leaves orc as it is.
+only when it is newer than the running orc. An npm global install runs npm
+install -g in the same npm prefix, and any other install runs bun add -g. A
+versioned launcher prepares a release before switching its release file: a
+checkout when run from source, a release archive when compiled. An
+update.command in config.json overrides the install method. A registry read that
+fails or takes more than 15 seconds leaves orc as it is.
 
 Options:
   --json  Print the result as an orc.update.v1 JSON document.

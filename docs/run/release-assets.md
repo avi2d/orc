@@ -10,7 +10,7 @@ The `assets` job of `.github/workflows/main.yml` runs after the `release` job ha
 Both the `binaries` and `assets` jobs run `bun run release:assets` on macOS arm64 and Linux x64.
 The `binaries` job runs before `release` so npm can publish the platform packages before `@avi2dg/orc`.
 The `assets` job attaches the files to the GitHub release.
-The build checks `orc --version` and runs both dashboard executables with `--help`.
+The build runs both dashboard executables with `--help`.
 The `@avi2dg/checks` kit writes these jobs from the release settings in `checks.config.ts`.
 
 ## Asset names
@@ -18,7 +18,9 @@ The `@avi2dg/checks` kit writes these jobs from the release settings in `checks.
 | File | What it holds |
 | --- | --- |
 | `orc-darwin-arm64` | The macOS executable for the npm platform package |
+| `orc-darwin-arm64.sha256` | The SHA-256 checksum of the macOS executable |
 | `orc-linux-x64` | The Linux executable for the npm platform package |
+| `orc-linux-x64.sha256` | The SHA-256 checksum of the Linux executable |
 | `orc-<version>-darwin-arm64.tar.gz` | The release archive for macOS on Apple silicon |
 | `orc-<version>-darwin-arm64.tar.gz.sha256` | The SHA-256 checksum of the macOS archive |
 | `orc-<version>-linux-x64.tar.gz` | The release archive for Linux on x64 |
@@ -42,12 +44,12 @@ Unpack it into one folder, such as `tar -xzf orc-0.21.0-linux-x64.tar.gz -C ~/.o
 
 ## Checksum file
 
-Each `.sha256` file holds one line in the `sha256sum` format: the archive's SHA-256 in lowercase hex, two spaces and the archive's name.
-Check a downloaded archive in its folder with `sha256sum -c orc-0.21.0-linux-x64.tar.gz.sha256`, or with `shasum -a 256 -c` on macOS.
+Each `.sha256` file holds one line in the `sha256sum` format: the SHA-256 of the file it names in lowercase hex, two spaces and that file's name.
+Check a downloaded file in its folder with `sha256sum -c orc-0.21.0-linux-x64.tar.gz.sha256`, or with `shasum -a 256 -c` on macOS.
 
 ## Build the assets by hand
 
-`bun run release:assets` writes the executable, archive, and checksum for the current platform to `release-assets/` at the repository root.
+`bun run release:assets` writes the executable, the archive, and a checksum of each for the current platform to `release-assets/` at the repository root.
 Give it a folder to write them elsewhere, such as `bun run release:assets /tmp/assets`.
 It prints the path of each file it wrote, one per line.
 

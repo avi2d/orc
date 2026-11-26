@@ -1,6 +1,6 @@
 import { defineConfig } from "@avi2dg/checks/oxlint";
 
-// Each wrapped call starts the stand-in runtime, and loading Effect there alone exceeds its 100 ms start budget.
+// Each listed file runs at the start of every orc or stand-in call, so loading Effect there slows every call.
 export default defineConfig({
   effect: {
     excludeFiles: [

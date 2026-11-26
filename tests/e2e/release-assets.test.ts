@@ -27,14 +27,16 @@ describe("release assets", () => {
       const target = process.platform + "-" + process.arch
       const binary = "orc-" + target
       const name = "orc-" + packageJson.version + "-" + target + ".tar.gz"
-      expect((await readdir(out)).toSorted()).toEqual([name, name + ".sha256", binary].toSorted())
-      expect(built.stdout.trim().split("\n")).toEqual([join(out, binary), join(out, name), join(out, name + ".sha256")])
+      expect((await readdir(out)).toSorted()).toEqual([name, name + ".sha256", binary, binary + ".sha256"].toSorted())
+      expect(built.stdout.trim().split("\n")).toEqual([join(out, binary), join(out, binary + ".sha256"), join(out, name), join(out, name + ".sha256")])
       const native = await run([join(out, binary), "--version"], dir, { ...process.env, PATH: dir })
       expect(native.exitCode, native.stderr).toBe(0)
       expect(native.stdout.trim()).toBe("orc " + packageJson.version)
 
-      const digest = createHash("sha256").update(await readFile(join(out, name))).digest("hex")
-      expect(await readFile(join(out, name + ".sha256"), "utf8")).toBe(digest + "  " + name + "\n")
+      for (const file of [binary, name]) {
+        const digest = createHash("sha256").update(await readFile(join(out, file))).digest("hex")
+        expect(await readFile(join(out, file + ".sha256"), "utf8")).toBe(digest + "  " + file + "\n")
+      }
 
       const unpacked = join(dir, "unpacked")
       await mkdir(unpacked)
