@@ -22,7 +22,7 @@ export {
   type JobSpan,
   type RepoFailure,
 } from "./sources/ci-runs";
-export { machineQueue, type MachineQueueView, type QueueEntry, type QueueRow, type QueueRowState, queueWindow } from "./views/machine-queue";
+export { inQueueWindow, machineQueue, type MachineQueueView, type QueueEntry, type QueueRow, type QueueRowState, queueWindow } from "./views/machine-queue";
 export { heavySummary, isHeavyNotSetup } from "./views/heavy";
 export { decodeHeavyCheck, HeavyCheck, type HeavyMachine, HeavyMachines, heavyMachinesLayer } from "./sources/heavy";
 export { decodePueue, knownProjects, type PueueMachine, PueueMachines, pueueMachinesLayer, PueueStatus } from "./sources/pueue";

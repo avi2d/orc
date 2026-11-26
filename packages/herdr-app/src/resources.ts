@@ -1,4 +1,4 @@
-import { type Guard, type Guarded, arrayOf, child, fields, literal, namedFields, number, ok, string } from "./guard"
+import { type Guard, type Guarded, absentOrString, arrayOf, child, fields, literal, namedFields, number, ok, oneOf, string } from "./guard"
 
 export type Known<A> =
   | { readonly kind: "ok"; readonly value: A }
@@ -80,6 +80,33 @@ const quotaWindow: Guard<QuotaWindow> = (value, at) => {
   })
 }
 
+interface QuotaAccount {
+  readonly title: string
+  readonly unread: string | null
+}
+
+const quotaStatuses = ["ok", "unreachable", "invalid"] as const
+
+const quotaAccount: Guard<QuotaAccount> = (value, at) => {
+  const record = fields(value, at)
+  if (record.kind === "refused") return record
+  const title = string(record.value, "title", at)
+  if (title.kind === "refused") return title
+  const where = child(at, "quota")
+  const quota = fields(record.value["quota"], where)
+  if (quota.kind === "refused") return quota
+  const status = oneOf(quota.value, "status", where, quotaStatuses)
+  if (status.kind === "refused") return status
+  const detail = absentOrString(quota.value, "detail", where)
+  if (detail.kind === "refused") return detail
+  return ok({ title: title.value, unread: status.value === "ok" ? null : detail.value ?? `quota ${status.value}` })
+}
+
+export interface Subscriptions {
+  readonly accounts: ReadonlyArray<QuotaAccount>
+  readonly windows: ReadonlyArray<QuotaWindow>
+}
+
 interface Bytes {
   readonly usedBytes: number
   readonly totalBytes: number
@@ -154,35 +181,49 @@ const runningGroups: Guard<ReadonlyArray<string>> = (value, at) => {
   return record.kind === "refused" ? record : arrayOf(record.value, "running", at, group)
 }
 
-const windowsOf = (record: Fields, at: string): Guarded<ReadonlyArray<QuotaWindow>> => {
-  const report = fields(record["report"], child(at, "report"))
+const subscriptionsOf = (record: Fields, at: string): Guarded<Subscriptions> => {
+  const where = child(at, "report")
+  const report = fields(record["report"], where)
   if (report.kind === "refused") return report
-  return arrayOf(report.value, "windows", child(at, "report"), quotaWindow)
+  const accounts = arrayOf(report.value, "accounts", where, quotaAccount)
+  if (accounts.kind === "refused") return accounts
+  const windows = arrayOf(report.value, "windows", where, quotaWindow)
+  if (windows.kind === "refused") return windows
+  return ok({ accounts: accounts.value, windows: windows.value })
 }
 
 export type Queues = ReadonlyArray<Named<ReadonlyArray<string>>>
 
-export interface ResourcesSnapshot {
-  readonly windows: Known<ReadonlyArray<QuotaWindow>>
-  readonly machines: Known<ReadonlyArray<Named<Machine>>>
-  readonly queues: Known<Queues>
-}
-
-export const resourcesSnapshot: Guard<ResourcesSnapshot> = (value, at) => {
+const snapshotSources = (value: unknown, at: string): Guarded<{ readonly sources: Fields; readonly at: string }> => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
   const version = literal(record.value, "schemaVersion", at, 1)
   if (version.kind === "refused") return version
   const where = child(at, "sources")
   const sources = fields(record.value["sources"], where)
-  if (sources.kind === "refused") return sources
-  const windows = answer(sources.value["quota"], child(where, "quota"), windowsOf)
-  if (windows.kind === "refused") return windows
-  const machines = answer(sources.value["resources"], child(where, "resources"), (r, a) => arrayOf(r, "machines", a, named("reading", machine)))
+  return sources.kind === "refused" ? sources : ok({ sources: sources.value, at: where })
+}
+
+export const subscriptionsSnapshot: Guard<Known<Subscriptions>> = (value, at) => {
+  const snapshot = snapshotSources(value, at)
+  if (snapshot.kind === "refused") return snapshot
+  return answer(snapshot.value.sources["quota"], child(snapshot.value.at, "quota"), subscriptionsOf)
+}
+
+export interface MachinesSnapshot {
+  readonly machines: Known<ReadonlyArray<Named<Machine>>>
+  readonly queues: Known<Queues>
+}
+
+export const machinesSnapshot: Guard<MachinesSnapshot> = (value, at) => {
+  const snapshot = snapshotSources(value, at)
+  if (snapshot.kind === "refused") return snapshot
+  const { sources, at: where } = snapshot.value
+  const machines = answer(sources["resources"], child(where, "resources"), (r, a) => arrayOf(r, "machines", a, named("reading", machine)))
   if (machines.kind === "refused") return machines
-  const queues = answer(sources.value["queues"], child(where, "queues"), (r, a) => arrayOf(r, "machines", a, named("pueue", runningGroups)))
+  const queues = answer(sources["queues"], child(where, "queues"), (r, a) => arrayOf(r, "machines", a, named("pueue", runningGroups)))
   if (queues.kind === "refused") return queues
-  return ok({ windows: windows.value, machines: machines.value, queues: queues.value })
+  return ok({ machines: machines.value, queues: queues.value })
 }
 
 const minuteMs = 60_000
@@ -222,10 +263,9 @@ export interface WindowRow {
   readonly runsOut: string | null
 }
 
-export interface AccountRows {
-  readonly account: string
-  readonly windows: ReadonlyArray<WindowRow>
-}
+export type AccountRows =
+  | { readonly kind: "windows"; readonly account: string; readonly windows: ReadonlyArray<WindowRow> }
+  | { readonly kind: "unread"; readonly account: string; readonly reason: string }
 
 const share = (fraction: number): number => Math.min(1, Math.max(0, fraction))
 
@@ -243,14 +283,16 @@ const windowRow = (window: QuotaWindow, now: number): WindowRow => {
   }
 }
 
-export const subscriptionRows = (windows: ReadonlyArray<QuotaWindow>, now: number): ReadonlyArray<AccountRows> => {
-  const accounts = new Map<string, Array<WindowRow>>()
-  for (const window of windows) {
-    const rows = accounts.get(window.account) ?? []
-    rows.push(windowRow(window, now))
-    accounts.set(window.account, rows)
-  }
-  return [...accounts].map(([account, rows]) => ({ account, windows: rows }))
+const noWindowReason = "the quota report holds no window for it"
+
+export const subscriptionRows = ({ accounts, windows }: Subscriptions, now: number): ReadonlyArray<AccountRows> => {
+  const titles = [...new Set([...accounts.map((entry) => entry.title), ...windows.map((window) => window.account)])]
+  return titles.map((account): AccountRows => {
+    const rows = windows.filter((window) => window.account === account).map((window) => windowRow(window, now))
+    if (rows.length > 0) return { kind: "windows", account, windows: rows }
+    const unread = accounts.find((entry) => entry.title === account && entry.unread !== null)?.unread
+    return { kind: "unread", account, reason: unread ?? noWindowReason }
+  })
 }
 
 export type Cell =
