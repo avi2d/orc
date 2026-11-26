@@ -94,6 +94,20 @@ const heldAcrossUpdate = (root: string, id: string, pr: string, head: string) =>
     return yield* isPendingUpdateHead(pr, pending.head, head)
   })
 
+const sendFreshRedChecks = (root: string, home: string, task: TaskRecord, view: PullRequestView, at: string, orcMode: boolean) =>
+  Effect.gen(function*() {
+    if (view.state !== "OPEN" || !orcMode || ranClosing(task)?.outcome !== "done") {
+      return false
+    }
+    const freshRed = redCheckEvidence(view).filter((check) => !(task.ciSentBack ?? []).includes(check.name))
+    if (freshRed.length === 0) {
+      return false
+    }
+    const evidence = freshRed.map((check) => check.name + (check.url === undefined ? "" : " " + check.url)).join(", ")
+    const sent = yield* sendBack(root, home, { kind: "SendBack", id: task.spec.id, words: "Fix the red CI check: " + evidence }, at, "cleared", freshRed.map((check) => check.name)).pipe(Effect.result)
+    return Result.isSuccess(sent)
+  })
+
 export const prEvents = (
   root: string,
   task: TaskRecord,
@@ -125,15 +139,8 @@ export const prEvents = (
       yield* writePrState(root, id, pr, prState)
       return Option.none()
     }
-    const freshRed = view.success.state === "OPEN" && orcMode && ranClosing(task)?.outcome === "done"
-      ? redCheckEvidence(view.success).filter((check) => !(task.ciSentBack ?? []).includes(check.name))
-      : []
-    if (freshRed.length > 0) {
-      const evidence = freshRed.map((check) => check.name + (check.url === undefined ? "" : " " + check.url)).join(", ")
-      const sent = yield* sendBack(root, home, { kind: "SendBack", id, words: "Fix the red CI check: " + evidence }, at, "cleared", freshRed.map((check) => check.name)).pipe(Effect.result)
-      if (Result.isSuccess(sent)) {
-        return Option.none()
-      }
+    if (yield* sendFreshRedChecks(root, home, task, view.success, at, orcMode)) {
+      return Option.none()
     }
     const waits = yield* readWaits(pr, view.success, yolo)
     yield* recordObservation(root, task, pr, view.success, at, waits, prState)
