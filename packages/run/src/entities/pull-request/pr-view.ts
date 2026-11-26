@@ -20,7 +20,9 @@ const PullRequestView = Schema.fromJsonString(Schema.Struct({
   state: Schema.String,
   headRefOid: Schema.String,
   baseRefName: Schema.String,
-  statusCheckRollup: Schema.Array(Schema.Union([CheckRun, StatusContext]))
+  statusCheckRollup: Schema.Array(Schema.Union([CheckRun, StatusContext])),
+  mergeCommit: Schema.optional(Schema.NullOr(Schema.Struct({ oid: Schema.String }))),
+  mergedAt: Schema.optional(Schema.NullOr(Schema.String))
 }))
 export type PullRequestView = typeof PullRequestView.Type
 type CheckRun = typeof CheckRun.Type
@@ -130,7 +132,7 @@ export const gh = (args: ReadonlyArray<string>): Effect.Effect<Said, RunnerError
 
 export const readPullRequest = (url: string): Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    const viewed = yield* gh(["pr", "view", url, "--json", "state,headRefOid,baseRefName,statusCheckRollup"])
+    const viewed = yield* gh(["pr", "view", url, "--json", "state,headRefOid,baseRefName,statusCheckRollup,mergeCommit,mergedAt"])
     if (viewed.exitCode !== 0) {
       return yield* new BacklogError({ detail: "cannot read " + url + ": " + viewed.said })
     }

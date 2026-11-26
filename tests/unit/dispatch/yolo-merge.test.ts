@@ -14,7 +14,7 @@ import { prEvents } from "../../../packages/run/src/widgets/beat/task-events"
 const check = (conclusion: string) => ({ name: "test", workflowName: "ci", status: "COMPLETED", conclusion, startedAt: "2026-11-18T10:00:00Z" })
 
 const view = (conclusion = "SUCCESS", state = "OPEN"): PullRequestView =>
-  ({ state, headRefOid: "0".repeat(40), baseRefName: "main", statusCheckRollup: [check(conclusion)] })
+  ({ state, headRefOid: "0".repeat(40), baseRefName: "main", statusCheckRollup: [check(conclusion)], mergeCommit: state === "MERGED" ? { oid: "1".repeat(40) } : null, mergedAt: state === "MERGED" ? "2026-11-18T11:09:00Z" : null })
 
 const changed = (path: string, status = "modified", version = false, previous?: string): ChangedFile =>
   previous === undefined ? { status, path, version } : { status, path, previous, version }
@@ -58,11 +58,7 @@ const taskOf = async (root: string) => {
   return task
 }
 
-const forgeView = (current: PullRequestView) => JSON.stringify({
-  ...current,
-  mergeCommit: current.state === "MERGED" ? { oid: "1".repeat(40) } : null,
-  mergedAt: current.state === "MERGED" ? "2026-11-18T11:09:00Z" : null
-})
+const forgeView = (current: PullRequestView) => JSON.stringify(current)
 
 const ghLayer = (current: PullRequestView, files: string | null, merges: Array<string>, parent = "0".repeat(40)): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> =>
   Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
