@@ -12,7 +12,7 @@ import { holdReleaseGuidance, holdReleaseWordsOf } from "../../entities/review-g
 import { freshFixOf, releaseGuidanceOf, resumedFix } from "./fix-guidance"
 import { finishAfterChecks } from "./run-finish"
 import { rebaseDelivery } from "./rebase-delivery"
-import { runOrcReviewLoop } from "./review-loop"
+import { finishChecked } from "./review-loop"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
 import type { AgentOutcome, AgentRun, AgentRunResult, AgentStep, ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
@@ -305,9 +305,7 @@ const runChecksFixLoop = (
       rounds.push(summary)
       yield* checkpoints.checksRoundDone(summary)
       if (failed.length === 0) {
-        return yield* (run.delivery.kind === "orc"
-          ? runOrcReviewLoop(run, ops, base, rounds, fixes, commits, plan, checkpoints, run.delivery.reviewer, fixOnce, readProjectChecks)
-          : finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir))
+        return yield* finishChecked({ run, ops, base, rounds, fixes, commits, plan, checkpoints, fixOnce, readProjectChecks })
       }
       if (fixes.length >= maxFixAttempts) {
         return {

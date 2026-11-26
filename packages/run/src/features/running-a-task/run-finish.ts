@@ -51,13 +51,15 @@ export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: Run
     return review
   })
 
+const openFindings = (findings: ReadonlyArray<ReviewFinding>): string =>
+  findings.length === 0 ? "" : "\nOpen review findings:\n" + findings.map((finding) => "- " + finding.severity + " " + finding.id + " (" + finding.file + (finding.line === null ? "" : ":" + finding.line.toString()) + "): " + finding.description + " " + finding.action).join("\n") + "\n"
+
 const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>, findings: ReadonlyArray<ReviewFinding>): string => {
   const passed = rounds.at(-1)?.checks.map((check) => check.name) ?? []
   const closing = passed.length === 0
     ? "orc opened this PR without local checks or no-mistakes. " + beatReadsChecks + "\n"
     : "orc opened this PR after " + passed.join(", ") + " passed, without no-mistakes.\n"
-  const remaining = findings.length === 0 ? "" : "\nOpen review findings:\n" + findings.map((finding) => "- " + finding.severity + " " + finding.id + " (" + finding.file + (finding.line === null ? "" : ":" + finding.line.toString()) + "): " + finding.description + " " + finding.action).join("\n") + "\n"
-  return (subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing) + remaining
+  return (subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing) + openFindings(findings)
 }
 
 const openPullRequest = (
