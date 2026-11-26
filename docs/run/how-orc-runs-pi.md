@@ -15,7 +15,7 @@ Orc runs only Pi, and it starts Pi itself as `pi -p --mode json` in the task cop
 - Pi prints one JSON event per line, and its first line is the `session` header with the session id and timestamp.
 - On that header orc records the session file, named after the timestamp and the id with `.jsonl`, so `orc show` names it while the step runs.
 - Orc writes each assistant message to the step's log on its own line, and each command a tool starts on a line opening with `>`.
-  The implement step logs to `agent.log` in the run folder, each fix to `fix-<n>.log`, and each review turn to `review-<n>.log`.
+  The implement step logs to `agent.log` in the run folder, each fix to `fix-<n>.log`, and reviews to `review-<n>.log`.
 - While a tool runs, orc writes `orc: still running <command> (N min)` to that log each minute.
 - Orc stops Pi only after the idle limit passes with no output and no tool running, so a quiet build, lint, or typecheck command is never cut off.
 
