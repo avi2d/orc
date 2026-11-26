@@ -12,7 +12,6 @@ import {
   isUnknownAction,
   omittedQuestionIds,
   openQuestionsIn,
-  recordedResponse,
   respondArgs,
   stepsWithFindings,
   type AllowWord,
@@ -23,17 +22,15 @@ import {
   type PendingFinding,
   type QuestionAnswer
 } from "./no-mistakes-gate"
-import { openDriveLog, type DriveLog, type Ending, type NoMistakesRecord } from "./no-mistakes-drive-log"
+import { appendGate, openDriveLog, type DriveLog, type Ending, type NoMistakesRecord } from "./no-mistakes-drive-log"
+import { settleFixResponse, type NoMistakesReply } from "./no-mistakes-response"
 import { hasTable, scalar } from "../../shared/lib/index"
 export { answerArgsFor, answerForGate, askUserWord, omittedQuestionIds, parseRun } from "./no-mistakes-gate"
 export type { AllowWord, NoMistakesFinding, QuestionAnswer } from "./no-mistakes-gate"
 export type { NoMistakesRecord } from "./no-mistakes-drive-log"
 
-export interface NoMistakesReply {
-  readonly stdout: string
-  readonly stderr: string
-  readonly exitCode: number
-}
+export { gateLogFileName } from "./no-mistakes-drive-log"
+export type { NoMistakesReply } from "./no-mistakes-response"
 
 // A runner that cannot reach no-mistakes resolves with a nonzero exit code, so the driver records why the step stopped.
 export interface NoMistakesRunner {
@@ -45,8 +42,6 @@ export interface NoMistakesRunner {
   readonly status: (runId: string | null) => Effect.Effect<NoMistakesReply>
   readonly logs: (runId: string, step: string) => Effect.Effect<NoMistakesReply>
 }
-
-export const gateLogFileName = "gate.log"
 
 export interface NoMistakesInput {
   readonly runner: NoMistakesRunner
@@ -222,14 +217,6 @@ const serveOpenQuestions = (input: NoMistakesInput, log: DriveLog, gate: ParkedG
     return { kind: "answered", command }
   })
 
-const appendGate = (runDir: string, step: string): Effect.Effect<void, never, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    yield* fs.writeFileString(runDir + "/" + gateLogFileName, new Date().toISOString() + " " + step + "\n", { flag: "a" }).pipe(
-      Effect.orElseSucceed(() => undefined)
-    )
-  })
-
 // supplied gains every answer the wait brings, so the rest of the gate sends them.
 const awaitMissing = (
   input: NoMistakesInput,
@@ -249,30 +236,6 @@ const awaitMissing = (
     yield* appendGate(input.runDir, "answered")
     return { missing: unanswered(), asking: waited.asked, askedAt: waited.askedAt }
   })
-
-const settleFixResponse = Effect.fnUntraced(function*(
-  runDir: string,
-  log: DriveLog,
-  supplied: Map<string, string>,
-  answeredIds: ReadonlyArray<string>,
-  reply: NoMistakesReply
-) {
-  const { followUps, sentToFixer } = recordedResponse(reply.stdout)
-  if (followUps.length > 0) {
-    const note = log.noteDeferrals({
-      findingIds: followUps,
-      skippedFixRound: sentToFixer?.length === 0,
-      unappliedAnswers: followUps.filter((id) => supplied.has(id))
-    })
-    yield* appendGate(runDir, note)
-  }
-  const legacyAccepted = reply.exitCode === 0 && scalar(reply.stdout, "error") === ""
-  for (const id of answeredIds) {
-    if (!followUps.includes(id) && (sentToFixer?.includes(id) ?? legacyAccepted)) {
-      supplied.delete(id)
-    }
-  }
-})
 
 type ParkedAdvance =
   | { readonly kind: "ending"; readonly ending: Ending }
