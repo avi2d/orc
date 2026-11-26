@@ -253,8 +253,8 @@ export default class OrcTask extends View {
     return v_flex().gap(6).child(shown).children(notes)
   }
 
-  decided(t: Palette, thread: Thread): ReadonlyArray<Element> {
-    const { owner, agent } = threadDecisions(thread)
+  decided(t: Palette, told: Thread): ReadonlyArray<Element> {
+    const { owner, agent } = threadDecisions(told)
     return [
       ...(owner.length === 0 ? [] : [this.decidedGroup(t, "owner", "Decided by the owner", owner)]),
       ...(agent.length === 0 ? [] : [this.decidedGroup(t, "agent", "Decided by the agent", agent)])
