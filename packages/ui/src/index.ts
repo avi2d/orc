@@ -1,4 +1,4 @@
-export { liveCommandRunner } from "./lib/runner";
+export { commandRunnerWithGrace, liveCommandRunner } from "./lib/runner";
 export { themeOfSettings } from "./panel/appearance";
 export {
   decodeSettings,
