@@ -10,7 +10,7 @@ export const queueRebase = Effect.fnUntraced(function*(root: string, home: strin
   if (pr === null || task.state.kind !== "closed" || task.state.claim === null) {
     return false
   }
-  if (task.rebase?.pr === pr && task.rebase.head === view.headRefOid) {
+  if (task.rebase?.pr === pr && (task.rebase.head === view.headRefOid || task.state.closing.outcome !== "done")) {
     return false
   }
   const machineName = task.state.claim.machine
