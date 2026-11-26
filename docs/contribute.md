@@ -9,6 +9,9 @@ To run the checks:
 1. Run `bun run typecheck` to typecheck it.
 1. Run `bun run test` to test it.
 
+The e2e tests start `orc` from the `packages/run/dist/bin.js` bundle, and `bun run test` builds it first through `bun run bundle`.
+To run one e2e file with `bun test`, run `bun run bundle` first and again after each change to `packages/run/src`.
+
 ## Run orc from a checkout
 
 To work on orc, run the `orc` command from a checkout instead of the [npm](https://www.npmjs.com) package:
