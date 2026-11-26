@@ -62,26 +62,4 @@ An unknown command or subcommand that is one or two typos away from exactly one 
 
 [Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/source-map.md) maps the rest of the package and the tests.
 
-## Related topics
-
-- [Running a task](https://github.com/avi2d/orc/blob/main/docs/run/running-a-task.md)
-- [Running without a sandbox](https://github.com/avi2d/orc/blob/main/docs/run/running-without-a-sandbox.md)
-- [Configuring providers](https://github.com/avi2d/orc/blob/main/docs/run/configuring-providers.md)
-- [Account folders and orc login](https://github.com/avi2d/orc/blob/main/docs/run/accounts.md)
-- [Installing no-mistakes](https://github.com/avi2d/orc/blob/main/docs/run/installing-no-mistakes.md)
-- [Choosing the no-mistakes binary](https://github.com/avi2d/orc/blob/main/docs/run/choosing-the-no-mistakes-binary.md)
-- [What the no-mistakes fork adds](https://github.com/avi2d/orc/blob/main/docs/run/no-mistakes-fork.md)
-- [Granting toolchain folders to the sandbox](https://github.com/avi2d/orc/blob/main/docs/run/toolchain-folders.md)
-- [How orc runs Pi](https://github.com/avi2d/orc/blob/main/docs/run/how-orc-runs-pi.md)
-- [Seeing runs](https://github.com/avi2d/orc/blob/main/docs/run/seeing-runs.md)
-- [The backlog and the beat](https://github.com/avi2d/orc/blob/main/docs/run/backlog-and-beat.md)
-- [Parked runs](https://github.com/avi2d/orc/blob/main/docs/run/parked-runs.md)
-- [The attention queue](https://github.com/avi2d/orc/blob/main/docs/run/attention-queue.md)
-- [Task kinds](https://github.com/avi2d/orc/blob/main/docs/run/task-kinds.md)
-- [Delivery modes](https://github.com/avi2d/orc/blob/main/docs/run/delivery-modes.md)
-- [Merging a task's PR](https://github.com/avi2d/orc/blob/main/docs/run/merging-a-tasks-pr.md)
-- [Adding tasks from a chat](https://github.com/avi2d/orc/blob/main/docs/run/chat.md)
-- [The runner](https://github.com/avi2d/orc/blob/main/docs/run/runner.md)
-- [The heavy queue](https://github.com/avi2d/orc/blob/main/docs/run/heavy-queue.md)
-- [Updating orc](https://github.com/avi2d/orc/blob/main/docs/run/updating-orc.md)
-- [Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/source-map.md)
+[Run package topics](https://github.com/avi2d/orc/blob/main/docs/run/topics.md) lists every page about the orc command.
