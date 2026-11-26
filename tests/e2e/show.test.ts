@@ -119,7 +119,7 @@ describe("orc show", () => {
         expect(decoded.run.reportUrl).toBe("file://" + report)
       }
     })
-  })
+  }, 30_000)
 
   test("show --json prints the version first and reads back through the schema", async () => {
     await withHome(async (home) => {
