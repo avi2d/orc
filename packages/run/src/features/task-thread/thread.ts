@@ -1,5 +1,5 @@
 import { Effect, type FileSystem } from "effect"
-import { decisionText, reviewQuestionId, taskItems, type Decision, type OpenItem } from "../../entities/attention/index"
+import { decisionText, deciderHeadings, notRecordedBasis, reviewQuestionId, taskItems, type Decision, type OpenItem } from "../../entities/attention/index"
 import { decisionAnswer, findTask, isDeciderAnswer, readNotes, type BacklogError, type Hold, type HoldQuestion, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { type Decider, deciderLabel, formatTable } from "../../shared/lib/index"
 
@@ -145,12 +145,41 @@ const readThread = (root: string, id: string): Effect.Effect<ThreadJson, Backlog
     return { schema: THREAD_JSON_SCHEMA, task: id, entries }
   })
 
+const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim()
+
+const decidedLine = (line: ThreadEntry): string => (line.id ?? "-") + ": " + oneLine(line.text)
+
+const isAgentDecision = (line: ThreadEntry): boolean => line.kind === "decision" && line.who === "decider"
+
+const agentGroup = (entries: ReadonlyArray<ThreadEntry>): ReadonlyArray<string> => {
+  const answers = entries.filter((line) => line.kind === "answer" && line.who === "decider")
+  const answered = new Set(answers.map((line) => line.id))
+  const basisOf = (answer: ThreadEntry): string =>
+    entries.findLast((line) => isAgentDecision(line) && line.id !== null && line.id === answer.id)?.text ?? notRecordedBasis
+  return [
+    ...answers.map((line) => decidedLine(line) + "\n  basis: " + oneLine(basisOf(line))),
+    ...entries.filter((line) => isAgentDecision(line) && !answered.has(line.id)).map((line) => decidedLine(line))
+  ]
+}
+
+const decidedGroups = (entries: ReadonlyArray<ThreadEntry>): ReadonlyArray<string> => {
+  const owner = entries.filter((line) => line.kind === "answer" && line.who === "user").map(decidedLine)
+  const agent = agentGroup(entries)
+  return [
+    ...(owner.length === 0 ? [] : [deciderHeadings.owner + ":\n" + owner.join("\n")]),
+    ...(agent.length === 0 ? [] : [deciderHeadings.agent + ":\n" + agent.join("\n")])
+  ]
+}
+
 const formatThread = (thread: ThreadJson): string =>
-  formatTable(
-    ["AT", "WHO", "KIND", "ID", "TEXT"],
-    thread.entries.map((line) => [line.at ?? "-", line.who === "user" ? deciderLabel("owner") : line.who === "decider" ? deciderLabel("agent") : line.who, line.kind, line.id ?? "-", line.text.replace(/\s+/g, " ").trim()]),
-    "nothing is said on " + thread.task + " yet"
-  )
+  [
+    formatTable(
+      ["AT", "WHO", "KIND", "ID", "TEXT"],
+      thread.entries.map((line) => [line.at ?? "-", line.who === "user" ? deciderLabel("owner") : line.who === "decider" ? deciderLabel("agent") : line.who, line.kind, line.id ?? "-", oneLine(line.text)]),
+      "nothing is said on " + thread.task + " yet"
+    ),
+    ...decidedGroups(thread.entries)
+  ].join("\n\n")
 
 export const threadText = (root: string, id: string, json: boolean): Effect.Effect<string, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.map(readThread(root, id), (thread) => json ? JSON.stringify(thread) : formatThread(thread))
