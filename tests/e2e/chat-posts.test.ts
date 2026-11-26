@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { chatSession } from "../../packages/run/src/features/chat/chat-tools"
-import { chatEnv, closeTask, type Fixture, orchestratorConfig, piFor, ranClosing, runOrc, sessionFor, until, withFixture } from "./chat-helpers"
+import { chatEnv, closeTask, type Fixture, orchestratorConfig, piFor, ranClosing, runOrc, sessionFor, until, waitPolls, withFixture } from "./chat-helpers"
 
 const startTask = async (fixture: Fixture, id: string): Promise<void> => {
   const from = join(fixture.home, "backlog", "new", id + ".md")
@@ -99,9 +99,13 @@ describe("orc chat tools", () => {
       const pi = piFor(fixture, 50)
       await pi.add({ project: "orc", task: "# Fix the typo\n" })
       pi.fire("session_start", { isIdle: () => true })
+      await waitPolls(pi, 1)
       pi.fire("session_shutdown")
       await closeTask(fixture, "orc-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
-      await Bun.sleep(1_000)
+      const witness = piFor(fixture, 50)
+      witness.fire("session_start", { isIdle: () => false })
+      await waitPolls(witness)
+      witness.fire("session_shutdown")
       expect(pi.sent).toEqual([])
       expect(await readFile(join(fixture.home, "backlog", "closed", "orc-1.md"), "utf8")).not.toContain("posted_at")
     })
@@ -114,7 +118,7 @@ describe("orc chat tools", () => {
       await closeTask(fixture, "orc-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
       let idle = false
       pi.fire("session_start", { isIdle: () => idle })
-      await Bun.sleep(500)
+      await waitPolls(pi)
       expect(pi.sent).toEqual([])
       expect(await readFile(join(fixture.home, "backlog", "closed", "orc-1.md"), "utf8")).not.toContain("posted_at")
       idle = true
@@ -206,17 +210,17 @@ describe("orc chat tools", () => {
       await first.add({ project: "orc", task: "# Fix the typo\n" })
       await startTask(fixture, "orc-1")
       first.fire("session_start", { isIdle: () => true })
-      await Bun.sleep(300)
+      await waitPolls(first)
       first.fire("session_shutdown")
       await finishTask(fixture, "orc-1", "https://github.com/acme/orc/pull/7")
       const reopened = piFor(fixture, 50)
       reopened.fire("session_start", { isIdle: () => true })
       await until(() => reopened.sent.length > 0, 10_000)
-      await Bun.sleep(500)
+      await waitPolls(reopened)
       reopened.fire("session_shutdown")
       const again = piFor(fixture, 50)
       again.fire("session_start", { isIdle: () => true })
-      await Bun.sleep(1_000)
+      await waitPolls(again)
       again.fire("session_shutdown")
       expect([first.sent, reopened.sent.map((sent) => sent.message), again.sent]).toEqual([
         [],
@@ -235,10 +239,10 @@ describe("orc chat tools", () => {
       first.fire("session_shutdown")
       const reopened = piFor(fixture, 50)
       reopened.fire("session_start", { isIdle: () => true })
-      await Bun.sleep(300)
+      await waitPolls(reopened)
       await finishTask(fixture, "orc-1", "https://github.com/acme/orc/pull/7")
       await until(() => reopened.sent.length > 0, 10_000)
-      await Bun.sleep(500)
+      await waitPolls(reopened)
       reopened.fire("session_shutdown")
       expect([first.sent, reopened.sent.map((sent) => sent.message)]).toEqual([
         [],
@@ -254,11 +258,11 @@ describe("orc chat tools", () => {
       const first = piFor(fixture, 50)
       first.fire("session_start", { isIdle: () => true })
       await until(() => first.sent.length > 0, 10_000)
-      await Bun.sleep(500)
+      await waitPolls(first)
       first.fire("session_shutdown")
       const reopened = piFor(fixture, 50)
       reopened.fire("session_start", { isIdle: () => true })
-      await Bun.sleep(1_000)
+      await waitPolls(reopened)
       reopened.fire("session_shutdown")
       expect([first.sent.map((sent) => sent.message), reopened.sent]).toEqual([
         [{ customType: "orc-event", content: "alert: mac over its cpu limit since 2026-11-02T11:25:00.000Z", display: true }],

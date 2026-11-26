@@ -117,12 +117,18 @@ test("does not start the App when HERDR_CORE_DIRS holds no herdr-core", async ()
   }
 }, 30000)
 
-test("times out after 35 seconds when the herdr-core socket never appears", async () => {
+test("the launcher defaults to 175 attempts at 0.2 seconds rather than the shortened test wait", async () => {
+  const script = await readFile(launcher, "utf8")
+  expect(script).toContain("wait_attempts=${HERDR_SCRATCH_WAIT_ATTEMPTS:-175}")
+  expect(script).toContain("sleep 0.2")
+})
+
+test("times out after two seconds when the herdr-core socket never appears", async () => {
   const staged = await stage(true)
   try {
-    const result = await launch(staged.env)
+    const result = await launch({ ...staged.env, HERDR_SCRATCH_WAIT_ATTEMPTS: "10" })
     expect(result.code).toBe(1)
-    expect(result.stderr).toContain("timed out waiting 35 seconds for the herdr-core socket")
+    expect(result.stderr).toContain("timed out waiting 2 seconds for the herdr-core socket")
     expect(result.stderr).toContain(staged.env["HC_SOCKET"])
     expect(result.stderr).toContain("HERDR_CORE_DIRS=")
     expect(result.seconds).toBeLessThan(70)

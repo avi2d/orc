@@ -61,6 +61,11 @@ const alive = (pid: number): boolean => {
 const stops: ReadonlyArray<NodeJS.Signals> = ["SIGTERM", "SIGINT", "SIGHUP"]
 
 // The queued call reads no input and ends once the stand-in that queued it is gone.
+export const ownerPollMillis = (env: Env): number => {
+  const interval = Number(env.ORC_HEAVY_OWNER_POLL_MILLIS)
+  return Number.isFinite(interval) && interval > 0 ? interval : 5000
+}
+
 export const waitOwned = async (words: ReadonlyArray<string>): Promise<number> => {
   const [ownerWord = "", ...argv] = words
   const owner = Number(ownerWord)
@@ -82,7 +87,7 @@ export const waitOwned = async (words: ReadonlyArray<string>): Promise<number> =
     if (!alive(owner)) {
       stop()
     }
-  }, 5000)
+  }, ownerPollMillis(process.env))
   const code = await child.exited
   clearInterval(watch)
   for (const signal of stops) {

@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { createTestRenderer, type TestRendererSetup } from "@opentui/core/testing";
-import { type Config, ConfigProvider, Effect, Fiber, type FileSystem, Layer } from "effect";
+import { Clock, type Config, ConfigProvider, Effect, Fiber, type FileSystem, Layer } from "effect";
 import { type ModuleSources, moduleFeeds, modules } from "@avi2dg/orc-cli";
 import type { CliRenderer } from "@opentui/core";
 import { dashboardScreen, printDashboard } from "@avi2dg/orc-dashboard";
@@ -222,9 +222,11 @@ export const withLivePanel = async <A>(
   size: { readonly width: number; readonly height: number },
   sources: Layer.Layer<ModuleSources, Config.ConfigError | ConfigRefused>,
   body: (setup: TestRendererSetup) => Promise<A>,
+  clock?: Clock.Clock,
 ): Promise<A> => {
   const setup = await createTestRenderer(size);
-  const fiber = Effect.runFork(liveDashboard(setup.renderer, sources));
+  const dashboard = liveDashboard(setup.renderer, sources);
+  const fiber = Effect.runFork(clock === undefined ? dashboard : dashboard.pipe(Effect.provideService(Clock.Clock, clock)));
   try {
     return await body(setup);
   } finally {

@@ -321,14 +321,32 @@ describe("orc runner hold", () => {
       await holdToken(fixture, "orc-9", placeholder, past)
       await runsInPueue(fixture, "orc-9")
       const seen = join(fixture.dir, "seen")
-      const holding = hold(fixture, "orc-9", "cat \"$1\" > '" + seen + "'")
-      await Bun.sleep(1_000)
+      const child = Bun.spawn([...orc, "runner", "hold", "orc-9", "--", "sh", "-c", "cat \"$1\" > '" + seen + "'", "orc-test-run", join(tokenDir(fixture, "orc-9"), "token")], {
+        env: { ...process.env, ...fixture.env }, cwd: fixture.dir, stdout: "pipe", stderr: "pipe"
+      })
+      const output = child.stdout.getReader()
+      const decoder = new TextDecoder()
+      let waiting = ""
+      let waitingPolls = 0
+      while (waitingPolls < 1) {
+        const chunk = await output.read()
+        if (chunk.done) throw new Error("the holder exited without waiting for a token")
+        waiting += decoder.decode(chunk.value, { stream: true })
+        waitingPolls = waiting.split("waits for a fresh token").length - 1
+      }
       expect(await readFile(seen, "utf8").catch(() => null)).toBeNull()
       const fresh = hoursFromNowIso(4)
       const renewal = await runOrc(fixture, ["runner", "renew"], {}, JSON.stringify({ task: "orc-9", token: renewedPlaceholder, expiresAt: fresh }))
       expect(renewal.stdout).toBe("renewed the token for orc-9 until " + fresh + "\n")
-      const result = await holding
-      expect(result.stdout).toBe("orc-9 waits for a fresh token from the machine that runs the beat: the one held here runs out at " + past + "\nthe run of orc-9 finished\n")
+      const remaining = await new Response(new ReadableStream({
+        async pull(controller) {
+          const next = await output.read()
+          if (next.done) controller.close()
+          else controller.enqueue(next.value)
+        }
+      })).text()
+      expect(await child.exited).toBe(0)
+      expect(waiting + remaining).toBe("orc-9 waits for a fresh token from the machine that runs the beat: the one held here runs out at " + past + "\nthe run of orc-9 finished\n")
       expect(await readFile(seen, "utf8")).toBe(renewedPlaceholder)
       expect(await gone(tokenDir(fixture, "orc-9"))).toBe(true)
     })
@@ -336,7 +354,7 @@ describe("orc runner hold", () => {
 
   test("a run that fails as its token runs out reruns on the renewed token instead of failing", async () => {
     await withFixture(async (fixture) => {
-      const lapsesAt = Date.now() + 10_000
+      const lapsesAt = Date.now() + 2_000
       const soon = new Date(lapsesAt + 5 * 60_000).toISOString()
       await holdToken(fixture, "orc-9", placeholder, soon)
       await runsInPueue(fixture, "orc-9")

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { ConfigProvider, Effect, Layer } from "effect";
+import { TestClock } from "effect/testing";
 import { savedReadingsLayer } from "@avi2dg/orc-schema";
 import { dashboardSources, frameWhere, recordedAnswer, tasksCommand, withLivePanel } from "../../lib/dashboard-sources";
 import { boxText } from "../../lib/host-fixture";
@@ -12,18 +13,26 @@ const remoteResourcesCommand = "ssh south.example.com orc-dash-resources --json"
 
 const ledgerLayout = join(import.meta.dir, "..", "..", "fixtures", "config", "ledger.json");
 
+const withClock = <A>(body: (clock: TestClock.TestClock) => Promise<A>): Promise<A> =>
+  Effect.runPromise(Effect.scoped(Effect.flatMap(TestClock.make(), (clock) => Effect.promise(() => body(clock)))));
+
+const waitFor = async (ready: () => boolean): Promise<void> => {
+  for (let attempt = 0; attempt < 400 && !ready(); attempt += 1) await Bun.sleep(25);
+  expect(ready()).toBe(true);
+};
+
 describe("the live dashboard's cadences", () => {
   // No tasks command is set, so the tasks listing never lists anything.
   test(
     "reads the machines every 10 seconds and the quota with them, and repaints on the 2 second tick once every box has answered",
-    async () => {
+    () => withClock(async (clock) => {
       const asked: Array<{ command: string; at: number }> = [];
       let passes = 0;
       const sources = dashboardSources({
         env: { ORC_DASH_MACHINE: "north", ORC_DASH_REMOTE_MACHINE: "south", ORC_DASH_REMOTE_RESOURCES: remoteResourcesCommand },
         run: (command) =>
           Effect.sync(() => {
-            asked.push({ command: command.argv.join(" "), at: performance.now() });
+            asked.push({ command: command.argv.join(" "), at: clock.currentTimeMillisUnsafe() });
             return recordedAnswer(command);
           }),
         samples: {
@@ -36,17 +45,16 @@ describe("the live dashboard's cadences", () => {
         },
       });
       await withLivePanel({ width: 84, height: 24 }, sources, async () => {
-        for (let attempt = 0; attempt < 800; attempt += 1) {
-          if (asked.filter((entry) => entry.command.includes(remoteResourcesCommand)).length >= 2) break;
-          await Bun.sleep(25);
-        }
-      });
+        await waitFor(() => asked.some((entry) => entry.command.includes(remoteResourcesCommand)));
+        await Effect.runPromise(clock.adjust("10 seconds"));
+        await waitFor(() => asked.filter((entry) => entry.command.includes(remoteResourcesCommand)).length >= 2);
+      }, clock);
       const machineReads = asked.filter((entry) => entry.command.includes(remoteResourcesCommand));
       const quotaReads = asked.filter((entry) => entry.command.startsWith("quota-axi")).length;
       expect(machineReads.length).toBeGreaterThanOrEqual(2);
-      expect((machineReads[1]?.at ?? 0) - (machineReads[0]?.at ?? 0)).toBeGreaterThanOrEqual(8_000);
+      expect((machineReads[1]?.at ?? 0) - (machineReads[0]?.at ?? 0)).toBeGreaterThanOrEqual(10_000);
       expect([quotaReads <= 2, passes <= 10]).toEqual([true, true]);
-    },
+    }),
     30_000,
   );
 });
@@ -54,25 +62,24 @@ describe("the live dashboard's cadences", () => {
 describe("the live dashboard's ledger cadence", () => {
   test(
     "reads the ledger every 10 seconds rather than on each paint",
-    async () => {
+    () => withClock(async (clock) => {
       const reads: Array<number> = [];
       const conversation = {
         read: () =>
           Effect.sync(() => {
-            reads.push(performance.now());
+            reads.push(clock.currentTimeMillisUnsafe());
             return { sessions: "set" as const, said: [] };
           }),
       };
       const sources = dashboardSources({ run: (command) => Effect.sync(() => recordedAnswer(command)), config: ledgerLayout, conversation });
       await withLivePanel({ width: 84, height: 24 }, sources, async () => {
-        for (let attempt = 0; attempt < 800; attempt += 1) {
-          if (reads.length >= 2) break;
-          await Bun.sleep(25);
-        }
-      });
+        await waitFor(() => reads.length >= 1);
+        await Effect.runPromise(clock.adjust("10 seconds"));
+        await waitFor(() => reads.length >= 2);
+      }, clock);
       expect(reads.length).toBeGreaterThanOrEqual(2);
-      expect((reads[1] ?? 0) - (reads[0] ?? 0)).toBeGreaterThanOrEqual(9_000);
-    },
+      expect((reads[1] ?? 0) - (reads[0] ?? 0)).toBeGreaterThanOrEqual(10_000);
+    }),
     30_000,
   );
 });
@@ -81,26 +88,25 @@ describe("the live dashboard's machines cadence", () => {
   // Waiting for the next cadence boundary turns a 10.8-second sample into a 20-second sampling interval.
   test(
     "starts the next read of a machine slower than its cadence as soon as the last one lands",
-    async () => {
+    () => withClock(async (clock) => {
       const sampleStarts: Array<number> = [];
       const sources = dashboardSources({
         run: (command) => {
           const cpuSample = command.argv[0] === "top" || command.argv.join(" ").startsWith("sh -c head -n 1 /proc/stat");
           if (!cpuSample) return Effect.sync(() => recordedAnswer(command));
-          sampleStarts.push(performance.now());
+          sampleStarts.push(clock.currentTimeMillisUnsafe());
           return Effect.as(Effect.sleep("10800 millis"), recordedAnswer(command));
         },
       });
       await withLivePanel({ width: 84, height: 24 }, sources, async () => {
-        for (let attempt = 0; attempt < 1_600; attempt += 1) {
-          if (sampleStarts.length >= 4) break;
-          await Bun.sleep(25);
-        }
-      });
+        await waitFor(() => sampleStarts.length >= 2);
+        await Effect.runPromise(clock.adjust("10800 millis"));
+        await waitFor(() => sampleStarts.length >= 4);
+      }, clock);
       const firstFour = sampleStarts.slice(0, 4);
       expect(firstFour).toHaveLength(4);
       expect(Math.max(...firstFour.slice(1).map((start, index) => start - (firstFour[index] ?? start)))).toBeLessThan(13_500);
-    },
+    }),
     60_000,
   );
 });
@@ -174,15 +180,13 @@ describe("the live dashboard's hanging readings", () => {
   test(
     "keep the machines' last reading on show and say its growing age while the next read hangs",
     () =>
-      withLivePanel({ width: 240, height: 60 }, answeringOnce(), async (setup) => {
+      withClock((clock) => withLivePanel({ width: 240, height: 60 }, answeringOnce(), async (setup) => {
         const fresh = boxText(await frameWhere(setup, (frame) => boxText(frame, "machines").includes(localCpu)), "machines");
-        const answered = performance.now();
         expect(fresh).toMatch(/read 0s ago/u);
-        await Bun.sleep(20_000);
+        await Effect.runPromise(clock.adjust("20 seconds"));
         const late = boxText(await frameWhere(setup, (frame) => /read 2\ds ago \u00b7 reading\u2026/u.test(boxText(frame, "machines"))), "machines");
-        expect(performance.now() - answered).toBeLessThan(30_000);
         expect(late).toContain(localCpu);
-      }),
+      }, clock)),
     40_000,
   );
 });
