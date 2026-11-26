@@ -385,7 +385,7 @@ describe("the beat's conflicting PR", () => {
         (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "stopped", started: oldStart, ended: oldStart, prLink: pr, endReason: "the run was stopped" })),
         (db) => Effect.sync(() => db.close())
       ).pipe(Effect.provide(BunServices.layer)))
-      const conflict = { state: "OPEN", headRefOid: "a".repeat(40), baseRefName: "main", mergeable: "CONFLICTING", statusCheckRollup: [{ name: "test", status: "COMPLETED", conclusion: "SUCCESS", startedAt: oldStart }] }
+      const conflict = { state: "OPEN", headRefOid: "a".repeat(40), baseRefName: "main", mergeable: "CONFLICTING" as const, statusCheckRollup: [{ name: "test", status: "COMPLETED", conclusion: "SUCCESS", startedAt: oldStart }] }
       const sources = quietSources(undefined, () => Effect.succeed(conflict))
       const layer = Layer.merge(BunServices.layer, pueueStub(JSON.stringify({ tasks: {} })))
       await Effect.runPromise(runBeat(root, root, sources).pipe(Effect.provide(layer)))
