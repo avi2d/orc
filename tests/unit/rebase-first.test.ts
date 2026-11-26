@@ -117,4 +117,3 @@ describe("a rebase-first run", () => {
     })
   })
 })
-
