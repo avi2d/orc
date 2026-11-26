@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -279,29 +279,33 @@ describe("the beat gate around the merge", () => {
     await withBacklog(true, async (root) => {
       await closeWith(root, "done")
       const merges: Array<string> = []
-      let failed = false
+      const failures: Array<{ readonly from: string; readonly to: string }> = []
       const failingStore = Layer.effect(FileSystem.FileSystem, Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
         return FileSystem.make({
           ...fs,
-          rename: (from, to) => {
-            if (!failed && merges.length > 0 && from.endsWith(".tmp") && to === join(root, "closed", "task-1.md")) {
-              failed = true
+          rename: (from, to) => Effect.suspend(() => {
+            if (failures.length === 0 && merges.length > 0 && from.endsWith(".tmp") && to === join(root, "closed", "task-1.md")) {
+              failures.push({ from, to })
               return Effect.fail(PlatformError.systemError({ _tag: "Unknown", module: "FileSystem", method: "rename" }))
             }
             return fs.rename(from, to)
-          }
+          })
         })
       })).pipe(Layer.provide(BunServices.layer))
       const task = await taskOf(root)
       await Effect.runPromise(prEvents(root, task, () => Effect.succeed(view()), "2026-11-18T11:10:00.000Z", true, dirname(root)).pipe(
         Effect.provide(Layer.mergeAll(BunServices.layer, ghLayer(view(), noFiles, merges), failingStore))
       ))
-      expect(failed).toBe(true)
+      expect(failures).toHaveLength(1)
+      expect(failures[0]?.to).toBe(join(root, "closed", "task-1.md"))
       expect(merges).toHaveLength(1)
+      const afterFailure: unknown = Bun.YAML.parse((await readFile(join(root, "closed", "task-1.md"), "utf8")).split("---\n")[1] ?? "")
+      expect(afterFailure).toMatchObject({ id: "task-1" })
       await beatAction(root, view("SUCCESS", "MERGED"), true, noFiles, merges)
       expect(merges).toHaveLength(1)
-      expect((await taskOf(root)).merge).toMatchObject({ stage: "merged", head: view().headRefOid })
+      const afterRetry: unknown = Bun.YAML.parse((await readFile(join(root, "closed", "task-1.md"), "utf8")).split("---\n")[1] ?? "")
+      expect(afterRetry).toMatchObject({ merge: { stage: "merged", head: view().headRefOid } })
     })
   })
 
