@@ -4,8 +4,8 @@ import { layout, run, setShared, shared } from "herdr"
 import { AgentAttentionSection } from "../../src/agent-attention-view"
 import type { InboxItem } from "../../src/inbox"
 import type { AgentAttention } from "../../src/inbox-read"
-import { type RunAgent, runAgent } from "../../src/agent-label"
 import { type Card, type Filter, cardAnswers, filterCards, goesOn, openedFilter, recordedStatus } from "../../src/agents"
+import { type RunAgent, runAgent } from "../../src/run-agent"
 import { type LocalAgents, agentsDocuments, readAgentQuestions, readLocalAgents } from "../../src/agents-read"
 import type { AttentionQueue } from "../../src/guard-attention"
 import { type AgentsActions, type Chosen, type DetailShown, type Keyed, approvalOf, askMerge, detailView, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
@@ -356,7 +356,7 @@ export default class OrcAgents extends View {
       .child(runsColumn(t, {
         cards: this.cards, filter: this.filter, menu: this.menu, selectedKey: card?.key ?? null, agents: this.agents, folded: this.folded,
         attention: (listed) => cardAttention(listed).map((item) => this.answers.item(t, item, (asked) => act.askMerge(listed, asked))),
-        agentAttention: this.agentAttention.render(t, this.agent)
+        ...(this.agentAttention.shows(this.agent) ? { agentAttention: () => this.agentAttention.render(t, this.agent) } : {})
       }, act))
       .child(stepsColumn(t, card, {
         reading: card === null ? null : this.currentSteps(card),

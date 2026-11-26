@@ -1,3 +1,4 @@
+import type { Card } from "./agents"
 import type { ShownStep } from "./guard"
 
 export interface RunAgent {
@@ -20,7 +21,7 @@ export const agentLabel = (agent: RunAgent | null): string | null => {
   return words.length === 0 ? null : words.join(" ")
 }
 
-export const cardPlace = (card: { readonly where: string }, agent: RunAgent | null): string => {
+export const cardPlace = (card: Pick<Card, "where">, agent: RunAgent | null): string => {
   const label = agentLabel(agent)
   return label === null ? card.where : `${label} · ${card.where}`
 }

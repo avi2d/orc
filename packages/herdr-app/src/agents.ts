@@ -127,6 +127,9 @@ const prPlace = (runId: string, link: string, task: Task | undefined, merged: Re
   if (task === undefined) {
     return { standing: { status: "Done" }, where: pr }
   }
+  if (task.retriedRun === runId) {
+    return { standing: { status: "Done" }, where: `Retried ${pr}` }
+  }
   if (task.status !== "closed" && task.parkedOrigin === runId) {
     return { standing: { status: "Done" }, where: sentBackLabel(pr, task.merge) }
   }

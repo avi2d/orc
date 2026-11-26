@@ -1,10 +1,11 @@
 import { type Color, type Context, type Element, div } from "gpui-kit"
 import { h_flex, v_flex } from "gpui-base"
-import { type RunAgent, cardPlace } from "./agent-label"
 import { type Card, type CardStatus, type Filter, filterCards, railLabel } from "./agents"
+import { type RunAgent, cardPlace } from "./run-agent"
 import { type Reading } from "./orc-read"
 import type { palette } from "./palette"
 import { type FilterMenu, projectMenu, statusMenu } from "./run-menus"
+import { rowsList } from "./rows-list"
 import { openInbox } from "./views"
 
 type Palette = ReturnType<typeof palette>
@@ -25,8 +26,13 @@ export interface RunsShown {
   readonly agents: ReadonlyMap<string, RunAgent | null>
   readonly folded: boolean
   readonly attention?: (card: Card) => ReadonlyArray<Element>
-  readonly agentAttention?: ReadonlyArray<Element>
+  readonly agentAttention?: () => ReadonlyArray<Element>
 }
+
+type CardRow =
+  | { readonly kind: "card"; readonly card: Card }
+  | { readonly kind: "no-match" }
+  | { readonly kind: "agent-attention"; readonly render: () => ReadonlyArray<Element> }
 
 const statusColor = (t: Palette, status: CardStatus): Color => {
   switch (status) {
@@ -115,6 +121,26 @@ const foldButton = (t: Palette, id: string, label: string, act: RunsActions): El
     .on_click((_event, cx) => act.toggleFold(cx))
     .child(label)
 
+const cardRows = (shown: RunsShown, visible: ReadonlyArray<Card>): ReadonlyArray<CardRow> => [
+  ...(visible.length === 0 ? [{ kind: "no-match" } as const] : visible.map((card) => ({ kind: "card", card } as const))),
+  ...(shown.agentAttention === undefined ? [] : [{ kind: "agent-attention", render: shown.agentAttention } as const])
+]
+
+const rowKey = (row: CardRow): string => row.kind === "card" ? `card-${row.card.key}` : row.kind
+
+const cardRow = (t: Palette, shown: RunsShown, row: CardRow, act: RunsActions): Element => {
+  switch (row.kind) {
+    case "no-match":
+      return div().p(4).text_color(t.muted).child("No run matches these filters")
+    case "agent-attention":
+      return v_flex().children(row.render())
+    case "card":
+      return v_flex().gap(3).min_w_0()
+        .child(cardView(t, row.card, row.card.key === shown.selectedKey, row.card.runId === null ? null : shown.agents.get(row.card.runId) ?? null, act))
+        .children(shown.attention?.(row.card) ?? [])
+  }
+}
+
 const listBody = (t: Palette, shown: RunsShown, visible: ReadonlyArray<Card>, act: RunsActions): Element => {
   if (shown.cards.kind === "failed") {
     return div().p(12).text_color(t.blocked).child(shown.cards.reason)
@@ -122,25 +148,19 @@ const listBody = (t: Palette, shown: RunsShown, visible: ReadonlyArray<Card>, ac
   if (shown.cards.kind === "reading") {
     return div().p(12).text_color(t.muted).child("Reading orc runs --json --local")
   }
-  return v_flex().id("cards").flex_1().min_h_0().overflow_y_scrollbar().px(8).py(8).gap(6)
-    .children(visible.length === 0 ? [div().p(4).text_color(t.muted).child("No run matches these filters")] : visible.map((card) =>
-      v_flex().gap(3).flex_shrink_0().min_w_0()
-        .child(cardView(t, card, card.key === shown.selectedKey, card.runId === null ? null : shown.agents.get(card.runId) ?? null, act))
-        .children(shown.attention?.(card) ?? [])))
-    .children(shown.agentAttention ?? [])
+  return rowsList("cards", cardRows(shown, visible), rowKey, (row) => cardRow(t, shown, row, act), { x: 8, y: 8, gap: 6 })
 }
 
 const rail = (t: Palette, shown: RunsShown, visible: ReadonlyArray<Card>, act: RunsActions): Element =>
   v_flex().id("rail").w(96).h_full().flex_shrink_0().bg(t.chrome).border_r(1).border_color(t.border)
     .child(h_flex().h(44).px(8).items_center().child(foldButton(t, "unfold", "»", act)))
-    .child(v_flex().id("rail-ids").flex_1().overflow_y_scrollbar().px(6).gap(2)
-      .children(visible.map((card) =>
-        div().id(`rail-${card.key}`).px(6).py(3).rounded(4).cursor_pointer().truncate()
-          .text_color(statusColor(t, card.standing.status))
-          .bg(card.key === shown.selectedKey ? t.selected : t.chrome)
-          .hover((style) => style.bg(t.hover))
-          .on_click((_event, cx) => act.select(cx, card.key))
-          .child(railLabel(card)))))
+    .child(rowsList("rail-ids", visible, (card) => card.key, (card) =>
+      div().id(`rail-${card.key}`).px(6).py(3).rounded(4).cursor_pointer().truncate()
+        .text_color(statusColor(t, card.standing.status))
+        .bg(card.key === shown.selectedKey ? t.selected : t.chrome)
+        .hover((style) => style.bg(t.hover))
+        .on_click((_event, cx) => act.select(cx, card.key))
+        .child(railLabel(card)), { x: 6, y: 0, gap: 2 }))
 
 export const runsColumn = (t: Palette, shown: RunsShown, act: RunsActions): Element => {
   const all = shown.cards.kind === "ok" ? shown.cards.value : []
