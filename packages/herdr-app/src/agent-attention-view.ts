@@ -29,13 +29,18 @@ const decidedCards = (t: Palette, items: AgentAttention["decided"]): ReadonlyArr
     ...(item.answer.decider === decider ? [decidedView(t, item, item.answer, false)] : [])
   ]))
 
+const attentionCount = (agent: AgentAttention): number => agent.pending.length + agent.decided.length
+
 export class AgentAttentionSection {
   expanded = false
 
+  shows(agent: AgentAttention): boolean {
+    return attentionCount(agent) > 0
+  }
+
   render(t: Palette, agent: AgentAttention): ReadonlyArray<Element> {
-    const count = agent.pending.length + agent.decided.length
-    if (count === 0) return []
-    const label = `${this.expanded ? "▾" : "▸"} Agent attention (${count})`
+    if (!this.shows(agent)) return []
+    const label = `${this.expanded ? "▾" : "▸"} Agent attention (${attentionCount(agent)})`
     return [v_flex().id("agent-attention").gap(6).items_stretch().flex_shrink_0()
       .child(actionButton(t, "toggle-agent-attention", label, false, (cx: Context) => { this.expanded = !this.expanded; cx.notify() }))
       .children(this.expanded ? [
