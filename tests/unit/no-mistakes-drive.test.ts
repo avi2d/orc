@@ -218,6 +218,33 @@ describe("driveNoMistakes", () => {
     expect(record.result).toContain("The captain's answer for r2 was not applied.")
   })
 
+  test("a mixed fix keeps the deferred answer without claiming that no fixer ran", async () => {
+    const sent: Array<GateResponse> = []
+    const fixReview = parked.replace("awaiting_approval", "fix_review").replace("r1,warning,a.go,,auto-fix", "r1,warning,a.go,,ask-user")
+    const warningOnly = fixReview.split("\n").filter((line) => !line.trimStart().startsWith("r2,")).join("\n").replace("findings[2]", "findings[1]")
+    const runner: NoMistakesRunner = {
+      ...endedSkippingPr,
+      start: () => Effect.succeed({ stdout: fixReview, stderr: "", exitCode: 0 }),
+      respond: (response) => {
+        sent.push(response)
+        const stdout = sent.length === 1
+          ? ["recorded:", "  sent_to_fixer[1]: r2", "  ignored[0]:", "  kept[0]:", "  follow_ups[1]: r1", warningOnly].join("\n")
+          : skippedPr
+        return Effect.succeed({ stdout, stderr: "", exitCode: 0 })
+      }
+    }
+    const answers = [{ question: "r1", answer: "Keep the warning visible" }, { question: "r2", answer: "Fix the error" }]
+    const { record } = await driveIn(runner, [], answers)
+    expect(sent).toMatchObject([
+      { kind: "fix", ids: ["r1", "r2"] },
+      { kind: "fix", ids: ["r1"], instructions: expect.stringContaining("r1: Keep the warning visible") }
+    ])
+    expect(record.openQuestions).toEqual([])
+    expect(record.result).not.toContain("no fix round")
+    expect(record.result).toContain("The captain's answer for r1 was not applied.")
+    expect(record.result).not.toContain("answer for r2")
+  })
+
   test("an ask-user finding answered within the wait is sent at the same gate instead of ending the run", async () => {
     const sent: Array<GateResponse> = []
     const waitedOn: Array<ReadonlyArray<string>> = []
