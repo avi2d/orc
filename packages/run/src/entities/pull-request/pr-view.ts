@@ -20,6 +20,7 @@ const PullRequestView = Schema.fromJsonString(Schema.Struct({
   state: Schema.String,
   headRefOid: Schema.String,
   baseRefName: Schema.String,
+  mergeable: Schema.optional(Schema.Literals(["MERGEABLE", "CONFLICTING", "UNKNOWN"])),
   statusCheckRollup: Schema.Array(Schema.Union([CheckRun, StatusContext])),
   mergeCommit: Schema.optional(Schema.NullOr(Schema.Struct({ oid: Schema.String }))),
   mergedAt: Schema.optional(Schema.NullOr(Schema.String))
@@ -115,6 +116,7 @@ export const checkRefusals = (view: PullRequestView): ReadonlyArray<string> => {
   const red = namesWith(verdicts, "red")
   const unreported = namesWith(verdicts, "unreported")
   return [
+    ...(view.mergeable === "CONFLICTING" ? ["the PR has a merge conflict"] : []),
     ...(red.length === 0 ? [] : ["the check " + red.join(", ") + " is red"]),
     ...(unreported.length === 0 ? [] : ["the check " + unreported.join(", ") + " has not reported"])
   ]
@@ -132,7 +134,7 @@ export const gh = (args: ReadonlyArray<string>): Effect.Effect<Said, RunnerError
 
 export const readPullRequest = (url: string): Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    const viewed = yield* gh(["pr", "view", url, "--json", "state,headRefOid,baseRefName,statusCheckRollup,mergeCommit,mergedAt"])
+    const viewed = yield* gh(["pr", "view", url, "--json", "state,headRefOid,baseRefName,mergeable,statusCheckRollup,mergeCommit,mergedAt"])
     if (viewed.exitCode !== 0) {
       return yield* new BacklogError({ detail: "cannot read " + url + ": " + viewed.said })
     }

@@ -106,7 +106,7 @@ test("a release lock left by an install that exited does not stop the next beat 
       { kind: "update", result: { outcome: "installed", running: runPackage.version, found: releaseVersion } }
     ])
     expect(await readVersion()).toBe(releaseVersion)
-    expect((await readdir(directory)).sort()).toEqual(["release", "v" + runPackage.version, "v" + releaseVersion])
+    expect((await readdir(directory)).sort()).toEqual([".update.lock.guard", "release", "v" + runPackage.version, "v" + releaseVersion])
   })
 }, 60_000)
 
@@ -119,6 +119,6 @@ test("the beat leaves the old release selected instead of pointing at a checkout
     ])
     expect(await readVersion()).toBe(runPackage.version)
     expect(await run(["--version"])).toEqual({ exitCode: 0, stdout: "orc " + runPackage.version })
-    expect((await readdir(directory)).sort()).toEqual(["release", "v" + runPackage.version])
+    expect((await readdir(directory)).sort()).toEqual([".update.lock.guard", "release", "v" + runPackage.version])
   })
 }, 60_000)

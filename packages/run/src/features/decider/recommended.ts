@@ -23,13 +23,10 @@ export const recommendedAnswer = (reply: { readonly rule?: unknown }, sources: R
     : { kind: "answered", words: option, basis: { kind: "rule", quote: found.quote, source: found.source, reason: "the question names " + JSON.stringify(option) + " on its Recommended: line, and the decider escalated only on the policy bullet " + JSON.stringify(reply.rule) } }
 }
 
-const quotesRecommendedRule = (found: Quoted): boolean => comparisonWords(normalizedQuote(found.quote)) === comparisonWords(recommendedRule)
+export const quotesRecommendedRule = (found: Quoted): boolean => comparisonWords(normalizedQuote(found.quote)) === comparisonWords(recommendedRule)
 
 // The decider may pick the other remedy on that rule, so orc answers on it only with the question's own Recommended: option.
-export const answerOnRule = (found: Quoted, reply: { readonly answer: string; readonly reason: string }, question: string): Verdict => {
-  if (!quotesRecommendedRule(found)) {
-    return { kind: "answered", words: reply.answer.trim(), basis: { kind: "rule", quote: found.quote, source: found.source, reason: reply.reason } }
-  }
+export const answerOnRecommendedRule = (found: Quoted, reply: { readonly answer: string; readonly reason: string }, question: string): Verdict => {
   const option = recommendedOption(question)
   return option === undefined
     ? { kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on the rule for a recommended option, and the question has no Recommended: line" }
