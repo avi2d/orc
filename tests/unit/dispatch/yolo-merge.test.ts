@@ -70,7 +70,7 @@ const ghLayer = (current: PullRequestView, files: string | null, merges: Array<s
       const args = command.args
       const text = "gh " + args.join(" ")
       if (args[0] === "pr" && args[1] === "view") {
-        return reply(JSON.stringify({ state: current.state, headRefOid: current.headRefOid, baseRefName: current.baseRefName, statusCheckRollup: current.statusCheckRollup }))
+        return reply(JSON.stringify({ state: current.state, headRefOid: current.headRefOid, baseRefName: current.baseRefName, statusCheckRollup: current.statusCheckRollup, mergeCommit: current.state === "MERGED" ? { oid: "1".repeat(40) } : null, mergedAt: current.state === "MERGED" ? "2026-11-18T11:09:00Z" : null }))
       }
       if (text.includes("/pulls/") && text.includes("/files")) {
         return files === null ? refusal() : reply(files)
@@ -305,7 +305,18 @@ describe("the beat gate around the merge", () => {
       await beatAction(root, view("SUCCESS", "MERGED"), true, noFiles, merges)
       expect(merges).toHaveLength(1)
       const afterRetry: unknown = Bun.YAML.parse((await readFile(join(root, "closed", "task-1.md"), "utf8")).split("---\n")[1] ?? "")
-      expect(afterRetry).toMatchObject({ merge: { stage: "merged", head: view().headRefOid } })
+      expect(afterRetry).toMatchObject({ merge: { stage: "merged", head: view().headRefOid, mergeCommit: "1".repeat(40), mergedAt: "2026-11-18T11:09:00Z" } })
+    })
+  })
+
+  test("a PR closed without merging opens attention instead of recording a merge", async () => {
+    await withBacklog(true, async (root) => {
+      await closeWith(root, "done")
+      const merges: Array<string> = []
+      await beatAction(root, view("SUCCESS", "CLOSED"), true, noFiles, merges)
+      expect(merges).toHaveLength(0)
+      expect((await taskOf(root)).merge).toBeUndefined()
+      expect((await run(taskItems(root, "task-1"))).some((entry) => entry.item.state.kind === "open" && entry.item.text.includes("closed without merging"))).toBe(true)
     })
   })
 
