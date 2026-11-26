@@ -65,6 +65,7 @@ export const ownerPollMillis = (env: Env): number => {
   return Number.isFinite(interval) && interval > 0 ? interval : 5000
 }
 
+// The queued call reads no input and ends once the stand-in that queued it is gone.
 export const waitOwned = async (words: ReadonlyArray<string>): Promise<number> => {
   const [ownerWord = "", ...argv] = words
   const owner = Number(ownerWord)
