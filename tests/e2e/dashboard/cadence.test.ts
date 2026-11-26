@@ -99,8 +99,10 @@ describe("the live dashboard's machines cadence", () => {
         },
       });
       await withLivePanel({ width: 84, height: 24 }, sources, async () => {
-        await waitFor(() => sampleStarts.length >= 2);
-        await Effect.runPromise(clock.adjust("10800 millis"));
+        for (const started of [1, 2, 3]) {
+          await waitFor(() => sampleStarts.length >= started);
+          await Effect.runPromise(clock.adjust("10800 millis"));
+        }
         await waitFor(() => sampleStarts.length >= 4);
       }, clock);
       const firstFour = sampleStarts.slice(0, 4);
