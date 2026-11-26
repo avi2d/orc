@@ -140,7 +140,7 @@ The beat opens an item for each run event, owned by the user:
 
 The beat opens these items for a closed ship task's PR, owned by the user:
 
-- A red GitHub Actions check on the PR makes orc run `gh run rerun <run-id> --failed` once per PR.
+- A red [GitHub Actions](https://github.com/features/actions) check on the PR makes orc run `gh run rerun <run-id> --failed` once per PR.
   orc records the rerun in the task file and posts a chat event.
   While the unfinished checks in a red run are queued or in progress, orc waits and does neither.
   If a check waits for approval or is pending, orc opens the `check-red` item instead.
@@ -158,7 +158,7 @@ The beat opens these items for a closed ship task's PR, owned by the user:
 
 ### Retry a dead run once
 
-A run is confirmed failed when pueue reports its task failed, not killed, and the runner holds a run ID for it.
+A run is confirmed failed when [pueue](https://github.com/Nukesor/pueue) reports its task failed, not killed, and the runner holds a run ID for it.
 The beat returns that task to `new` once, keeping its branch and origin run, so the next beat resumes the run.
 It records the `retry` mark in the task file and a chat event `<task-id>.retry.<run-id>`.
 A failure after the retry closes the task and opens a `run-died` item with the task log tail.
