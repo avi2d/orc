@@ -1,9 +1,19 @@
 import { EventEmitter, once } from "node:events";
 import { createTestRenderer, type TestRendererOptions } from "@opentui/core/testing";
-import { Effect } from "effect";
+import { Effect, type Fiber } from "effect";
 import { ScreenDrawObserver } from "@avi2dg/orc-ui";
 
-export const createLiveTestRenderer = async (size: Pick<TestRendererOptions, "width" | "height">) => {
+type TestSetup = Awaited<ReturnType<typeof createTestRenderer>>;
+
+export type LiveTestRenderer = TestSetup & {
+  readonly start: <A, E>(program: Effect.Effect<A, E>) => Fiber.Fiber<A, E>;
+  readonly frameWhere: (matches: (frame: string) => boolean, after?: number) => Promise<string>;
+  readonly nextFrame: () => Promise<string>;
+};
+
+const isAbort = (error: unknown): boolean => error instanceof Error && error.name === "AbortError";
+
+export const createLiveTestRenderer = async (size: Pick<TestRendererOptions, "width" | "height">): Promise<LiveTestRenderer> => {
   const setup = await createTestRenderer(size);
   const events = new EventEmitter();
   let revision = 0;
@@ -34,11 +44,11 @@ export const createLiveTestRenderer = async (size: Pick<TestRendererOptions, "wi
       try {
         await once(events, "draw", { signal });
       } catch (error) {
-        if (!signal.aborted) throw error;
+        if (!isAbort(error)) throw error;
       }
     }
     throw new Error(`no frame matched, last was:\n${last.text}`);
   };
 
-  return { ...setup, start, frameWhere, nextFrame: () => frameWhere(() => true, revision) };
+  return { ...setup, start, frameWhere, nextFrame: (): Promise<string> => frameWhere(() => true, revision) };
 };
