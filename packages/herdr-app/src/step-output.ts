@@ -1,6 +1,6 @@
 import { ScrollHandle } from "gpui-base"
 import { readTextFile } from "herdr"
-import { opensTurns } from "./agents"
+import { opensTurns } from "./run-agent"
 import type { Keyed } from "./agents-view"
 import { type ChecksSummary, checkIndexFile, checksSummary, logLines, parseCheckIndex } from "./checks"
 import type { ShownStep } from "./guard"

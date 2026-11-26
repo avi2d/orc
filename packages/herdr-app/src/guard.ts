@@ -138,6 +138,7 @@ export interface Task {
   readonly hold: number | null
   readonly parked: number | null
   readonly parkedOrigin: string | null
+  readonly retriedRun: string | null
   readonly reason: string | null
   readonly prState: typeof prStates[number] | null
   readonly merge?: RecordedMerge
@@ -155,6 +156,13 @@ const parkedOrigin = (record: Fields, at: string): Guarded<string | null> => {
   return string(guarded.value, "run", child(child(at, "parked"), "origin"))
 }
 
+const retriedRun = (record: Fields, at: string): Guarded<string | null> => {
+  const retry = record["retry"]
+  if (retry === null || retry === undefined) return ok(null)
+  const holder = fields(retry, child(at, "retry"))
+  return holder.kind === "refused" ? holder : string(holder.value, "run", child(at, "retry"))
+}
+
 const task: Guard<Task> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
@@ -166,19 +174,22 @@ const task: Guard<Task> = (value, at) => {
   if (parked.kind === "refused") return parked
   const origin = parkedOrigin(record.value, at)
   if (origin.kind === "refused") return origin
+  const retried = retriedRun(record.value, at)
+  if (retried.kind === "refused") return retried
   const reason = absentOrString(record.value, "reason", at)
   if (reason.kind === "refused") return reason
   const prState = record.value["prState"] === null || record.value["prState"] === undefined ? ok(null) : oneOf(record.value, "prState", at, prStates)
   if (prState.kind === "refused") return prState
   const rawMerge = record.value["merge"]
-  if (rawMerge === undefined || rawMerge === null) return ok({ ...head.value, hold: hold.value, parked: parked.value, parkedOrigin: origin.value, reason: reason.value, prState: prState.value })
+  const read = { ...head.value, hold: hold.value, parked: parked.value, parkedOrigin: origin.value, retriedRun: retried.value, reason: reason.value, prState: prState.value }
+  if (rawMerge === undefined || rawMerge === null) return ok(read)
   const merge = fields(rawMerge, child(at, "merge"))
   if (merge.kind === "refused") return merge
   const stage = oneOf(merge.value, "stage", child(at, "merge"), mergeStages)
   if (stage.kind === "refused") return stage
   const detail = absentOrString(merge.value, "detail", child(at, "merge"))
   if (detail.kind === "refused") return detail
-  return ok({ ...head.value, hold: hold.value, parked: parked.value, parkedOrigin: origin.value, reason: reason.value, prState: prState.value, merge: { stage: stage.value, detail: detail.value } })
+  return ok({ ...read, merge: { stage: stage.value, detail: detail.value } })
 }
 
 interface ProjectCheckouts {
