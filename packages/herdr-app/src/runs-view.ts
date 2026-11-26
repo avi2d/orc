@@ -1,6 +1,7 @@
 import { type Color, type Context, type Element, div } from "gpui-kit"
 import { h_flex, v_flex } from "gpui-base"
-import { type Card, type CardStatus, type Filter, type RunAgent, cardPlace, filterCards, railLabel } from "./agents"
+import { type Card, type CardStatus, type Filter, filterCards, railLabel } from "./agents"
+import { type RunAgent, cardPlace } from "./run-agent"
 import { type Reading } from "./orc-read"
 import type { palette } from "./palette"
 import { type FilterMenu, projectMenu, statusMenu } from "./run-menus"

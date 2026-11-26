@@ -1,6 +1,6 @@
 import { type Context, type Element, div } from "gpui-kit"
 import { h_flex } from "gpui-base"
-import { agentLabel, opensTurns } from "./agents"
+import { agentLabel, opensTurns } from "./run-agent"
 import type { ShownStep } from "./guard"
 import type { palette } from "./palette"
 
