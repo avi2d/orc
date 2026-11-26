@@ -1,5 +1,5 @@
 import { Effect, FileSystem } from "effect"
-import { type Decider, deciderLabel } from "../../shared/lib/index"
+import { type Decider, deciderHeadings, deciderLabel, notRecordedBasis } from "../../shared/lib/index"
 import { decisionAnswer, isHeld, parseTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
 import { answeredReason } from "./task-record-decision"
 import { closeNewTask } from "./close-new"
@@ -22,16 +22,29 @@ const answeredRecord = (fresh: TaskRecord, words: string, at: string, decider: D
 export const answerDecision = (root: string, id: string, words: string, at: string, decider: Decider): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   closeNewTask(root, id, (fresh) => answeredRecord(fresh, words, at, decider))
 
-const decisionNote = (decision: TaskRecord): string => {
-  const answer = decisionAnswer(decision)
-  return answer === null
-    ? ""
-    : "\n\nDecision " + decision.spec.id + " asked:\n\n" + decision.spec.body.trim() + "\n\n" + deciderLabel(answer.decider) + " answered: " + answer.words + "\n"
+export interface DecidedNote {
+  readonly decider: Decider
+  readonly text: string
 }
 
-export const withDecisions = (body: string, decisions: ReadonlyArray<TaskRecord>): string => {
-  const notes = decisions.filter((decision) => decision.spec.kind === "decision").map(decisionNote).join("")
-  return notes === "" ? body : body.trimEnd() + notes
+const decisionNote = (decision: TaskRecord): ReadonlyArray<DecidedNote> => {
+  const answer = decisionAnswer(decision)
+  return answer === null
+    ? []
+    : [{ decider: answer.decider, text: "Decision " + decision.spec.id + " asked:\n\n" + decision.spec.body.trim() + "\n\n" + deciderLabel(answer.decider) + " answered: " + answer.words }]
+}
+
+export const decisionNotes = (decisions: ReadonlyArray<TaskRecord>): ReadonlyArray<DecidedNote> =>
+  decisions.filter((decision) => decision.spec.kind === "decision").flatMap(decisionNote)
+
+const decidedSection = (notes: ReadonlyArray<DecidedNote>, decider: Decider): ReadonlyArray<string> => {
+  const texts = notes.filter((note) => note.decider === decider).map((note) => decider === "agent" ? note.text + "\nBasis: " + notRecordedBasis : note.text)
+  return texts.length === 0 ? [] : [deciderHeadings[decider] + ":\n\n" + texts.join("\n\n")]
+}
+
+export const withDecided = (body: string, notes: ReadonlyArray<DecidedNote>): string => {
+  const sections = [...decidedSection(notes, "owner"), ...decidedSection(notes, "agent")]
+  return sections.length === 0 ? body : body.trimEnd() + "\n\n" + sections.join("\n\n") + "\n"
 }
 
 export const readAnsweredDependencies = (root: string, record: TaskRecord): Effect.Effect<ReadonlyArray<TaskRecord>, BacklogError | TaskFileError, FileSystem.FileSystem> =>

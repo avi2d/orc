@@ -110,6 +110,42 @@ const startCard = (line: ThreadLine, index: number, open: boolean): ThreadCard =
   return { key, line, what, ask: line.kind === "question" ? askText(line.text) : null, answers: [], delivered: false, notes: [], reply, waitsOn: [] }
 }
 
+export interface DecidedLine {
+  readonly key: string
+  readonly what: string
+  readonly words: string
+}
+
+export interface AgentDecidedLine extends DecidedLine {
+  readonly basis: string | null
+}
+
+export interface ThreadDecisions {
+  readonly owner: ReadonlyArray<DecidedLine>
+  readonly agent: ReadonlyArray<AgentDecidedLine>
+}
+
+const decidedLine = (line: ThreadLine, index: number): DecidedLine => {
+  const question = line.id === null ? null : questionIdOf(line.id)
+  return { key: `${line.kind}-${index}`, what: question === null ? kindLabels[line.kind] : `${kindLabels[line.kind]} ${question}`, words: line.text }
+}
+
+export const threadDecisions = (thread: Thread): ThreadDecisions => {
+  const indexed = thread.entries.map((line, index) => ({ line, index }))
+  const isAgentDecision = (line: ThreadLine): boolean => line.kind === "decision" && line.who === "decider"
+  const agentAnswers = indexed.filter(({ line }) => line.kind === "answer" && line.who === "decider")
+  const answered = new Set(agentAnswers.map(({ line }) => line.id))
+  const basisOf = (answer: ThreadLine): string =>
+    thread.entries.filter((line) => isAgentDecision(line) && line.id !== null && line.id === answer.id).at(-1)?.text ?? "Not recorded"
+  return {
+    owner: indexed.filter(({ line }) => line.kind === "answer" && line.who === "user").map(({ line, index }) => decidedLine(line, index)),
+    agent: [
+      ...agentAnswers.map(({ line, index }) => ({ ...decidedLine(line, index), basis: basisOf(line) })),
+      ...indexed.filter(({ line }) => isAgentDecision(line) && !answered.has(line.id)).map(({ line, index }) => ({ ...decidedLine(line, index), basis: null }))
+    ]
+  }
+}
+
 export const threadCards = (thread: Thread, task: TaskDetail, waitsOn: ReadonlyArray<string> = []): ReadonlyArray<ThreadCard> => {
   const open = task.state.status !== "closed"
   const cards: Array<ThreadCard> = []

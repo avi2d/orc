@@ -32,7 +32,7 @@ The panel keeps its state when you switch tabs.
 
 | Tab | What it shows |
 | --- | --- |
-| Thread | Questions, answers, decisions, and notes in time order |
+| Thread | Questions, answers, decisions, and notes in time order, then the answers again under **Decided by the owner** and **Decided by the agent**, each agent answer with its basis or `Not recorded` |
 | Description | The task body |
 | Info | The account, run, branch, PR, dependencies, times, priority, and assets |
 

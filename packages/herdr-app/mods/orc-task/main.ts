@@ -7,7 +7,7 @@ import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { type AnswerTarget, type TaskDetail, type TaskRun, answerArgv, descriptionOf, infoRows, mergeArgv, mergeablePr, runToOpen, runsOfTask, shortTime } from "../../src/task"
 import { taskDetails, taskRuns, taskRunsAndQueue, thread } from "../../src/task-guard"
-import { type AskOption, type Thread, type ThreadCard, type ThreadLine, lineLabel, threadCards, whoLabel } from "../../src/thread"
+import { type AgentDecidedLine, type AskOption, type DecidedLine, type Thread, type ThreadCard, type ThreadLine, lineLabel, threadCards, threadDecisions, whoLabel } from "../../src/thread"
 import { linkedText } from "../../src/links-view"
 import { holdsOnTasks, waitsOnLabel } from "../../src/inbox"
 import { agentsOpenKey, selectedTaskKey, viewsStack, refreshWhenShown, reloadNow } from "../../src/views"
@@ -186,10 +186,10 @@ export default class OrcTask extends View {
         const told = this.reading.kind === "ok" ? this.reading.value.thread : null
         if (told?.kind === "failed") return body.child(div().text_color(t.blocked).child(told.reason))
         const cards = this.cards(task)
-        if (cards === null) return body.child(div().text_color(t.muted).child("Reading the thread"))
+        if (cards === null || told?.kind !== "ok") return body.child(div().text_color(t.muted).child("Reading the thread"))
         return cards.length === 0
           ? body.child(div().text_color(t.muted).child(`Nothing is said on ${task.id} yet`))
-          : body.children(cards.map((card) => this.card(t, task.id, card)))
+          : body.children(cards.map((card) => this.card(t, task.id, card))).children(this.decided(t, told.value))
       }
       case "Description": {
         const description = descriptionOf(task.body)
@@ -255,6 +255,23 @@ export default class OrcTask extends View {
     const notes = card.notes.map((line, index) => v_flex().ml(24).gap(4).p(8).rounded(6).border_l(2).border_color(t.border).bg(t.surface)
       .child(this.lineHeader(t, line, lineLabel(line))).child(linkedText(`note-${card.key}-${index}`, line.text)))
     return v_flex().gap(6).child(shown).children(notes)
+  }
+
+  decided(t: Palette, told: Thread): ReadonlyArray<Element> {
+    const { owner, agent } = threadDecisions(told)
+    return [
+      ...(owner.length === 0 ? [] : [this.decidedGroup(t, "owner", "Decided by the owner", owner)]),
+      ...(agent.length === 0 ? [] : [this.decidedGroup(t, "agent", "Decided by the agent", agent)])
+    ]
+  }
+
+  decidedGroup(t: Palette, key: string, heading: string, lines: ReadonlyArray<DecidedLine | AgentDecidedLine>): Element {
+    return v_flex().id(`decided-by-${key}`).gap(6)
+      .child(div().text_size(12).font_semibold().text_color(t.muted).child(heading))
+      .children(lines.map((line) => v_flex().id(`decided-${key}-${line.key}`).gap(4).p(10).rounded(6).bg(t.raised).min_w_0()
+        .child(div().text_size(12).font_semibold().child(line.what))
+        .child(linkedText(`decided-text-${key}-${line.key}`, line.words))
+        .children("basis" in line && line.basis !== null ? [section(t, "Basis", div().whitespace_normal().child(line.basis))] : [])))
   }
 
   replyBox(t: Palette, task: string, card: ThreadCard): ReadonlyArray<Element> {

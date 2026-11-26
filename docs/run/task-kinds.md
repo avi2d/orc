@@ -42,14 +42,21 @@ A task file stored before `decider` existed reads as an owner answer.
 To drop it instead, run `orc backlog close <task-id> failed [<reason>]`, which drops it as `orc backlog drop` does.
 `orc backlog close <task-id> done` refuses a decision, since only its answer closes it done.
 `orc backlog hold` and `orc merge` refuse a decision, and a decision never parks, since no run of it asks.
-`orc backlog` shows an answered decision as `Owner · <task> answered: <words>`, or `Agent · ` when the agent answered, and `orc backlog --json` gives it `kind: "decision"` and `answer` as its words, time and `decider`.
+`orc backlog` lists answered decisions at the end of the closed column as `<task> answered: <words>`, under **Decided by the owner** and **Decided by the agent**.
+An agent answer is followed by `basis: not recorded`, because a decision task keeps no basis.
+`orc backlog --json` gives it `kind: "decision"` and `answer` as its words, time and `decider`.
 Every other closed task carries `null` for `answer`.
 
+## Tasks that wait on a decision
+
 A task added with `--depends-on <decision-id>` waits until you answer the decision, as any dependency does.
-When it starts, the runner appends the decision's question and your answer after the task's own body in the run's task file:
+When it starts, the runner appends the decision's question and your answer after the task's own body in the run's task file.
+The run report quotes that file:
 
 ```text
 # Build the button
+
+Decided by the owner:
 
 Decision orc-1 asked:
 
@@ -59,6 +66,9 @@ The left one or the right one?
 
 Owner answered: use the left one
 ```
+
+The answers sit under **Decided by the owner** and **Decided by the agent**, together with the answers to the task's holds.
+An agent answer ends with `Basis: not recorded`, because a decision task keeps no basis.
 
 In chat, `orc_backlog_add` takes `kind: "decision"`, and `orc_backlog_answer` answers the decision.
 

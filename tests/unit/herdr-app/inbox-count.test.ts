@@ -242,6 +242,8 @@ test("the Awaiting you count on the Agents tab opens the Inbox as cmd-4 does ins
 const wordsOf = (element: object | string): ReadonlyArray<string> =>
   typeof element === "string" ? [element] : (nodes.get(element)?.kids ?? []).flatMap(wordsOf)
 
+const wordsUnder = (element: object, id: string): ReadonlyArray<string> => find(element, id)?.kids.flatMap(wordsOf) ?? []
+
 test("shows the subject, outcomes, and recommendation in an unselected Agents card instead of behind the step list", async () => {
   const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
   const data = await loadAttention()
@@ -274,8 +276,7 @@ test("an Inbox choice sends the option text to the right question once instead o
   expect(wordsOf(element)).not.toContain("Two retries")
   click(find(element, "toggle-agent-attention"))
   const opened = wordsOf(view.render())
-  expect(opened).toContain("garden-10 · Decided by the agent")
-  expect(opened).toContain("Two retries")
+  expect(wordsUnder(view.render(), "decided-by-agent")).toContain("Two retries")
   expect(opened).toContain("The task says to retry twice.\ntask garden-10: “Retry a failed upload twice.”")
   const command = "orc backlog answer garden-8 ask-1=Narrow"
   documents.set(command, "answered")
@@ -449,12 +450,90 @@ test("an answer you gave in place of the agent's stays in the collapsed Agent at
   const view = new OrcInbox()
   view.reading = { kind: "ok", value: inboxDocuments([], queue.value) }
   const closed = wordsOf(view.render())
-  expect(closed).not.toContain("garden-10 · Decided by you")
+  expect(closed).not.toContain("Decided by the owner")
   expect(closed).not.toContain("Three retries")
   click(find(view.render(), "toggle-agent-attention"))
-  const opened = wordsOf(view.render())
-  expect(opened).toContain("garden-10 · Decided by the agent")
-  expect(opened).toContain("Two retries")
-  expect(opened).toContain("garden-10 · Decided by you")
-  expect(opened).toContain("Three retries")
+  const owner = wordsUnder(view.render(), "decided-by-owner")
+  const agent = wordsUnder(view.render(), "decided-by-agent")
+  expect(owner).toContain("Three retries")
+  expect(owner).not.toContain("Two retries")
+  expect(agent).toContain("Two retries")
+  expect(agent).not.toContain("Three retries")
+})
+
+test("an owner answer and an agent answer open under their own Decided by headings, with the agent's basis, rather than in one mixed list", async () => {
+  const { default: OrcInbox } = await import("../../../packages/herdr-app/mods/orc-inbox/main")
+  const { inboxDocuments } = await import("../../../packages/herdr-app/src/inbox-read")
+  const { guardJson } = await import("../../../packages/herdr-app/src/guard")
+  const { attention } = await import("../../../packages/herdr-app/src/guard-attention")
+  const ownerAnswered = {
+    id: "garden-11.question-1.2026-11-25T07_50_00_000Z", kind: "review-question", task: "garden-11", text: "Which mulch goes on the bed?",
+    asked: "2026-11-25T07:50:00.000Z", owner: "user", answer: { decider: "owner", words: "Bark mulch", at: "2026-11-25T07:55:00.000Z" }
+  }
+  const queue = guardJson(JSON.stringify({ ...fixture, decided: [...fixture.decided, ownerAnswered] }), attention)
+  if (queue.kind !== "ok") throw new Error(queue.reason)
+  const view = new OrcInbox()
+  view.reading = { kind: "ok", value: inboxDocuments([], queue.value) }
+  click(find(view.render(), "toggle-agent-attention"))
+  const owner = wordsUnder(view.render(), "decided-by-owner")
+  const agent = wordsUnder(view.render(), "decided-by-agent")
+  expect(owner).toEqual(expect.arrayContaining(["Decided by the owner", "garden-11", "Which mulch goes on the bed?", "Bark mulch"]))
+  expect(owner).not.toContain("Two retries")
+  expect(agent).toEqual(expect.arrayContaining(["Decided by the agent", "garden-10", "Two retries", "The task says to retry twice.\ntask garden-10: “Retry a failed upload twice.”"]))
+  expect(agent).not.toContain("Bark mulch")
+})
+
+test("an agent escalation the owner then answered lists under Decided by the agent with its basis, not only the owner's answer", async () => {
+  const { default: OrcInbox } = await import("../../../packages/herdr-app/mods/orc-inbox/main")
+  const { inboxDocuments } = await import("../../../packages/herdr-app/src/inbox-read")
+  const { guardJson } = await import("../../../packages/herdr-app/src/guard")
+  const { attention } = await import("../../../packages/herdr-app/src/guard-attention")
+  const escalated = {
+    id: "garden-7.question-3.2026-11-25T07_00_00_000Z", kind: "review-question", task: "garden-7", text: "Where does the bench go?",
+    asked: "2026-11-25T07:00:00.000Z", owner: "user",
+    decision: { kind: "escalated", reason: "The task does not say where the bench goes.", at: "2026-11-25T07:01:00.000Z", decider: "agent" },
+    answer: { decider: "owner", words: "By the pond", at: "2026-11-25T07:05:00.000Z" }
+  }
+  const queue = guardJson(JSON.stringify({ ...fixture, decided: [...fixture.decided, escalated] }), attention)
+  if (queue.kind !== "ok") throw new Error(queue.reason)
+  const view = new OrcInbox()
+  view.reading = { kind: "ok", value: inboxDocuments([], queue.value) }
+  click(find(view.render(), "toggle-agent-attention"))
+  const owner = wordsUnder(view.render(), "decided-by-owner")
+  const agent = wordsUnder(view.render(), "decided-by-agent")
+  expect(owner).toEqual(expect.arrayContaining(["garden-7", "By the pond"]))
+  expect(owner).not.toContain("The task does not say where the bench goes.")
+  expect(agent).toEqual(expect.arrayContaining(["garden-7", "Where does the bench go?", "Escalated to the owner", "The task does not say where the bench goes."]))
+  expect(agent).not.toContain("By the pond")
+})
+
+test("the task panel Thread lists an owner answer and an agent answer under their own Decided by headings, with the agent's basis, instead of only in time order", async () => {
+  const { default: OrcTask } = await import("../../../packages/herdr-app/mods/orc-task/main")
+  const { guardJson } = await import("../../../packages/herdr-app/src/guard")
+  const { taskDetails, thread } = await import("../../../packages/herdr-app/src/task-guard")
+  const { palette } = await import("../../../packages/herdr-app/src/palette")
+  const tasks = guardJson(JSON.stringify({ schema: "orc.backlog.v1", projects: [{ name: "garden" }], tasks: [openTask("garden-12")] }), taskDetails)
+  if (tasks.kind !== "ok") throw new Error(tasks.reason)
+  const asked = (n: number) => `garden-12.question-${n}.2026-11-25T07_5${n}_00_000Z`
+  const told = guardJson(JSON.stringify({
+    schema: "orc.thread.v1", task: "garden-12", entries: [
+      { at: "2026-11-25T07:51:00.000Z", who: "worker", kind: "question", id: asked(1), text: "Which mulch goes on the bed?" },
+      { at: "2026-11-25T07:51:30.000Z", who: "user", kind: "answer", id: asked(1), text: "Bark mulch" },
+      { at: "2026-11-25T07:52:00.000Z", who: "worker", kind: "question", id: asked(2), text: "How many times should the run retry?" },
+      { at: "2026-11-25T07:52:10.000Z", who: "decider", kind: "decision", id: asked(2), text: "answered: The task says to retry twice." },
+      { at: "2026-11-25T07:52:20.000Z", who: "decider", kind: "answer", id: asked(2), text: "Two retries" },
+      { at: "2026-11-25T07:53:00.000Z", who: "worker", kind: "question", id: asked(3), text: "Where does the bench go?" },
+      { at: "2026-11-25T07:53:10.000Z", who: "decider", kind: "decision", id: asked(3), text: "escalated: The task does not say where the bench goes." }
+    ]
+  }), thread)
+  if (told.kind !== "ok") throw new Error(told.reason)
+  const panel = new OrcTask()
+  panel.reading = { kind: "ok", value: { tasks: tasks.value, runs: [], queued: [], local: [], thread: told } }
+  const body = panel.tabBody(palette(), tasks.value[0], [])
+  const owner = wordsUnder(body, "decided-by-owner")
+  const agent = wordsUnder(body, "decided-by-agent")
+  expect(owner).toEqual(expect.arrayContaining(["Decided by the owner", "Bark mulch"]))
+  expect(owner).not.toContain("Two retries")
+  expect(agent).toEqual(expect.arrayContaining(["Decided by the agent", "Two retries", "answered: The task says to retry twice.", "escalated: The task does not say where the bench goes."]))
+  expect(agent).not.toContain("Bark mulch")
 })

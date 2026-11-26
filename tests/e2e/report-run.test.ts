@@ -1,6 +1,11 @@
 import { bundlePath, ensureBundle } from "./bundle"
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
+import { addTask } from "../../packages/run/src/entities/backlog/index"
+import { answerTask } from "../../packages/run/src/entities/parked-runs/index"
+import { readRequest } from "../../packages/run/src/features/queueing-a-task/runner-request"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -84,6 +89,36 @@ const runOrc = async (args: ReadonlyArray<string>, cwd: string, env: Record<stri
 const scoutRun = ["run", "task.md", "--kind", "scout", "--branch", "orc/task-1", "--sandbox", "none"]
 
 const taskRun = ["run", "task.md", "--kind", "task", "--branch", "orc/task-1", "--sandbox", "none"]
+
+const effect = <A, E>(run: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> => Effect.runPromise(run.pipe(Effect.provide(BunServices.layer)))
+
+const decisionSpec = {
+  project: "orc", kind: "decision" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-10-27T10:00:00.000Z"
+}
+
+const takeTask = async (backlog: string, id: string): Promise<string> => {
+  const taken = join(backlog, "taken", id + ".md")
+  const text = await readFile(join(backlog, "new", id + ".md"), "utf8")
+  await mkdir(join(backlog, "taken"), { recursive: true })
+  await writeFile(taken, text.replace("\n---\n", "\nbeat: \"beat-1\"\ntaken_for: \"mac\"\naccount: \"main\"\ntaken_at: \"2026-11-02T10:01:00.000Z\"\n---\n"))
+  await rm(join(backlog, "new", id + ".md"))
+  return taken
+}
+
+const decidedTaskFile = async (orcHome: string, repo: string): Promise<string> => {
+  const backlog = join(orcHome, "backlog")
+  const at = "2026-10-27T10:30:00.000Z"
+  await effect(addTask(backlog, { ...decisionSpec, title: "Which button goes first", body: "# Which button goes first\n\nThe left one or the right one?\n" }))
+  await effect(addTask(backlog, { ...decisionSpec, title: "Which colour", body: "# Which colour\n\nBlue or green?\n" }))
+  await effect(addTask(backlog, { ...decisionSpec, kind: "ship", priority: 0, title: "Say what the checkout holds", dependsOn: ["orc-1", "orc-2"], body: "Say what the checkout holds.\n" }))
+  await effect(answerTask(backlog, "orc-1", "use the left one", at))
+  await effect(answerTask(backlog, "orc-2", "green", at, undefined, "decider"))
+  const taken = await takeTask(backlog, "orc-3")
+  const request = await effect(readRequest({ ORC_TASK_ID: "orc-3", ORC_TASK_FILE: taken, ORC_TASK_CHECKOUT: repo, ORC_TASK_PROVIDER: "acme-go" }, Effect.succeed("")))
+  const file = join(orcHome, "orc-3.md")
+  await writeFile(file, request.body)
+  return file
+}
 
 describe("orc run --kind scout", () => {
   test("runs Pi in the run folder and ends on its report, with no no-mistakes call, no PR and no branch", async () => {
@@ -179,6 +214,21 @@ describe("orc run --kind scout", () => {
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toContain("orc: the heavy queue failed to start")
       expect(await Bun.file(join(fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+})
+
+describe("the ship run report", () => {
+  test("lists the owner decision and the agent decision a task carries under their own Decided by headings, the agent one with its basis, instead of one mixed list", async () => {
+    await withReportFixture(true, async ({ repo, orcHome, env }) => {
+      const taskFile = await decidedTaskFile(orcHome, repo)
+      await runOrc(["run", taskFile, "--branch", "orc/task-1", "--sandbox", "none", "--delivery", "direct-PR"], repo, env)
+      const runIds = await readdir(join(orcHome, "runs"))
+      expect(runIds).toHaveLength(1)
+      const report = await readFile(join(orcHome, "runs", runIds[0] ?? "", "report.md"), "utf8")
+      const owner = "Decided by the owner:\n\nDecision orc-1 asked:\n\n# Which button goes first\n\nThe left one or the right one?\n\nOwner answered: use the left one"
+      const agent = "Decided by the agent:\n\nDecision orc-2 asked:\n\n# Which colour\n\nBlue or green?\n\nAgent answered: green\nBasis: not recorded"
+      expect(report).toContain(owner + "\n\n" + agent)
     })
   }, 60_000)
 })

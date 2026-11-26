@@ -4,4 +4,5 @@ export { ciOnlyTestsEnv, workerCiInstructions, OrcRunError } from "./run-session
 export { isRunId, newRunId } from "./run-id"
 export { reportKinds, runKinds, taskIdPattern, TaskId, type RunKind } from "./task-identity"
 export { isRunning, withFileClaim } from "./file-claim"
-export { askBackWords, AnswerWords, Decider, DecisionAnswer, deciderLabel } from "./decision-answer"
+export { oneLine } from "./one-line"
+export { askBackWords, AnswerWords, Decider, DecisionAnswer, deciderHeadings, deciderLabel, notRecordedBasis } from "./decision-answer"
