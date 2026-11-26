@@ -1,4 +1,4 @@
-import { Clock, DateTime, Effect, Result, Schema } from "effect"
+import { Clock, DateTime, Effect, type Path, Result, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { duplicateOf, roomAtFloor } from "../../shared/config/index"
 import { type AccountReading, type CommandFailureCause, runQuotaCommand } from "./quota-command"
@@ -146,7 +146,7 @@ export const assessSubquo = (document: unknown, settings: QuotaSettings, nowMill
 
 export const readQuota = (
   settings: QuotaSettings
-): Effect.Effect<QuotaReading, never, ChildProcessSpawner.ChildProcessSpawner> =>
+): Effect.Effect<QuotaReading, never, ChildProcessSpawner.ChildProcessSpawner | Path.Path> =>
   Effect.gen(function*() {
     const run = yield* runQuotaCommand(settings.command)
     if (run.kind === "failed") {
