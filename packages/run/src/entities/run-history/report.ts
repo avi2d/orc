@@ -59,8 +59,18 @@ export interface OrcRunReport {
   readonly endReason: string
 }
 
-export const findingLine = (finding: NoMistakesFinding): string =>
+const findingLine = (finding: NoMistakesFinding): string =>
   [finding.id, finding.severity, finding.file + (finding.line === "" ? "" : ":" + finding.line), finding.action, finding.description].filter((part) => part !== "").join(" ")
+
+export const noMistakesFindingLines = (record: NoMistakesRecord): ReadonlyArray<string> => {
+  const deferred = new Set(record.deferredFindingIds)
+  const described = new Set(record.findings.map((finding) => finding.id))
+  const suffix = " (deferred to PR follow-ups)"
+  return [
+    ...record.findings.map((finding) => findingLine(finding) + (deferred.has(finding.id) ? suffix : "")),
+    ...record.deferredFindingIds.filter((id) => !described.has(id)).map((id) => id + suffix)
+  ]
+}
 
 export const measuredSignals = (report: Pick<OrcRunReport, "tokens" | "commits" | "sessionSize">): ReadonlyArray<{ readonly name: string; readonly value: string }> => [
   ...longSessionSignal(report.sessionSize),
@@ -180,12 +190,11 @@ const tailLines = (report: OrcRunReport): Array<string> => {
     lines.push("- " + entry.name + ": " + entry.value)
   }
   lines.push("")
-  if (report.noMistakes !== null && report.noMistakes.findings.length > 0) {
+  const findings = report.noMistakes === null ? [] : noMistakesFindingLines(report.noMistakes)
+  if (findings.length > 0) {
     lines.push("## Findings")
     lines.push("")
-    for (const finding of report.noMistakes.findings) {
-      lines.push("- " + findingLine(finding))
-    }
+    lines.push(...findings.map((finding) => "- " + finding))
     lines.push("")
   }
   lines.push("## Result")

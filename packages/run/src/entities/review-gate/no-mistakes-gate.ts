@@ -62,7 +62,7 @@ export interface ParsedRun {
 
 export type GateAnswer =
   | { readonly kind: "fix"; readonly ids: ReadonlyArray<string>; readonly ignore: ReadonlyArray<string>; readonly instructions?: string }
-  | { readonly kind: "approve" }
+  | { readonly kind: "approve"; readonly followUps?: ReadonlyArray<string> }
   | { readonly kind: "refuse"; readonly reason: string }
 
 export type GateResponse = Exclude<GateAnswer, { readonly kind: "refuse" }>
@@ -246,7 +246,7 @@ export const answerForGate = (
 
 export const respondArgs = (answer: GateResponse): ReadonlyArray<string> =>
   answer.kind === "approve"
-    ? ["axi", "respond", "--action", "approve"]
+    ? ["axi", "respond", "--action", "approve", ...(answer.followUps === undefined ? [] : ["--follow-ups", answer.followUps.join(",")])]
     : [
       "axi", "respond", "--action", "fix", "--findings", answer.ids.join(","),
       ...(answer.ignore.length === 0 ? [] : ["--ignore", answer.ignore.join(",")]),

@@ -283,6 +283,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/review-gate/answer-wait.ts` | The wait at a no-mistakes gate for your answers in the run folder |
 | `packages/run/src/entities/review-gate/no-mistakes-drive-log.ts` | The no-mistakes drive log: the run record it keeps and the ending it reports |
 | `packages/run/src/entities/review-gate/no-mistakes-gate.ts` | The no-mistakes gate output parsing: the findings, the open questions, the gate answers and the respond arguments |
+| `packages/run/src/entities/review-gate/no-mistakes-response.ts` | The findings no-mistakes sends to the fixer or defers to PR follow-ups |
 
 ## entities/run-history
 
