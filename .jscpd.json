@@ -1,5 +1,5 @@
 {
-  "path": ["packages", "scripts"],
+  "path": ["packages", "scripts", "tests"],
   "format": ["typescript"],
   "ignore": ["**/*.d.ts"]
 }
