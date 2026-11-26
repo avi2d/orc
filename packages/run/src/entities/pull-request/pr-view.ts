@@ -39,13 +39,14 @@ const runVerdict = (run: CheckRun): CheckVerdict => {
 }
 
 // GitHub keeps a cancelled run beside its re-run under one run and name, so only the newest run of each run and name speaks for the check.
-const runScope = (run: CheckRun): string => run.detailsUrl?.match(/\/actions\/runs\/(\d+)(?:\/|$)/)?.[1] ?? run.workflowName ?? ""
+const actionsRunId = (run: CheckRun): string | undefined => run.detailsUrl?.match(/\/actions\/runs\/(\d+)(?:\/|$)/)?.[1]
+const runScope = (run: CheckRun): string => actionsRunId(run) ?? run.workflowName ?? ""
 const newestRuns = (runs: ReadonlyArray<CheckRun>): ReadonlyArray<CheckRun> => {
   const newest = new Map<string, CheckRun>()
   for (const run of runs) {
     const key = runScope(run) + "\0" + run.name
     const seen = newest.get(key)
-    if (seen === undefined || run.startedAt > seen.startedAt) {
+    if (seen === undefined || (run.status !== "COMPLETED" && seen.status === "COMPLETED") || ((run.status === "COMPLETED") === (seen.status === "COMPLETED") && run.startedAt > seen.startedAt)) {
       newest.set(key, run)
     }
   }
@@ -66,6 +67,36 @@ const checkVerdicts = (view: PullRequestView): ReadonlyArray<NamedVerdict> => {
 
 const namesWith = (verdicts: ReadonlyArray<NamedVerdict>, verdict: CheckVerdict): ReadonlyArray<string> =>
   verdicts.filter((entry) => entry.verdict === verdict).map((entry) => entry.name || "(unnamed check)")
+
+const failedRuns = (view: PullRequestView): ReadonlyArray<CheckRun> =>
+  newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry)).filter((run) => runVerdict(run) === "red")
+
+const unfinishedScopes = (view: PullRequestView): ReadonlySet<string> =>
+  new Set(newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry)).filter((run) => run.status !== "COMPLETED").map(runScope))
+
+const pendingInFailedScopes = (view: PullRequestView): ReadonlyArray<CheckRun> => {
+  const failedScopes = new Set(failedRuns(view).filter((run) => actionsRunId(run) !== undefined).map(runScope))
+  return newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry))
+    .filter((run) => run.status !== "COMPLETED" && failedScopes.has(runScope(run)))
+}
+
+const canHold = (run: CheckRun): boolean => run.status === "QUEUED" || run.status === "IN_PROGRESS"
+
+export const pendingRedRuns = (view: PullRequestView): boolean => {
+  const pending = pendingInFailedScopes(view)
+  return pending.length > 0 && pending.every(canHold)
+}
+
+export const redRuns = (view: PullRequestView): ReadonlyArray<{ readonly run: string; readonly name: string }> => {
+  if (pendingInFailedScopes(view).some((run) => !canHold(run))) {
+    return []
+  }
+  const unfinished = unfinishedScopes(view)
+  return failedRuns(view).flatMap((run) => {
+    const id = actionsRunId(run)
+    return id === undefined || unfinished.has(runScope(run)) ? [] : [{ run: id, name: run.workflowName === undefined || run.workflowName === "" ? run.name : run.workflowName + "/" + run.name }]
+  })
+}
 
 export const greenChecks = (view: PullRequestView): ReadonlyArray<string> => namesWith(checkVerdicts(view), "green")
 

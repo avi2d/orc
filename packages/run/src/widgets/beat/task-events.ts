@@ -3,7 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, ranClosing, taskPr, type TaskRecord } from "../../entities/backlog/index"
 import type { BeatAction, StalledAction } from "../../entities/attention/index"
 import type { ChatEvent, PrState } from "../../entities/events/index"
-import { pullRequestHeld, routePullRequest } from "../../entities/attention/index"
+import { pullRequestHeld, routePullRequestWithRetry } from "../../entities/attention/index"
 import { eventRecorded, readPrState, recordEvent, writePrState } from "../../entities/events/index"
 import { checkRefusals, greenChecks, redCheckEvidence, type PullRequestView } from "../../entities/pull-request/index"
 import type { RunnerError } from "../../shared/process/index"
@@ -75,14 +75,15 @@ const recordObservation = (
   at: string,
   waits: Result.Result<ReadonlyArray<string> | null, BacklogError | RunnerError>,
   prState: PrState
-): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    yield* routePullRequest(root, task.spec.id, pr, view, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
+    const holdingRed = yield* routePullRequestWithRetry(root, task, pr, view, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
     const event = prEvent(task, pr, view, at, yield* eventRecorded(root, task.spec.id + ".pr-ready"))
     if (event !== null) {
       yield* recordEvent(root, event)
     }
     yield* writePrState(root, task.spec.id, pr, prState)
+    return holdingRed
   })
 
 const heldAcrossUpdate = (root: string, id: string, pr: string, head: string) =>
@@ -139,11 +140,11 @@ export const prEvents = (
       yield* writePrState(root, id, pr, prState)
       return Option.none()
     }
-    if (yield* sendFreshRedChecks(root, home, task, view.success, at, orcMode)) {
+    const waits = yield* readWaits(pr, view.success, yolo)
+    const holdingRed = yield* recordObservation(root, task, pr, view.success, at, waits, prState)
+    if (holdingRed || (yield* sendFreshRedChecks(root, home, task, view.success, at, orcMode))) {
       return Option.none()
     }
-    const waits = yield* readWaits(pr, view.success, yolo)
-    yield* recordObservation(root, task, pr, view.success, at, waits, prState)
     if (Result.isFailure(waits)) {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: waits.failure.detail })
     }

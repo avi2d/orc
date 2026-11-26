@@ -54,12 +54,12 @@ export const pullRequestHeld = (root: string, task: string, head: string): Effec
   Effect.map(readItem(root, itemId(task, "pr-ready", head)), (item) => item?.state.kind === "closed" && item.state.answer.words.trim().toLowerCase().startsWith("hold"))
 
 // Each head commit gets its own items, so a fix pushed after a red check opens anew.
-export const routePullRequest = (root: string, task: string, pr: string, view: PullRequestView, at: string, waits: ReadonlyArray<string> = []): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+export const routePullRequest = (root: string, task: string, pr: string, view: PullRequestView, at: string, waits: ReadonlyArray<string> = [], suppressRed = false): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const ended = view.state === "MERGED" ? "merged" : view.state === "CLOSED" ? "closed without merging" : null
     const refusals = checkRefusals(view)
     const red = redChecks(view)
-    const holds = (kind: AttentionItem["kind"]): boolean => ended === null && (kind === "check-red" ? refusals.length > 0 : red.length === 0)
+    const holds = (kind: AttentionItem["kind"]): boolean => ended === null && (kind === "check-red" ? !suppressRed && refusals.length > 0 : red.length === 0)
     const prefixes = [itemId(task, "check-red") + ".", itemId(task, "pr-ready") + "."]
     const settled = (yield* openItems(root, (name) => prefixes.some((prefix) => name.startsWith(prefix)))).filter((entry) =>
       !(entry.id === itemId(task, entry.item.kind, view.headRefOid) && holds(entry.item.kind))
@@ -71,7 +71,7 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
     if (ended !== null) {
       return
     }
-    if (red.length > 0) {
+    if (red.length > 0 && !suppressRed) {
       yield* openOrRefreshItem(root, itemId(task, "check-red", view.headRefOid), {
         kind: "check-red",
         task,
