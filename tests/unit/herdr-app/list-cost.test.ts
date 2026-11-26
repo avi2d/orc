@@ -69,7 +69,7 @@ const awaiting = (count: number): void => {
     schema: "orc.backlog.v1",
     tasks: tasks.map((id) => ({
       id, title: "Update the report", project: "garden", kind: "ship", body: "", created: "2026-11-24T08:00:00Z",
-      priority: null, dependsOn: [], prState: null, status: "new", hold: null, parked: null
+      priority: null, parent: null, dependsOn: [], prState: null, status: "new", hold: null, parked: null
     }))
   })
   documents.set("orc attention --json", { ...fixture, items: tasks.map((task) => ({ ...asked, task, id: asked.id.replace(asked.task, task) })), decided: [] })

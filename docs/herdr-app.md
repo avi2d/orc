@@ -51,11 +51,6 @@ An option with a picture shows as a tile, and others as buttons.
 The Inbox outlines the recommended option.
 If Orc did not record options, the card shows the original text and says **No options recorded**.
 An overdue card shows how long it has waited.
-A hold without questions on a task that waits on other tasks, its children or its dependencies, has no card.
-A closed ship child, or the closed ship dependency of a ship task, still counts until its PR merges.
-A dependency the backlog does not hold counts too.
-An answer would not start that task, so its Agents card and its task panel read **Waits on** and those task IDs instead.
-The hold returns to the Inbox once Orc no longer waits on those tasks, or as an overdue card once its date passes.
 The Agents tab shows the same cards under each run in **Awaiting you**.
 
 To answer a question, a decision, a hold or an event:
@@ -79,6 +74,12 @@ A failed command shows the first line of its error on its card.
 
 Questions the agent owns, and its answers, stay in the collapsed **Agent attention** section at the end, each with its basis.
 Where you replaced an agent's answer, your answer shows beside it as **Decided by you**.
+
+## Holds that wait on tasks
+
+A hold without questions on a task that waits on other tasks has no Inbox card, because an answer would not start it.
+Its Agents card and task panel read **Waits on** and those task IDs instead.
+The hold returns once Orc no longer waits, or as an overdue card once its date passes.
 
 ## Tab guides
 
