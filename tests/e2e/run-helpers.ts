@@ -207,21 +207,29 @@ const stubGh = async (): Promise<{ readonly dir: string; readonly calls: string 
 
 const unexpectedNoMistakes: ReadonlyArray<NoMistakesReply> = [{ stdout: "", stderr: "unexpected no-mistakes call", exitCode: 1 }]
 
+const fixtureGit: typeof hostGitShim = (fs, path, realGit) =>
+  Effect.gen(function*() {
+    const dir = yield* fs.makeTempDirectoryScoped({ prefix: "orc-fixture-git-" })
+    const git = path.join(dir, "git")
+    yield* fs.symlink(realGit, git)
+    return git
+  })
+
 type DelivererFor = (spawner: ChildProcessSpawner.ChildProcessSpawner["Service"], hostGit: string, pathEnv: string, dir: string) => RunDeliverer
 
 const noMistakesDelivery: DelivererFor = (spawner, hostGit, pathEnv, dir) =>
   ({ kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv, git: hostGit, worktreeDir: dir }) })
 
 export const runStep = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck = unexpectedChecks, nmReplies: ReadonlyArray<NoMistakesReply> = unexpectedNoMistakes, answers: ReadonlyArray<QuestionAnswer> = []): Promise<StepOutcome & { readonly nmCalls: string }> =>
-  runStepWith(dir, home, sandbox, execCheck, nmReplies, answers, noMistakesDelivery, "")
+  runStepWith(dir, home, sandbox, execCheck, nmReplies, answers, hostGitShim, noMistakesDelivery, "")
 
 export const runStepAs = (dir: string, home: string, sandbox: FakeAgent, facts: RunFacts): Promise<StepOutcome & { readonly nmCalls: string }> =>
-  runStepWith(dir, home, sandbox, unexpectedChecks, unexpectedNoMistakes, [], noMistakesDelivery, "", facts)
+  runStepWith(dir, home, sandbox, unexpectedChecks, unexpectedNoMistakes, [], hostGitShim, noMistakesDelivery, "", facts)
 
 export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const gh = await stubGh()
   try {
-    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], (spawner, hostGit, pathEnv, worktreeDir) =>
+    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
       ({ kind: "direct-PR", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer }), gh.dir + ":")
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
@@ -232,7 +240,7 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
 export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const gh = await stubGh()
   try {
-    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], (spawner, hostGit, pathEnv, worktreeDir) =>
+    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
       ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer }), gh.dir + ":")
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
@@ -243,7 +251,7 @@ export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: Fak
 export const runDirectPrResume = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, answers: ReadonlyArray<QuestionAnswer>): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const gh = await stubGh()
   try {
-    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, answers, (spawner, hostGit, pathEnv, worktreeDir) =>
+    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, answers, fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
       ({ kind: "direct-PR", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer }), gh.dir + ":", handRunFacts, { runId: "step-run-2", resumeRun: "step-run-1" })
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
@@ -251,7 +259,7 @@ export const runDirectPrResume = async (dir: string, home: string, sandbox: Fake
   }
 }
 
-const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, nmReplies: ReadonlyArray<NoMistakesReply>, answers: ReadonlyArray<QuestionAnswer>, deliver: DelivererFor, extraPath: string, facts: RunFacts = handRunFacts, resume: { readonly runId: string; readonly resumeRun: string } | null = null): Promise<StepOutcome & { readonly nmCalls: string }> =>
+const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, nmReplies: ReadonlyArray<NoMistakesReply>, answers: ReadonlyArray<QuestionAnswer>, prepareGit: typeof hostGitShim, deliver: DelivererFor, extraPath: string, facts: RunFacts = handRunFacts, resume: { readonly runId: string; readonly resumeRun: string } | null = null): Promise<StepOutcome & { readonly nmCalls: string }> =>
   Effect.runPromise(
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
@@ -262,7 +270,7 @@ const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: F
       yield* fs.makeDirectory(path.join(runDir, "sessions"), { recursive: true })
       const stub = yield* Effect.promise(() => stubNoMistakes(nmReplies))
       yield* fs.writeFileString(path.join(runDir, "task.md"), "Do the thing.\n")
-      const hostGit = yield* hostGitShim(fs, path, Bun.which("git") ?? "git")
+      const hostGit = yield* prepareGit(fs, path, Bun.which("git") ?? "git")
       return yield* Effect.acquireUseRelease(
         openDatabase(home),
         (db) =>
