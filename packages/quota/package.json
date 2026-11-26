@@ -12,10 +12,10 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@effect/platform-bun": "4.0.0",
+    "@effect/platform-bun": "4.1.4",
     "@opentui/core": "0.6.5",
     "@avi2dg/orc-schema": "workspace:*",
     "@avi2dg/orc-ui": "workspace:*",
-    "effect": "4.0.0"
+    "effect": "4.1.4"
   }
 }
