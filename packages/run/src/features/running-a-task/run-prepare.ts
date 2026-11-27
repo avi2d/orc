@@ -13,6 +13,7 @@ import type { PreparedReviewer } from "./run-deliverer"
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
 
 export interface PreparedAgents {
+  readonly maxFixRounds: OrcConfig["review"]["maxFixRounds"]
   readonly folders: RunFolders
   readonly agent: AgentFile
   readonly fixer: AgentFile
@@ -123,5 +124,5 @@ export const prepareAgents = (
         const reviewerModels = { agent: entry.model, fixer: entry.model }
         return yield* planSandbox(fs, path, spawner, host, { projectDir: checkout.projectDir, runDir: folders.runDir, piAgentDir, orcHome: home }, reviewerModels, { config, provider: reviewerProvider, tokenFileFlag: undefined }, sandboxKind)
       })
-    return { folders, agent, fixer, reviewer, plan, planReviewer }
+    return { folders, agent, fixer, reviewer, plan, planReviewer, maxFixRounds: config.review.maxFixRounds }
   })

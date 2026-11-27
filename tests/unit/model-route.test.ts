@@ -13,7 +13,7 @@ const login = { id: "acme", credential: "pi-login" } as const
 
 const keyed = { id: "keyed", credential: "token-file", tokenFile: { env: "ACME_TOKEN_FILE" } } as const
 
-const config: OrcConfig = { file: "/home/me/.orc/config.json", providers: [login, keyed] }
+const config: OrcConfig = { file: "/home/me/.orc/config.json", providers: [login, keyed], review: { maxFixRounds: 2 } }
 
 const tokenFileProblem = (source: TokenFileSource): Promise<string | null> =>
   Effect.runPromise(Effect.gen(function*() {

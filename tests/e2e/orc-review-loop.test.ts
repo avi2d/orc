@@ -6,17 +6,18 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { openDatabase } from "../../packages/run/src/entities/run-history/index"
 import { readShow, readStepLog } from "../../packages/run/src/features/seeing-runs/index"
+import type { OrcRunReport } from "../../packages/run/src/features/running-a-task/run-record"
 import { cleanFinish, ghPrLink, git, readyToCheck, recordedMetrics, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
-const error = { id: "e", file: "work.txt", line: 1, severity: "error", action: "Fix the error.", description: "The result is wrong." }
-const warning = { id: "w", file: "work.txt", line: 1, severity: "warning", action: "Fix the warning.", description: "The result is fragile." }
-const info = { id: "i", file: "work.txt", line: null, severity: "info", action: "Name the helper.", description: "The helper name says nothing." }
-const lateError = { id: "late", file: "other.txt", line: 3, severity: "error", action: "Close the file.", description: "The handle leaks." }
+const error = { topic: "wrong-result", id: "e", file: "work.txt", line: 1, severity: "error", action: "Fix the error.", description: "The result is wrong." }
+const warning = { topic: "fragile-result", id: "w", file: "work.txt", line: 1, severity: "warning", action: "Fix the warning.", description: "The result is fragile." }
+const info = { topic: "helper-name", id: "i", file: "work.txt", line: null, severity: "info", action: "Name the helper.", description: "The helper name says nothing." }
+const lateError = { topic: "handle-leak", id: "late", file: "other.txt", line: 3, severity: "error", action: "Close the file.", description: "The handle leaks." }
 
-type Finding = Omit<typeof error, "line"> & { line: number | null; topic?: string }
+type Finding = Omit<typeof error, "line"> & { line: number | null }
 
-const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramReply = "no diagram", taskText = "Do the thing.\n", limit?: number) => {
-  let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, endReason: "", prLink: null as string | null, prCreated: false, steps: [] as unknown, metrics: [] as ReadonlyArray<unknown>, reviewEvidence: [] as ReadonlyArray<{ readonly file: string | undefined; readonly log: string }> }
+const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramReply = "no diagram", taskText = "Do the thing.\n", limit?: number, projectConfig?: string) => {
+  let result = { report: undefined as OrcRunReport | undefined, kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, endReason: "", prLink: null as string | null, prCreated: false, steps: [] as unknown, metrics: [] as ReadonlyArray<unknown>, reviewEvidence: [] as ReadonlyArray<{ readonly file: string | undefined; readonly log: string }> }
   await withRepo(async (dir) => {
     await withHome(async (home) => {
       const origin = await mkdtemp(join(tmpdir(), "orc-loop-origin-"))
@@ -27,7 +28,8 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramR
         git(dir, ["push", "-u", "origin", base])
         git(dir, ["remote", "set-head", "origin", base])
         const sha = await readyToCheck(dir, home)
-        if (limit !== undefined) await writeFile(join(dir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\nreview:\n  max_fix_rounds: " + limit.toString() + "\n")
+        if (limit !== undefined) await writeFile(join(home, "config.json"), JSON.stringify({ providers: [], review: { maxFixRounds: limit } }))
+        if (projectConfig !== undefined) await writeFile(join(dir, ".no-mistakes.yaml"), projectConfig)
         git(dir, ["checkout", "-q", "orc/test"])
         const kinds: Array<string> = []
         const evidence: Array<string> = []
@@ -67,7 +69,7 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramR
             openDatabase(home),
             (db) => Effect.gen(function*() {
               const document = yield* readShow(db, "step-run-1")
-              return yield* Effect.forEach(document?.steps.filter((step) => step.name === "review") ?? [], (step) =>
+              return yield* Effect.forEach(document?.steps.filter((step) => step.name === "review" && step.status === "passed") ?? [], (step) =>
                 readStepLog(db, "step-run-1", step.id).pipe(Effect.map((log) => {
                   const file = step.evidence.find((item) => item.direction === "out" && item.kind === "review")?.path
                   return { file: file === undefined ? undefined : basename(file), log }
@@ -77,7 +79,7 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramR
             (db) => Effect.sync(() => db.close())
           ).pipe(Effect.provide(BunServices.layer))
         )
-        result = { kinds, evidence, reviewEvidence, body: await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8"), checks, completed: outcome.report.completed, endReason: outcome.report.endReason, steps: outcome.steps, prLink: outcome.report.prLink, prCreated: outcome.ghCalls.includes("pr create"), metrics: await recordedMetrics(home) }
+        result = { report: outcome.report, kinds, evidence, reviewEvidence, body: outcome.report.prLink === null ? "" : await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8"), checks, completed: outcome.report.completed, endReason: outcome.report.endReason, steps: outcome.steps, prLink: outcome.report.prLink, prCreated: outcome.ghCalls.includes("pr create"), metrics: await recordedMetrics(home) }
       } finally {
         await rm(origin, { recursive: true, force: true })
       }
@@ -86,11 +88,35 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramR
   return result
 }
 
+test("a malformed path rule fails the review without erasing implement or checks evidence", async () => {
+  const result = await exercise([[]], "no diagram", undefined, undefined, 'commands:\n  lint: bun run lint\nreview:\n  path_instructions:\n    - path: "docs/**"\n')
+  expect(result.report).toMatchObject({ implementPassed: true, markerVerified: true, completed: false, prLink: null })
+  expect(result.report?.commits).toHaveLength(1)
+  expect(result.report?.checksRounds).toHaveLength(1)
+  expect(result.steps).toContainEqual({ name: "review", status: "failed" })
+  expect(result.endReason).toContain("path_instructions")
+  expect(result.prCreated).toBe(false)
+  expect(result.kinds).toEqual(["implementer"])
+}, 60_000)
+
+test("an ask-user warning alone stops for a decision rather than a first-round severity bar", async () => {
+  const result = await exercise([[{ ...warning, action: "ask-user" }]])
+  expect(result.evidence).toHaveLength(0)
+  expect(result.endReason).toContain("The review fix loop stopped because a finding needs the user's decision.")
+  expect(result.body).toContain("Left because it asks the user.")
+}, 60_000)
+
+test("an ask-user warning after a fix stops for a decision rather than a severity bar", async () => {
+  const result = await exercise([[error], [{ ...warning, action: "ask-user" }]])
+  expect(result.evidence).toHaveLength(1)
+  expect(result.endReason).toContain("The review fix loop stopped because a finding needs the user's decision.")
+}, 60_000)
+
 test("an empty review does not start a fixer", async () => {
   const result = await exercise([[]])
   expect(result.kinds).toEqual(["implementer", "reviewer", "reviewer"])
   expect(result.completed).toBe(true)
-  expect(result.endReason).toContain("stopped: cleared")
+  expect(result.endReason).toContain("stopped because no error or warning remained.")
 }, 60_000)
 
 test("a cleared first fix does not start a second round", async () => {
@@ -141,6 +167,7 @@ test("warnings after the first fix do not count as a second gate stop", async ()
   expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "reviewer"])
   expect(result.completed).toBe(true)
   expect(result.metrics).toMatchObject([{ run: "step-run-1", delivery: "orc", failedSteps: 0, gateStops: 1, fixRounds: 1 }])
+  expect(result.endReason).toContain("The review fix loop stopped because no finding met the later rounds' severity bar.")
 }, 60_000)
 
 test("warnings left after a fixed round 1 open a PR listing each with its reason rather than ending without a PR", async () => {
@@ -167,31 +194,32 @@ test("an error left after round 2 names a repeat or the round limit rather than 
   expect(result.body).toContain(
     "## Open review findings\n\n" +
     "- error `late` at `other.txt:3`: The handle leaks. Action: Close the file.\n" +
-      "  - Left because it has the same id and file as a finding the fixer received in round 2.\n" +
+      "  - Left because it has the same topic and file as a finding the fixer received in round 2.\n" +
       "- error `new` at `new.txt:1`: The result is wrong. Action: Fix the error.\n" +
-      "  - Left because the round limit was reached: the review after fix round 2 reported it.\n"
+      "  - Left because the review after fix round 2 reached the round limit.\n"
   )
 }, 60_000)
 
 test("a repeated topic with a new id and wording is not sent to the fixer again", async () => {
   const first = { ...error, topic: "result-error" }
   const repeated = { ...error, id: "new-id", topic: "result-error", description: "The calculation fails." }
-  const result = await exercise([[first], [repeated]])
+  const result = await exercise([[first], [repeated, lateError]])
   expect(result.evidence).toHaveLength(1)
   expect(result.body).toContain("same topic and file")
-  expect(result.endReason).toContain("stopped: repeat")
+  expect(result.body).toContain("Left because a finding repeated one sent to the fixer.")
+  expect(result.endReason).toContain("stopped because a finding repeated one sent to the fixer.")
 }, 60_000)
 
-test("different topics in the same file do not stop the second fixer round", async () => {
-  const result = await exercise([[{ ...error, topic: "first" }], [{ ...error, id: "second", topic: "second" }], []])
+test("a reused id with different topics in the same file does not stop the second fixer round", async () => {
+  const result = await exercise([[{ ...error, topic: "first" }], [{ ...error, topic: "second" }], []])
   expect(result.evidence).toHaveLength(2)
 }, 60_000)
 
 test("the default round limit does not start a third fix round", async () => {
   const result = await exercise([[error], [lateError], [{ ...error, id: "third", file: "third.txt" }]])
   expect(result.evidence).toHaveLength(2)
-  expect(result.body).toContain("round limit was reached")
-  expect(result.endReason).toContain("stopped: round-limit")
+  expect(result.body).toContain("reached the round limit")
+  expect(result.endReason).toContain("stopped because the configured fix round limit was reached.")
 }, 60_000)
 
 test("a limit of one does not start a second fix round", async () => {
@@ -205,18 +233,13 @@ test("a configured limit above two does not stop a third fix round", async () =>
   expect(result.evidence).toHaveLength(3)
 }, 60_000)
 
-test("a repeated id without a topic is not sent to the fixer again", async () => {
-  const result = await exercise([[error], [{ ...error, description: "A different description." }]])
-  expect(result.evidence).toHaveLength(1)
-  expect(result.body).toContain("same id and file")
-}, 60_000)
-
 test("an ask-user error is not sent to the fixer and remains in the PR", async () => {
   const result = await exercise([[{ ...error, action: "ask-user" }, lateError]])
   expect(result.evidence).toHaveLength(0)
   expect(result.body).toContain("Left because it asks the user.")
   expect(result.body).toContain("The handle leaks.")
-  expect(result.endReason).toContain("stopped: ask-user")
+  expect(result.body).toContain("Left because a finding needs the user's decision.")
+  expect(result.endReason).toContain("stopped because a finding needs the user's decision.")
 }, 60_000)
 
 test("an ask-user warning is not sent to the fixer", async () => {
@@ -238,14 +261,14 @@ test("a re-reported ask-user warning does not block a new error from the second 
   const asked = { ...warning, action: "ask-user" }
   const result = await exercise([[error, asked], [lateError, asked], []])
   expect(result.evidence.map((value) => JSON.parse(value))).toEqual([[error], [lateError]])
-  expect(result.endReason).toContain("stopped: cleared")
+  expect(result.endReason).toContain("stopped because no error or warning remained.")
   expect(result.body).toContain("Left because it asks the user.")
 }, 60_000)
 
 test("a repeated warning below the second round bar does not block a new error", async () => {
   const result = await exercise([[error, warning], [lateError, warning], []])
   expect(result.evidence.map((value) => JSON.parse(value))).toEqual([[error, warning], [lateError]])
-  expect(result.endReason).toContain("stopped: cleared")
+  expect(result.endReason).toContain("stopped because no error or warning remained.")
 }, 60_000)
 
 test("a warning never sent in round 2 does not block a new error in round 3", async () => {
@@ -257,8 +280,8 @@ test("a warning never sent in round 2 does not block a new error in round 3", as
 test("an info-only review does not claim a second round severity bar", async () => {
   const result = await exercise([[info]])
   expect(result.evidence).toHaveLength(0)
-  expect(result.endReason).toContain("stopped: cleared")
-  expect(result.body).toContain("Left because the review fix loop stopped: cleared.")
+  expect(result.endReason).toContain("stopped because no error or warning remained.")
+  expect(result.body).toContain("Left because no error or warning remained.")
   expect(result.body).not.toContain("round 2 bar")
 }, 60_000)
 

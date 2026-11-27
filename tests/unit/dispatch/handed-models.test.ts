@@ -162,7 +162,7 @@ describe("models the beat hands to orc run", () => {
   })
 
   const keyed = { id: "keyed", credential: "token-file", tokenFile: { env: "KEYED_TOKEN_FILE" } } as const
-  const config: OrcConfig = { file: "/home/me/.orc/config.json", providers: [{ id: "acme", credential: "pi-login" }, keyed], models: { implementer: "acme/coder-large", fixer: "acme/coder-small" } }
+  const config: OrcConfig = { file: "/home/me/.orc/config.json", review: { maxFixRounds: 2 }, providers: [{ id: "acme", credential: "pi-login" }, keyed], models: { implementer: "acme/coder-large", fixer: "acme/coder-small" } }
 
   const route = (handed: { readonly implementer: string | undefined; readonly fixer: string | undefined }) => {
     const models = configuredModels(config, handed)

@@ -11,7 +11,7 @@ const ReviewFinding = Schema.Struct({
 
 const OrcReviewFinding = Schema.Struct({
   ...ReviewFinding.fields,
-  topic: Schema.optional(Schema.NonEmptyString),
+  topic: Schema.NonEmptyString,
   severity: Schema.Literals(["error", "warning", "info"])
 })
 

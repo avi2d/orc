@@ -9,8 +9,7 @@ export type PathRule = typeof PathRule.Type
 
 const ReviewConfig = Schema.Struct({
   review: Schema.optional(Schema.NullOr(Schema.Struct({
-    path_instructions: Schema.optional(Schema.NullOr(Schema.Array(PathRule))),
-    max_fix_rounds: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)))
+    path_instructions: Schema.optional(Schema.NullOr(Schema.Array(PathRule)))
   })))
 })
 const decodeReviewConfig = Schema.decodeUnknownEffect(ReviewConfig)
@@ -28,9 +27,6 @@ const readReviewConfig = (yamlText: string, source: string): Effect.Effect<(type
     )
     return config.review
   })
-
-export const reviewRoundLimit = (yamlText: string): Effect.Effect<number, OrcRunError> =>
-  readReviewConfig(yamlText, configFile).pipe(Effect.map((review) => review?.max_fix_rounds ?? 2))
 
 const rulesForChangedFiles = (rules: ReadonlyArray<PathRule>, changedFiles: ReadonlyArray<string>): ReadonlyArray<PathRule> =>
   rules.filter((rule) => {

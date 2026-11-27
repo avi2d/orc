@@ -157,7 +157,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/running-a-task/review-turn.ts` | The direct-PR review turn: the branch diff, the reviewer run and its findings |
 | `packages/run/src/features/running-a-task/reviewer-chain.ts` | The reviewer pick by quota room on another provider, and `NoReviewerRoom` |
 | `packages/run/src/features/running-a-task/diagram-turn.ts` | The Pi turn that writes a PR body's Why line and `mermaid` diagram |
-| `packages/run/src/features/running-a-task/review-path-rules.ts` | The `review` settings in `.no-mistakes.yaml`: `path_instructions` for changed files and `max_fix_rounds` |
+| `packages/run/src/features/running-a-task/review-path-rules.ts` | The `review.path_instructions` settings in `.no-mistakes.yaml` for changed files |
 | `packages/run/src/features/running-a-task/run-resume.ts` | The prior run's session and passed steps a resume starts from |
 | `packages/run/src/features/running-a-task/checks.ts` | The check commands `.no-mistakes.yaml` names and their run in the copy |
 | `packages/run/src/features/running-a-task/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
@@ -322,7 +322,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the reviewer chain, the heavy queue tuning, the `orc update` install command and the implementer, fixer, orchestrator, planner and decider models |
+| `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the reviewer chain, the review fix round limit, the heavy queue tuning, the `orc update` install command and the implementer, fixer, orchestrator, planner and decider models |
 | `packages/run/src/shared/config/provider-room.ts` | The default credential of a provider and the room reading a reviewer chain entry takes |
 | `packages/run/src/shared/config/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `packages/run/src/shared/config/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |

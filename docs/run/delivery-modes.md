@@ -16,11 +16,12 @@ A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: 
 An `orc` run fetches `origin` and rebases its branch onto the default branch recorded by `refs/remotes/origin/HEAD` before running the project checks.
 If the rebase fails, the run does not open a PR.
 After the checks pass, the run reviews the branch and fixes findings in up to two rounds by default.
-Set `review.max_fix_rounds` in `.no-mistakes.yaml` to a positive integer to change the limit.
+Set `review.maxFixRounds` in `$ORC_HOME/config.json` to a positive integer to change the limit.
 When the first round runs, it sends every finding to the fixer, except findings marked `ask-user`.
 Later rounds send only `error` findings.
 The loop stops when no `error` or `warning` remains, the round limit is reached, a finding repeats, or an `ask-user` error is open.
-It also stops when no finding meets the later rounds' severity bar.
+It also stops when no finding can go to the fixer.
+That stop names the later rounds' severity bar or the need for the user's decision.
 The run's end reason records why the loop stopped.
 The run history records each review turn as its own `review` step, numbered by attempt.
 If a review turn fails, a fix does not finish, or a check fails after a fix, the run stops without opening a PR.
@@ -108,7 +109,7 @@ If no fix round is left, the reason line names the round limit.
 A repeat has the same file and topic as a finding the fixer received earlier.
 Only findings eligible for the next fix round can trigger the repeat stop.
 The reviewer supplies a stable topic slug for each finding and keeps it across review rounds.
-If either finding has no topic, orc compares their ids instead.
+A finding without a topic fails decoding and follows the unreadable-reply retry rule.
 The reason line names the match and the round, or the stop that left the finding open.
 
 ## After the PR opens

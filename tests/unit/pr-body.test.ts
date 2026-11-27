@@ -3,8 +3,8 @@ import { parseDiagramReply, type DiagramResult } from "../../packages/run/src/fe
 import { prBody, type PrBodyInput } from "../../packages/run/src/features/running-a-task/run-finish"
 
 const twoFindings = [
-  { id: "stale-cache", file: "src/cache.ts", line: 42, severity: "error", action: "Clear the cache on write.", description: "A write leaves the old value in the cache." },
-  { id: "loose-type", file: "src/types.ts", line: null, severity: "warning", action: "Narrow the parameter to the three modes.", description: "The parameter accepts any string." }
+  { topic: "stale-cache", id: "stale-cache", file: "src/cache.ts", line: 42, severity: "error", action: "Clear the cache on write.", description: "A write leaves the old value in the cache." },
+  { topic: "loose-type", id: "loose-type", file: "src/types.ts", line: null, severity: "warning", action: "Narrow the parameter to the three modes.", description: "The parameter accepts any string." }
 ] as const
 
 const headed = (overrides: Partial<PrBodyInput> = {}): string =>
@@ -81,20 +81,20 @@ test("a failed review turn is named rather than read as a review that found noth
   expect(body).not.toContain("## Open review findings")
 })
 
-test("an id-and-file repeat names its match rather than claiming issue identity", () => {
+test("a topic-and-file repeat names its match rather than a review-local id", () => {
   const left = [
     { finding: twoFindings[0], reason: { kind: "repeat", round: 2 } },
     { finding: twoFindings[1], reason: { kind: "below-round-2-bar" } },
-    { finding: { ...twoFindings[0], id: "late-leak" }, reason: { kind: "round-limit" } }
+    { finding: { ...twoFindings[0], id: "late-leak" }, reason: { kind: "round-limit", round: 2 } }
   ] as const
   expect(headed({ review: { kind: "left", findings: left } })).toContain(
     "## Open review findings\n\n" +
       "- error `stale-cache` at `src/cache.ts:42`: A write leaves the old value in the cache. Action: Clear the cache on write.\n" +
-      "  - Left because it has the same id and file as a finding the fixer received in round 2.\n" +
+      "  - Left because it has the same topic and file as a finding the fixer received in round 2.\n" +
       "- warning `loose-type` at `src/types.ts`: The parameter accepts any string. Action: Narrow the parameter to the three modes.\n" +
       "  - Left because its severity is below the round 2 bar, which fixes only errors.\n" +
       "- error `late-leak` at `src/cache.ts:42`: A write leaves the old value in the cache. Action: Clear the cache on write.\n" +
-      "  - Left because the round limit was reached: the review after fix round 2 reported it.\n"
+      "  - Left because the review after fix round 2 reached the round limit.\n"
   )
 })
 

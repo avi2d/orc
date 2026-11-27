@@ -174,12 +174,13 @@ describe("the orc review turn sends the project's path rules for the changed fil
     expect(runs[0]?.prompt).not.toContain("path rules")
   })
 
-  test("an invalid round limit is not mislabeled as a path instructions failure", async () => {
-    const { outcome, runs, saved } = await review(["[]"], { mode: "orc", config: "review:\n  max_fix_rounds: 0\n" })
-    expect(runs).toHaveLength(0)
-    expect(outcome).toMatchObject({ status: "failed", reason: expect.stringContaining("review config") })
-    expect(outcome).toMatchObject({ reason: expect.stringContaining("max_fix_rounds") })
-    expect(saved).toBeNull()
+  test("an orc finding without a topic is retried rather than accepted for id matching", async () => {
+    const missing = { ...finding, severity: "error" }
+    const complete = { ...missing, topic: "stray-comment" }
+    const { outcome, runs, saved } = await review([JSON.stringify([missing]), JSON.stringify([complete])], { mode: "orc", config: "commands: {}\n" })
+    expect(runs).toHaveLength(2)
+    expect(outcome).toMatchObject({ status: "passed", findings: [complete] })
+    expect(JSON.parse(saved ?? "null")).toEqual([complete])
   })
 
   test("a path rule with no instructions fails the review before the reviewer runs instead of dropping the rule", async () => {

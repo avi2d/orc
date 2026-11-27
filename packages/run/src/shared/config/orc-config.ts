@@ -70,9 +70,14 @@ const ReviewerEntry = Schema.Struct({
 })
 export type ReviewerEntry = typeof ReviewerEntry.Type
 
+const ReviewConfig = Schema.Struct({
+  maxFixRounds: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(2)))
+})
+
 const OrcConfigFile = Schema.Struct({
   providers: Schema.Array(Provider),
   reviewers: Schema.optional(Schema.NonEmptyArray(ReviewerEntry)),
+  review: ReviewConfig.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
   heavy: Schema.optional(HeavyConfig),
   update: Schema.optional(UpdateConfig),
   models: Schema.optional(Schema.Struct({
@@ -107,7 +112,7 @@ export const readOrcConfig = (orcHome: string): Effect.Effect<OrcConfig, ConfigE
   const file = orcConfigFile(orcHome)
   return readJsonFileIfPresent(file, OrcConfigFile, { onExcessProperty: "error" }).pipe(
     Effect.flatMap((config) => {
-      const read = config ?? { providers: [] }
+      const read = config ?? Schema.decodeSync(OrcConfigFile)({ providers: [] })
       const duplicate = duplicateOf(read.providers.map((provider) => provider.id))
       const problem = duplicate === null ? reviewerProblem(read) : "the provider " + duplicate + " is named twice"
       return problem === null

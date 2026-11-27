@@ -2,9 +2,8 @@ import { Effect } from "effect"
 import { OrcRunError } from "../../shared/lib/index"
 import { runChecksRound, summarizeChecksRound, type ChecksCommand } from "./checks"
 import { finishAfterChecks, reviewOrc } from "./run-finish"
-import type { ReviewFinding, ReviewOutcome } from "./review-outcome"
+import type { ReviewFinding } from "./review-outcome"
 import { passesRoundTwoBar, sameFinding, type ReviewStop } from "./left-findings"
-import { reviewRoundLimit } from "./review-path-rules"
 import type { RunStopped } from "./loop-pause"
 import type { ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
@@ -25,15 +24,14 @@ interface ReviewLoop {
 const findingsForRound = (findings: ReadonlyArray<ReviewFinding>, round: number): ReadonlyArray<ReviewFinding> =>
   findings.filter((finding) => finding.action !== "ask-user" && (round === 1 || passesRoundTwoBar(finding)))
 
-const stopForReview = (review: ReviewOutcome, round: number, limit: number, sent: ReadonlyArray<ReadonlyArray<ReviewFinding>>): ReviewStop | null => {
-  if (review.status !== "passed") return null
-  const findings = review.findings
-  if (!findings.some((finding) => finding.severity === "error" || finding.severity === "warning")) return "cleared"
+const stopForReview = (findings: ReadonlyArray<ReviewFinding>, round: number, limit: number, sent: ReadonlyArray<ReadonlyArray<ReviewFinding>>): ReviewStop | null => {
+  const unresolved = findings.filter((finding) => finding.severity === "error" || finding.severity === "warning")
+  if (unresolved.length === 0) return "cleared"
   if (findings.some((finding) => finding.severity === "error" && finding.action === "ask-user")) return "ask-user"
   if (round > limit) return "round-limit"
   const eligible = findingsForRound(findings, round)
   if (eligible.some((finding) => sent.some((previous) => previous.some((earlier) => sameFinding(earlier, finding))))) return "repeat"
-  if (eligible.length === 0) return "severity-bar"
+  if (eligible.length === 0) return unresolved.every((finding) => finding.action === "ask-user") ? "ask-user" : "severity-bar"
   return null
 }
 
@@ -95,17 +93,17 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
     if (run.delivery.kind !== "orc") {
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
     }
-    const config = yield* run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read review config: " + String(cause) }))
-    )
-    const limit = yield* reviewRoundLimit(config)
+    const limit = run.delivery.maxFixRounds
     const reviewer = run.delivery.reviewer
     let review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, 1)
     const sentPerRound: Array<ReadonlyArray<ReviewFinding>> = []
     const askUserFindings: Array<ReviewFinding> = []
     let round = 1
-    let stop = stopForReview(review, round, limit, sentPerRound)
-    while (review.status === "passed" && stop === null) {
+    while (review.status === "passed") {
+      const stop = stopForReview(review.findings, round, limit, sentPerRound)
+      if (stop !== null) {
+        return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, stop, askUserFindings })
+      }
       for (const finding of review.findings) {
         if (finding.action === "ask-user" && !askUserFindings.some((earlier) => sameFinding(earlier, finding))) askUserFindings.push(finding)
       }
@@ -115,7 +113,6 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
       if (failure !== null) return stopReport(loop, failure)
       round += 1
       review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, round)
-      stop = stopForReview(review, round, limit, sentPerRound)
     }
-    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, stop, askUserFindings })
+    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review })
   })

@@ -47,7 +47,7 @@ describe("a rebase-first run", () => {
       ].join("\n") + "\n")
       const reply = { stdout: "", stderr: "", exitCode: 0 }
       const opener = { fetch: Effect.succeed(reply), push: Effect.succeed(reply), existing: Effect.succeed(reply), create: () => Effect.succeed(reply) }
-      const run = { ...normal, delivery: { kind: "orc" as const, opener, reviewer: fixedReviewer({ ...normal.agent, kind: "reviewer" as const }) }, rebase: { head: "a".repeat(40), pr: "https://github.com/example/orc/pull/7" } }
+      const run = { ...normal, delivery: { kind: "orc" as const, maxFixRounds: 2, opener, reviewer: fixedReviewer({ ...normal.agent, kind: "reviewer" as const }) }, rebase: { head: "a".repeat(40), pr: "https://github.com/example/orc/pull/7" } }
       const ops = fakeOps({ runAgent: async () => ({ commits: [] }), execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 }) }, run.hostSessionsDir)
       const exit = await Effect.runPromiseExit(runFull(run, ops, freshPlan, runLoopCheckpoints(db, run)))
       expect(Exit.isFailure(exit)).toBe(true)
@@ -71,7 +71,7 @@ describe("a rebase-first run", () => {
       ].join("\n") + "\n")
       const reply = { stdout: "", stderr: "", exitCode: 0 }
       const opener = { fetch: Effect.succeed(reply), push: Effect.succeed(reply), existing: Effect.succeed(reply), create: () => Effect.succeed(reply) }
-      const run = { ...normal, delivery: { kind: "orc" as const, opener, reviewer: fixedReviewer({ ...normal.agent, kind: "reviewer" as const }) }, rebase: { head: "a".repeat(40), pr: "https://github.com/example/orc/pull/7" } }
+      const run = { ...normal, delivery: { kind: "orc" as const, maxFixRounds: 2, opener, reviewer: fixedReviewer({ ...normal.agent, kind: "reviewer" as const }) }, rebase: { head: "a".repeat(40), pr: "https://github.com/example/orc/pull/7" } }
       let agents = 0
       const ops = fakeOps({
         runAgent: async () => { agents += 1; return { commits: [] } },
@@ -103,7 +103,7 @@ describe("a rebase-first run", () => {
       ].join("\n") + "\n")
       const reply = { stdout: "", stderr: "", exitCode: 0 }
       const opener = { fetch: Effect.succeed(reply), push: Effect.succeed(reply), existing: Effect.succeed(reply), create: () => Effect.succeed(reply) }
-      const run = { ...normal, delivery: { kind: "orc" as const, opener, reviewer: fixedReviewer({ ...normal.agent, kind: "reviewer" as const }) }, rebase: { head: "a".repeat(40), pr: "https://github.com/example/orc/pull/7" } }
+      const run = { ...normal, delivery: { kind: "orc" as const, maxFixRounds: 2, opener, reviewer: fixedReviewer({ ...normal.agent, kind: "reviewer" as const }) }, rebase: { head: "a".repeat(40), pr: "https://github.com/example/orc/pull/7" } }
       let agents = 0
       const ops = fakeOps({
         runAgent: async () => { agents += 1; return { commits: [] } },
