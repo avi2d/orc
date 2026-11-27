@@ -1,15 +1,11 @@
-import { Console, Data, Effect, FileSystem, Path } from "effect"
-import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
+import { checkDocPages } from "./doc-pages"
 import tools from "./outside-tools.json"
 
 export interface OutsideTool {
   readonly name: string
   readonly url: string
 }
-
-class CheckDocLinksError extends Data.TaggedError("CheckDocLinksError")<{
-  readonly message: string
-}> {}
 
 const fencePattern = /^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^[ \t]*\1[^\n]*$/gm
 const targetPatterns = [/\]\(\s*<?([^)\s>]+)/g, /^\s*\[[^\]]+\]:\s*<?(\S+?)>?(?:\s|$)/gm, /<(https?:\/\/[^>\s]+)>/g, /href="([^"]+)"/g]
@@ -37,56 +33,12 @@ export const unlinkedTools = (source: string, registry: ReadonlyArray<OutsideToo
   return registry.filter((tool) => names(prose, tool, registry) && !targets.has(bare(tool.url)))
 }
 
-const listedOf = (
-  fs: FileSystem.FileSystem,
-  path: Path.Path,
-  target: string
-): Effect.Effect<Array<string>, CheckDocLinksError> =>
-  fs.stat(target).pipe(
-    Effect.mapError((cause) => new CheckDocLinksError({ message: "cannot stat " + target + ": " + String(cause) })),
-    Effect.flatMap((info) => {
-      if (info.type === "Directory") {
-        return path.basename(target).startsWith(".") ? Effect.succeed([]) : markdownFiles(fs, path, target)
-      }
-      return Effect.succeed(info.type === "File" && target.endsWith(".md") ? [target] : [])
-    })
-  )
-const markdownFiles = (
-  fs: FileSystem.FileSystem,
-  path: Path.Path,
-  directory: string
-): Effect.Effect<Array<string>, CheckDocLinksError> =>
-  fs.readDirectory(directory).pipe(
-    Effect.mapError((cause) => new CheckDocLinksError({ message: "cannot list " + directory + ": " + String(cause) })),
-    Effect.flatMap((entries) => Effect.forEach(entries, (entry) => listedOf(fs, path, path.join(directory, entry)))),
-    Effect.map((groups) => groups.flat())
-  )
-const program = Effect.gen(function*() {
-  const fs = yield* FileSystem.FileSystem
-  const path = yield* Path.Path
-  const docs = path.join(import.meta.dir, "..", "docs")
-  const files = yield* markdownFiles(fs, path, docs)
-  if (files.length === 0) {
-    return yield* new CheckDocLinksError({ message: "No documentation pages found" })
-  }
-  const pages = yield* Effect.forEach(files, (file) =>
-    fs.readFileString(file).pipe(
-      Effect.mapError((cause) => new CheckDocLinksError({ message: "cannot read " + file + ": " + String(cause) })),
-      Effect.map((source) =>
-        unlinkedTools(source, tools).map((tool) =>
-          path.relative(docs, file) + ": names " + tool.name + " but never links " + tool.url
-        )
-      )
-    ))
-  const failures = pages.flat()
-  if (failures.length > 0) {
-    yield* Console.error(failures.join("\n"))
-    yield* Effect.sync(() => {
-      process.exitCode = 1
-    })
-  } else {
-    yield* Console.log("Checked outside tool links in " + files.length.toString() + " documentation pages")
-  }
-}).pipe(Effect.provide(BunServices.layer))
+const program = checkDocPages({
+  skipsDirectory: (name) => name.startsWith("."),
+  checksPage: () => true,
+  failuresOf: (page, source) =>
+    unlinkedTools(source, tools).map((tool) => page + ": names " + tool.name + " but never links " + tool.url),
+  passed: (pages) => "Checked outside tool links in " + pages.toString() + " documentation pages"
+})
 
 if (import.meta.main) void Effect.runPromise(program)

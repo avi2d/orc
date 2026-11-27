@@ -155,6 +155,7 @@ const expectedFiles = [
   "src/widgets/beat/beat-route.ts",
   "src/widgets/beat/beat-update.ts",
   "src/widgets/beat/beat-close.ts",
+  "src/widgets/beat/beat-close-runner.ts",
   "src/widgets/beat/beat-origin.ts",
   "src/widgets/beat/beat-place.ts",
   "src/widgets/beat/beat-rebase.ts",

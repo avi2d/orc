@@ -29,6 +29,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/widgets/beat/quota.ts` | The quota reading from the configured command and the pick of an account |
 | `packages/run/src/widgets/beat/beat.ts` | The beat: room, placement, take and start |
 | `packages/run/src/widgets/beat/beat-close.ts` | The closing of finished runs and the running output time |
+| `packages/run/src/widgets/beat/beat-close-runner.ts` | The runner record read for a close and the relay of answers and corrections to a running task |
 | `packages/run/src/widgets/beat/beat-split.ts` | The application of a worker's split proposal when its run ends |
 | `packages/run/src/widgets/beat/beat-update.ts` | The hourly update claim and the check on each dispatch machine |
 | `packages/run/src/widgets/beat/beat-place.ts` | The room reading, the placement of each new task and the wait it names |

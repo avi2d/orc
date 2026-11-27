@@ -80,9 +80,13 @@ const follow = (): void => {
 }
 
 const listen = (on: boolean): void => {
-  const method = on ? "addEventListener" : "removeEventListener"
-  document[method]("pointerdown", pressAnywhere, true)
-  document[method]("keydown", keyAnywhere)
+  if (on) {
+    document.addEventListener("pointerdown", pressAnywhere, true)
+    document.addEventListener("keydown", keyAnywhere)
+  } else {
+    document.removeEventListener("pointerdown", pressAnywhere, true)
+    document.removeEventListener("keydown", keyAnywhere)
+  }
 }
 
 watch(details, (now, before) => {
