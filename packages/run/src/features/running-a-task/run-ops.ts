@@ -26,7 +26,7 @@ export interface SandboxOps {
   readonly execCheck: <E>(command: string, onOutput: (text: string) => Effect.Effect<void, E>) => Effect.Effect<CommandResult, OrcRunError | E>
 }
 
-export interface PickedReviewer {
+interface PickedReviewer {
   readonly reviewer: AgentFile
   readonly runAgent: SandboxOps["runAgent"]
 }

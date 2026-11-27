@@ -53,6 +53,25 @@ export const withHome = async (use: (home: string) => Promise<void>): Promise<vo
   }
 }
 
+export const withOrigin = async (dir: string, use: (origin: string) => Promise<void>): Promise<void> => {
+  const origin = await mkdtemp(join(tmpdir(), "orc-origin-"))
+  try {
+    git(origin, ["init", "-q", "--bare"])
+    git(dir, ["remote", "add", "origin", origin])
+    await use(origin)
+  } finally {
+    await rm(origin, { recursive: true, force: true })
+  }
+}
+
+export const withPushedBase = (dir: string, use: (origin: string) => Promise<void>): Promise<void> =>
+  withOrigin(dir, async (origin) => {
+    const baseBranch = git(dir, ["branch", "--show-current"])
+    git(dir, ["push", "-u", "origin", baseBranch])
+    git(dir, ["remote", "set-head", "origin", baseBranch])
+    await use(origin)
+  })
+
 const implementer: AgentFile = {
   kind: "implementer",
   model: "acme/coder",

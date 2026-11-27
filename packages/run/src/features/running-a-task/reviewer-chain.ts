@@ -5,7 +5,7 @@ export class NoReviewerRoom extends Schema.TaggedError<NoReviewerRoom>()("NoRevi
   message: Schema.String
 }) {}
 
-export interface PassedEntry {
+interface PassedEntry {
   readonly entry: ReviewerEntry
   readonly reason: string
 }
