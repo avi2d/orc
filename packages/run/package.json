@@ -36,12 +36,12 @@
   },
   "dependencies": {
     "@avi2dg/subquo": "0.1.0",
-    "@effect/platform-bun": "4.1.4",
-    "@effect/platform-node-shared": "4.1.4",
-    "effect": "4.1.4"
+    "@effect/platform-bun": "4.1.6",
+    "@effect/platform-node-shared": "4.1.6",
+    "effect": "4.1.6"
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.120.0",
+    "@avi2dg/checks": "0.121.0",
     "@avi2dg/orc-schema": "workspace:*"
   }
 }

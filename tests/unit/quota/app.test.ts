@@ -75,7 +75,7 @@ describe("the live panel", () => {
         eventType: "press",
         source: "raw",
       });
-      await Effect.runPromise(Fiber.join(fiber).pipe(Effect.timeout("5 seconds")));
+      expect(await Effect.runPromise(Fiber.join(fiber).pipe(Effect.timeout("5 seconds")))).toBeUndefined();
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));
       await setup.dispose();

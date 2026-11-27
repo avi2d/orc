@@ -1,4 +1,3 @@
-import { strict as assert } from "node:assert"
 import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -191,7 +190,8 @@ describe("the chat's backlog tools", () => {
 
   for (const call of calls.filter((candidate, index) => calls.findIndex((first) => first.name === candidate.name) === index)) {
     test(call.name + " refuses an extra parameter instead of dropping it", async () => {
-      await assert.rejects(toolNamed(call.name).execute("call-1", { ...call.params, force: true }), (error: Error) => error.message.startsWith(call.name + " takes"))
+      const refusal = await toolNamed(call.name).execute("call-1", { ...call.params, force: true }).then(() => undefined, (error: unknown) => error)
+      expect(refusal).toMatchObject({ message: expect.stringMatching(new RegExp(`^${call.name} takes`)) })
     })
   }
 })

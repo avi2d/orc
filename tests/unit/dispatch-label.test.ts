@@ -4,7 +4,7 @@ import { mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Layer } from "effect"
+import { Effect, Exit, FileSystem, Layer } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogJson, formatBoard } from "../../packages/run/src/widgets/beat/board"
 import type { Project } from "../../packages/run/src/shared/config/dispatch-config"
@@ -111,7 +111,7 @@ describe("the result label on stdin", () => {
     expect(await run(readStdinLabel(Effect.succeed(JSON.stringify({ label: "/homes/a task-1" }))))).toBe("/homes/a task-1")
   })
   test("a pipe holding no document is refused instead of read as a label", async () => {
-    await assert.rejects(run(readStdinLabel(Effect.succeed("no json"))))
+    expect(Exit.isFailure(await run(Effect.exit(readStdinLabel(Effect.succeed("no json")))))).toBe(true)
   })
 })
 
