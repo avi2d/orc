@@ -37,7 +37,7 @@ In `orc` delivery, orc also reads the `path_instructions` list under `review` in
 Each entry holds a `path` glob and its `instructions`.
 Orc adds each entry whose glob matches a changed file to the review prompt, and the reviewer names that glob in each finding the entry raises.
 An entry missing either string fails the review turn.
-Orc decodes the findings JSON array from the reviewer's last reply and writes it to the run folder as `review.json`, then `review-2.json` and `review-3.json` in later orc turns.
+Orc decodes the findings JSON array from the reviewer's last reply and writes it to the run folder as `review.json`, then `review-2.json`, `review-3.json` and so on in later orc turns.
 An unreadable reply gets one rerun on the same session, and a second one fails the review turn.
 The run's end reason names the finding count or the review failure.
 The run history records the turn as the `review` step with its times and the reviewer's model.
