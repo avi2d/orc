@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { DateTime, Schema } from "effect";
 import {
   composedSessionQuota,
+  composedSessionQuotaReport,
   SessionQuotaReport,
   sessionQuotaReport,
   type SessionQuotaView,
@@ -197,6 +198,37 @@ describe("an account one machine could not read", () => {
     expect(view.accounts.find((account) => account.title === "claude work")?.body).toEqual({ kind: "invalid", issue: `south: ${unread}` });
     expect(failedOn(view)).toEqual([["south", { kind: "invalid", issue: unread }]]);
   });
+
+  test.each(["invalid", "unreachable"] as const)(
+    "names a remote-only %s failure in its body and JSON instead of treating the login head as local",
+    (kind) => {
+      const north = machineView("north");
+      const south = machineView("south");
+      const failure = kind === "invalid" ? { kind, issue: unread } : { kind, reason: unread };
+      const view = composedSessionQuota(
+        { ...north, accounts: north.accounts.filter((account) => account.provider !== "claude") },
+        "north",
+        [
+          southReading({
+            kind: "ok",
+            value: {
+              ...south,
+              accounts: south.accounts.map((account) => (account.provider === "claude" ? { ...account, body: failure } : account)),
+            },
+          }),
+        ],
+      );
+      expect(view.accounts.find((account) => account.title === "claude work")?.body).toEqual(
+        kind === "invalid" ? { kind, issue: `south: ${unread}` } : { kind, reason: `south: ${unread}` },
+      );
+      expect(failedOn(view)).toEqual([["south", failure]]);
+      const report = composedSessionQuotaReport(view, "north");
+      expect(report.accounts.find((account) => account.title === "claude work")?.quota).toEqual({ status: kind, detail: `south: ${unread}` });
+      expect(report.machines.find((machine) => machine.name === "south")?.failedAccounts).toEqual([
+        expect.objectContaining({ provider: "claude", accountKey: "work", title: "claude work", quota: { status: kind, detail: unread } }),
+      ]);
+    },
+  );
 
   test("lists no failed account when every machine read every account", () => {
     expect(composed().composition?.failedAccounts).toEqual([]);

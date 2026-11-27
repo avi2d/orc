@@ -230,9 +230,11 @@ const mergedAccounts = (machines: ReadonlyArray<Machine>): ReadonlyArray<MergedA
       account.body.kind === "windows" && account.body.windows.length > 0 ? [{ machine, account, windows: account.body.windows }] : [],
     );
     const shownFound = metered.length > 0 ? undefined : (found.find(({ account }) => account.body.kind !== "windows") ?? found.at(0));
-    const shown = shownFound?.account;
+    const shownIsLocal = shownFound?.machine === machines[0];
     const failed = found.flatMap(({ machine, account }): ReadonlyArray<FailedAccount> =>
-      account.body.kind === "windows" || (account === shown && shown === head) ? [] : [{ machine: machine.name, account, failure: account.body }],
+      account.body.kind === "windows" || (account === shownFound?.account && shownIsLocal)
+        ? []
+        : [{ machine: machine.name, account, failure: account.body }],
     );
     const merged = {
       ...head,
@@ -241,7 +243,7 @@ const mergedAccounts = (machines: ReadonlyArray<Machine>): ReadonlyArray<MergedA
     };
     if (shownFound !== undefined) {
       const { machine, account } = shownFound;
-      const body = account === head || account.body.kind === "windows" ? account.body : failedOn(machine.name, account.body);
+      const body = shownIsLocal || account.body.kind === "windows" ? account.body : failedOn(machine.name, account.body);
       return [{ account: { ...merged, body }, failed }];
     }
     const windows = groupedWindows(metered).flatMap(windowOfGroup);
