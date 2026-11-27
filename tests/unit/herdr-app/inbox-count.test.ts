@@ -296,6 +296,16 @@ test("an Inbox choice sends the option text to the right question once instead o
 })
 
 
+test("the Inbox registers its option, Send and fold handlers outside a virtual list row, which the App refuses and then draws nothing", async () => {
+  const { default: OrcInbox } = await import("../../../packages/herdr-app/mods/orc-inbox/main")
+  const { inbox } = await loadAttention()
+  const view = new OrcInbox()
+  view.reading = { kind: "ok", value: inbox }
+  view.answers.sync(cx, inbox.items)
+  expect(find(view.render(), "toggle-agent-attention")).not.toBeNull()
+  expect(handlersInRows(view.render())).toEqual([])
+})
+
 const idsIn = (lane: Node | null): ReadonlyArray<string> =>
   (lane?.kids ?? []).flatMap((kid) => typeof kid === "string" ? [] : (nodes.get(kid)?.calls ?? []).flatMap((call) => call.name === "id" ? [String(call.args[0])] : []))
 

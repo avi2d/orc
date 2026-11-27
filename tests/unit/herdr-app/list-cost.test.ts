@@ -107,16 +107,6 @@ const agentsFrame = async (count: number, folded = false) => {
   return frame(() => agents.render(cx))
 }
 
-const inboxFrame = async (count: number) => {
-  const { default: OrcInbox } = await import("../../../packages/herdr-app/mods/orc-inbox/main")
-  const { readInbox } = await import("../../../packages/herdr-app/src/inbox-read")
-  awaiting(count)
-  const view = new OrcInbox()
-  view.reading = await readInbox().finally(() => documents.clear())
-  if (view.reading.kind === "ok") view.answers.sync(cx, view.reading.value.items)
-  return frame(() => view.render())
-}
-
 test("an Agents frame with 300 cards awaiting you builds as many elements as one with 30 instead of building every card", async () => {
   const few = await agentsFrame(30)
   const many = await agentsFrame(300)
@@ -130,11 +120,4 @@ test("an Agents frame enters the script once for the card rows on screen instead
   const rail = await agentsFrame(300, true)
   expect(shown.entries.get("cards")).toBe(1)
   expect(rail.entries.get("rail-ids")).toBe(1)
-})
-
-test("an Inbox frame with 300 questions builds as many elements as one with 30 instead of building every question", async () => {
-  const few = await inboxFrame(30)
-  const many = await inboxFrame(300)
-  expect(many.held).toContain(300)
-  expect(many.built).toBe(few.built)
 })
