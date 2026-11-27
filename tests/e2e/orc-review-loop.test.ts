@@ -155,10 +155,10 @@ test("the second fix receives only errors and a third review adds neither a fix 
 
 test("each review step log keeps its own findings instead of the final turn's findings", async () => {
   const result = await exercise([[error, warning], [lateError], [warning]])
-  expect(result.reviewEvidence).toEqual([
-    { file: "review.json", log: JSON.stringify([error, warning], null, 2) + "\n" },
-    { file: "review-2.json", log: JSON.stringify([lateError], null, 2) + "\n" },
-    { file: "review-3.json", log: JSON.stringify([warning], null, 2) + "\n" }
+  expect(result.reviewEvidence.map(({ file, log }) => ({ file, findings: JSON.parse(log) }))).toEqual([
+    { file: "review.json", findings: [error, warning] },
+    { file: "review-2.json", findings: [lateError] },
+    { file: "review-3.json", findings: [warning] }
   ])
 }, 60_000)
 
