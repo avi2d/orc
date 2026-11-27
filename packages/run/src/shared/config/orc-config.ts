@@ -111,8 +111,8 @@ const reviewerProblem = (config: OrcConfigFile): string | null => {
 export const readOrcConfig = (orcHome: string): Effect.Effect<OrcConfig, ConfigError, FileSystem.FileSystem> => {
   const file = orcConfigFile(orcHome)
   return readJsonFileIfPresent(file, OrcConfigFile, { onExcessProperty: "error" }).pipe(
-    Effect.flatMap((config) => {
-      const read = config ?? Schema.decodeSync(OrcConfigFile)({ providers: [] })
+    Effect.flatMap((config) => config === null ? Schema.decodeUnknownEffect(OrcConfigFile)({ providers: [] }).pipe(Effect.orDie) : Effect.succeed(config)),
+    Effect.flatMap((read) => {
       const duplicate = duplicateOf(read.providers.map((provider) => provider.id))
       const problem = duplicate === null ? reviewerProblem(read) : "the provider " + duplicate + " is named twice"
       return problem === null
