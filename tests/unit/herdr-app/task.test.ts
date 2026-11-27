@@ -20,7 +20,7 @@ const fresh: TaskDetail = {
 
 test("lists the info rows in the fixed order with a dash for each empty one instead of dropping them", () => {
   const rows = infoRows(fresh, [])
-  expect(rows.map((row) => row.label)).toEqual(["Waits for reviewer", "Account", "Run", "Branch", "PR", "Depends on", "Created", "Started", "Closed", "Priority", "Assets"])
+  expect(rows.map((row) => row.label)).toEqual(["Account", "Run", "Branch", "Waits for reviewer", "PR", "Depends on", "Created", "Started", "Closed", "Priority", "Assets"])
   expect(rows.filter((row) => row.label !== "Created").map((row) => row.value)).toEqual(Array.from({ length: 10 }, () => "—"))
 })
 

@@ -81,7 +81,7 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
     })
   })
 
-  test("a parked run resumed on another provider's account keeps its reviewer off the provider that implemented it, instead of passing over the waiting entry or reviewing on the implementer's provider", async () => {
+  const resumedOnBeta = async (resumeRooms: Readonly<Record<string, ProviderRoom>>): Promise<void> => {
     await withReadyBranch(async ({ dir, home, sha, kinds }) => {
           await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses,
             pickWith({ acme: { kind: "room" }, beta: { kind: "no-room", reason: "beta-main 2% left, floor 10%" }, gamma: { kind: "no-room", reason: "gamma-main 0% left, floor 10%" } }))
@@ -91,11 +91,19 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
             const sessionFile = join(sessionsDir, "review.jsonl")
             await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: "[]" }], stopReason: "stop", usage: { input: 1, output: 1 } }))
             return { sessionFile, commits: [] }
-          }, resumedKinds), lintPasses, pickWith({ acme: { kind: "room" }, beta: { kind: "room" }, gamma: { kind: "no-room", reason: "gamma-main 0% left, floor 10%" } }), "beta/coder")
+          }, resumedKinds), lintPasses, pickWith(resumeRooms), "beta/coder")
           expect(resumedKinds).toEqual(["reviewer"])
           expect(resumed.stepAgents).toContainEqual({ name: "review", model: "beta/reviewer", thinking: "high" })
           expect(resumed.ghCalls).toContain("pr create --head orc/test")
     })
+  }
+
+  test("a parked run resumed on another provider's account while both have room reviews off the provider that implemented it, instead of on the implementer's provider", async () => {
+    await resumedOnBeta({ acme: { kind: "room" }, beta: { kind: "room" }, gamma: { kind: "no-room", reason: "gamma-main 0% left, floor 10%" } })
+  })
+
+  test("a parked run resumed on another provider's account after the implementer's provider runs out reviews on the waiting entry, instead of passing it over as the implementer's", async () => {
+    await resumedOnBeta({ acme: { kind: "no-room", reason: "acme-main 1% left, floor 10%" }, beta: { kind: "room" }, gamma: { kind: "no-room", reason: "gamma-main 0% left, floor 10%" } })
   })
 
   test("still fails the review turn when every entry is on the implementer's provider, instead of parking on a wait no quota ends", async () => {

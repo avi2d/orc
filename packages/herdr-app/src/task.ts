@@ -87,7 +87,7 @@ export const descriptionOf = (body: string): string => {
   return lines.slice(title + 1).join("\n").trim()
 }
 
-const infoLabels = ["Waits for reviewer", "Account", "Run", "Branch", "PR", "Depends on", "Created", "Started", "Closed", "Priority", "Assets"] as const
+const infoLabels = ["Account", "Run", "Branch", "Waits for reviewer", "PR", "Depends on", "Created", "Started", "Closed", "Priority", "Assets"] as const
 type InfoLabel = typeof infoLabels[number]
 
 export interface InfoRow {

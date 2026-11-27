@@ -21,8 +21,8 @@ const parkedReason = "The review turn waits for a reviewer in the chain to have 
 
 const accounts = [{ name: "main", kind: "none" }, { name: "beta-main", provider: "beta", kind: "none", models: { implementer: "beta/coder", fixer: "beta/coder" } }] as const
 
-const quotaAt = (root: string, betaPercent: number) => {
-  const reply = JSON.stringify({ schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 80 }, { name: "beta-main", remainingPercent: betaPercent }] })
+const quotaAt = (root: string, betaPercent: number, mainPercent = 80) => {
+  const reply = JSON.stringify({ schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: mainPercent }, { name: "beta-main", remainingPercent: betaPercent }] })
   return writeFile(join(root, "dispatch.json"), JSON.stringify({
     machines: [{ name: "mac", slots: 1, start: ["true"] }],
     quota: { provider: "keyed", command: ["sh", "-c", "printf '%s' '" + reply + "'"], accounts, floorPercent: 15 }
@@ -93,6 +93,18 @@ describe("a run that waits for a reviewer with room", () => {
       expect(resumed.parked?.reviewerWait).toBeUndefined()
       const request = await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: join(root, "taken", "orc-1.md"), ORC_TASK_CHECKOUT: "/checkout", ORC_TASK_PROVIDER: "keyed" }, Effect.succeed("")))
       expect(request.resumeRun).toBe("run-1")
+    })
+  })
+
+  test("the beat resumes the parked run on the waiting entry's account once the implementer's account runs out, instead of waiting on the provider that wrote the code", async () => {
+    await withBacklog(async (root) => {
+      await parkedForReviewer(root)
+      await quotaAt(root, 80, 2)
+      await beatWith(root, pueueDone(root, { Failed: 1 }))
+      const resumed = await current(root)
+      if (resumed.state.kind !== "started") throw new Error("the beat did not resume the task: " + resumed.state.kind)
+      expect(resumed.state.claim.account).toBe("beta-main")
+      expect(resumed.parked?.reviewerWait).toBeUndefined()
     })
   })
 })
