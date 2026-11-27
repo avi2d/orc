@@ -190,11 +190,11 @@ describe("an account one machine could not read", () => {
     expect(view.composition?.failedAccounts).toEqual([]);
   });
 
-  test("names the remote beside its failure shown as the body when this machine read the account but no window", () => {
+  test("names the remote in the failure shown as the body, not a bare reason read as this machine's", () => {
     const north = machineView("north", noClaudeWindow);
     expect(north.accounts.find((account) => account.title === "claude work")?.body).toEqual({ kind: "windows", windows: [] });
     const view = withSouthUnread(north);
-    expect(view.accounts.find((account) => account.title === "claude work")?.body).toEqual({ kind: "invalid", issue: unread });
+    expect(view.accounts.find((account) => account.title === "claude work")?.body).toEqual({ kind: "invalid", issue: `south: ${unread}` });
     expect(failedOn(view)).toEqual([["south", { kind: "invalid", issue: unread }]]);
   });
 

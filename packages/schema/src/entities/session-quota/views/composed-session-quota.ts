@@ -210,6 +210,9 @@ const logins = (found: ReadonlyArray<Found>): ReadonlyArray<Login> => {
 const joinsOf = (accounts: ReadonlyArray<AccountView>): ReadonlyArray<AccountJoin> =>
   distinctJoins(accounts.flatMap((account) => account.joins));
 
+const failedOn = (machine: string, failure: Failed): Failed =>
+  failure.kind === "unreachable" ? { ...failure, reason: `${machine}: ${failure.reason}` } : { ...failure, issue: `${machine}: ${failure.issue}` };
+
 interface MergedAccount {
   readonly account: AccountView;
   readonly failed: ReadonlyArray<FailedAccount>;
@@ -226,7 +229,8 @@ const mergedAccounts = (machines: ReadonlyArray<Machine>): ReadonlyArray<MergedA
     const metered = found.flatMap(({ machine, account }) =>
       account.body.kind === "windows" && account.body.windows.length > 0 ? [{ machine, account, windows: account.body.windows }] : [],
     );
-    const shown = metered.length > 0 ? undefined : (found.find(({ account }) => account.body.kind !== "windows") ?? found.at(0))?.account;
+    const shownFound = metered.length > 0 ? undefined : (found.find(({ account }) => account.body.kind !== "windows") ?? found.at(0));
+    const shown = shownFound?.account;
     const failed = found.flatMap(({ machine, account }): ReadonlyArray<FailedAccount> =>
       account.body.kind === "windows" || (account === shown && shown === head) ? [] : [{ machine: machine.name, account, failure: account.body }],
     );
@@ -235,7 +239,11 @@ const mergedAccounts = (machines: ReadonlyArray<Machine>): ReadonlyArray<MergedA
       accountKeys: [...new Set(found.flatMap(({ account }) => account.accountKeys))],
       joins: joinsOf(found.map(({ account }) => account)),
     };
-    if (shown !== undefined) return [{ account: { ...merged, body: shown.body }, failed }];
+    if (shownFound !== undefined) {
+      const { machine, account } = shownFound;
+      const body = account === head || account.body.kind === "windows" ? account.body : failedOn(machine.name, account.body);
+      return [{ account: { ...merged, body }, failed }];
+    }
     const windows = groupedWindows(metered).flatMap(windowOfGroup);
     return [{ account: { ...merged, body: { kind: "windows" as const, windows } }, failed }];
   });
