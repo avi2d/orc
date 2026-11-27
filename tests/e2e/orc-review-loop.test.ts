@@ -134,7 +134,7 @@ test("each review step log keeps its own findings instead of the final turn's fi
 
 test("warnings after the first fix do not count as a second gate stop", async () => {
   const result = await exercise([[error, warning], [warning]])
-  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer"])
+  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "reviewer"])
   expect(result.completed).toBe(true)
   expect(result.metrics).toMatchObject([{ run: "step-run-1", delivery: "orc", failedSteps: 0, gateStops: 1, fixRounds: 1 }])
 }, 60_000)
