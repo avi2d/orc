@@ -80,11 +80,11 @@ Options:
                             PR without a CI verdict.
   --branch <name>           The branch to commit to, or to resume. Defaults to
                             orc/<run-id>.
-  --sandbox <nono|none>     Where the agent runs. Runs you start by hand default
-                            to nono. none runs on the host as you. Queued tasks
-                            pass none without a per-agent sandbox. Their safety
-                            boundary is the isolated space around the whole
-                            agent system.
+  --sandbox <nono|none>     Where the agent runs. The default is no per-agent
+                            sandbox: none runs the agent on the host as you, and
+                            the safety boundary is the isolated space around the
+                            whole agent system. Queued tasks always run that
+                            way. Pass nono to sandbox a run you start by hand.
   --token-file <path>       A file holding the provider token the run uses.
   --provider <id>           The provider id from config.json the run must use.
   --implementer-model <model>

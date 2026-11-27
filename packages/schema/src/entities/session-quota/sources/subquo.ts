@@ -2,6 +2,7 @@ import { DateTime, Duration, Effect, Layer, Result, Schema } from "effect";
 import { type QuotaProvider, type QuotaProviderId, type QuotaReport, QuotaSource, type QuotaWindow, readQuotaAxi } from "./quota";
 import type { DashConfig } from "../../../shared/config";
 import { CommandRunner, decodeJson, failureOf, runDecoded } from "../../../shared/lib";
+import { linearPace } from "./window-sources";
 
 const Instant = Schema.DateTimeUtcFromString;
 const Label = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9_-]{0,63}$/u));
@@ -78,6 +79,26 @@ const freshAt = (observation: SubquoObservation, now: DateTime.Utc): observation
   DateTime.toEpochMillis(observation.observedAt) <= DateTime.toEpochMillis(now) &&
   DateTime.toEpochMillis(now) < DateTime.toEpochMillis(observation.validUntil);
 
+// quota-axi's pace rests on its own reading, so a subquo reading paces itself on the window's cycle.
+const paceOf = (cycleSeconds: number | undefined, percentLeft: number, resetsAt: DateTime.Utc, now: DateTime.Utc) =>
+  cycleSeconds === undefined
+    ? {}
+    : { pace: linearPace(cycleSeconds, percentLeft, DateTime.toEpochMillis(resetsAt), DateTime.toEpochMillis(now)) };
+
+interface WindowShape {
+  readonly label: string;
+  readonly kind: QuotaWindow["kind"];
+  readonly windowSeconds?: number;
+}
+
+const windowShape = (id: string, subquoId: string): WindowShape => {
+  if (id === "five_hour") return { label: "session", kind: "session", windowSeconds: 18_000 };
+  if (id === "rolling" && subquoId === "five-hour") return { label: "rolling", kind: "unknown", windowSeconds: 18_000 };
+  if (id === "seven_day" || id === "weekly") return { label: "week", kind: "weekly", windowSeconds: 604_800 };
+  if (id === "monthly") return { label: "month", kind: "monthly" };
+  return { label: "rolling", kind: "unknown" };
+};
+
 const overlayProvider = (
   entry: QuotaProvider,
   match: MatchedSubquo,
@@ -93,8 +114,14 @@ const overlayProvider = (
     );
     const reading = found.length === 1 ? found[0] : undefined;
     if (reading === undefined || reading.percentLeft === null || reading.resetsAt === null) return window;
-    const { pace: _pace, ...rest } = window;
-    return { ...rest, percentRemaining: reading.percentLeft, resetsAt: reading.resetsAt, subquoReadAt: observation.observedAt };
+    const { pace, ...rest } = window;
+    return {
+      ...rest,
+      ...paceOf(pace?.cycleSeconds ?? window.windowSeconds, reading.percentLeft, reading.resetsAt, now),
+      percentRemaining: reading.percentLeft,
+      resetsAt: reading.resetsAt,
+      subquoReadAt: observation.observedAt,
+    };
   });
   return { ...entry, windows };
 };
@@ -108,18 +135,11 @@ const standaloneSubquo = (
   const windows = observation.windows.flatMap((window): ReadonlyArray<QuotaWindow> => {
     const id = quotaWindowId(mapping.provider, window.id, window.scope);
     if (id === undefined || window.percentLeft === null || window.resetsAt === null) return [];
-    const shape = id === "five_hour"
-      ? { label: "session", kind: "session" as const, windowSeconds: 18_000 }
-      : id === "rolling" && window.id === "five-hour"
-        ? { label: "rolling", kind: "unknown" as const, windowSeconds: 18_000 }
-      : id === "seven_day" || id === "weekly"
-        ? { label: "week", kind: "weekly" as const, windowSeconds: 604_800 }
-        : id === "monthly"
-          ? { label: "month", kind: "monthly" as const }
-          : { label: "rolling", kind: "unknown" as const };
+    const shape = windowShape(id, window.id);
     return [{
       id,
       ...shape,
+      ...paceOf(shape.windowSeconds, window.percentLeft, window.resetsAt, now),
       percentRemaining: window.percentLeft,
       resetsAt: window.resetsAt,
       subquoReadAt: observation.observedAt,

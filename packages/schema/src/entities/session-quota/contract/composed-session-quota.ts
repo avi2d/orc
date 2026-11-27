@@ -28,7 +28,7 @@ const MachineJson = Schema.Struct({
 });
 
 export const ComposedSessionQuotaReport = Schema.Struct({
-  schemaVersion: Schema.Literal(2),
+  schemaVersion: Schema.Literals([2, 4]),
   generatedAt: Schema.String,
   scope: Schema.Literal("composed"),
   estimate: Schema.Struct({

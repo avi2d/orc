@@ -111,9 +111,11 @@ const weightOf = (tokens: Tokens, weighting: Weighting): number => weightings[we
 
 // The first machine's quota reading stands for the account, and every machine's calls are a share of the calls both observed.
 const combinedWindow = (anchor: WindowView, members: ReadonlyArray<Member>): WindowView => {
+  if (anchor.startsAt === null) return anchor;
   const observedTokens = sumTokens(members.map(({ window }) => window.observedTokens));
   const all = { raw: weightOf(observedTokens, "raw"), priced: weightOf(observedTokens, "priced") };
   const rows = members.flatMap(({ machine, window }) => {
+    if (window.startsAt === null) return [];
     const span = rateSpanHours(
       DateTime.toEpochMillis(window.startsAt),
       DateTime.toEpochMillis(window.resetsAt),
@@ -156,8 +158,9 @@ const combinedWindow = (anchor: WindowView, members: ReadonlyArray<Member>): Win
   };
 };
 
+// A reading with no cycle has no start to rate sessions against, so a member that knows the cycle anchors the window.
 const windowOfGroup = ({ members, otherCycle }: WindowGroup): ReadonlyArray<WindowView> => {
-  const anchor = members.at(0)?.window;
+  const anchor = (members.find(({ window }) => window.startsAt !== null) ?? members.at(0))?.window;
   if (anchor === undefined) return [];
   return [{ ...(members.length === 1 ? anchor : combinedWindow(anchor, members)), otherCycle }];
 };
@@ -335,7 +338,7 @@ export const composedSessionQuotaReport = (view: SessionQuotaView, localName: st
   const composition = view.composition ?? { local: localName, remotes: [], failedAccounts: [] };
   const machineOf = (machine: string | undefined): string => machine ?? composition.local;
   return {
-    schemaVersion: 2,
+    schemaVersion: 4,
     generatedAt: instant(view.now),
     scope: "composed",
     estimate: { basis: "machine-logs", upperBound: true, priceRatios: { ...priceRatios } },

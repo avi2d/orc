@@ -144,7 +144,7 @@ describe("orc bin", () => {
   test("a login provider config.json gives no nono entry is refused in the nono sandbox instead of sending its key nowhere", async () => {
     await withLoginFixture("echo ready; exit 0", async ({ dir, home, fakeBin }) => {
       await writeConfig(join(home, "orc"), { ...loginConfig, providers: [{ id: "acme-go", credential: "pi-login" }] })
-      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], dir, { HOME: home, ORC_HOME: join(home, "orc"), PI_CODING_AGENT_DIR: undefined, PATH: fakeBin + ":" + (process.env["PATH"] ?? "") })
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "nono"], dir, loginEnv(home, fakeBin))
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toContain("gives the provider acme-go no nono entry, so the nono sandbox cannot carry its key")
       expect(await Bun.file(join(fakeBin, "auth-checks")).exists()).toBe(false)
@@ -162,13 +162,7 @@ describe("orc bin", () => {
 
   test("run refuses a key pi reads only from the environment, which nono's credential capture does not see", async () => {
     await withLoginFixture("if [ -n \"$ACME_API_KEY\" ]; then echo ready; exit 0; fi; echo not_ready; exit 1", async ({ dir, home, fakeBin }) => {
-      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], dir, {
-        HOME: home,
-        ORC_HOME: join(home, "orc"),
-        PI_CODING_AGENT_DIR: undefined,
-        ACME_API_KEY: "an-environment-key",
-        PATH: fakeBin + ":" + (process.env["PATH"] ?? "")
-      })
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "nono"], dir, loginEnv(home, fakeBin, { ACME_API_KEY: "an-environment-key" }))
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toContain("a key held only in the keychain or in an environment variable is refused")
       expect(await Bun.file(join(fakeBin, "other-calls")).exists()).toBe(false)
@@ -195,13 +189,7 @@ describe("orc bin", () => {
       await chmod(join(fakeBin, "no-mistakes"), 0o755)
       await chmod(join(fakeBin, "nono"), 0o755)
       const orcHome = join(home, "orc")
-      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], dir, {
-        HOME: home,
-        ORC_HOME: orcHome,
-        ORC_NO_MISTAKES_BIN: join(fakeBin, "no-mistakes"),
-        PI_CODING_AGENT_DIR: undefined,
-        PATH: fakeBin + ":" + (process.env["PATH"] ?? "")
-      })
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "nono"], dir, loginEnv(home, fakeBin, { ORC_NO_MISTAKES_BIN: join(fakeBin, "no-mistakes") }))
       expect(result.stderr).toContain("the sandbox failed to start")
       expect(JSON.parse(await readFile(join(fakeBin, "rpc-request"), "utf8"))).toEqual({ id: "orc-models", type: "get_available_models" })
       const [runId] = await readdir(join(orcHome, "runs"))
@@ -328,6 +316,14 @@ const seedRecordedRun = async (orcHome: string, dir: string, sandbox: string): P
 }
 
 const loginProvider = { id: "acme-go", credential: "pi-login", nono: { upstream: "https://llm.acme.test/v1" } }
+
+const loginEnv = (home: string, fakeBin: string, extra: Record<string, string> = {}): Record<string, string | undefined> => ({
+  HOME: home,
+  ORC_HOME: join(home, "orc"),
+  PI_CODING_AGENT_DIR: undefined,
+  PATH: fakeBin + ":" + (process.env["PATH"] ?? ""),
+  ...extra
+})
 
 const loginConfig = { providers: [loginProvider], models: { implementer: "acme-go/coder-1", fixer: "acme-go/coder-1" } }
 

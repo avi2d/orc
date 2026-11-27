@@ -54,6 +54,7 @@ For an open PR, select **Merge** and confirm to run `orc merge <task> --basis ca
 Subscriptions shows each account's quota windows.
 An account with no window shows the reason the quota report gives in place of its windows.
 The Used bar compares usage with elapsed time and turns red when usage is ahead.
+A window with no known cycle shows its usage with no elapsed-time mark.
 Runs out shows an estimate only when the quota will run out before reset.
 
 Machines shows local and configured remote resources.

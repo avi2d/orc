@@ -5,7 +5,7 @@ import type { HarvestOrigin } from "../sources/harvest";
 import type { Session, SessionIdentity } from "../sources/live";
 import type { Tokens } from "../contract/tokens";
 import { spendGate } from "./estimate";
-import type { AccountView, SessionQuotaView, SessionShare, WindowView } from "./session-quota";
+import type { AccountView, SessionQuotaView, SessionShare, WindowTiming, WindowView } from "./session-quota";
 import type { WindowSource } from "../sources/window-sources";
 import type { SessionQuotaReport } from "../contract/session-quota";
 
@@ -112,14 +112,25 @@ const sourceOf = (window: WindowJson, where: string, reportedAt: DateTime.Utc): 
   }));
 };
 
+const timingOf = (window: WindowJson, resetsAt: DateTime.Utc, where: string): Decoded<WindowTiming> => {
+  if (window.startsAt === null && window.elapsedFraction === null) return decoded({ startsAt: null, cycleSeconds: undefined, elapsedFraction: null });
+  if (window.startsAt === null || window.elapsedFraction === null) return rejected(`${where} has incomplete cycle timing`);
+  const elapsedFraction = window.elapsedFraction;
+  return mapDecoded(instantOf(window.startsAt, `${where}.startsAt`), (startsAt) => ({
+    startsAt,
+    cycleSeconds: (DateTime.toEpochMillis(resetsAt) - DateTime.toEpochMillis(startsAt)) / 1000,
+    elapsedFraction,
+  }));
+};
+
 const windowOf = (
   window: WindowJson,
   where: string,
   sessions: ReadonlyMap<string, Session>,
   reportedAt: DateTime.Utc,
 ): Decoded<WindowView> =>
-  flatMapDecoded(instantOf(window.startsAt, `${where}.startsAt`), (startsAt) =>
-    flatMapDecoded(instantOf(window.resetsAt, `${where}.resetsAt`), (resetsAt) =>
+  flatMapDecoded(instantOf(window.resetsAt, `${where}.resetsAt`), (resetsAt) =>
+    flatMapDecoded(timingOf(window, resetsAt, where), (timing) =>
       flatMapDecoded(sourceOf(window, where, reportedAt), (source) =>
         mapDecoded(rowsOf(window, where, sessions), (rows) => {
           const gate = spendGate(
@@ -133,13 +144,11 @@ const windowOf = (
             label: window.label,
             kind: window.kind,
             source,
-            cycleSeconds: (DateTime.toEpochMillis(resetsAt) - DateTime.toEpochMillis(startsAt)) / 1000,
-            startsAt,
+            ...timing,
             resetsAt,
             usedPoints: window.usedPoints,
             leftPoints: window.leftPoints,
             pace: window.pace,
-            elapsedFraction: window.elapsedFraction,
             aheadOfPace: window.gate.aheadOfPace,
             pastFirstTenth: window.gate.pastFirstTenth,
             exhaustsBeforeReset: gate.exhaustsBeforeReset,

@@ -30,7 +30,7 @@ describe("orc run through the agent step", () => {
       git(repo, ["commit", "-qm", "task"])
       await copyFile(liveConfig, join(home, "config.json"))
       const report = await Effect.runPromise(
-        runAgentStep({ cwd: repo, taskFile: join(repo, "task.md"), branch: "orc/e2e-agent", homeDir: home, runId: "e2e-agent-1" }).pipe(
+        runAgentStep({ cwd: repo, taskFile: join(repo, "task.md"), branch: "orc/e2e-agent", sandbox: "nono", homeDir: home, runId: "e2e-agent-1" }).pipe(
           Effect.provide(BunServices.layer)
         )
       )
