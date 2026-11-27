@@ -37,7 +37,8 @@ const readClaim = (fs: FileSystem.FileSystem, file: string): Effect.Effect<Optio
 const publishClaim = (fs: FileSystem.FileSystem, file: string, mine: string): Effect.Effect<boolean, PlatformError.PlatformError> =>
   Effect.gen(function*() {
     const scratch = file + "." + crypto.randomUUID() + ".tmp"
-    yield* fs.writeFileString(scratch, mine)
+    yield* fs.writeFileString(scratch, mine, { mode: 0o600 })
+    yield* fs.chmod(scratch, 0o600)
     const published = yield* fs.link(scratch, file).pipe(
       Effect.as(true),
       Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.succeed(false))
@@ -90,6 +91,7 @@ const tryFlock = (fs: FileSystem.FileSystem): TryLock => (file) => Effect.gen(fu
   const { libc, errno } = loadedLibc ??= loadLibc()
   yield* fs.chmod(file, 0o600).pipe(Effect.catchReason("PlatformError", "NotFound", () => Effect.void))
   yield* fs.writeFileString(file, "", { flag: "a", mode: 0o600 })
+  yield* fs.chmod(file, 0o600)
   const fd = libc.symbols.open(Buffer.from(file + "\0"), openFlags)
   if (fd < 0) {
     return yield* Effect.fail(lockFailure(file, "open", "cannot open lock file"))

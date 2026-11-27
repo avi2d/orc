@@ -29,6 +29,23 @@ test.skipIf(process.platform === "win32")("a guard with bad permissions does not
   await chmod(guard, 0o050)
 }))
 
+test.skipIf(process.platform === "win32")("a restrictive umask does not block the first claim or leave it behind", () => inClaimDir(async (file) => {
+  const module = import.meta.resolve("../../packages/run/src/shared/lib/file-claim")
+  const script = `
+    import { BunServices } from "@effect/platform-bun"
+    import { Effect, Option } from "effect"
+    import { withFileClaim } from ${JSON.stringify(module)}
+    process.umask(0o777)
+    const take = () => Effect.runPromise(withFileClaim(${JSON.stringify(file)}, Effect.succeed("acquired")).pipe(Effect.provide(BunServices.layer)))
+    if (Option.getOrNull(await take()) !== "acquired" || Option.getOrNull(await take()) !== "acquired") process.exit(1)
+  `
+  const child = Bun.spawn([process.execPath, "-e", script], { stderr: "pipe" })
+  const error = await new Response(child.stderr).text()
+  expect({ code: await child.exited, error }).toEqual({ code: 0, error: "" })
+  expect((await stat(file + ".guard")).mode & 0o777).toBe(0o600)
+  expect(await access(file).then(() => true, () => false)).toBe(false)
+}))
+
 test("an old empty breaker cannot block a claimant or cause it to remove a replacement claim", () => inClaimDir(async (file) => {
   const dead = Bun.spawn([process.execPath, "-e", ""])
   await dead.exited
