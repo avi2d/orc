@@ -1,6 +1,6 @@
 import { constants } from "node:os"
 import { BunServices } from "@effect/platform-bun"
-import { Console, Data, Effect, type FileSystem, type Path } from "effect"
+import { Console, Data, Effect, FileSystem, type Path, type PlatformError } from "effect"
 
 class StepError extends Data.TaggedError("StepError")<{
   readonly message: string
@@ -8,11 +8,29 @@ class StepError extends Data.TaggedError("StepError")<{
 
 export const root = Bun.fileURLToPath(new URL("..", import.meta.url))
 
-export interface Step {
+interface Command {
   readonly command: ReadonlyArray<string>
   readonly cwd?: string
   readonly env?: Record<string, string | undefined>
 }
+
+interface FileWork {
+  readonly fileWork: Effect.Effect<void, PlatformError.PlatformError, FileSystem.FileSystem>
+}
+
+export type Step = Command | FileWork
+
+const fileWork = (work: (fs: FileSystem.FileSystem) => Effect.Effect<void, PlatformError.PlatformError>): Step => ({
+  fileWork: Effect.gen(function*() {
+    yield* work(yield* FileSystem.FileSystem)
+  })
+})
+
+export const copyFile = (from: string, to: string): Step => fileWork((fs) => fs.copyFile(root + from, root + to))
+
+export const copyTree = (from: string, to: string): Step => fileWork((fs) => fs.copy(root + from, root + to))
+
+export const removeTree = (target: string): Step => fileWork((fs) => fs.remove(root + target, { recursive: true, force: true }))
 
 const signalNumbers: ReadonlyMap<string, number> = new Map(Object.entries(constants.signals))
 
@@ -22,7 +40,15 @@ const shellExitCode = (exitCode: number | null, signal: string | number | null):
 
 const notFound = 127
 
-const runStep = (step: Step): Effect.Effect<number, StepError> => {
+const fileWorkFailed = 1
+
+const runFileWork = (step: FileWork): Effect.Effect<number, never, FileSystem.FileSystem> =>
+  step.fileWork.pipe(
+    Effect.as(0),
+    Effect.catchTag("PlatformError", (error) => Console.error(error.message).pipe(Effect.as(fileWorkFailed)))
+  )
+
+const runCommand = (step: Command): Effect.Effect<number, StepError> => {
   const [program = ""] = step.command
   return Effect.try({
     try: () => Bun.spawn([...step.command], { cwd: root + (step.cwd ?? ""), env: step.env ?? process.env, stdio: ["inherit", "inherit", "inherit"] }),
@@ -33,7 +59,10 @@ const runStep = (step: Step): Effect.Effect<number, StepError> => {
   )
 }
 
-const runInOrder = (steps: ReadonlyArray<Step>): Effect.Effect<number> =>
+const runStep = (step: Step): Effect.Effect<number, StepError, FileSystem.FileSystem> =>
+  "fileWork" in step ? runFileWork(step) : runCommand(step)
+
+const runInOrder = (steps: ReadonlyArray<Step>): Effect.Effect<number, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     for (const step of steps) {
       const code = yield* runStep(step)
@@ -45,7 +74,7 @@ const runInOrder = (steps: ReadonlyArray<Step>): Effect.Effect<number> =>
 // A package.json script hands its own arguments to its last command, so the last step gets them.
 const withArguments = (steps: ReadonlyArray<Step>, extra: ReadonlyArray<string>): ReadonlyArray<Step> => {
   const last = steps.at(-1)
-  return last === undefined ? steps : [...steps.slice(0, -1), { ...last, command: [...last.command, ...extra] }]
+  return last === undefined || "fileWork" in last ? steps : [...steps.slice(0, -1), { ...last, command: [...last.command, ...extra] }]
 }
 
 export const runPlannedStepsAndExit = (planned: Effect.Effect<ReadonlyArray<Step>, never, FileSystem.FileSystem | Path.Path>): void => {

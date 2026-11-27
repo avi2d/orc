@@ -1,6 +1,6 @@
-import { runStepsAndExit } from "./run-steps"
+import { copyFile, runStepsAndExit } from "./run-steps"
 
 runStepsAndExit([
   { command: ["bun", "packages/run/scripts/patch-knip-jiti.ts"] },
-  { command: ["cp", "CHANGELOG.md", "packages/run/CHANGELOG.md"] }
+  copyFile("CHANGELOG.md", "packages/run/CHANGELOG.md")
 ])
