@@ -93,9 +93,9 @@ const noted = () => ({
 describe("the session quota panel's rows", () => {
   const rows = () => sessionLines(fixtureSessionView(), 84).map(plain);
 
-  test("says an account has no windows reported when quota-axi gave none with a pace, as quota-rows pins it, not a bare heading", () => {
-    const unpaced = JSON.stringify(JSON.parse(fixture("quota-axi/full.json"), (key, value) => (key === "pace" ? undefined : value)));
-    const lines = sessionLines(sessionViewOfQuota(unpaced, recordedNow), 84).map(plain);
+  test("says an account has no windows reported when quota-axi gave none with a reset, as quota-rows pins it, not a bare heading", () => {
+    const unreset = JSON.stringify(JSON.parse(fixture("quota-axi/full.json"), (key, value) => (key === "resetsAt" ? undefined : value)));
+    const lines = sessionLines(sessionViewOfQuota(unreset, recordedNow), 84).map(plain);
     const heading = lines.findIndex((row) => row.startsWith("● claude"));
     expect(lines.slice(heading + 1, heading + 2)).toEqual(["no windows reported"]);
   });
@@ -397,7 +397,7 @@ describe("the live session quota panel inside the terminal's rows where flags de
       accounts: view.accounts.flatMap((account) => {
         if (account.provider !== "claude" || account.body.kind !== "windows") return [];
         const found = account.body.windows.find((window) => window.id === "seven_day");
-        if (found === undefined) return [];
+        if (found === undefined || found.startsAt === null) return [];
         const week = { ...found, sessions: found.sessions.map((row) => ({ ...row, flagged: row.session.id === "pane:w1A:p2" })) };
         const windows = [1, 2, 3, 4, 5, 6, 7].map((hours) => ({ ...week, id: `w${hours}`, cycleSeconds: hours * 3600 }));
         return [{ ...account, body: { kind: "windows" as const, windows } }];

@@ -3,7 +3,7 @@ kind: reference
 ---
 # Compose two machines
 The panel, the printed frame and the dashboard merge a second machine's sessions when a command that prints that machine's report is configured.
-The command runs on this machine and prints the other machine's `--json` report, the version 1 report above.
+The command runs on this machine and prints the other machine's `--json` report, the single-machine report of [Read the JSON report](json-report.md).
 Only that usage-only report crosses between machines, never a log line or a prompt.
 
 To configure the second machine, set these variables where the panel runs:
@@ -43,7 +43,7 @@ It keeps as many as fit beside the pane id, which always stays whole.
 Short names leave the row more room for the place.
 A window neither machine logged a call in reads, for example, `none logged on north or south`.
 The caption names the machines whose logs the estimates come from, such as `estimates from north and south logs`.
-When the command fails or its output is not a version 1 report, the panel says so on a warning line with the reason.
+When the command fails or its output is not a version 1 or version 3 single-machine report, the panel says so on a warning line with the reason.
 It does the same when the report is more than five minutes old.
 It then shows this machine's shares alone, as upper bounds, under a caption that names only this machine.
 When this machine's [quota-axi](https://github.com/kunchenguid/quota-axi) reading fails, the other machine's accounts and the accounts the harness logs read still show.
@@ -56,18 +56,20 @@ A warning line beside them names the machine and the account, with the reason.
 To print the merged report once, run `orc-dash report session-quota-composed`.
 It prints this machine's report alone, in the composed shape, when no second machine is configured.
 `ComposedSessionQuotaReport` in `packages/schema/src/entities/session-quota/contract/composed-session-quota.ts` decodes it.
-Its `schemaVersion` is `2`, so a reader of the version 1 report never mistakes one for the other.
-`orc-dash report session-quota` prints this machine's version 1 report alone, and the alert stream reads this machine alone.
+Its `schemaVersion` is `4`, so a reader of the single-machine report, version 1 or 3, never mistakes one for the other.
+A version 2 composed report still reads.
+In version 4, a window with no known cycle stays in the report with `startsAt` and `elapsedFraction` both `null`.
+`orc-dash report session-quota` prints this machine's single-machine report alone, and the alert stream reads this machine alone.
 
-The composed report keeps the fields of the version 1 report, except `sources`, and changes these:
+The composed report keeps the fields of the version 3 single-machine report, except `sources`, and changes these:
 
 | Field | What it holds |
 | --- | --- |
-| `schemaVersion` | `2` |
+| `schemaVersion` | `4`, or `2` from an older machine |
 | `scope` | `composed` |
 | `estimate.basis` | `machine-logs`, and `upperBound` stays `true` |
 | `machines` | Each machine's `name`, `role` `local` or `remote`, `status` `ok`, `unreachable`, `invalid` or `stale` with a `detail`, `generatedAt` and whether its calls are `combined` |
-| `machines[].sources` | The `sources` the machine read, as in the version 1 report |
+| `machines[].sources` | The `sources` the machine read, as in the single-machine report |
 | `machines[].failedAccounts` | Each account the machine could not read, with its `quota` status, where the merged account does not already carry that failure |
 | `windows[].otherCycle` | The machines that read the window in another cycle, so their calls are left out of it |
 | `machine` | On each entry of `sessions`, `windows[].sessions`, `flags` and `unmatchedProcesses` |

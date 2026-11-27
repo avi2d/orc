@@ -33,7 +33,7 @@ Each candidate list contains at least one entry, ordered from first choice to la
 A string candidate names a `provider/model` for all Orc agent roles.
 An object candidate requires `models.implementer` and can name `models.fixer` and `models.reviewer`.
 If omitted, the fixer uses the implementer model, and the reviewer uses the fixer model.
-The reviewer model applies only to Orc's `direct-PR` delivery.
+The reviewer model applies only to Orc's `direct-PR` and `orc` deliveries.
 The [no-mistakes](https://github.com/kunchenguid/no-mistakes) reviewer has its own settings.
 
 All models in a candidate must use the same provider.
