@@ -85,6 +85,21 @@ const paceOf = (cycleSeconds: number | undefined, percentLeft: number, resetsAt:
     ? {}
     : { pace: linearPace(cycleSeconds, percentLeft, DateTime.toEpochMillis(resetsAt), DateTime.toEpochMillis(now)) };
 
+interface WindowShape {
+  readonly label: string;
+  readonly kind: QuotaWindow["kind"];
+  readonly windowSeconds?: number;
+}
+
+// The labels follow the ones quota-axi publishes for each provider, so one window reads the same whichever source read it.
+const windowShape = (provider: QuotaProviderId, id: string, subquoId: string): WindowShape => {
+  if (id === "five_hour") return { label: "session", kind: "session", windowSeconds: 18_000 };
+  if (id === "rolling" && subquoId === "five-hour") return { label: "rolling", kind: "unknown", windowSeconds: 18_000 };
+  if (id === "seven_day" || id === "weekly") return { label: provider === "opencode-go" ? "weekly" : "week", kind: "weekly", windowSeconds: 604_800 };
+  if (id === "monthly") return { label: "monthly", kind: "monthly" };
+  return { label: "rolling", kind: "unknown" };
+};
+
 const overlayProvider = (
   entry: QuotaProvider,
   match: MatchedSubquo,
@@ -121,19 +136,11 @@ const standaloneSubquo = (
   const windows = observation.windows.flatMap((window): ReadonlyArray<QuotaWindow> => {
     const id = quotaWindowId(mapping.provider, window.id, window.scope);
     if (id === undefined || window.percentLeft === null || window.resetsAt === null) return [];
-    const shape = id === "five_hour"
-      ? { label: "session", kind: "session" as const, windowSeconds: 18_000 }
-      : id === "rolling" && window.id === "five-hour"
-        ? { label: "rolling", kind: "unknown" as const, windowSeconds: 18_000 }
-      : id === "seven_day" || id === "weekly"
-        ? { label: id === "seven_day" ? "week" : id, kind: "weekly" as const, windowSeconds: 604_800 }
-        : id === "monthly"
-          ? { label: id, kind: "monthly" as const }
-          : { label: "rolling", kind: "unknown" as const };
+    const shape = windowShape(mapping.provider, id, window.id);
     return [{
       id,
       ...shape,
-      ...paceOf("windowSeconds" in shape ? shape.windowSeconds : undefined, window.percentLeft, window.resetsAt, now),
+      ...paceOf(shape.windowSeconds, window.percentLeft, window.resetsAt, now),
       percentRemaining: window.percentLeft,
       resetsAt: window.resetsAt,
       subquoReadAt: observation.observedAt,

@@ -3,7 +3,7 @@ import { type Failed, failureOf, type Outcome } from "../../../shared/lib";
 import { withCaptured } from "../sources/capture";
 import { type CountedCall, countedCalls, type Ledger } from "../sources/ledger";
 import { resolveSessions, type Session, sessionLabel, type UnmatchedRuns } from "../sources/live";
-import { noTokens, sumTokens, type Tokens, tokenTotal } from "../contract/tokens";
+import { sumTokens, type Tokens, tokenTotal } from "../contract/tokens";
 import type { HarnessProcess, HerdrPane } from "../sources/live-sessions";
 import type { QuotaAvailability, QuotaProviderId, QuotaWindow } from "../sources/quota";
 import { type QuotaRead, type QuotaReadings, sourcedEntries } from "../sources/quota-read";
@@ -14,6 +14,7 @@ import { accountTitle } from "./quotas";
 import { localMidnight, type SessionModels, sessionModelsSinceMidnight } from "./session-models";
 import type { SourcedEntry, SourcedProvider, SourcedWindow, WindowSource } from "../sources/window-sources";
 import { presenceFieldsOf, presenceOf, type PresenceFields } from "./session-pane-presence";
+import { uncycledWindow, type WindowHead } from "./uncycled-window";
 
 interface ModelShare {
   readonly model: string | undefined;
@@ -212,7 +213,7 @@ const windowView = (
   availability: ReadonlyArray<QuotaAvailability>,
 ): WindowView => {
   const usedPoints = 100 - metered.percentRemaining;
-  const head = {
+  const head: WindowHead = {
     id: metered.window.id,
     label: metered.window.label,
     kind: metered.window.kind,
@@ -223,24 +224,7 @@ const windowView = (
     otherCycle: [],
   };
   const cycleSeconds = metered.window.pace?.cycleSeconds;
-  if (cycleSeconds === undefined) return {
-    ...head,
-    cycleSeconds: undefined,
-    startsAt: null,
-    elapsedFraction: null,
-    pace: "unknown",
-    aheadOfPace: false,
-    pastFirstTenth: false,
-    exhaustsBeforeReset: false,
-    verdict: null,
-    sustainablePointsPerHour: null,
-    activeSessions: 0,
-    fairPointsPerHour: null,
-    observedCalls: 0,
-    observedTokens: noTokens,
-    unattributedPoints: usedPoints,
-    sessions: [],
-  };
+  if (cycleSeconds === undefined) return uncycledWindow(head);
   const now = DateTime.toEpochMillis(inputs.now);
   const start = startOf(metered, cycleSeconds);
   const resetsAt = DateTime.toEpochMillis(metered.resetsAt);

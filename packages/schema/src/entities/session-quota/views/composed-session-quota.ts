@@ -158,8 +158,9 @@ const combinedWindow = (anchor: WindowView, members: ReadonlyArray<Member>): Win
   };
 };
 
+// A reading with no cycle has no start to rate sessions against, so a member that knows the cycle anchors the window.
 const windowOfGroup = ({ members, otherCycle }: WindowGroup): ReadonlyArray<WindowView> => {
-  const anchor = members.at(0)?.window;
+  const anchor = (members.find(({ window }) => window.startsAt !== null) ?? members.at(0))?.window;
   if (anchor === undefined) return [];
   return [{ ...(members.length === 1 ? anchor : combinedWindow(anchor, members)), otherCycle }];
 };

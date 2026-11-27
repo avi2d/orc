@@ -223,6 +223,36 @@ describe("the subscriptions table over a subquo reading", () => {
   test("shows the week of a Claude account only subquo reads, not an account with windows read as holding none", () => {
     expect(rowsOver({ generatedAt: readAt, providers: [], notSetUp: ["claude"] })).toEqual([["claude", [["week", 30]]]])
   })
+
+  test("labels the week of a Codex account only subquo reads as quota-axi does, not as weekly", () => {
+    const view = viewOver({ generatedAt: readAt, providers: [], notSetUp: ["codex"] }, [
+      { provider: "codex", accountKey: "default", subquoId: "codex" }
+    ])
+    expect(rowsFrom(view).map((group) => [group.account, windowsOf(group).map((row) => [row.label, row.usedPercent])])).toEqual([
+      ["codex", [["week", 70]]]
+    ])
+  })
+
+  test("dates a window two machines share from the machine that knows its cycle, not from the first machine's reading with no start", () => {
+    const local = viewOver({ generatedAt: readAt, providers: [], notSetUp: ["opencode-go"] }, [
+      { provider: "opencode-go", accountKey: "default", subquoId: "opencode-go" }
+    ])
+    const decoded = decodeQuota(quotaAxiJsonFor(["--provider", "opencode-go"], fixtureText("quota-axi/full.json")))
+    if (decoded.kind !== "ok") throw new Error(decoded.issue)
+    const sameReset = DateTime.makeUnsafe("2026-12-08T10:59:08.000Z")
+    const remote = viewOver({
+      ...decoded.value,
+      providers: decoded.value.providers.map((entry) => "kind" in entry ? entry : {
+        ...entry,
+        windows: entry.windows.filter((window) => window.id === "monthly").map((window) => ({ ...window, resetsAt: sameReset }))
+      })
+    }, [])
+    const composed = composedSessionQuota(local, "mac", [{ name: "remote", reading: { kind: "ok", value: remote } }])
+    const monthly = composed.accounts
+      .flatMap((account) => account.body.kind === "windows" ? account.body.windows : [])
+      .filter((window) => window.id === "monthly")
+    expect(monthly.map((window) => window.startsAt === null ? null : DateTime.formatIso(window.startsAt))).toEqual(["2026-11-07T10:59:08.000Z"])
+  })
 })
 
 describe("the machines table", () => {
