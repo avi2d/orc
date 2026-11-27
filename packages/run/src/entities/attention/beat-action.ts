@@ -44,6 +44,7 @@ export type BeatAction =
     readonly branch: string
     readonly questions: ReadonlyArray<string>
     readonly decider: ReadonlyArray<string>
+    readonly reason?: string
   }
   | { readonly kind: "held"; readonly task: string; readonly machine: string; readonly reason: string }
   | { readonly kind: "asking"; readonly task: string; readonly machine: string; readonly until: string; readonly questions: ReadonlyArray<string> }

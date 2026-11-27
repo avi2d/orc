@@ -295,6 +295,8 @@ const expectedFiles = [
   "src/features/running-a-task/review-outcome.ts",
   "src/features/running-a-task/review-path-rules.ts",
   "src/features/running-a-task/review-turn.ts",
+  "src/features/running-a-task/review-wait-checkpoint.ts",
+  "src/features/running-a-task/review-wait.ts",
   "src/features/running-a-task/reviewer-chain.ts",
   "src/features/running-a-task/run-args.ts",
   "src/entities/run-history/report.ts",

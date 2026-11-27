@@ -68,7 +68,12 @@ export interface Hold {
   readonly history?: ReadonlyArray<AnsweredHold>
 }
 
-const ParkedOrigin = Schema.Struct({ machine: Schema.String.check(Schema.isNonEmpty()), run: Schema.String.check(Schema.isNonEmpty()), pr: Schema.optional(Schema.String) })
+const ParkedOrigin = Schema.Struct({
+  machine: Schema.NonEmptyString,
+  run: Schema.NonEmptyString,
+  pr: Schema.optional(Schema.String),
+  reviewerQuota: Schema.optional(Schema.NonEmptyString)
+})
 
 export interface Parked {
   readonly origin?: typeof ParkedOrigin.Type
@@ -257,9 +262,9 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (typeof questions === "string") {
     return questions
   }
-  return questions.length > 0 || ((front.retry !== undefined || front.rebase !== undefined) && front.parked_origin !== undefined)
+  return questions.length > 0 || (front.parked_origin !== undefined && (front.retry !== undefined || front.rebase !== undefined || front.parked_origin.reviewerQuota !== undefined))
     ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }), ...(front.parked_at === undefined ? {} : { at: front.parked_at }), ...(front.parked_sent_back_at === undefined ? {} : { sentBackAt: front.parked_sent_back_at }) }
-    : "a parked task names no question"
+    : "a parked task names no question or resume reason"
 }
 
 const holdOf = (front: Frontmatter): Hold | null | string => {

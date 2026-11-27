@@ -3,7 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs } from "./dispatch-args"
 import { backlogPaths, BacklogError, findTask, listTasks, markPosted, runLabel, backlogPresent, backlogRoot as backlogRootOf, noBacklog, type TaskFileError } from "../entities/backlog/index"
 import { readAttention, routeTaskItems, withdrawTaskItems } from "../entities/attention/index"
-import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readBeatWaits, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText, taskPrState } from "../widgets/beat/index"
+import { backlogJson, type BacklogView, beatJson, checkReviewerRoom, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readBeatWaits, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText, taskPrState } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
 import { edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add, retryTask } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
@@ -129,7 +129,7 @@ const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult"
       label = (yield* readStdinLabel(place.stdin)) ?? label
     }
     const result = args.reach.kind === "here"
-      ? yield* readResult(args.task, place.home, label)
+      ? yield* readResult(args.task, place.home, label, checkReviewerRoom)
       : yield* readResultThrough(args.reach.command, args.task, label)
     yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
   })

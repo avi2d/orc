@@ -282,13 +282,19 @@ const runChecksFixLoop = (
     if (resumed !== null) {
       return resumed
     }
+    const readChecks = (number: number) => readProjectChecks(run, number)
+    const finish = () => finishChecked({
+      run, ops, base, rounds, fixes, commits, plan, checkpoints, readChecks,
+      fixReview: (evidence, attempt) => fixOnce(run, ops.runAgent, evidence, attempt, null, checkpoints, null, true)
+    })
     for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
-      const summary = yield* runRecordedChecks(run, ops, checkpoints, rounds, round, (number) => readProjectChecks(run, number))
+      const summary = yield* runRecordedChecks(run, ops, checkpoints, rounds, rounds.length + 1, readChecks)
       const failed = summary.failed
       if (failed.length === 0) {
-        return yield* finishChecked({ run, ops, base, rounds, fixes, commits, plan, checkpoints, fixReview: (evidence, attempt) => fixOnce(run, ops.runAgent, evidence, attempt, null, checkpoints, null, true), readChecks: (number) => readProjectChecks(run, number) })
+        return yield* finish()
       }
-      if (fixes.length >= maxFixAttempts) {
+      const checksFixes = fixes.filter((fix) => rounds.some((checked) => checked.file === fix.evidenceIn))
+      if (checksFixes.length >= maxFixAttempts) {
         return {
           ...base,
           commits,
