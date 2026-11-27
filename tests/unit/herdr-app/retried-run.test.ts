@@ -50,7 +50,7 @@ const everyRow = (_id: unknown, count: number, _key: unknown, row: (index: numbe
   return element
 }
 
-void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow }))
+void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow, image: node, svg: node }))
 void mock.module("gpui-base", () => ({
   h_flex: node, v_flex: node, Scrollbar: { vertical: node }, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
@@ -116,10 +116,16 @@ test("the Agents panel labels a run the beat retried after its PR opened Retried
     const agents = new OrcAgents()
     agents.refresh(cx)
     while (spawned.length > 0) await spawned.shift()
-    const words = wordsOf(agents.render(cx))
-    expect(words).toContain("Retried PR #48")
-    expect(words).toContain("Sent back PR #49")
-    expect(words).not.toContain("Sent back PR #48")
+    const openedRun = (runId: string): ReadonlyArray<string> => {
+      const card = agents.allCards().find((candidate) => candidate.runId === runId)
+      if (card === undefined) throw new Error("No card for " + runId)
+      agents.selectedKey = card.key
+      return wordsOf(agents.render(cx))
+    }
+    const retried = openedRun(retriedRun)
+    expect(retried).toContain("Retried PR #48")
+    expect(retried).not.toContain("Sent back PR #48")
+    expect(openedRun(sentBackRun)).toContain("Sent back PR #49")
   } finally {
     documents.clear()
     await rm(root, { recursive: true, force: true })

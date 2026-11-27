@@ -111,7 +111,8 @@ const inboxFrame = async (count: number) => {
 test("an Agents frame with 300 cards awaiting you builds as many elements as one with 30 instead of building every card", async () => {
   const few = await agentsFrame(30)
   const many = await agentsFrame(300)
-  expect(many.held).toContain(300)
+  const statusHeader = 1
+  expect(many.held).toContain(300 + statusHeader)
   expect(many.built).toBe(few.built)
 })
 
