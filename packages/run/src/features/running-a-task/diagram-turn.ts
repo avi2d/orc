@@ -13,28 +13,33 @@ export const parseDiagramReply = (reply: string | null): DiagramResult => {
   return chart === "" ? { kind: "none" } : { kind: "mermaid", chart }
 }
 
-const diagramPrompt = (taskFile: string, diffFile: string): string =>
+const diagramPrompt = (diffFile: string): string =>
   [
     "You draw one diagram of the change on the current branch of this repository for the PR that ships it.",
-    "The task sits in " + taskFile + ".",
     "The branch diff sits in " + diffFile + ".",
-    "Read the task and the diff, and read every changed file in full.",
+    "Read the diff and every changed file in full. Do not read task files or include private details.",
+    "Start with Why: followed by one short sentence explaining the change from the diff.",
     "Change no file, make no commit and run no command that writes anything.",
-    "When the change alters a flow, a structure or a boundary, print one ```mermaid flowchart block that explains it, with nothing before or after the fence.",
-    "When no picture explains the change better than words, print only: no diagram"
+    "When the change alters a flow, a structure or a boundary, follow with one ```mermaid flowchart block that explains it.",
+    "Otherwise, follow with: no diagram"
   ].join("\n")
+
+export interface DiagramTurnResult {
+  readonly diagram: DiagramResult
+  readonly why: string | null
+}
 
 export const runDiagramTurn = (
   run: Pick<HistoryRun, "fs" | "path" | "runDir" | "piSessionDir" | "spawner" | "git" | "projectDir" | "branch">,
   runAgent: SandboxOps["runAgent"],
   reviewer: AgentFile
-): Effect.Effect<DiagramResult> =>
+): Effect.Effect<DiagramTurnResult> =>
   Effect.gen(function*() {
     const diffed = yield* readDiff(run).pipe(Effect.result)
     if (Result.isFailure(diffed)) {
-      return { kind: "none" } as const
+      return { diagram: { kind: "none" }, why: null } as const
     }
-    const prompt = diagramPrompt(run.path.join(run.piSessionDir, "task.md"), diffed.success)
+    const prompt = diagramPrompt(diffed.success)
     const result = yield* runAgent({
       agent: { ...reviewer, tools: readOnlyTools },
       prompt,
@@ -44,7 +49,10 @@ export const runDiagramTurn = (
       onSession: () => Effect.void
     }).pipe(Effect.result)
     if (Result.isFailure(result)) {
-      return { kind: "none" } as const
+      return { diagram: { kind: "none" }, why: null } as const
     }
-    return parseDiagramReply(yield* readReply(run, result.success.sessionFile))
+    const reply = yield* readReply(run, result.success.sessionFile)
+    const reason = reply?.split("```", 1)[0]?.match(/^[ \t]*(?:Why:|\*\*Why:\*\*|\*\*Why\*\*:)\s*([^\r\n]+)/m)?.[1]?.trim() ?? ""
+    const why = reason === "" || /^no diagram$/i.test(reason) ? null : reason
+    return { diagram: parseDiagramReply(reply), why }
   })
