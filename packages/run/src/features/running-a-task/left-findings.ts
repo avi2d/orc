@@ -5,7 +5,7 @@ export const passesRoundTwoBar = (finding: ReviewFinding): boolean => finding.se
 export type ReviewStop = "cleared" | "round-limit" | "repeat" | "severity-bar"
 
 const stopReasons = {
-  cleared: "no error or warning remained",
+  cleared: "no fixable error or warning remained",
   "round-limit": "the configured fix round limit was reached",
   repeat: "a finding repeated one sent to the fixer",
   "severity-bar": "no finding met the later rounds' severity bar"
@@ -29,7 +29,7 @@ export const sameFinding = (one: ReviewFinding, other: ReviewFinding): boolean =
   one.file === other.file && "topic" in one && "topic" in other && one.topic === other.topic
 
 export const leftFindings = (remaining: ReadonlyArray<ReviewFinding>, sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>, stop: ReviewStop, askUserFindings: ReadonlyArray<ReviewFinding>): ReadonlyArray<LeftFinding> =>
-  [...remaining.filter((finding) => finding.action !== "ask-user"), ...askUserFindings].map((finding) => {
+  [...remaining, ...askUserFindings.filter((finding) => !remaining.some((current) => sameFinding(current, finding)))].map((finding) => {
     if (finding.action === "ask-user") return { finding, reason: { kind: "ask-user" } }
     if (stop === "cleared") return { finding, reason: { kind: "stopped", stop } }
     if (stop === "round-limit" && !passesRoundTwoBar(finding)) return { finding, reason: { kind: "round-limit", round: sentPerRound.length } }

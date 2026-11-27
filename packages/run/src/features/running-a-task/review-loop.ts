@@ -100,7 +100,10 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
     let round = 1
     while (review.status === "passed") {
       for (const finding of review.findings) {
-        if (finding.action === "ask-user" && !askUserFindings.some((earlier) => sameFinding(earlier, finding))) askUserFindings.push(finding)
+        if (finding.action !== "ask-user") continue
+        const earlier = askUserFindings.findIndex((kept) => sameFinding(kept, finding))
+        if (earlier === -1) askUserFindings.push(finding)
+        else askUserFindings[earlier] = finding
       }
       const stop = stopForReview(review.findings, round, limit, sentPerRound)
       if (stop !== null) {

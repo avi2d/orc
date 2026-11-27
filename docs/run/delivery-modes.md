@@ -96,6 +96,7 @@ When the task file cannot be read, the diagram is kept.
 `## How it was checked` names the local checks that passed and the review result.
 A review with no findings gives the line `The review found nothing.`, and a failed review turn gives `The review turn failed, so this PR lists no review findings.`
 `## Open review findings` lists each open finding with its severity, id, file and line, description and action, and the run leaves the heading out when no finding is open.
+`## Findings that need a person` follows it and lists each open `ask-user` finding the same way, and the run leaves the heading out when none is open.
 
 ## Findings left open
 After a successful review and any fix rounds, an `orc` run opens its PR the same way, with the remaining findings.
@@ -104,7 +105,7 @@ Under each remaining finding, a nested line says why the fix loop left it.
 An `ask-user` finding stays out of the fixer input and remains in the PR body.
 If the final review reports the same finding again, the PR uses that review's wording and action.
 When a later round is available, a `warning` or `info` finding is below its severity bar, which fixes only errors.
-If no fix round runs because no `error` or `warning` remains, the reason line names that stop.
+If no fix round runs because no fixable `error` or `warning` remains, the reason line names that stop.
 If no fix round is left, the reason line names the round limit.
 A repeat has the same file and topic as a finding the fixer received earlier.
 Only findings eligible for the next fix round can trigger the repeat stop.

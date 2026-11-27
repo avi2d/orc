@@ -117,7 +117,7 @@ test("an empty review does not start a fixer", async () => {
   const result = await exercise([[]])
   expect(result.kinds).toEqual(["implementer", "reviewer", "reviewer"])
   expect(result.completed).toBe(true)
-  expect(result.endReason).toContain("stopped because no error or warning remained.")
+  expect(result.endReason).toContain("stopped because no fixable error or warning remained.")
 }, 60_000)
 
 test("a cleared first fix does not start a second round", async () => {
@@ -271,14 +271,14 @@ test("a re-reported ask-user warning does not block a new error from the second 
   const asked = { ...warning, action: "ask-user" }
   const result = await exercise([[error, asked], [lateError, asked], []])
   expect(result.evidence.map((value) => JSON.parse(value))).toEqual([[error], [lateError]])
-  expect(result.endReason).toContain("stopped because no error or warning remained.")
+  expect(result.endReason).toContain("stopped because no fixable error or warning remained.")
   expect(result.body).toContain("Left because it asks the user.")
 }, 60_000)
 
 test("a repeated warning below the second round bar does not block a new error", async () => {
   const result = await exercise([[error, warning], [lateError, warning], []])
   expect(result.evidence.map((value) => JSON.parse(value))).toEqual([[error, warning], [lateError]])
-  expect(result.endReason).toContain("stopped because no error or warning remained.")
+  expect(result.endReason).toContain("stopped because no fixable error or warning remained.")
 }, 60_000)
 
 test("a warning never sent in round 2 does not block a new error in round 3", async () => {
@@ -290,8 +290,8 @@ test("a warning never sent in round 2 does not block a new error in round 3", as
 test("an info-only review does not claim a second round severity bar", async () => {
   const result = await exercise([[info]])
   expect(result.evidence).toHaveLength(0)
-  expect(result.endReason).toContain("stopped because no error or warning remained.")
-  expect(result.body).toContain("Left because no error or warning remained.")
+  expect(result.endReason).toContain("stopped because no fixable error or warning remained.")
+  expect(result.body).toContain("Left because no fixable error or warning remained.")
   expect(result.body).not.toContain("round 2 bar")
 }, 60_000)
 
@@ -309,14 +309,28 @@ test("a retained ask-user finding does not inflate the recorded final review cou
   expect(result.body).toContain("warning `w`")
 }, 60_000)
 
-test("a retained ask-user finding is not lost when a later review changes its action", async () => {
+test("a retained ask-user finding is not listed twice when a later review changes its action", async () => {
   const asked = { ...warning, topic: "result-fragile", action: "ask-user" }
   const current = { ...error, id: "updated", topic: "result-fragile", description: "The result corrupts saved data." }
   const result = await exercise([[error, asked], [current]], "no diagram", undefined, 1)
   expect(result.body).toContain("error `updated`")
   expect(result.body).toContain("The result corrupts saved data.")
-  expect(result.body).toContain("The result is fragile.")
-  expect(result.body).toContain("## Findings that need a person")
+  expect(result.body).not.toContain("The result is fragile.")
+  expect(result.body).not.toContain("## Findings that need a person")
+}, 60_000)
+
+test("a re-asked finding does not keep an earlier review's wording", async () => {
+  const asked = { ...warning, action: "ask-user" }
+  const result = await exercise([[error, asked], [{ ...asked, description: "The result breaks on empty input." }]])
+  expect(result.body).toContain("The result breaks on empty input.")
+  expect(result.body).not.toContain("The result is fragile.")
+}, 60_000)
+
+test("a finding re-asked in a middle round does not keep the first round's wording", async () => {
+  const asked = { ...warning, action: "ask-user" }
+  const result = await exercise([[error, asked], [lateError, { ...asked, description: "The result breaks on empty input." }], []])
+  expect(result.body).toContain("The result breaks on empty input.")
+  expect(result.body).not.toContain("The result is fragile.")
 }, 60_000)
 
 test("a drawn diagram lands as a mermaid fence rather than prose", async () => {
