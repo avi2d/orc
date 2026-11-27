@@ -34,6 +34,16 @@ const stopForReview = (findings: ReadonlyArray<ReviewFinding>, round: number, li
   return null
 }
 
+const collectAskUser = (kept: Array<ReviewFinding>, findings: ReadonlyArray<ReviewFinding>): void => {
+  for (const finding of findings) {
+    const earlier = kept.findIndex((held) => sameFinding(held, finding))
+    if (finding.action !== "ask-user") {
+      if (earlier !== -1) kept.splice(earlier, 1)
+    } else if (earlier === -1) kept.push(finding)
+    else kept[earlier] = finding
+  }
+}
+
 const stopReport = (loop: ReviewLoop, endReason: string): OrcRunReport => ({
   ...loop.base, commits: loop.commits, completed: false, checksRounds: loop.rounds,
   fixes: loop.fixes, fixAttempts: loop.fixes.length, endReason
@@ -99,13 +109,7 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
     const askUserFindings: Array<ReviewFinding> = []
     let round = 1
     while (review.status === "passed") {
-      for (const finding of review.findings) {
-        const earlier = askUserFindings.findIndex((kept) => sameFinding(kept, finding))
-        if (finding.action !== "ask-user") {
-          if (earlier !== -1) askUserFindings.splice(earlier, 1)
-        } else if (earlier === -1) askUserFindings.push(finding)
-        else askUserFindings[earlier] = finding
-      }
+      collectAskUser(askUserFindings, review.findings)
       const stop = stopForReview(review.findings, round, limit, sentPerRound)
       if (stop !== null) {
         return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, stop, askUserFindings })
