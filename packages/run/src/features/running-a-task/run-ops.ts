@@ -7,7 +7,7 @@ import type { DirectPrRecord } from "../../entities/pull-request/index"
 import type { ChecksRoundSummary, OrcRunCommit, RecordedFixAttempt } from "../../entities/run-history/index"
 import type { ReviewAtHeadOutcome } from "./review-outcome"
 import type { NoReviewerRoom } from "./reviewer-chain"
-import type { ReviewWaitCheckpoint } from "./review-wait"
+import type { ReviewWaitCheckpoint } from "./review-wait-checkpoint"
 
 export interface AgentRun {
   readonly agent: AgentFile

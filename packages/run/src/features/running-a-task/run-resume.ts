@@ -263,6 +263,34 @@ const inheritedCompletion = (
     }
   })
 
+const readNote = (run: HistoryRun, file: string): Effect.Effect<string | null, OrcRunError> =>
+  run.fs.readFileString(file).pipe(
+    Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<string | null>(null)),
+    Effect.mapError((cause) => historyFailure("read", cause))
+  )
+
+const forwardHandover = (run: HistoryRun, priorDir: string) =>
+  Effect.gen(function*() {
+    const own = yield* readNote(run, run.path.join(priorDir, handoverFileName))
+    const forwarded = own === null ? yield* readNote(run, run.path.join(priorDir, inheritedHandoverFileName)) : null
+    const handover = own ?? forwarded
+    if (handover !== null) {
+      yield* run.fs.writeFileString(run.path.join(run.runDir, inheritedHandoverFileName), handover).pipe(
+        Effect.mapError((cause) => historyFailure("forward the handover note in", cause))
+      )
+    }
+    return { own, forwarded, handover }
+  })
+
+const checkedReviewWait = (run: HistoryRun, priorDir: string) =>
+  Effect.gen(function*() {
+    const reviewWait = yield* readReviewWait(run, priorDir)
+    if (reviewWait !== null && run.delivery.kind !== "orc") {
+      return yield* refuse("orc: a run waiting for reviewer quota needs --delivery orc")
+    }
+    return reviewWait
+  })
+
 export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePlan, OrcRunError> =>
   Effect.gen(function*() {
     const allow = run.allow ?? []
@@ -273,24 +301,9 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       return empty
     }
     const progress = yield* readPriorProgress(db, run, prior)
-    const readNote = (file: string): Effect.Effect<string | null, OrcRunError> =>
-      run.fs.readFileString(file).pipe(
-        Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<string | null>(null)),
-        Effect.mapError((cause) => historyFailure("read", cause))
-      )
     const priorDir = run.path.join(run.path.dirname(run.runDir), prior.id)
-    const reviewWait = yield* readReviewWait(run, priorDir)
-    if (reviewWait !== null && run.delivery.kind !== "orc") {
-      return yield* refuse("orc: a run waiting for reviewer quota needs --delivery orc")
-    }
-    const own = yield* readNote(run.path.join(priorDir, handoverFileName))
-    const forwarded = own === null ? yield* readNote(run.path.join(priorDir, inheritedHandoverFileName)) : null
-    const handover = own ?? forwarded
-    if (handover !== null) {
-      yield* run.fs.writeFileString(run.path.join(run.runDir, inheritedHandoverFileName), handover).pipe(
-        Effect.mapError((cause) => historyFailure("forward the handover note in", cause))
-      )
-    }
+    const reviewWait = yield* checkedReviewWait(run, priorDir)
+    const { own, forwarded, handover } = yield* forwardHandover(run, priorDir)
     const fresh = !progress.implementPassed && (own !== null || (forwarded !== null && progress.implementSessionId === null))
     const carriedImplement = fresh ? null : yield* carrySession(run, progress.implementSource, progress.implementSessionId)
     const sentBack = sentBackAnswersOf(answers).length > 0
