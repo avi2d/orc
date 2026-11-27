@@ -32,7 +32,7 @@ To install orc:
 
 Orc prints its version.
 The npm package runs without Bun on Apple silicon macOS and Linux x64 with glibc.
-If the compiled binary is missing, install Bun to run orc from source.
+If the compiled binary is missing, install Bun to run the bundled `dist/bin.js`.
 To upgrade orc, run the same install command again or follow [Updating orc](docs/run/updating-orc.md).
 The beat's hourly update needs an npm prefix you can write to, and that page says how to turn it off for a root-owned one.
 To run orc from a checkout of this repository instead, follow [Contribute](docs/contribute.md#run-orc-from-a-checkout).

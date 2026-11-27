@@ -366,7 +366,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/scripts/launch.sh` | The shell entry of the npm `orc` bin, which finds Node and starts `launch.js` |
-| `packages/run/scripts/launch.ts` | The Node launcher, which `bun run build:launcher` bundles into `packages/run/dist/launch.js`. It runs the compiled orc from the platform package, else the source entry with Bun |
+| `packages/run/scripts/launch.ts` | The Node launcher, which `bun run build:launcher` bundles into `packages/run/dist/launch.js`. It runs the compiled orc from the platform package, else the bundled `dist/bin.js` with Bun |
 | `packages/run/agents` | The bundled agent files |
 | `packages/run/agents/decider-policy.md` | The written policy the decider answers under |
 | `packages/run/agents/reviewer.md` | The bundled reviewer prompt, which the project's `.orc/agents/reviewer.md` and then `$ORC_HOME/agents/reviewer.md` override |
