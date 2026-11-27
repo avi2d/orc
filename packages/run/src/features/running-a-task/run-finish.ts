@@ -5,8 +5,7 @@ import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
 import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
-import { type DiagramResult, runDiagramTurn } from "./diagram-turn"
-import { splitFrontmatter } from "../../entities/backlog/index"
+import { type DiagramTurnResult, runDiagramTurn } from "./diagram-turn"
 import type { ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
@@ -92,20 +91,6 @@ export interface PrBodyInput {
   readonly review: ReviewSection
 }
 
-const isHeading = (line: string): boolean => /^#{1,6}(\s|$)/.test(line)
-
-export const taskGoal = (taskText: string): string => {
-  const body = splitFrontmatter(taskText)?.body ?? taskText
-  const lines = body.split("\n").map((line) => line.trim())
-  const start = lines.findIndex((line) => line !== "" && !isHeading(line))
-  if (start === -1) {
-    const title = lines.find((line) => line.startsWith("# "))?.slice(2).trim() ?? ""
-    return title === "" ? "The task file states no goal." : title
-  }
-  const end = lines.findIndex((line, index) => index > start && (line === "" || isHeading(line)))
-  return lines.slice(start, end === -1 ? undefined : end).join("\n")
-}
-
 const checkedSentence = (passed: ReadonlyArray<string>): string =>
   passed.length === 0
     ? "orc opened this PR without local checks or no-mistakes. " + beatReadsChecks
@@ -134,32 +119,24 @@ export const prBody = (input: PrBodyInput): string => {
   return "## Why\n\n" + input.goal + "\n\n## What changed\n\n" + changed + "\n" + diagram + "\n## How it was checked\n\n" + checkedSentence(input.passed) + "\n" + reviewStatusLine(input.review) + "\n" + openFindingLines(input.review)
 }
 
-const readTaskGoal = (run: Pick<HistoryRun, "fs" | "taskPath">): Effect.Effect<string> =>
-  run.fs.readFileString(run.taskPath).pipe(
-    Effect.map(taskGoal),
-    Effect.catchTag("PlatformError", () => Effect.succeed(taskGoal("")))
-  )
-
-const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps["runAgent"]): Effect.Effect<DiagramResult> =>
+const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps["runAgent"]): Effect.Effect<DiagramTurnResult> =>
   pick(runAgent).pipe(
     Effect.flatMap((picked) => runDiagramTurn(run, picked.runAgent, picked.reviewer)),
     Effect.catchTags({
-      NoReviewerRoom: () => Effect.succeed({ kind: "none" } as const),
-      OrcRunError: () => Effect.succeed({ kind: "none" } as const)
+      NoReviewerRoom: () => Effect.succeed({ diagram: { kind: "none" }, why: null } as const),
+      OrcRunError: () => Effect.succeed({ diagram: { kind: "none" }, why: null } as const)
     })
   )
 
 const openPullRequest = (
   run: HistoryRun,
   opener: PullRequestOpener,
-  drawDiagram: Effect.Effect<DiagramResult>,
+  drawDiagram: Effect.Effect<DiagramTurnResult>,
   rounds: ReadonlyArray<ChecksRoundSummary>,
   checkpoints: RunCheckpoints,
   review: ReviewSection
 ): Effect.Effect<DirectPrRecord, OrcRunError> =>
   Effect.gen(function*() {
-    const drawn = yield* drawDiagram
-    const diagram = drawn.kind === "mermaid" ? drawn.chart : null
     yield* checkpoints.pullRequestStart(new Date().toISOString())
     const head = yield* runGit(run.spawner, run.git, ["log", "-1", "--format=%s", run.branch], run.worktreeDir).pipe(
       Effect.map((logged) => logged.stdout.trim()),
@@ -168,12 +145,17 @@ const openPullRequest = (
     const listed = yield* branchCommits(run.spawner, run.git, run.branch, run.projectDir).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed([] as Array<OrcRunCommit>)))
     const subjects = listed.map((commit) => commit.subject.trim()).filter((subject) => subject !== "")
     const bodySubjects = subjects.length > 0 ? subjects : (head !== "" ? [head] : [])
-    const goal = yield* readTaskGoal(run)
-    const bodyFile = run.path.join(run.runDir, prBodyFileName)
-    yield* run.fs.writeFileString(bodyFile, prBody({ goal, subjects: bodySubjects, diagram, passed: rounds.at(-1)?.checks.map((check) => check.name) ?? [], review })).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
-    )
-    const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, bodyFile)
+    const prepareBody = Effect.gen(function*() {
+      const drawn = yield* drawDiagram
+      const diagram = drawn.diagram.kind === "mermaid" ? drawn.diagram.chart : null
+      const goal = [head || "No commits landed on the branch.", drawn.why].filter((part) => part !== null).join("\n\n")
+      const bodyFile = run.path.join(run.runDir, prBodyFileName)
+      yield* run.fs.writeFileString(bodyFile, prBody({ goal, subjects: bodySubjects, diagram, passed: rounds.at(-1)?.checks.map((check) => check.name) ?? [], review })).pipe(
+        Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
+      )
+      return bodyFile
+    })
+    const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, prepareBody)
     yield* checkpoints.pullRequestDone(pr)
     return pr
   })

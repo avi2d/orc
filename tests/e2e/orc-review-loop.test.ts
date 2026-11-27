@@ -170,16 +170,17 @@ test("an error left after round 2 names a repeat or the round limit rather than 
 }, 60_000)
 
 test("a drawn diagram lands as a mermaid fence rather than prose", async () => {
-  const result = await exercise([[]], "```mermaid\nflowchart LR\n  task --> run\n```")
+  const result = await exercise([[]], "Why: The change connects the two steps.\n```mermaid\nflowchart LR\n  task --> run\n```")
   expect(result.completed).toBe(true)
   expect(result.prCreated).toBe(true)
   expect(result.body).toContain("## How it fits\n\n```mermaid\nflowchart LR\n  task --> run\n```")
-  expect(result.body).toContain("## Why\n\nDo the thing.")
+  expect(result.body).not.toContain("Do the thing.")
+  expect(result.body).toContain("## Why\n\nwork\n\nThe change connects the two steps.")
 }, 60_000)
 
 test("a declined diagram leaves How it fits out rather than an empty section", async () => {
   const result = await exercise([[]])
   expect(result.completed).toBe(true)
   expect(result.body).not.toContain("## How it fits")
-  expect(result.body).toContain("## Why\n\nDo the thing.")
+  expect(result.body).not.toContain("Do the thing.")
 }, 60_000)

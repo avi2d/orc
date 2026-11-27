@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { parseDiagramReply, type DiagramResult } from "../../packages/run/src/features/running-a-task/diagram-turn"
-import { prBody, taskGoal, type PrBodyInput } from "../../packages/run/src/features/running-a-task/run-finish"
+import { prBody, type PrBodyInput } from "../../packages/run/src/features/running-a-task/run-finish"
 
 const twoFindings = [
   { id: "stale-cache", file: "src/cache.ts", line: 42, severity: "error", action: "Clear the cache on write.", description: "A write leaves the old value in the cache." },
@@ -95,28 +95,6 @@ test("an id-and-file repeat names its match rather than claiming issue identity"
       "- error `late-leak` at `src/cache.ts:42`: A write leaves the old value in the cache. Action: Clear the cache on write.\n" +
       "  - Left because the round limit was reached: the review after fix round 2 reported it.\n"
   )
-})
-
-test("the goal is the first paragraph after the title rather than the whole task file", () => {
-  expect(taskGoal("# Add the cache\n\nServe reads from a cache.\n\n## Done when\n\nA check passes.\n")).toBe("Serve reads from a cache.")
-})
-
-test("a section heading under the title is skipped rather than given as the goal", () => {
-  expect(taskGoal("# Add the cache\n\n## Goal\n\nServe reads from a cache.\n")).toBe("Serve reads from a cache.")
-  expect(taskGoal("# Add the cache\n## Goal\nServe reads from a cache.\n## Done when\nA check passes.\n")).toBe("Serve reads from a cache.")
-})
-
-test("a task file without a title still gives its first paragraph as the goal", () => {
-  expect(taskGoal("Do the thing.\n")).toBe("Do the thing.")
-})
-
-test("frontmatter never leaks into the goal", () => {
-  expect(taskGoal("---\nkind: ship\n---\n# Add the cache\n\nServe reads from a cache.\n")).toBe("Serve reads from a cache.")
-})
-
-test("a title-only task file falls back to the title rather than an empty goal", () => {
-  expect(taskGoal("# Add the cache\n")).toBe("Add the cache")
-  expect(taskGoal("")).toBe("The task file states no goal.")
 })
 
 const mermaid = (chart: string): DiagramResult => ({ kind: "mermaid", chart })
