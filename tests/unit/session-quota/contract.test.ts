@@ -18,10 +18,10 @@ import { fixtureSessionView, harvestedSessionView, recordedNow } from "../../lib
 
 const report = () => sessionQuotaReport(fixtureSessionView());
 
-describe("the session quota JSON contract, version 1", () => {
+describe("the session quota JSON contract, version 3", () => {
   test("survives a JSON round trip and decodes against its own published schema", () => {
     const decoded = Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(JSON.stringify(report())));
-    expect(decoded.schemaVersion).toBe(1);
+    expect(decoded.schemaVersion).toBe(3);
     expect(decoded.scope).toBe("local");
     expect(decoded.estimate.upperBound).toBe(true);
   });
@@ -135,6 +135,27 @@ describe("a version-1 north.json report from before window sources and credentia
       new Set(["2026-10-16T12:00:00.000Z"]),
     );
     expect(view.accounts.map((account) => account.credentialKey)).toEqual(view.accounts.map(() => undefined));
+  });
+});
+
+describe("a window with no cycle in a single-machine report", () => {
+  const withoutCycle = (report: SessionQuotaReport): SessionQuotaReport => ({
+    ...report,
+    windows: report.windows.map((window, index) => (index === 0 ? { ...window, startsAt: null, elapsedFraction: null } : window)),
+  });
+
+  test("refuses a version 1 report carrying a null startsAt instead of reading it", () => {
+    const report = withoutCycle(machineReport("north"));
+    expect(report.schemaVersion).toBe(1);
+    expect(() => Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(JSON.stringify(report)))).toThrow(
+      "a version 1 report gives every window a startsAt and an elapsedFraction",
+    );
+  });
+
+  test("reads it at version 3 instead of refusing the null startsAt", () => {
+    const report = { ...withoutCycle(machineReport("north")), schemaVersion: 3 as const };
+    const decoded = Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(JSON.stringify(report)));
+    expect([decoded.windows[0]?.startsAt, decoded.windows[0]?.elapsedFraction]).toEqual([null, null]);
   });
 });
 

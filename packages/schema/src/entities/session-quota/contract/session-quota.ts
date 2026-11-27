@@ -160,8 +160,9 @@ export const LedgerJson = Schema.Struct({
 
 export const UnmeteredJson = Schema.Struct({ route: Schema.String, calls: Count, tokens: TokensJson });
 
+// Version 2 names the composed report, so the single-machine report that gained windows with no cycle is version 3.
 export const SessionQuotaReport = Schema.Struct({
-  schemaVersion: Schema.Literal(1),
+  schemaVersion: Schema.Literals([1, 3]),
   generatedAt: Schema.String,
   panePresence: Schema.optionalKey(Schema.Array(PanePresenceJson)),
   headlessFolders: Schema.optionalKey(Schema.Array(HeadlessFolderJson)),
@@ -179,7 +180,14 @@ export const SessionQuotaReport = Schema.Struct({
   unmatchedProcesses: Schema.Array(UnmatchedRunsJson),
   flags: Schema.Array(FlagJson),
   unmetered: Schema.Array(UnmeteredJson),
-});
+}).check(
+  // A version 1 report predates windows with no known cycle, so every window in it has a start.
+  Schema.makeFilter(({ schemaVersion, windows }) =>
+    schemaVersion !== 1 ||
+    windows.every((window) => window.startsAt !== null && window.elapsedFraction !== null) ||
+    "a version 1 report gives every window a startsAt and an elapsedFraction",
+  ),
+);
 
 export type SessionQuotaReport = typeof SessionQuotaReport.Type;
 

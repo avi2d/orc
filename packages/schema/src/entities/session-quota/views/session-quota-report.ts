@@ -171,7 +171,7 @@ const panePresenceJson = (pane: NonNullable<SessionQuotaView["panePresence"]>[nu
 });
 
 export const sessionQuotaReport = (view: SessionQuotaView): SessionQuotaReport => ({
-  schemaVersion: 1,
+  schemaVersion: 3,
   generatedAt: instant(view.now),
   panePresence: (view.panePresence ?? []).map(panePresenceJson),
   headlessFolders: (view.headlessFolders ?? []).map(({ cwd }) => ({ cwd })),

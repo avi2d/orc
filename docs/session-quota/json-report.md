@@ -4,13 +4,15 @@ kind: reference
 # Read the JSON report
 To print the report once, run `orc-dash report session-quota`.
 The report is one JSON object on one line, and `SessionQuotaReport` in `packages/schema/src/entities/session-quota/contract/session-quota.ts` decodes it.
-A reader checks `schemaVersion` first, and version 1 is the only version.
+A reader checks `schemaVersion` first.
+This report is version 3, and a version 1 report from an older machine still reads.
+Version 2 is the composed report of [Compose two machines](compose-two-machines.md).
 
 ## Report fields
 
 | Field | What it holds |
 | --- | --- |
-| `schemaVersion` | `1` |
+| `schemaVersion` | `3`, or `1` from an older machine |
 | `generatedAt` | The ISO instant of the read |
 | `scope` | `local`, since the report covers only the machine it ran on |
 | `estimate` | `basis` `local-logs`, `upperBound` `true`, and the `priceRatios` of input, output, cache read and cache write tokens |
@@ -46,6 +48,8 @@ The window rows detail each tracked window.
 
 ## Older reports
 
+Version 3 differs from version 1 in one way: a window with no known cycle stays in the report, with `startsAt` and `elapsedFraction` both `null`.
+A version 1 report gives every window both, and a version 1 report with a `null` in either is refused.
 A report written before window sources and credential keys has no `windows[].source`, `accounts[].credentialKey` or `accounts[].accountKeys`, and still reads.
 Its windows count as read by quota-axi at its `generatedAt`.
 A report written before the capture ledger has no `windows[].source.via`, and its harvested windows read as read from a log.
