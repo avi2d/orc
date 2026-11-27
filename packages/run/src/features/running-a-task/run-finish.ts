@@ -17,7 +17,7 @@ import type { NoReviewerRoom } from "./reviewer-chain"
 interface OrcLoopEnd {
   readonly review: ReviewOutcome
   readonly sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>
-  readonly parkedImplementerProvider: string | undefined
+  readonly parkedImplementerProviders: ReadonlyArray<string> | undefined
 }
 
 type ReviewSection =
@@ -40,7 +40,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       if (orcLoop.review.status === "failed") {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent, orcLoop.parkedImplementerProvider), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound) })
+      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent, orcLoop.parkedImplementerProviders), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound) })
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
@@ -62,8 +62,8 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number, parkedImplementerProvider: string | undefined): Effect.Effect<ReviewOutcome, OrcRunError | NoReviewerRoom> =>
-  pick(runAgent, parkedImplementerProvider).pipe(
+export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number, parkedImplementerProviders: ReadonlyArray<string> | undefined): Effect.Effect<ReviewOutcome, OrcRunError | NoReviewerRoom> =>
+  pick(runAgent, parkedImplementerProviders).pipe(
     Effect.flatMap((picked) =>
       Effect.gen(function*() {
         const started = new Date().toISOString()
@@ -142,8 +142,8 @@ const readTaskGoal = (run: Pick<HistoryRun, "fs" | "taskPath">): Effect.Effect<s
     Effect.catchTag("PlatformError", () => Effect.succeed(taskGoal("")))
   )
 
-const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps["runAgent"], parkedImplementerProvider: string | undefined): Effect.Effect<DiagramResult> =>
-  pick(runAgent, parkedImplementerProvider).pipe(
+const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps["runAgent"], parkedImplementerProviders: ReadonlyArray<string> | undefined): Effect.Effect<DiagramResult> =>
+  pick(runAgent, parkedImplementerProviders).pipe(
     Effect.flatMap((picked) => runDiagramTurn(run, picked.runAgent, picked.reviewer)),
     Effect.catchTags({
       NoReviewerRoom: () => Effect.succeed({ kind: "none" } as const),

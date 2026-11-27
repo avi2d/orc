@@ -22,7 +22,7 @@ export const readReviewerRoom = (
     return roomOf
   })
 
-export const checkReviewerRoom: ReviewerRoomCheck = (home, implementerProvider) =>
+export const checkReviewerRoom: ReviewerRoomCheck = (home, implementerProviders) =>
   Effect.gen(function*() {
     const config = yield* readOrcConfig(home)
     if (config.reviewers === undefined) {
@@ -30,7 +30,7 @@ export const checkReviewerRoom: ReviewerRoomCheck = (home, implementerProvider) 
     }
     const roomOf = yield* readReviewerRoom(home)
     const providers = new Map(config.providers.map((provider) => [provider.id, provider]))
-    yield* pickChainEntry(config.reviewers, implementerProvider, ({ provider }) => {
+    yield* pickChainEntry(config.reviewers, implementerProviders, ({ provider }) => {
       const configured = providers.get(provider)
       return configured === undefined
         ? { kind: "no-room", reason: "the reviewer provider is not configured" }

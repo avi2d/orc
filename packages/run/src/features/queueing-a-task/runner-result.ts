@@ -218,7 +218,7 @@ const liveFilesOf = (run: RunRecord, home: string): Effect.Effect<LiveFiles, nev
   return Effect.all({ asking, failing })
 }
 
-export type ReviewerRoomCheck = (home: string, implementerProvider: string) => Effect.Effect<ProviderRoom, never, RunnerRequirements>
+export type ReviewerRoomCheck = (home: string, implementerProviders: Arr.NonEmptyReadonlyArray<string>) => Effect.Effect<ProviderRoom, never, RunnerRequirements>
 
 const readReviewerWait = (home: string, run: RunRecord, checkRoom: ReviewerRoomCheck | undefined) =>
   Effect.gen(function*() {
@@ -228,7 +228,7 @@ const readReviewerWait = (home: string, run: RunRecord, checkRoom: ReviewerRoomC
     const wait = yield* readJsonFileIfPresent(runDirFor(home, run.id) + "/" + reviewerWaitFileName, ReviewerWait)
     return wait === null || checkRoom === undefined
       ? wait
-      : { ...wait, room: yield* checkRoom(home, wait.implementerProvider) }
+      : { ...wait, room: yield* checkRoom(home, wait.implementerProviders) }
   })
 
 const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null, checkRoom: ReviewerRoomCheck | undefined): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>

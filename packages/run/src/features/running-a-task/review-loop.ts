@@ -87,9 +87,9 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
     }
     const reviewer = run.delivery.reviewer
-    const parkedImplementerProvider = plan.reviewWait?.implementerProvider
+    const parkedImplementerProviders = plan.reviewWait?.implementerProviders
     const sentPerRound = [...plan.reviewWait?.sentPerRound ?? []]
-    const reviewNext = () => reviewOrc(run, reviewer, checkpoints, ops.runAgent, sentPerRound.length + 1, parkedImplementerProvider)
+    const reviewNext = () => reviewOrc(run, reviewer, checkpoints, ops.runAgent, sentPerRound.length + 1, parkedImplementerProviders)
     return yield* Effect.gen(function*() {
       let review = yield* reviewNext()
       while (mayStartRound(sentPerRound.length + 1, review)) {
@@ -101,12 +101,12 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
         if (failure !== null) return stopReport(loop, failure)
         review = yield* reviewNext()
       }
-      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, parkedImplementerProvider })
+      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, parkedImplementerProviders })
     }).pipe(
-      Effect.catchTag("NoReviewerRoom", ({ implementerProvider, message }) =>
+      Effect.catchTag("NoReviewerRoom", ({ implementerProviders, message }) =>
         Effect.gen(function*() {
           const head = yield* reviewHead(run)
-          yield* writeReviewWait(run, { implementerProvider, reason: message, head, sentPerRound })
+          yield* writeReviewWait(run, { implementerProviders, reason: message, head, sentPerRound })
           return { ...stopReport(loop, message), waitingForReviewer: true as const }
         })
       )

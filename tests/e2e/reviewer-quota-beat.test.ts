@@ -38,7 +38,7 @@ test("the beat parks without a question or a retry and resumes the same Orc run 
     const reason = "beta-main 2% left, floor 15%"
     const runDir = join(fixture.home, "runs", "run-1")
     await mkdir(runDir, { recursive: true })
-    await writeFile(join(runDir, "reviewer-wait.json"), JSON.stringify({ implementerProvider: "acme", reason, head: "0".repeat(40), sentPerRound: [] }))
+    await writeFile(join(runDir, "reviewer-wait.json"), JSON.stringify({ implementerProviders: ["acme"], reason, head: "0".repeat(40), sentPerRound: [] }))
 
     expect(await orcOk(fixture, ["beat"])).toContain("parked orc-1 on orc/orc-1: " + reason)
     expect(await backlogTaskOne(fixture)).toMatchObject({ parked: { questions: [] } })

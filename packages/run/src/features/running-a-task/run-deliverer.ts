@@ -1,4 +1,4 @@
-import { type Array as Arr, Console, Effect } from "effect"
+import { Array as Arr, Console, Effect } from "effect"
 import type { AgentFile } from "../../entities/agent/index"
 import { subprocessPullRequestOpener } from "../../entities/pull-request/index"
 import { subprocessNoMistakesRunner, type SubprocessRunnerOptions } from "../../entities/review-gate/index"
@@ -19,8 +19,8 @@ export type PreparedReviewer =
   | { readonly kind: "orc"; readonly reviewer: AgentFile }
   | { readonly kind: "orc-chain"; readonly chain: Arr.NonEmptyReadonlyArray<ChainReviewer> }
 
-export const fixedReviewer = (reviewer: AgentFile): ReviewerPick => (runAgent, parkedImplementerProvider) =>
-  parkedImplementerProvider === undefined
+export const fixedReviewer = (reviewer: AgentFile): ReviewerPick => (runAgent, parkedImplementerProviders) =>
+  parkedImplementerProviders === undefined
     ? Effect.succeed({ reviewer, runAgent })
     : Effect.fail(new OrcRunError({ message: "orc: a run waiting for reviewer quota needs a reviewer chain" }))
 
@@ -33,10 +33,11 @@ export interface ReviewerChainOptions {
 
 export const chainReviewer = (options: ReviewerChainOptions): ReviewerPick => {
   const opened = new Map<number, SandboxOps["runAgent"]>()
-  return (_runAgent, parkedImplementerProvider) =>
+  return (_runAgent, parkedImplementerProviders = []) =>
     Effect.gen(function*() {
       const roomOf = yield* options.readRoom
-      const pick = yield* pickChainEntry(options.chain, parkedImplementerProvider ?? options.implementerProvider, roomOf)
+      const implementerProviders = Arr.dedupe(Arr.append(parkedImplementerProviders, options.implementerProvider))
+      const pick = yield* pickChainEntry(options.chain, implementerProviders, roomOf)
       yield* Console.log(chosenReviewerLine(pick))
       const runAgent = opened.get(pick.position) ?? (yield* options.openReviewer(pick.entry, pick.position))
       opened.set(pick.position, runAgent)
