@@ -26,6 +26,10 @@ For a run or resume you start by hand, pass `--delivery orc`.
 
 ## Review the branch
 Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one [Pi](https://pi.dev) turn with the reviewer agent over that diff and the task file.
+In `orc` delivery, orc also reads `review.path_instructions` from `.no-mistakes.yaml` in the run's worktree.
+Each entry holds a `path` glob and its `instructions`.
+Orc adds each entry whose glob matches a changed file to the review prompt, and the reviewer names that glob in each finding the entry raises.
+An entry missing either string fails the review turn.
 Orc decodes the findings JSON array from the reviewer's last reply and writes it to the run folder.
 The first turn writes `review.json`, and later orc turns write `review-2.json` and `review-3.json`.
 An unreadable reply gets one rerun on the same session, and a second unreadable reply fails the review turn.
@@ -36,10 +40,10 @@ A failed `review` step gives the failure as the `review-failure` signal.
 In `direct-PR` delivery, the review turn fixes nothing, and a review failure does not block opening the PR.
 After a successful `direct-PR` review, if orc can read the branch head, it writes `review-checkpoint.json` in the run folder with the head and findings.
 A resumed direct-PR run reads the previous run's checkpoint and reuses the completed review when the branch head is unchanged.
-It writes the findings to `review.json` and a new checkpoint in the current run folder.
+It writes `review.json` and a new checkpoint in the current run folder.
 If the head changed or no completed review was recorded, orc runs the review turn.
-Failed review turns are not recorded for reuse, so a resume retries them.
-A checkpoint write failure does not block the PR, but the next resume runs the review again.
+A resume retries a failed review turn.
+A checkpoint write failure does not block the PR, but the next resume reviews again.
 
 ## Open the PR
 After the review turn, a direct-PR run runs `git push --set-upstream origin <branch>` from the run's worktree.
@@ -48,6 +52,12 @@ The PR's title is the head commit's subject, and its body lists the branch's com
 The body then lists each open review finding with its severity, id, `file:line`, description and action.
 A review with no findings gives the line `The review found nothing.`, and a failed review turn gives `The review turn failed, so this PR lists no review findings.`
 After a successful review and any fix rounds, an `orc` run opens its PR the same way, with the remaining findings.
+Findings that remain after the fix rounds do not stop the PR.
+Under each remaining finding, a nested line says why the fix loop left it.
+A `warning` or `info` finding is below the round 2 bar, which fixes only errors.
+For an `error` finding with the same id and file as one the fixer already received, the reason line names that match and the round.
+Any other `error` finding came from the review after fix round 2, so the round limit was reached.
+Orc does not yet mark a finding as left because it needs a person's decision.
 To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
 Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
 

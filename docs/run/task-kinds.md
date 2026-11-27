@@ -16,7 +16,7 @@ The runner queues a scout or task as `orc run <task-file> --kind <scout|task> --
 To run one directly, enter a clean checkout of the target project and run the same command.
 That run skips [no-mistakes](https://github.com/kunchenguid/no-mistakes) and the PR and creates no branch.
 It starts [Pi](https://pi.dev) on the host in `~/.orc/runs/<run-id>`, tells it where the task and the checkout are, and asks it to write `agent-report.md` there.
-Orc refuses a scout or task run without `--sandbox none`, and refuses `--allow` and `--answer` on one.
+Orc refuses a scout or task run with `--sandbox nono`, and refuses `--allow` and `--answer` on one.
 It prints `orc: <kind> run <run-id> wrote its report to <path>` and records the run succeeded.
 A run you stop at its looping question prints `orc: <kind> run <run-id> stopped: <reason>` and records the run stopped.
 Any other run that does not report prints why it failed, records the run failed and exits non-zero.

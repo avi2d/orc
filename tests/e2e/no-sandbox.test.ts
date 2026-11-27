@@ -51,6 +51,13 @@ const filesHolding = async (dirs: ReadonlyArray<string>, needle: string): Promis
   return holding
 }
 
+const expectRefusedInNono = async (fixture: NoSandboxFixture, env: Record<string, string>): Promise<void> => {
+  const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "nono"], fixture.repo, env)
+  expect(result.exitCode).not.toBe(0)
+  expect(result.stderr).toContain("--sandbox none")
+  expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
+}
+
 describe("orc run --sandbox none", () => {
   test("runs Pi on the host in its own worktree, without nono and without writing the operator's git config, to one PR", async () => {
     await withNoSandboxFixture(async ({ repo, home, fakeBin, env }) => {
@@ -192,11 +199,12 @@ describe("orc run --sandbox none", () => {
     })
   }, 60_000)
 
-  test("without --sandbox the run still takes nono instead of running unsandboxed", async () => {
+  test("without --sandbox the run uses the host instead of nono", async () => {
     await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
       const result = await runOrc(["run", "task.md", "--branch", "orc/test"], repo, env)
-      expect(result.exitCode).not.toBe(0)
-      expect(await Bun.file(join(fakeBin, "pi-cwd")).exists()).toBe(false)
+      expect(result.exitCode).toBe(0)
+      expect(await Bun.file(join(fakeBin, "pi-cwd")).exists()).toBe(true)
+      expect(await Bun.file(join(fakeBin, "nono-calls")).exists()).toBe(false)
     })
   }, 60_000)
 })
@@ -277,11 +285,7 @@ describe("orc run on a token-file provider", () => {
 
   test("in the nono sandbox is refused before Pi runs, naming --sandbox none", async () => {
     await withNoSandboxFixture(async (fixture) => {
-      const env = await asTokenFileRun(fixture, 0o600)
-      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], fixture.repo, env)
-      expect(result.exitCode).not.toBe(0)
-      expect(result.stderr).toContain("--sandbox none")
-      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
+      await expectRefusedInNono(fixture, await asTokenFileRun(fixture, 0o600))
     })
   }, 60_000)
 
@@ -369,10 +373,7 @@ describe("orc run on a package provider", () => {
   test("in the nono sandbox is refused before Pi runs, naming --sandbox none", async () => {
     await withNoSandboxFixture(async (fixture) => {
       await asPackageRun(fixture)
-      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], fixture.repo, fixture.env)
-      expect(result.exitCode).not.toBe(0)
-      expect(result.stderr).toContain("--sandbox none")
-      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
+      await expectRefusedInNono(fixture, fixture.env)
     })
   }, 60_000)
 })

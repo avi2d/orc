@@ -3,6 +3,7 @@ import { OrcRunError } from "../../shared/lib/index"
 import { runChecksRound, summarizeChecksRound, type ChecksCommand } from "./checks"
 import { finishAfterChecks, reviewOrc } from "./run-finish"
 import type { ReviewFinding, ReviewOutcome } from "./review-outcome"
+import { lastFixRound, passesRoundTwoBar } from "./left-findings"
 import type { RunStopped } from "./loop-pause"
 import type { ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
@@ -21,10 +22,10 @@ interface ReviewLoop {
 }
 
 const findingsForRound = (findings: ReadonlyArray<ReviewFinding>, round: number): ReadonlyArray<ReviewFinding> =>
-  round === 1 ? findings : findings.filter((finding) => finding.severity === "error")
+  round === 1 ? findings : findings.filter(passesRoundTwoBar)
 
 const mayStartRound = (round: number, review: ReviewOutcome): boolean =>
-  round <= 2 && review.status === "passed" && findingsForRound(review.findings, round).length > 0
+  round <= lastFixRound && review.status === "passed" && findingsForRound(review.findings, round).length > 0
 
 const stopReport = (loop: ReviewLoop, endReason: string): OrcRunReport => ({
   ...loop.base, commits: loop.commits, completed: false, checksRounds: loop.rounds,
@@ -86,11 +87,14 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
     }
     const reviewer = run.delivery.reviewer
     let review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, 1)
+    const sentPerRound: Array<ReadonlyArray<ReviewFinding>> = []
     for (let round = 1; mayStartRound(round, review); round += 1) {
       if (review.status !== "passed") break
-      const failure = yield* runOneRound(loop, findingsForRound(review.findings, round), round)
+      const sent = findingsForRound(review.findings, round)
+      sentPerRound.push(sent)
+      const failure = yield* runOneRound(loop, sent, round)
       if (failure !== null) return stopReport(loop, failure)
       review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, round + 1)
     }
-    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, review)
+    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound })
   })

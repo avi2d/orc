@@ -240,13 +240,13 @@ describe("parseArgs run flags", () => {
   test("run rejects --delivery on a scout instead of opening a PR for a report", () => {
     expect(parseArgs(["run", "task.md", "--kind", "scout", "--delivery", "direct-PR"]).kind).toBe("UsageError")
   })
-  test("run takes --sandbox none instead of the nono default", () => {
+  test("run keeps explicit --sandbox none instead of discarding it", () => {
     expect(parseArgs(["run", "task.md", "--sandbox", "none"])).toEqual({ kind: "RunAgent", taskFile: "task.md", taskKind: "ship", delivery: "no-mistakes", branch: undefined, sandbox: "none", tokenFile: undefined, provider: undefined, implementerModel: undefined, fixerModel: undefined, implementerThinking: undefined, fixerThinking: undefined, instructions: undefined, allow: [], answers: [] })
   })
   test("run preserves explicit --sandbox nono instead of dropping the flag", () => {
     expect(parseArgs(["run", "--sandbox", "nono", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: null, taskKind: "ship", delivery: "no-mistakes", branch: "orc/demo", sandbox: "nono", tokenFile: undefined, provider: undefined, implementerModel: undefined, fixerModel: undefined, implementerThinking: undefined, fixerThinking: undefined, instructions: undefined, allow: [], answers: [] })
   })
-  test("run rejects a sandbox kind it does not know instead of falling back to nono", () => {
+  test("run rejects a sandbox kind it does not know instead of falling back to a default", () => {
     expect(parseArgs(["run", "task.md", "--sandbox", "docker"])).toEqual({ kind: "UsageError", detail: "orc run takes --sandbox once, with nono or none" })
   })
   test("run rejects a sandbox flag without a kind instead of reading the task file as one", () => {

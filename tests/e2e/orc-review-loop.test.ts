@@ -6,13 +6,17 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { openDatabase } from "../../packages/run/src/entities/run-history/index"
 import { readShow, readStepLog } from "../../packages/run/src/features/seeing-runs/index"
-import { cleanFinish, git, readyToCheck, recordedMetrics, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+import { cleanFinish, ghPrLink, git, readyToCheck, recordedMetrics, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const error = { id: "e", file: "work.txt", line: 1, severity: "error", action: "Fix the error.", description: "The result is wrong." }
 const warning = { id: "w", file: "work.txt", line: 1, severity: "warning", action: "Fix the warning.", description: "The result is fragile." }
+const info = { id: "i", file: "work.txt", line: null, severity: "info", action: "Name the helper.", description: "The helper name says nothing." }
+const lateError = { id: "late", file: "other.txt", line: 3, severity: "error", action: "Close the file.", description: "The handle leaks." }
 
-const exercise = async (reviews: ReadonlyArray<ReadonlyArray<typeof error>>) => {
-  let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, steps: [] as unknown, metrics: [] as ReadonlyArray<unknown>, reviewEvidence: [] as ReadonlyArray<{ readonly file: string | undefined; readonly log: string }> }
+type Finding = Omit<typeof error, "line"> & { line: number | null }
+
+const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>) => {
+  let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, prLink: null as string | null, prCreated: false, steps: [] as unknown, metrics: [] as ReadonlyArray<unknown>, reviewEvidence: [] as ReadonlyArray<{ readonly file: string | undefined; readonly log: string }> }
   await withRepo(async (dir) => {
     await withHome(async (home) => {
       const origin = await mkdtemp(join(tmpdir(), "orc-loop-origin-"))
@@ -65,7 +69,7 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<typeof error>>) => 
             (db) => Effect.sync(() => db.close())
           ).pipe(Effect.provide(BunServices.layer))
         )
-        result = { kinds, evidence, reviewEvidence, body: await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8"), checks, completed: outcome.report.completed, steps: outcome.steps, metrics: await recordedMetrics(home) }
+        result = { kinds, evidence, reviewEvidence, body: await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8"), checks, completed: outcome.report.completed, steps: outcome.steps, prLink: outcome.report.prLink, prCreated: outcome.ghCalls.includes("pr create"), metrics: await recordedMetrics(home) }
       } finally {
         await rm(origin, { recursive: true, force: true })
       }
@@ -78,7 +82,7 @@ test("an empty review does not start a fixer", async () => {
   const result = await exercise([[]])
   expect(result.kinds).toEqual(["implementer", "reviewer"])
   expect(result.completed).toBe(true)
-})
+}, 60_000)
 
 test("a cleared first fix does not start a second round", async () => {
   const result = await exercise([[error, warning], []])
@@ -86,7 +90,7 @@ test("a cleared first fix does not start a second round", async () => {
   expect(result.evidence[0]).toContain('"id": "e"')
   expect(result.evidence[0]).toContain('"id": "w"')
   expect(result.checks).toBe(2)
-})
+}, 60_000)
 
 test("a review whose findings one fix round clears counts one gate stop rather than none, and records both review turns", async () => {
   const result = await exercise([[error, warning], []])
@@ -112,7 +116,7 @@ test("the second fix receives only errors and a third review adds neither a fix 
   expect(result.completed).toBe(true)
   expect(result.body).toContain("The result is wrong.")
   expect(result.body).toContain("The result is fragile.")
-})
+}, 60_000)
 
 test("each review step log keeps its own findings instead of the final turn's findings", async () => {
   const result = await exercise([[error, warning], [error], [warning]])
@@ -121,11 +125,40 @@ test("each review step log keeps its own findings instead of the final turn's fi
     { file: "review-2.json", log: JSON.stringify([error], null, 2) + "\n" },
     { file: "review-3.json", log: JSON.stringify([warning], null, 2) + "\n" }
   ])
-})
+}, 60_000)
 
 test("warnings after the first fix do not count as a second gate stop", async () => {
   const result = await exercise([[error, warning], [warning]])
   expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer"])
   expect(result.completed).toBe(true)
   expect(result.metrics).toMatchObject([{ run: "step-run-1", delivery: "orc", failedSteps: 0, gateStops: 1, fixRounds: 1 }])
-})
+}, 60_000)
+
+test("warnings left after a fixed round 1 open a PR listing each with its reason rather than ending without a PR", async () => {
+  const result = await exercise([[error, warning, info], [warning, info]])
+  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer"])
+  expect(result.completed).toBe(true)
+  expect(result.prCreated).toBe(true)
+  expect(result.prLink).toBe(ghPrLink)
+  expect(result.body).toContain(
+    "Open review findings:\n" +
+      "- warning `w` at `work.txt:1`: The result is fragile. Action: Fix the warning.\n" +
+      "  - Left because its severity is below the round 2 bar, which fixes only errors.\n" +
+      "- info `i` at `work.txt`: The helper name says nothing. Action: Name the helper.\n" +
+      "  - Left because its severity is below the round 2 bar, which fixes only errors.\n"
+  )
+  expect(result.body).not.toContain("The result is wrong.")
+}, 60_000)
+
+test("an error left after round 2 names a repeat or the round limit rather than the severity bar", async () => {
+  const result = await exercise([[error, warning], [error], [error, lateError]])
+  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "fixer", "reviewer"])
+  expect(result.completed).toBe(true)
+  expect(result.prCreated).toBe(true)
+  expect(result.body).toContain(
+    "- error `e` at `work.txt:1`: The result is wrong. Action: Fix the error.\n" +
+      "  - Left because it has the same id and file as a finding the fixer received in round 2.\n" +
+      "- error `late` at `other.txt:3`: The handle leaks. Action: Close the file.\n" +
+      "  - Left because the round limit was reached: the review after fix round 2 reported it.\n"
+  )
+}, 60_000)
