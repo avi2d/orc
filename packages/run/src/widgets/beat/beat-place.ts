@@ -167,7 +167,6 @@ const noRoom = (machine: string): string => machine + " has no room"
 const assessMachine = (
   machine: Machine,
   project: Project,
-  pin: TaskRecord["spec"]["machine"],
   restriction: MachineRestriction | null,
   room: ReadonlyArray<MachineRoom>,
   overloaded: ReadonlyMap<string, string>
@@ -180,7 +179,7 @@ const assessMachine = (
   if (checkout === null) {
     return rejectMachine(machine.name, "no-checkout", checkoutMissing(project.name, machine.name))
   }
-  if (machine.pinnedOnly === true && pin !== machine.name) {
+  if (machine.pinnedOnly === true && restriction === null) {
     return rejectMachine(machine.name, "pin-required", machine.name + " only runs tasks pinned to it")
   }
   const slot = room.find((entry) => entry.machine === machine.name)
@@ -242,7 +241,7 @@ export const placeTask = (
   if (restriction !== null && !config.machines.some((machine) => machine.name === restriction.machine)) {
     return rejectPlacement(config.machines, restriction.code, "the machine " + restriction.machine + " is not in dispatch.json")
   }
-  const assessments = config.machines.map((machine) => assessMachine(machine, project, task.spec.machine, restriction, room, overloaded))
+  const assessments = config.machines.map((machine) => assessMachine(machine, project, restriction, room, overloaded))
   const machines = assessments.map(machinePlacement)
   const best = roomiest(assessments)
   if (best === null) {

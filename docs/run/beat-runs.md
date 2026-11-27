@@ -23,7 +23,8 @@ Without [dispatch rules](dispatch-rules.md), the beat chooses the account with t
 With routing, the rules choose an account and models for each runnable task.
 A task restricted to a machine waits for a slot there.
 On a machine with `pinnedOnly` set to `true`, only an explicit machine pin makes a task eligible.
-A parked run's origin still limits it to its original machine, but the origin alone does not count as a pin.
+A parked run's origin limits it to its original machine, and that origin also makes it eligible on a `pinnedOnly` machine, so a parked run resumes where it started.
+A new or unparked task without a pin still waits on a `pinnedOnly` machine.
 New tasks start in priority order, as [Set priority](backlog-tasks.md#set-priority) describes.
 
 ## Starting and closing runs

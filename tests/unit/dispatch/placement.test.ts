@@ -94,6 +94,37 @@ describe("placeTask", () => {
       ]
     })
   })
+  const macPinnedOnly: DispatchConfig = { ...config, machines: [{ name: "mac", slots: 1, pinnedOnly: true, start: ["true"] }, { name: "linux", slots: 4, start: ["true"] }] }
+  const parkedOnMac: TaskRecord = { ...newTask(null), parked: { origin: { machine: "mac", run: "run-1" }, branch: "orc/task-1", questions: [{ id: "ask-1", text: "Which one?", asked: "2026-10-27T10:05:00.000Z", blocks: true, answer: { decider: "owner" as const, words: "Keep it", at: "2026-10-27T10:06:00.000Z", relayedTo: null } }] } }
+  test("an unpinned task parked on a pin-only mac resumes there instead of waiting forever for a pin", () => {
+    expect(placeTask(parkedOnMac, macPinnedOnly, projects, linuxFull)).toMatchObject({
+      kind: "place",
+      machine: { name: "mac" },
+      machines: [
+        { machine: "mac", kind: "eligible" },
+        { machine: "linux", kind: "rejected", code: "parked-origin", reason: "the task is parked on mac" }
+      ]
+    })
+  })
+  test("an unpinned task parked on a full pin-only mac waits for room there instead of skipping the slot limit", () => {
+    expect(placeTask(parkedOnMac, macPinnedOnly, projects, room)).toMatchObject({
+      kind: "waits",
+      reason: "mac has no room",
+      machines: [
+        { machine: "mac", kind: "rejected", code: "capacity", reason: "mac has no room" },
+        { machine: "linux", kind: "rejected", code: "parked-origin", reason: "the task is parked on mac" }
+      ]
+    })
+  })
+  test("an unpinned, unparked task still skips a pin-only mac instead of taking its idle slot", () => {
+    expect(placeTask(newTask(null), macPinnedOnly, projects, linuxFull)).toMatchObject({
+      kind: "waits",
+      machines: [
+        { machine: "mac", kind: "rejected", code: "pin-required", reason: "mac only runs tasks pinned to it" },
+        { machine: "linux", kind: "rejected", code: "capacity", reason: "linux has no room" }
+      ]
+    })
+  })
 })
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
