@@ -78,10 +78,8 @@ export const writerModelsForBranch = (db: Database, project: string, branch: str
       SELECT DISTINCT steps.model AS model
       FROM runs
       JOIN steps ON steps.run_id = runs.id
-      JOIN signals ON signals.step_id = steps.id
       WHERE runs.project = ? AND runs.branch = ?
         AND steps.name IN ('implement', 'fix') AND steps.model IS NOT NULL
-        AND signals.name = 'commit-count' AND CAST(signals.value AS INTEGER) > 0
       ORDER BY model
     `).all(project, branch)
   ).pipe(

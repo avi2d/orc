@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
+import { openDatabase, recordRun, recordSignal, recordStep, type StepInput } from "../../packages/run/src/entities/run-history/index"
 import { chainReviewer } from "../../packages/run/src/features/running-a-task/run-deliverer"
 import type { ReviewerPick } from "../../packages/run/src/features/running-a-task/run-ops"
 import type { ProviderRoom } from "../../packages/run/src/shared/config/index"
@@ -51,6 +53,37 @@ const cleanReviewer = (sha: string, model: string, kinds: Array<string>) =>
     expect(run.agent.model).toBe(model)
     return passReview(sessionsDir)
   }, kinds)
+
+const errorFinding = [{ id: "missing-file", file: "fix.txt", line: null, severity: "error", action: "Add the file.", description: "The file is missing." }]
+
+const replyFindings = async (sessionsDir: string, name: string, findings: ReadonlyArray<unknown>) => {
+  const sessionFile = join(sessionsDir, name + ".jsonl")
+  await writeFile(sessionFile, sessionEnding({ ...cleanFinish, content: [{ type: "text", text: JSON.stringify(findings) }] }))
+  return { sessionFile, commits: [] }
+}
+
+const commitFix = async (worktreeDir: string, sessionsDir: string, name: string) => {
+  await writeFile(join(worktreeDir, name + ".txt"), name)
+  git(worktreeDir, ["add", name + ".txt"])
+  git(worktreeDir, ["commit", "-qm", "Fix " + name])
+  const sessionFile = join(sessionsDir, name + ".jsonl")
+  await writeFile(sessionFile, sessionEnding(cleanFinish))
+  return { sessionFile, commits: [{ sha: git(worktreeDir, ["rev-parse", "HEAD"]) }] }
+}
+
+type SeededStep = Pick<StepInput, "name" | "status" | "model"> & { readonly commits?: number }
+
+const seedCrashedRun = (home: string, project: string, steps: ReadonlyArray<SeededStep>): Promise<void> =>
+  Effect.runPromise(Effect.acquireUseRelease(openDatabase(home), (db) =>
+    Effect.gen(function*() {
+      yield* recordRun(db, { id: "step-run-1", project, branch: "orc/test", taskFile: join(home, "runs", "step-run-1", "task.md"), status: "running", started: "2026-10-19T09:00:00.000Z", delivery: "orc" })
+      for (const { commits, ...step } of steps) {
+        const stepId = yield* recordStep(db, { runId: "step-run-1", attempt: 1, started: "2026-10-19T09:00:00.000Z", agentFile: "bundled/" + step.name + ".md", thinking: "high", ...step })
+        if (commits !== undefined) {
+          yield* recordSignal(db, { stepId, name: "commit-count", value: commits.toString() })
+        }
+      }
+    }), (db) => Effect.sync(() => db.close())).pipe(Effect.provide(BunServices.layer)))
 
 const commitSendBack = async (worktreeDir: string, sessionsDir: string) => {
   await writeFile(join(worktreeDir, "send-back.txt"), "applied")
@@ -205,6 +238,96 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
         { worktreeDir, resumeRun: opened.report.runId, answers: [sendBack], implementerModel: "beta/coder" })
       expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
       expect(resumed.stepAgents).toContainEqual({ name: "review", model: "gamma/reviewer", thinking: "high" })
+      expect(resumed.ghCalls).toContain("pr create --head orc/test")
+    })
+  })
+})
+
+describe("a provider that ran an interrupted step on the branch never reviews it", () => {
+  test("an implementation interrupted before it recorded its commits keeps acme out of the review after beta resumes it", async () => {
+    await withReadyBranch(async ({ dir, home, kinds, worktreeDir }) => {
+      await seedCrashedRun(home, dir, [{ name: "implement", status: "running", model: "acme/coder" }])
+      const resumeWithoutNewCommits = recordingKinds(async (run, sessionsDir) => {
+        if (run.agent.kind === "reviewer") {
+          expect(run.agent.model).toBe("gamma/reviewer")
+          return passReview(sessionsDir)
+        }
+        expect(run.agent.model).toBe("beta/coder")
+        const sessionFile = join(sessionsDir, "implement.jsonl")
+        await writeFile(sessionFile, sessionEnding(cleanFinish))
+        return { sessionFile, commits: [] }
+      }, kinds)
+      const resumed = await runOrcDeliveryStep(dir, home, resumeWithoutNewCommits, lintPasses,
+        pickWith({ acme: room, beta: room, gamma: room }, sameProviderFirst),
+        { worktreeDir, resumeRun: "step-run-1", implementerModel: "beta/coder", fixerModel: "beta/coder" })
+      expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
+      expect(resumed.stepAgents).toContainEqual({ name: "review", model: "gamma/reviewer", thinking: "high" })
+      expect(resumed.ghCalls).toContain("pr create --head orc/test")
+    })
+  })
+
+  test("a fix interrupted before it recorded its commits keeps beta out of the review after gamma resumes the run", async () => {
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktreeDir }) => {
+      await writeFile(join(worktreeDir, "interrupted-fix.txt"), "fixed by beta")
+      git(worktreeDir, ["add", "interrupted-fix.txt"])
+      git(worktreeDir, ["commit", "-qm", "Fix the failing check"])
+      await seedCrashedRun(home, dir, [
+        { name: "implement", status: "passed", model: "acme/coder", commits: 1 },
+        { name: "checks", status: "failed", model: null },
+        { name: "fix", status: "running", model: "beta/coder" }
+      ])
+      const resumed = await runOrcDeliveryStep(dir, home, cleanReviewer(sha, "gamma/reviewer", kinds), lintPasses,
+        pickWith({ acme: room, beta: room, gamma: room }, sameProviderFirst),
+        { worktreeDir, resumeRun: "step-run-1", implementerModel: "gamma/coder", fixerModel: "gamma/coder" })
+      expect(kinds).toEqual(["reviewer", "reviewer"])
+      expect(resumed.stepAgents).toContainEqual({ name: "review", model: "gamma/reviewer", thinking: "high" })
+      expect(resumed.ghCalls).toContain("pr create --head orc/test")
+    })
+  })
+})
+
+describe("a new send-back on a reviewer quota resume starts a fresh review cycle", () => {
+  test("gives the new send-back's findings a fix round instead of inheriting the two rounds the parked run spent", async () => {
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktreeDir }) => {
+      const rooms: Record<string, ProviderRoom> = { acme: room, beta: room, gamma: exhausted }
+      const pick = pickWith(rooms, sameProviderFirst)
+      const opened = await runOrcDeliveryStep(dir, home, cleanReviewer(sha, "beta/reviewer", kinds), lintPasses, pick, { worktreeDir })
+      const first = { question: "send-back", answer: "rename the first flag", decider: "owner" as const }
+      const second = { question: "send-back-2", answer: "remove the old example", decider: "owner" as const }
+
+      let fixesInParkedRun = 0
+      const spendBothRounds = recordingKinds(async (run, sessionsDir) => {
+        if (run.agent.kind === "reviewer") return replyFindings(sessionsDir, "review-" + kinds.length.toString(), errorFinding)
+        if (run.agent.kind === "implementer") return commitSendBack(worktreeDir, sessionsDir)
+        fixesInParkedRun += 1
+        if (fixesInParkedRun === 2) rooms.beta = exhausted
+        return commitFix(worktreeDir, sessionsDir, "parked-fix-" + fixesInParkedRun.toString())
+      }, kinds)
+      kinds.length = 0
+      const parked = await runOrcDeliveryStep(dir, home, spendBothRounds, lintPasses, pick,
+        { worktreeDir, resumeRun: opened.report.runId, answers: [first] })
+      expect(kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "fixer"])
+      expect(parked.report.waitingForReviewer).toBe(true)
+      const wait: unknown = await Bun.file(join(home, "runs", parked.report.runId, "reviewer-wait.json")).json()
+      expect(wait).toMatchObject({ sentPerRound: [errorFinding, errorFinding] })
+
+      rooms.beta = room
+      let reviewsInResumedRun = 0
+      const fixNewFindings = recordingKinds(async (run, sessionsDir) => {
+        if (run.agent.kind === "reviewer") {
+          reviewsInResumedRun += 1
+          return replyFindings(sessionsDir, "resumed-review-" + reviewsInResumedRun.toString(), reviewsInResumedRun === 1 ? errorFinding : [])
+        }
+        if (run.agent.kind === "implementer") {
+          expect(run.prompt).toContain(second.answer)
+          return commitFix(worktreeDir, sessionsDir, "send-back-2")
+        }
+        return commitFix(worktreeDir, sessionsDir, "resumed-fix")
+      }, kinds)
+      kinds.length = 0
+      const resumed = await runOrcDeliveryStep(dir, home, fixNewFindings, lintPasses, pick,
+        { worktreeDir, resumeRun: parked.report.runId, runId: "step-run-3", answers: [first, second] })
+      expect(kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "reviewer"])
       expect(resumed.ghCalls).toContain("pr create --head orc/test")
     })
   })

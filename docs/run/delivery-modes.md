@@ -49,7 +49,7 @@ Without it, the review turn runs the reviewer agent on its usual model.
 With it, orc picks the reviewer before each review turn:
 
 1. Orc runs the quota command in `dispatch.json` once, as [Accounts on other providers](backlog-configuration.md#accounts-on-other-providers) describes.
-2. Orc skips providers that committed changes in any implementation or fix step on this branch.
+2. Orc skips every provider that ran an implementation or fix step on this branch, in any run, even when the step was interrupted or made no commit.
 3. For each other entry, orc reads the quota account that holds the provider's default credential in `config.json`, because the review turn runs on that credential.
 4. Orc takes the first entry whose account is at or above `floorPercent`, and the review turn runs the reviewer agent on that entry's model.
 
@@ -73,8 +73,9 @@ The beat parks the task with that reason and checks reviewer quota on the machin
 When a reviewer qualifies, the beat resumes the same branch.
 The resumed run keeps the implementation, runs the checks again and then runs the pending review turn.
 It does not apply again a send-back that the parked run already applied.
+A new send-back runs the implementer again and starts a fresh review cycle with up to two fix rounds.
 The resumed run excludes the providers saved when it parked.
-An account that dispatch assigns to the resumed run can still review until its provider commits a change.
+An account that dispatch assigns to the resumed run can still review until its provider runs an implementation or fix step.
 If the run parks again, it saves the updated list of excluded providers for the beat.
 
 ## Open the PR

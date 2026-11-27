@@ -332,7 +332,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       fixRunning: fixCarry.running,
       handover,
       priorDir,
-      ...(reviewWait === null ? {} : { reviewWait }),
+      ...(reviewWait === null ? {} : { reviewWait: replaysSendBack ? { ...reviewWait, sentPerRound: [] } : reviewWait }),
       cleanupPriorDir: implementSafe && fixSafe ? priorDir : null
     }
   })

@@ -29,7 +29,7 @@ export const pickChainEntry = <T extends ReviewerEntry>(
   const passed: Array<PassedEntry> = []
   for (const [index, entry] of chain.entries()) {
     if (implementerProviders.includes(entry.provider)) {
-      passed.push({ entry, reason: entry.provider + " wrote commits for this change" })
+      passed.push({ entry, reason: entry.provider + " implemented or fixed this change" })
       continue
     }
     const room = roomOf(entry)
@@ -40,7 +40,7 @@ export const pickChainEntry = <T extends ReviewerEntry>(
   }
   return Effect.fail(new NoReviewerRoom({
     implementerProviders,
-    message: "no reviewer in the chain has quota room on a provider that did not write the change: " + passedText(passed)
+    message: "no reviewer in the chain has quota room on a provider that did not implement or fix the change: " + passedText(passed)
   }))
 }
 
