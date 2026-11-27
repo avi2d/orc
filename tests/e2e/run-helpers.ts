@@ -263,24 +263,24 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
   }
 }
 
-const runOrcDelivery = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerChoice, resumed: { readonly implementerModel: string } | null): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+const runOrcDelivery = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerChoice, resumed: { readonly implementerModel: string } | null, worktreeDir: string | undefined): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const config = await Effect.runPromise(readOrcConfig(home).pipe(Effect.provide(BunServices.layer)))
   const gh = await stubGh()
   try {
-    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
-      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer: reviewerPick, maxFixRounds: config.review.maxFixRounds }), gh.dir + ":",
-      handRunFacts, resumed === null ? null : { runId: "step-run-2", resumeRun: "step-run-1" }, resumed === null ? implementer : { ...implementer, model: resumed.implementerModel })
+    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], fixtureGit, (spawner, hostGit, pathEnv, projectDir) =>
+      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir: worktreeDir ?? projectDir, branch: "orc/test" }), reviewer: reviewerPick, maxFixRounds: config.review.maxFixRounds }), gh.dir + ":",
+      { ...handRunFacts, worktreeDir }, resumed === null ? null : { runId: "step-run-2", resumeRun: "step-run-1" }, resumed === null ? implementer : { ...implementer, model: resumed.implementerModel })
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
     await rm(gh.dir, { recursive: true, force: true })
   }
 }
 
-export const runOrcDeliveryStep = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerChoice = fixedReviewer(reviewer)): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> =>
-  runOrcDelivery(dir, home, sandbox, execCheck, reviewerPick, null)
+export const runOrcDeliveryStep = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerChoice = fixedReviewer(reviewer), worktreeDir?: string): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> =>
+  runOrcDelivery(dir, home, sandbox, execCheck, reviewerPick, null, worktreeDir)
 
-export const runOrcDeliveryResume = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerChoice, implementerModel: string = implementer.model): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> =>
-  runOrcDelivery(dir, home, sandbox, execCheck, reviewerPick, { implementerModel })
+export const runOrcDeliveryResume = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerChoice, worktreeDir: string, implementerModel: string = implementer.model): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> =>
+  runOrcDelivery(dir, home, sandbox, execCheck, reviewerPick, { implementerModel }, worktreeDir)
 
 export const runDirectPrResume = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, answers: ReadonlyArray<QuestionAnswer>): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const gh = await stubGh()

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { readFile, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect, Schema } from "effect"
 import { chainReviewer } from "../../packages/run/src/features/running-a-task/run-deliverer"
@@ -7,13 +8,19 @@ import type { ReviewerChoice } from "../../packages/run/src/features/running-a-t
 import { type ProviderRoom, ReviewerWait } from "../../packages/run/src/shared/config/index"
 import { chainEntry, git, readyToCheck, recordingKinds, runOrcDeliveryResume, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withPushedBase, withRepo } from "./run-helpers"
 
-const withReadyBranch = (use: (ready: { readonly dir: string; readonly home: string; readonly sha: string; readonly kinds: Array<string> }) => Promise<void>): Promise<void> =>
+const withReadyBranch = (use: (ready: { readonly dir: string; readonly home: string; readonly sha: string; readonly kinds: Array<string>; readonly worktree: string }) => Promise<void>): Promise<void> =>
   withRepo((dir) =>
     withHome((home) =>
       withPushedBase(dir, async () => {
         const sha = await readyToCheck(dir, home)
-        git(dir, ["checkout", "-q", "orc/test"])
-        await use({ dir, home, sha, kinds: [] })
+        const worktree = await mkdtemp(join(tmpdir(), "orc-chain-worktree-"))
+        try {
+          git(dir, ["worktree", "add", "-q", worktree, "orc/test"])
+          await writeFile(join(worktree, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
+          await use({ dir, home, sha, kinds: [], worktree })
+        } finally {
+          await rm(worktree, { recursive: true, force: true })
+        }
       })
     )
   )
@@ -40,13 +47,13 @@ const reviewsOn = (model: string | null, kinds: Array<string>, sha: string) => r
 const noRoomBeta = { kind: "no-room", reason: "beta-main 2% left, floor 10%" } as const
 const noRoomGamma = { kind: "no-room", reason: "gamma-main 0% left, floor 10%" } as const
 
-const parkedForRoom = (dir: string, home: string, sha: string, kinds: Array<string>) =>
-  runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses, pickWith({ acme: { kind: "room" }, beta: noRoomBeta, gamma: noRoomGamma }))
+const parkedForRoom = (dir: string, home: string, sha: string, kinds: Array<string>, worktree: string) =>
+  runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses, pickWith({ acme: { kind: "room" }, beta: noRoomBeta, gamma: noRoomGamma }), worktree)
 
 describe("an orc run's review turn takes the first chain reviewer with room on another provider", () => {
   test("reviews on the third entry when the second has no room, instead of the implementer's provider", async () => {
-    await withReadyBranch(async ({ dir, home, sha, kinds }) => {
-          const outcome = await runOrcDeliveryStep(dir, home, reviewsOn("gamma/reviewer", kinds, sha), lintPasses, pickWith({ acme: { kind: "room" }, beta: noRoomBeta, gamma: { kind: "room" } }))
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktree }) => {
+          const outcome = await runOrcDeliveryStep(dir, home, reviewsOn("gamma/reviewer", kinds, sha), lintPasses, pickWith({ acme: { kind: "room" }, beta: noRoomBeta, gamma: { kind: "room" } }), worktree)
           expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
           expect(outcome.steps).toContainEqual({ name: "review", status: "passed" })
           expect(outcome.stepAgents).toContainEqual({ name: "review", model: "gamma/reviewer", thinking: "high" })
@@ -55,9 +62,9 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
   })
 
   test("parks the run with the no-room reason and opens no PR when no entry has room, instead of reviewing anyway or ending for good", async () => {
-    await withReadyBranch(async ({ dir, home, sha, kinds }) => {
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktree }) => {
           const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses,
-            pickWith({ acme: { kind: "room" }, beta: noRoomBeta, gamma: { kind: "no-room", reason: "quota unread: timed out" } }))
+            pickWith({ acme: { kind: "room" }, beta: noRoomBeta, gamma: { kind: "no-room", reason: "quota unread: timed out" } }), worktree)
           expect(kinds).toEqual(["implementer"])
           expect(outcome.steps).toContainEqual({ name: "review", status: "failed" })
           expect(outcome.stepAgents).toContainEqual({ name: "review", model: null, thinking: null })
@@ -72,10 +79,10 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
   })
 
   test("a parked run resumed once an entry has room reviews on that entry and opens its PR, instead of implementing again", async () => {
-    await withReadyBranch(async ({ dir, home, sha, kinds }) => {
-          await parkedForRoom(dir, home, sha, kinds)
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktree }) => {
+          await parkedForRoom(dir, home, sha, kinds, worktree)
           const resumedKinds: Array<string> = []
-          const resumed = await runOrcDeliveryResume(dir, home, reviewsOn("gamma/reviewer", resumedKinds, sha), lintPasses, pickWith({ acme: { kind: "room" }, beta: noRoomBeta, gamma: { kind: "room" } }))
+          const resumed = await runOrcDeliveryResume(dir, home, reviewsOn("gamma/reviewer", resumedKinds, sha), lintPasses, pickWith({ acme: { kind: "room" }, beta: noRoomBeta, gamma: { kind: "room" } }), worktree)
           expect(resumedKinds).toEqual(["reviewer"])
           expect(resumed.stepAgents).toContainEqual({ name: "review", model: "gamma/reviewer", thinking: "high" })
           expect(resumed.ghCalls).toContain("pr create --head orc/test")
@@ -83,10 +90,10 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
   })
 
   const resumedOnBeta = async (resumeRooms: Readonly<Record<string, ProviderRoom>>): Promise<void> => {
-    await withReadyBranch(async ({ dir, home, sha, kinds }) => {
-          await parkedForRoom(dir, home, sha, kinds)
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktree }) => {
+          await parkedForRoom(dir, home, sha, kinds, worktree)
           const resumedKinds: Array<string> = []
-          const resumed = await runOrcDeliveryResume(dir, home, reviewsOn(null, resumedKinds, sha), lintPasses, pickWith(resumeRooms), "beta/coder")
+          const resumed = await runOrcDeliveryResume(dir, home, reviewsOn(null, resumedKinds, sha), lintPasses, pickWith(resumeRooms), worktree, "beta/coder")
           expect(resumedKinds).toEqual(["reviewer"])
           expect(resumed.stepAgents).toContainEqual({ name: "review", model: "beta/reviewer", thinking: "high" })
           expect(resumed.ghCalls).toContain("pr create --head orc/test")
@@ -102,9 +109,9 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
   })
 
   test("still fails the review turn when every entry is on the implementer's provider, instead of parking on a wait no quota ends", async () => {
-    await withReadyBranch(async ({ dir, home, sha, kinds }) => {
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktree }) => {
           const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses, (implementerModel) => (runAgent) =>
-            chainReviewer({ chain: [chainEntry("acme/coder")], readRoom: Effect.succeed(() => ({ kind: "room" })), openReviewer: () => Effect.succeed(runAgent) })(implementerModel)(runAgent))
+            chainReviewer({ chain: [chainEntry("acme/coder")], readRoom: Effect.succeed(() => ({ kind: "room" })), openReviewer: () => Effect.succeed(runAgent) })(implementerModel)(runAgent), worktree)
           expect(outcome.steps).toContainEqual({ name: "review", status: "failed" })
           expect(outcome.report.endReason).not.toContain("the run parks")
           expect(outcome.ghCalls).not.toContain("pr create")
