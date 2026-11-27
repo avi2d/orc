@@ -11,11 +11,12 @@ import type { ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
 import { beatReadsChecks } from "./checks"
-import { leftFindings, leftReasonLine, type LeftFinding } from "./left-findings"
+import { leftFindings, leftReasonLine, type LeftFinding, type ReviewStop } from "./left-findings"
 
 interface OrcLoopEnd {
   readonly review: ReviewOutcome
   readonly sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>
+  readonly stop: ReviewStop | null
 }
 
 type ReviewSection =
@@ -34,11 +35,11 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       if (orcLoop === undefined) {
         return yield* new OrcRunError({ message: "orc: an orc delivery run reached its PR without the review fix loop" })
       }
-      const reviewed = checked + reviewSentence(orcLoop.review)
+      const reviewed = checked + reviewSentence(orcLoop.review) + (orcLoop.stop === null ? "" : "The review fix loop stopped: " + orcLoop.stop + ". ")
       if (orcLoop.review.status === "failed") {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound) })
+      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound, orcLoop.stop ?? "round-limit") })
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {

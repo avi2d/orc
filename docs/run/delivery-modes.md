@@ -15,8 +15,13 @@ A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: 
 ## Orc delivery
 An `orc` run fetches `origin` and rebases its branch onto the default branch recorded by `refs/remotes/origin/HEAD` before running the project checks.
 If the rebase fails, the run does not open a PR.
-After the checks pass, the run reviews the branch and fixes the findings in at most two rounds.
-The first round fixes every finding, and the second round fixes only the `error` findings the next review still reports.
+After the checks pass, the run reviews the branch and fixes findings in up to two rounds by default.
+Set `review.max_fix_rounds` in `.no-mistakes.yaml` to a positive integer to change the limit.
+The first round sends `error` and `warning` findings to the fixer, except findings marked `ask-user`.
+Later rounds send only `error` findings.
+The loop stops when no `error` or `warning` remains, the round limit is reached, a finding repeats, or an `ask-user` error is open.
+It also stops when no finding meets the later rounds' severity bar.
+The run's end reason records why the loop stopped.
 The run history records each review turn as its own `review` step, numbered by attempt.
 If a review turn fails, a fix does not finish, or a check fails after a fix, the run stops without opening a PR.
 Otherwise, the run pushes the branch and opens or reuses a PR.
@@ -91,10 +96,12 @@ A review with no findings gives the line `The review found nothing.`, and a fail
 After a successful review and any fix rounds, an `orc` run opens its PR the same way, with the remaining findings.
 Findings that remain after the fix rounds do not stop the PR.
 Under each remaining finding, a nested line says why the fix loop left it.
+An `ask-user` finding stays out of the fixer input and remains in the PR body.
 A `warning` or `info` finding is below the round 2 bar, which fixes only errors.
-For an `error` finding with the same id and file as one the fixer already received, the reason line names that match and the round.
-Any other `error` finding came from the review after fix round 2, so the round limit was reached.
-Orc does not yet mark a finding as left because it needs a person's decision.
+A repeat has the same file and topic as a finding the fixer received earlier.
+The reviewer supplies a stable topic slug for each finding and keeps it across review rounds.
+If either finding has no topic, orc compares their ids instead.
+The reason line names the match and the round, or the stop that left the finding open.
 
 ## After the PR opens
 A direct-PR run succeeds as soon as the PR opens.

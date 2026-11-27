@@ -1,34 +1,48 @@
 import type { ReviewFinding } from "./review-outcome"
 
-export const lastFixRound = 2
-
 export const passesRoundTwoBar = (finding: ReviewFinding): boolean => finding.severity === "error"
+
+export type ReviewStop = "cleared" | "round-limit" | "repeat" | "ask-user" | "severity-bar"
 
 type LeftReason =
   | { readonly kind: "below-round-2-bar" }
-  | { readonly kind: "repeat"; readonly round: number }
-  | { readonly kind: "round-limit" }
+  | { readonly kind: "repeat"; readonly round: number; readonly topic?: boolean }
+  | { readonly kind: "round-limit"; readonly round?: number }
+  | { readonly kind: "ask-user" }
+  | { readonly kind: "stopped"; readonly stop: ReviewStop }
 
 export interface LeftFinding {
   readonly finding: ReviewFinding
   readonly reason: LeftReason
 }
 
-const sameFinding = (one: ReviewFinding, other: ReviewFinding): boolean => one.id === other.id && one.file === other.file
+export const sameFinding = (one: ReviewFinding, other: ReviewFinding): boolean => {
+  if (one.file !== other.file) return false
+  const oneTopic = "topic" in one ? one.topic : undefined
+  const otherTopic = "topic" in other ? other.topic : undefined
+  return oneTopic !== undefined && otherTopic !== undefined ? oneTopic === otherTopic : one.id === other.id
+}
 
-// The caller ran the fix loop to its end, so an error still reported means no fix round was left for it.
-export const leftFindings = (remaining: ReadonlyArray<ReviewFinding>, sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>): ReadonlyArray<LeftFinding> =>
+export const leftFindings = (remaining: ReadonlyArray<ReviewFinding>, sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>, stop: ReviewStop = "round-limit"): ReadonlyArray<LeftFinding> =>
   remaining.map((finding) => {
-    if (!passesRoundTwoBar(finding)) {
-      return { finding, reason: { kind: "below-round-2-bar" } }
-    }
+    if (finding.action === "ask-user") return { finding, reason: { kind: "ask-user" } }
+    if (!passesRoundTwoBar(finding)) return { finding, reason: { kind: "below-round-2-bar" } }
     const sentIn = sentPerRound.findLastIndex((sent) => sent.some((earlier) => sameFinding(earlier, finding)))
-    return { finding, reason: sentIn === -1 ? { kind: "round-limit" } : { kind: "repeat", round: sentIn + 1 } }
+    if (sentIn !== -1) {
+      const earlier = sentPerRound[sentIn]?.find((item) => sameFinding(item, finding))
+      const topic = "topic" in finding && finding.topic !== undefined && earlier !== undefined && "topic" in earlier && earlier.topic !== undefined
+      return { finding, reason: { kind: "repeat", round: sentIn + 1, topic } }
+    }
+    return { finding, reason: stop === "round-limit" ? { kind: "round-limit", round: sentPerRound.length } : { kind: "stopped", stop } }
   })
 
 export const leftReasonLine = (reason: LeftReason): string =>
   reason.kind === "below-round-2-bar"
     ? "Left because its severity is below the round 2 bar, which fixes only errors."
     : reason.kind === "repeat"
-    ? "Left because it has the same id and file as a finding the fixer received in round " + reason.round.toString() + "."
-    : "Left because the round limit was reached: the review after fix round " + lastFixRound.toString() + " reported it."
+    ? "Left because it has the same " + (reason.topic === true ? "topic" : "id") + " and file as a finding the fixer received in round " + reason.round.toString() + "."
+    : reason.kind === "ask-user"
+    ? "Left because it asks the user."
+    : reason.kind === "stopped"
+    ? "Left because the review fix loop stopped: " + reason.stop + "."
+    : "Left because the round limit was reached: the review after fix round " + (reason.round ?? 2).toString() + " reported it."

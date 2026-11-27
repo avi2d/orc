@@ -9,10 +9,23 @@ export type PathRule = typeof PathRule.Type
 
 const ReviewConfig = Schema.Struct({
   review: Schema.optional(Schema.NullOr(Schema.Struct({
-    path_instructions: Schema.optional(Schema.NullOr(Schema.Array(PathRule)))
+    path_instructions: Schema.optional(Schema.NullOr(Schema.Array(PathRule))),
+    max_fix_rounds: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)))
   })))
 })
 const decodeReviewConfig = Schema.decodeUnknownEffect(ReviewConfig)
+
+export const reviewRoundLimit = (yamlText: string): Effect.Effect<number, OrcRunError> =>
+  Effect.gen(function*() {
+    const parsed: unknown = yield* Effect.try({
+      try: () => Bun.YAML.parse(yamlText),
+      catch: () => new OrcRunError({ message: "orc: .no-mistakes.yaml is no YAML orc can read" })
+    })
+    const config = yield* decodeReviewConfig(parsed).pipe(
+      Effect.mapError((error) => new OrcRunError({ message: "orc: .no-mistakes.yaml holds review config orc cannot read: " + error.message }))
+    )
+    return config.review?.max_fix_rounds ?? 2
+  })
 
 const configFile = ".no-mistakes.yaml"
 

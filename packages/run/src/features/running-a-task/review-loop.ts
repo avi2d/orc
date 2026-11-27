@@ -3,7 +3,8 @@ import { OrcRunError } from "../../shared/lib/index"
 import { runChecksRound, summarizeChecksRound, type ChecksCommand } from "./checks"
 import { finishAfterChecks, reviewOrc } from "./run-finish"
 import type { ReviewFinding, ReviewOutcome } from "./review-outcome"
-import { lastFixRound, passesRoundTwoBar } from "./left-findings"
+import { passesRoundTwoBar, sameFinding, type ReviewStop } from "./left-findings"
+import { reviewRoundLimit } from "./review-path-rules"
 import type { RunStopped } from "./loop-pause"
 import type { ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
@@ -22,10 +23,18 @@ interface ReviewLoop {
 }
 
 const findingsForRound = (findings: ReadonlyArray<ReviewFinding>, round: number): ReadonlyArray<ReviewFinding> =>
-  round === 1 ? findings : findings.filter(passesRoundTwoBar)
+  findings.filter((finding) => finding.action !== "ask-user" && (round === 1 ? finding.severity === "error" || finding.severity === "warning" : passesRoundTwoBar(finding)))
 
-const mayStartRound = (round: number, review: ReviewOutcome): boolean =>
-  round <= lastFixRound && review.status === "passed" && findingsForRound(review.findings, round).length > 0
+const stopForReview = (review: ReviewOutcome, round: number, limit: number, sent: ReadonlyArray<ReadonlyArray<ReviewFinding>>): ReviewStop | null => {
+  if (review.status !== "passed") return null
+  const findings = review.findings
+  if (!findings.some((finding) => finding.severity === "error" || finding.severity === "warning")) return "cleared"
+  if (findings.some((finding) => finding.severity === "error" && finding.action === "ask-user")) return "ask-user"
+  if (round > limit) return "round-limit"
+  if (findings.some((finding) => sent.some((previous) => previous.some((earlier) => sameFinding(earlier, finding))))) return "repeat"
+  if (findingsForRound(findings, round).length === 0) return "severity-bar"
+  return null
+}
 
 const stopReport = (loop: ReviewLoop, endReason: string): OrcRunReport => ({
   ...loop.base, commits: loop.commits, completed: false, checksRounds: loop.rounds,
@@ -85,16 +94,34 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
     if (run.delivery.kind !== "orc") {
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
     }
+    const config = yield* run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read review config: " + String(cause) }))
+    )
+    const limit = yield* reviewRoundLimit(config)
     const reviewer = run.delivery.reviewer
     let review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, 1)
     const sentPerRound: Array<ReadonlyArray<ReviewFinding>> = []
-    for (let round = 1; mayStartRound(round, review); round += 1) {
-      if (review.status !== "passed") break
+    const earlierReviews: Array<ReadonlyArray<ReviewFinding>> = []
+    const askUserFindings: Array<ReviewFinding> = []
+    let round = 1
+    let stop = stopForReview(review, round, limit, sentPerRound)
+    while (review.status === "passed" && stop === null) {
+      for (const finding of review.findings) {
+        if (finding.action === "ask-user" && !askUserFindings.some((earlier) => sameFinding(earlier, finding))) askUserFindings.push(finding)
+      }
+      earlierReviews.push(review.findings)
       const sent = findingsForRound(review.findings, round)
       sentPerRound.push(sent)
       const failure = yield* runOneRound(loop, sent, round)
       if (failure !== null) return stopReport(loop, failure)
-      review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, round + 1)
+      round += 1
+      review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, round)
+      stop = stopForReview(review, round, limit, earlierReviews)
     }
-    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound })
+    if (review.status === "passed") {
+      const kept = askUserFindings.filter((finding) => !review.findings.some((remaining) => remaining.action === "ask-user" && sameFinding(remaining, finding)))
+      const current = review.findings.filter((finding) => !kept.some((earlier) => sameFinding(earlier, finding)))
+      review = { ...review, findings: [...current, ...kept] }
+    }
+    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, stop })
   })
