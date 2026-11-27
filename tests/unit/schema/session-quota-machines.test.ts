@@ -152,6 +152,10 @@ describe("one shared account read under quota-axi's two spellings of a default k
 
 describe("an account one machine could not read", () => {
   const unread = "quota-axi gave claude work no windows";
+  const withSouthUnread = (north: ReturnType<typeof machineView>) =>
+    composedSessionQuota(north, "north", [southReading({ kind: "ok", value: machineView("south", claudeUnread(unread)) })]);
+  const failedOn = (view: ReturnType<typeof composedSessionQuota>) =>
+    view.composition?.failedAccounts.map(({ machine, failure }) => [machine, failure]);
 
   test("keeps the other machine's windows and names the machine and account that failed", () => {
     const view = composedSessionQuota(machineView("north", claudeUnread(unread)), "north", [southReading()]);
@@ -168,13 +172,9 @@ describe("an account one machine could not read", () => {
   });
 
   test("names the remote when it is the machine that failed", () => {
-    const view = composedSessionQuota(machineView("north"), "north", [
-      southReading({ kind: "ok", value: machineView("south", claudeUnread(unread)) }),
-    ]);
+    const view = withSouthUnread(machineView("north"));
     expect(rowsOf(windowOf(view, "claude work", "seven_day")).map((row) => row.machine)).toEqual(["north", "north"]);
-    expect(view.composition?.failedAccounts.map(({ machine, failure }) => [machine, failure])).toEqual([
-      ["south", { kind: "invalid", issue: unread }],
-    ]);
+    expect(failedOn(view)).toEqual([["south", { kind: "invalid", issue: unread }]]);
   });
 
   const noClaudeWindow = (report: SessionQuotaReport): SessionQuotaReport => ({
@@ -193,11 +193,9 @@ describe("an account one machine could not read", () => {
   test("names the remote beside its failure shown as the body when this machine read the account but no window", () => {
     const north = machineView("north", noClaudeWindow);
     expect(north.accounts.find((account) => account.title === "claude work")?.body).toEqual({ kind: "windows", windows: [] });
-    const view = composedSessionQuota(north, "north", [southReading({ kind: "ok", value: machineView("south", claudeUnread(unread)) })]);
+    const view = withSouthUnread(north);
     expect(view.accounts.find((account) => account.title === "claude work")?.body).toEqual({ kind: "invalid", issue: unread });
-    expect(view.composition?.failedAccounts.map(({ machine, failure }) => [machine, failure])).toEqual([
-      ["south", { kind: "invalid", issue: unread }],
-    ]);
+    expect(failedOn(view)).toEqual([["south", { kind: "invalid", issue: unread }]]);
   });
 
   test("lists no failed account when every machine read every account", () => {
