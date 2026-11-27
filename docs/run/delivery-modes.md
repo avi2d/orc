@@ -79,6 +79,7 @@ The run history records the `review` step as failed with no model, and the `revi
 The beat parks the task with that reason and checks reviewer quota on the machine where the run stopped.
 When a reviewer qualifies, the beat resumes the same branch.
 The resumed run keeps the implementation, runs the checks again and then runs the pending review turn.
+It keeps the fix rounds the parked run spent and its ask-user findings for the PR body, so the two-round cap holds across the wait.
 It does not apply again a send-back that the parked run already applied.
 A new send-back runs the implementer again and starts a fresh review cycle with up to two fix rounds.
 The resumed run excludes the providers saved when it parked.
