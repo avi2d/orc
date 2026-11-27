@@ -10,6 +10,7 @@ export {
   backlogRoot,
   backlogPaths,
   grabIn,
+  takenGrab,
   newGrab,
 } from "./backlog-write"
 

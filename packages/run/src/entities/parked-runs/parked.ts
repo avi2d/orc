@@ -3,8 +3,7 @@ import { type AnswerWords, type Decider } from "../../shared/lib/index"
 import type { OpenQuestion } from "../review-gate/index"
 import { openReviewQuestions } from "../attention/index"
 import { repeatHold, repeatsResume } from "./repeat-hold"
-import { originOfRun, takenToNew } from "./taken-to-new"
-import { answerDecision, choicesOf, findTask, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, type Hold, type HoldQuestion, isHeld, isDeciderAnswer, openQuestions, type Parked, type CaptainAnswer, type DeciderAnswer, type ParkedAnswer, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../backlog/index"
+import { answerDecision, choicesOf, findTask, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, isDeciderAnswer, openQuestions, type Parked, type CaptainAnswer, type DeciderAnswer, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
 
 // An answer handed to an asking that ended went into the run, so only one never handed out or handed to this asking still answers it.
 const answersAsking = (answer: ParkedAnswer, asking: string | null): boolean => answer.relayedTo === null || answer.relayedTo === asking
@@ -108,6 +107,31 @@ export const answersFor = (record: TaskRecord, asking: LiveAsking): ReadonlyArra
   ))
 
 // rename(2) takes the taken file at most once, so of two beats parking one run exactly one moves it back to new.
+const parkInNew = (
+  root: string,
+  id: string,
+  update: (record: TaskRecord, machine: string) => Effect.Effect<TaskRecord, BacklogError, FileSystem.FileSystem>
+): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const { fs, paths, file, grabbed, putBack, read } = yield* takenGrab(root, id, Effect.fail(new BacklogError({ detail: id + " was parked or closed by another command" })))
+    const park = Effect.gen(function*() {
+      const text = yield* read
+      const record = yield* parseTaskFile(file, "taken", text)
+      if (record.state.kind !== "started") {
+        return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task parks" })
+      }
+      const updated = yield* update(record, record.state.claim.machine)
+      const parked: TaskRecord = { ...updated, state: { kind: "new" } }
+      if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(parked)))) {
+        return yield* new BacklogError({ detail: "new/ already holds " + id })
+      }
+      return parked
+    })
+    const parked = yield* park.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
+    yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
+    return parked
+  }).pipe(Effect.uninterruptible)
+
 export const parkStartedTask = (
   root: string,
   id: string,
@@ -117,20 +141,34 @@ export const parkStartedTask = (
   run?: string,
   ended?: string
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  takenToNew(root, id, "was parked or closed by another command", (record) =>
+  parkInNew(root, id, (record, machine) =>
     Effect.gen(function*() {
-      if (record.state.kind !== "started") {
-        return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task parks" })
-      }
       const open = latestAskings(asked)
       const lastAsking = asked.find((question) => question.asking !== undefined)?.asking ?? asked.find((question) => question.asked !== undefined)?.asked ?? null
       const known = record.parked?.questions ?? []
       const questions = parkedQuestions(open, known, lastAsking, (question) => question.asked ?? at)
       yield* openReviewQuestions(root, id, newlyAsked(questions, known))
-      const origin = run === undefined ? record.parked?.origin : originOfRun(record, record.state.claim.machine, run)
+      const sentPr = record.parked?.origin?.pr
+      const origin = run === undefined ? record.parked?.origin : { machine, run, ...(sentPr === undefined ? {} : { pr: sentPr }) }
       const hold = repeatsResume(record, questions) ? repeatHold(record, run, ended, at) : record.hold
-      return { ...record, hold, parked: { branch, questions, ...(origin === undefined ? {} : { origin }), at, ...(record.parked?.sentBackAt === undefined ? {} : { sentBackAt: record.parked.sentBackAt }) }, state: { kind: "new" } } satisfies TaskRecord
-    }))
+      return { ...record, hold, parked: { branch, questions, ...(origin === undefined ? {} : { origin }), at, ...(record.parked?.sentBackAt === undefined ? {} : { sentBackAt: record.parked.sentBackAt }) } }
+    })
+  )
+
+export const parkForReviewerQuota = (root: string, id: string, run: string, reason: string, at: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  parkInNew(root, id, (record, machine) => {
+    const prior = record.parked
+    return Effect.succeed({
+      ...record,
+      parked: {
+        ...prior,
+        branch: prior?.branch ?? taskBranch(id),
+        questions: prior?.questions ?? [],
+        origin: { ...prior?.origin, machine, run, reviewerQuota: reason },
+        at
+      }
+    })
+  })
 
 export type AnswerOutcome =
   | { readonly kind: "hold"; readonly hold: Hold }

@@ -6,12 +6,12 @@ import { OrcRunError } from "../../shared/lib/index"
 import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 import { type DiagramTurnResult, runDiagramTurn } from "./diagram-turn"
-import type { ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
-import type { ReviewerRoomWait } from "./reviewer-chain"
+import type { ReviewEligibility, ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
 import { beatReadsChecks } from "./checks"
 import { leftFindings, leftReasonLine, reviewStopReason, type LeftFinding, type ReviewStop } from "./left-findings"
+import type { NoReviewerRoom } from "./reviewer-chain"
 
 type OrcLoopEnd =
   | { readonly review: Extract<ReviewOutcome, { readonly status: "failed" }> }
@@ -20,7 +20,7 @@ type OrcLoopEnd =
     readonly sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>
     readonly stop: ReviewStop
     readonly askUserFindings: ReadonlyArray<ReviewFinding>
-    readonly reviewer: ReviewerPick
+    readonly eligibility: ReviewEligibility
   }
 
 type ReviewSection =
@@ -43,7 +43,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       if (!("stop" in orcLoop)) {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, orcLoop.reviewer, runAgent), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound, orcLoop.stop, orcLoop.askUserFindings) })
+      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent, orcLoop.eligibility), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound, orcLoop.stop, orcLoop.askUserFindings) })
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + "The review fix loop stopped because " + reviewStopReason(orcLoop.stop) + ". " + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
@@ -65,14 +65,8 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-const recordUnreviewed = (checkpoints: RunCheckpoints, attempt: number, reason: string): Effect.Effect<ReviewOutcome, OrcRunError> => {
-  const failed: ReviewOutcome = { status: "failed", reason }
-  const at = new Date().toISOString()
-  return checkpoints.reviewDone(null, attempt, { ...failed, reusedFrom: null }, at, at).pipe(Effect.as(failed))
-}
-
-export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number): Effect.Effect<ReviewOutcome, OrcRunError | ReviewerRoomWait> =>
-  pick(runAgent).pipe(
+export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number, eligibility: ReviewEligibility): Effect.Effect<ReviewOutcome, OrcRunError | NoReviewerRoom> =>
+  pick(runAgent, eligibility).pipe(
     Effect.flatMap((picked) =>
       Effect.gen(function*() {
         const started = new Date().toISOString()
@@ -82,9 +76,10 @@ export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunC
         return review
       })
     ),
-    Effect.catchTags({
-      NoReviewerRoom: (error) => recordUnreviewed(checkpoints, attempt, error.message),
-      ReviewerRoomWait: (error) => recordUnreviewed(checkpoints, attempt, error.wait.reason).pipe(Effect.andThen(Effect.fail(error)))
+    Effect.catchTag("NoReviewerRoom", (error) => {
+      const failed: ReviewOutcome = { status: "failed", reason: error.message }
+      const at = new Date().toISOString()
+      return checkpoints.reviewDone(null, attempt, { ...failed, reusedFrom: null }, at, at).pipe(Effect.andThen(Effect.fail(error)))
     })
   )
 
@@ -148,12 +143,11 @@ export const prBody = (input: PrBodyInput): string => {
   return "## Why\n\n" + why + "\n\n## What changed\n\n" + changed + "\n" + diagram + "\n## How it was checked\n\n" + checkedSentence(input.passed) + "\n" + reviewStatusLine(input.review) + "\n" + openFindingLines(input.review)
 }
 
-const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps["runAgent"]): Effect.Effect<DiagramTurnResult> =>
-  pick(runAgent).pipe(
+const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps["runAgent"], eligibility: ReviewEligibility): Effect.Effect<DiagramTurnResult> =>
+  pick(runAgent, eligibility).pipe(
     Effect.flatMap((picked) => runDiagramTurn(run, picked.runAgent, picked.reviewer)),
     Effect.catchTags({
       NoReviewerRoom: () => Effect.succeed({ diagram: { kind: "none" }, why: null } as const),
-      ReviewerRoomWait: () => Effect.succeed({ diagram: { kind: "none" }, why: null } as const),
       OrcRunError: () => Effect.succeed({ diagram: { kind: "none" }, why: null } as const)
     })
   )

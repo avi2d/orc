@@ -1,11 +1,11 @@
-import { Array as Arr, Console, Effect } from "effect"
+import { type Array as Arr, Console, Effect } from "effect"
 import type { AgentFile } from "../../entities/agent/index"
 import { subprocessPullRequestOpener } from "../../entities/pull-request/index"
 import { subprocessNoMistakesRunner, type SubprocessRunnerOptions } from "../../entities/review-gate/index"
-import { type DefaultCredential, providerOfModel, type ReviewerEntry, type RoomReading } from "../../shared/config/index"
-import type { OrcRunError } from "../../shared/lib/index"
-import { chosenReviewerLine, type NoReviewerRoom, pickChainEntry, ReviewerRoomWait } from "./reviewer-chain"
-import type { ReviewerChoice, SandboxOps } from "./run-ops"
+import type { DefaultCredential, ReviewerEntry, RoomReading } from "../../shared/config/index"
+import { OrcRunError } from "../../shared/lib/index"
+import { chosenReviewerLine, pickChainEntry } from "./reviewer-chain"
+import type { ReviewerPick, SandboxOps } from "./run-ops"
 import type { RunDeliverer } from "./run-record"
 
 export interface ChainReviewer extends ReviewerEntry {
@@ -19,7 +19,10 @@ export type PreparedReviewer =
   | { readonly kind: "orc"; readonly reviewer: AgentFile }
   | { readonly kind: "orc-chain"; readonly chain: Arr.NonEmptyReadonlyArray<ChainReviewer> }
 
-export const fixedReviewer = (reviewer: AgentFile): ReviewerChoice => () => (runAgent) => Effect.succeed({ reviewer, runAgent })
+export const fixedReviewer = (reviewer: AgentFile): ReviewerPick => (runAgent, { resumedForQuota }) =>
+  !resumedForQuota
+    ? Effect.succeed({ reviewer, runAgent })
+    : Effect.fail(new OrcRunError({ message: "orc: a run waiting for reviewer quota needs a reviewer chain" }))
 
 export interface ReviewerChainOptions {
   readonly chain: Arr.NonEmptyReadonlyArray<ChainReviewer>
@@ -27,25 +30,12 @@ export interface ReviewerChainOptions {
   readonly openReviewer: (entry: ChainReviewer, position: number) => Effect.Effect<SandboxOps["runAgent"], OrcRunError>
 }
 
-// Only an entry off the implementer's provider can ever review, so a chain without one has nothing to wait for.
-const waitForRoom = (options: ReviewerChainOptions, implementerProvider: string, error: NoReviewerRoom): Effect.Effect<never, NoReviewerRoom | ReviewerRoomWait> => {
-  const reviewers = options.chain
-    .filter((entry) => entry.provider !== implementerProvider)
-    .map(({ provider, model, credential }) => ({ provider, model, credential }))
-  return Arr.isReadonlyArrayNonEmpty(reviewers)
-    ? Effect.fail(new ReviewerRoomWait({ wait: { reason: error.message, reviewers } }))
-    : Effect.fail(error)
-}
-
-export const chainReviewer = (options: ReviewerChainOptions): ReviewerChoice => {
+export const chainReviewer = (options: ReviewerChainOptions): ReviewerPick => {
   const opened = new Map<number, SandboxOps["runAgent"]>()
-  return (implementerModel) => () =>
+  return (_runAgent, { implementerProviders }) =>
     Effect.gen(function*() {
-      const implementerProvider = providerOfModel(implementerModel)
       const roomOf = yield* options.readRoom
-      const pick = yield* pickChainEntry(options.chain, implementerProvider, roomOf).pipe(
-        Effect.catchTag("NoReviewerRoom", (error) => waitForRoom(options, implementerProvider, error))
-      )
+      const pick = yield* pickChainEntry(options.chain, implementerProviders, roomOf)
       yield* Console.log(chosenReviewerLine(pick))
       const runAgent = opened.get(pick.position) ?? (yield* options.openReviewer(pick.entry, pick.position))
       opened.set(pick.position, runAgent)
@@ -53,7 +43,7 @@ export const chainReviewer = (options: ReviewerChainOptions): ReviewerChoice => 
     })
 }
 
-export const subprocessDeliverer = (host: SubprocessRunnerOptions & { readonly branch: string; readonly maxFixRounds: number }, prepared: PreparedReviewer, pickChain: (chain: Arr.NonEmptyReadonlyArray<ChainReviewer>) => ReviewerChoice): RunDeliverer => {
+export const subprocessDeliverer = (host: SubprocessRunnerOptions & { readonly branch: string; readonly maxFixRounds: number }, prepared: PreparedReviewer, pickChain: (chain: Arr.NonEmptyReadonlyArray<ChainReviewer>) => ReviewerPick): RunDeliverer => {
   switch (prepared.kind) {
     case "direct-PR":
       return { kind: "direct-PR", opener: subprocessPullRequestOpener({ ...host, gh: "gh" }), reviewer: prepared.reviewer }

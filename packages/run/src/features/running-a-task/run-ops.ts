@@ -6,7 +6,8 @@ import type { AllowWord, NoMistakesRecord, OpenQuestion, QuestionAnswer } from "
 import type { DirectPrRecord } from "../../entities/pull-request/index"
 import type { ChecksRoundSummary, OrcRunCommit, RecordedFixAttempt } from "../../entities/run-history/index"
 import type { ReviewAtHeadOutcome } from "./review-outcome"
-import type { NoReviewerRoom, ReviewerRoomWait } from "./reviewer-chain"
+import type { NoReviewerRoom } from "./reviewer-chain"
+import type { ReviewWaitCheckpoint } from "./review-wait-checkpoint"
 
 export interface AgentRun {
   readonly agent: AgentFile
@@ -31,9 +32,12 @@ interface PickedReviewer {
   readonly runAgent: SandboxOps["runAgent"]
 }
 
-export type ReviewerPick = (runAgent: SandboxOps["runAgent"]) => Effect.Effect<PickedReviewer, NoReviewerRoom | ReviewerRoomWait | OrcRunError>
+export interface ReviewEligibility {
+  readonly implementerProviders: ReviewWaitCheckpoint["implementerProviders"]
+  readonly resumedForQuota: boolean
+}
 
-export type ReviewerChoice = (implementerModel: string) => ReviewerPick
+export type ReviewerPick = (runAgent: SandboxOps["runAgent"], eligibility: ReviewEligibility) => Effect.Effect<PickedReviewer, NoReviewerRoom | OrcRunError>
 
 export interface ResumePlan {
   readonly implementSessionId: string | null
@@ -51,6 +55,7 @@ export interface ResumePlan {
   readonly handover: string | null
   readonly priorDir: string | null
   readonly cleanupPriorDir: string | null
+  readonly reviewWait?: ReviewWaitCheckpoint
 }
 
 export interface AgentOutcome {
@@ -65,6 +70,7 @@ export interface AgentOutcome {
 }
 
 export interface RunCheckpoints {
+  readonly branchWriterModels: Effect.Effect<ReadonlyArray<string>, OrcRunError>
   readonly implementStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly implementSession: (file: string) => Effect.Effect<void, OrcRunError>
   readonly implementDone: (outcome: AgentOutcome, started: string, ended: string) => Effect.Effect<void, OrcRunError>

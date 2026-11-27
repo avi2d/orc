@@ -1,14 +1,15 @@
-import { Effect } from "effect"
+import { Array as Arr, Effect } from "effect"
+import { providerOfModel } from "../../shared/config/index"
 import { OrcRunError } from "../../shared/lib/index"
-import { type ReviewerWait, reviewerWaitFileName } from "../../shared/config/index"
-import type { ReviewerRoomWait } from "./reviewer-chain"
 import { runChecksRound, summarizeChecksRound, type ChecksCommand } from "./checks"
 import { finishAfterChecks, reviewOrc } from "./run-finish"
 import type { ReviewFinding } from "./review-outcome"
 import { passesRoundTwoBar, sameFinding, type ReviewStop } from "./left-findings"
 import type { RunStopped } from "./loop-pause"
-import type { ResumePlan, ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
+import { writeReviewWait } from "./review-wait"
+import type { ResumePlan, ReviewEligibility, RunCheckpoints, SandboxOps } from "./run-ops"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
+import { sentBackAnswersOf } from "./worker-question"
 
 interface ReviewLoop {
   readonly run: HistoryRun
@@ -89,49 +90,52 @@ const runOneRound = (loop: ReviewLoop, findings: ReadonlyArray<ReviewFinding>, r
     return yield* checkAfterFix(loop)
   })
 
-const waitsForReviewerLine = (wait: ReviewerWait): string =>
-  "The review turn waits for a reviewer in the chain to have room, so the run parks and no PR opens: " + wait.reason
+const reviewEligibility = ({ checkpoints, plan }: Pick<ReviewLoop, "checkpoints" | "plan">): Effect.Effect<ReviewEligibility, OrcRunError> =>
+  checkpoints.branchWriterModels.pipe(Effect.map((models) => ({
+    implementerProviders: Arr.dedupe([...plan.reviewWait?.implementerProviders ?? [], ...models.map(providerOfModel)]),
+    resumedForQuota: plan.reviewWait !== undefined
+  })))
 
-// The beat reads the wait from the run folder to know which entries to re-read, and the run's end reason carries only words.
-const parkForReviewer = (loop: ReviewLoop, error: ReviewerRoomWait): Effect.Effect<OrcRunReport, OrcRunError> => {
-  const file = loop.run.path.join(loop.run.runDir, reviewerWaitFileName)
-  return loop.run.fs.writeFileString(file, JSON.stringify(error.wait, null, 2) + "\n").pipe(
-    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + file + ": " + String(cause) })),
-    Effect.as(stopReport(loop, waitsForReviewerLine(error.wait)))
-  )
-}
+const appliedSendBackIds = (plan: ResumePlan): ReadonlyArray<string> =>
+  Arr.dedupe([...plan.reviewWait?.appliedSendBackIds ?? [], ...sentBackAnswersOf(plan.answers).map(({ question }) => question)])
 
-const writtenByModel = (run: HistoryRun, plan: ResumePlan): string => plan.inheritedImplement?.model ?? run.agent.model
-
-export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> => {
-  const { run, ops, base, rounds, fixes, commits, plan, checkpoints } = loop
-  if (run.delivery.kind !== "orc") {
-    return finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
-  }
-  return reviewAndFinish(loop, run.delivery.reviewer(writtenByModel(run, plan)), run.delivery.maxFixRounds).pipe(Effect.catchTag("ReviewerRoomWait", (error) => parkForReviewer(loop, error)))
-}
-
-const reviewAndFinish = (loop: ReviewLoop, reviewer: ReviewerPick, limit: number): Effect.Effect<OrcRunReport, OrcRunError | RunStopped | ReviewerRoomWait> =>
+export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const { run, ops, base, rounds, fixes, commits, plan, checkpoints } = loop
-    let review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, 1)
-    const sentPerRound: Array<ReadonlyArray<ReviewFinding>> = []
-    const askUserFindings: Array<ReviewFinding> = []
-    let round = 1
-    while (review.status === "passed") {
-      const stop = stopForReview(review.findings, round, limit, sentPerRound)
-      if (stop !== null) {
-        return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, stop, askUserFindings, reviewer })
-      }
-      for (const finding of review.findings) {
-        if (finding.action === "ask-user" && !askUserFindings.some((earlier) => sameFinding(earlier, finding))) askUserFindings.push(finding)
-      }
-      const sent = findingsForRound(review.findings, round)
-      sentPerRound.push(sent)
-      const failure = yield* runOneRound(loop, sent, round)
-      if (failure !== null) return stopReport(loop, failure)
-      round += 1
-      review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, round)
+    if (run.delivery.kind !== "orc") {
+      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
     }
-    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review })
+    const limit = run.delivery.maxFixRounds
+    const reviewer = run.delivery.reviewer
+    const sentPerRound = [...plan.reviewWait?.sentPerRound ?? []]
+    const askUserFindings = [...plan.reviewWait?.askUserFindings ?? []]
+    const eligibility = reviewEligibility(loop)
+    const reviewNext = () => eligibility.pipe(Effect.flatMap((writers) =>
+      reviewOrc(run, reviewer, checkpoints, ops.runAgent, sentPerRound.length + 1, writers)
+    ))
+    return yield* Effect.gen(function*() {
+      let review = yield* reviewNext()
+      while (review.status === "passed") {
+        const round = sentPerRound.length + 1
+        const stop = stopForReview(review.findings, round, limit, sentPerRound)
+        if (stop !== null) {
+          return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, stop, askUserFindings, eligibility: yield* eligibility })
+        }
+        for (const finding of review.findings) {
+          if (finding.action === "ask-user" && !askUserFindings.some((earlier) => sameFinding(earlier, finding))) askUserFindings.push(finding)
+        }
+        const sent = findingsForRound(review.findings, round)
+        sentPerRound.push(sent)
+        const failure = yield* runOneRound(loop, sent, round)
+        if (failure !== null) return stopReport(loop, failure)
+        review = yield* reviewNext()
+      }
+      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review })
+    }).pipe(
+      Effect.catchTag("NoReviewerRoom", ({ implementerProviders, message }) =>
+        writeReviewWait(run, { implementerProviders, reason: message, sentPerRound, askUserFindings, appliedSendBackIds: appliedSendBackIds(plan) }).pipe(
+          Effect.as({ ...stopReport(loop, message), waitingForReviewer: true as const })
+        )
+      )
+    )
   })

@@ -13,7 +13,7 @@ import { readOrcConfig } from "../../packages/run/src/shared/config/index"
 import { askSetupFor, orcCompletionLine } from "../../packages/run/src/entities/agent/index"
 import { runWithHistory } from "../../packages/run/src/features/running-a-task/run"
 import { type ChainReviewer, fixedReviewer } from "../../packages/run/src/features/running-a-task/run-deliverer"
-import type { ReviewerChoice } from "../../packages/run/src/features/running-a-task/run-ops"
+import type { ReviewerPick } from "../../packages/run/src/features/running-a-task/run-ops"
 import type { OrcRunReport, RunDeliverer } from "../../packages/run/src/features/running-a-task/run-record"
 import { listRuns, openDatabase, openQuestionsForRun, type RunRecord } from "../../packages/run/src/entities/run-history/index"
 import { readRunMetrics } from "../../packages/run/src/features/seeing-runs/index"
@@ -134,6 +134,8 @@ export interface RunFacts {
   readonly branch: string
   readonly machine: string | null
   readonly worktreeDir?: string | undefined
+  readonly implementerModel?: string | undefined
+  readonly fixerModel?: string | undefined
 }
 
 const handRunFacts: RunFacts = { branch: "orc/test", machine: null }
@@ -263,24 +265,17 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
   }
 }
 
-const runOrcDelivery = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerChoice, resumed: { readonly implementerModel: string } | null, worktreeDir: string | undefined): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerPick = fixedReviewer(reviewer), options: Pick<RunFacts, "worktreeDir" | "implementerModel" | "fixerModel"> & { readonly resumeRun?: string; readonly runId?: string; readonly answers?: ReadonlyArray<QuestionAnswer> } = {}): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const config = await Effect.runPromise(readOrcConfig(home).pipe(Effect.provide(BunServices.layer)))
   const gh = await stubGh()
   try {
-    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], fixtureGit, (spawner, hostGit, pathEnv, projectDir) =>
-      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir: worktreeDir ?? projectDir, branch: "orc/test" }), reviewer: reviewerPick, maxFixRounds: config.review.maxFixRounds }), gh.dir + ":",
-      { ...handRunFacts, worktreeDir }, resumed === null ? null : { runId: "step-run-2", resumeRun: "step-run-1" }, resumed === null ? implementer : { ...implementer, model: resumed.implementerModel })
+    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, options.answers ?? [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
+      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir: options.worktreeDir ?? worktreeDir, branch: "orc/test" }), reviewer: reviewerPick, maxFixRounds: config.review.maxFixRounds }), gh.dir + ":", { ...handRunFacts, ...options }, options.resumeRun === undefined ? null : { runId: options.runId ?? "step-run-2", resumeRun: options.resumeRun })
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
     await rm(gh.dir, { recursive: true, force: true })
   }
 }
-
-export const runOrcDeliveryStep = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerChoice = fixedReviewer(reviewer), worktreeDir?: string): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> =>
-  runOrcDelivery(dir, home, sandbox, execCheck, reviewerPick, null, worktreeDir)
-
-export const runOrcDeliveryResume = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerChoice, worktreeDir: string, implementerModel: string = implementer.model): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> =>
-  runOrcDelivery(dir, home, sandbox, execCheck, reviewerPick, { implementerModel }, worktreeDir)
 
 export const runDirectPrResume = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, answers: ReadonlyArray<QuestionAnswer>): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const gh = await stubGh()
@@ -293,7 +288,7 @@ export const runDirectPrResume = async (dir: string, home: string, sandbox: Fake
   }
 }
 
-const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, nmReplies: ReadonlyArray<NoMistakesReply>, answers: ReadonlyArray<QuestionAnswer>, prepareGit: typeof hostGitShim, deliver: DelivererFor, extraPath: string, facts: RunFacts = handRunFacts, resume: { readonly runId: string; readonly resumeRun: string } | null = null, agent: AgentFile = implementer): Promise<StepOutcome & { readonly nmCalls: string }> =>
+const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, nmReplies: ReadonlyArray<NoMistakesReply>, answers: ReadonlyArray<QuestionAnswer>, prepareGit: typeof hostGitShim, deliver: DelivererFor, extraPath: string, facts: RunFacts = handRunFacts, resume: { readonly runId: string; readonly resumeRun: string } | null = null): Promise<StepOutcome & { readonly nmCalls: string }> =>
   Effect.runPromise(
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
@@ -302,6 +297,7 @@ const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: F
       const runId = resume?.runId ?? "step-run-1"
       const runDir = path.join(home, "runs", runId)
       yield* fs.makeDirectory(path.join(runDir, "sessions"), { recursive: true })
+      yield* fs.makeDirectory(path.join(runDir, "session"), { recursive: true })
       const stub = yield* Effect.promise(() => stubNoMistakes(nmReplies))
       yield* fs.writeFileString(path.join(runDir, "task.md"), "Do the thing.\n")
       const hostGit = yield* prepareGit(fs, path, Bun.which("git") ?? "git")
@@ -316,7 +312,9 @@ const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: F
             const report = yield* runWithHistory(db, {
               fs, path, spawner, git: hostGit, projectDir: dir, runId, runDir, resumeRun: resume?.resumeRun,
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
-              taskPath: path.join(runDir, "task.md"), instructions: null, agent, fixer, branch: facts.branch, sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
+              taskPath: path.join(runDir, "task.md"), instructions: null, branch: facts.branch, sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
+              agent: { ...implementer, model: facts.implementerModel ?? implementer.model },
+              fixer: { ...fixer, model: facts.fixerModel ?? fixer.model },
               asks: askSetupFor(runDir, path.join(runDir, "session"), 600, answers, priorOpen),
               worktreeDir: facts.worktreeDir ?? dir, machine: facts.machine,
               delivery: deliver(spawner, hostGit, extraPath + stub.dir + ":" + (process.env.PATH ?? ""), dir),

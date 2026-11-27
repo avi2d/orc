@@ -129,6 +129,7 @@ const takenResume = (task: string, record: TaskRecord): Effect.Effect<Record<str
     : {
       branch: record.parked.branch,
       resumeRun: record.parked.origin?.run,
+      ...(record.parked.origin?.reviewerQuota === undefined ? {} : { delivery: "orc" }),
       ...(record.parked.questions.length === 0 && record.rebase !== undefined ? { rebase: record.rebase, delivery: "orc" } : {}),
       answers: [...latestPerId(record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ ...question, answer: question.answer }])).map((question) => ({ question: question.id, answer: question.answer.words, decider: question.answer.decider })), ...releaseAnswerOf(record.hold, record.parked)]
     })

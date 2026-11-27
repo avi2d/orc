@@ -69,7 +69,6 @@ type TaskJson = {
 
 interface ParkedJson {
   readonly origin?: Parked["origin"]
-  readonly reviewerWait?: { readonly reason: string; readonly reviewers: ReadonlyArray<{ readonly provider: string; readonly model: string }> }
   readonly branch: string
   readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string; readonly blocks: boolean; readonly deciderOwns: boolean; readonly answer: typeof DecisionAnswer.Type | null; readonly overturned?: typeof DecisionAnswer.Type }>
 }
@@ -86,7 +85,6 @@ const parkedAnswers = (answer: Parked["questions"][number]["answer"]) => {
 
 const parkedJson = (task: string, parked: Parked, deciderOwns: DeciderOwns): ParkedJson => ({
   ...(parked.origin === undefined ? {} : { origin: parked.origin }),
-  ...(parked.reviewerWait === undefined ? {} : { reviewerWait: { reason: parked.reviewerWait.reason, reviewers: parked.reviewerWait.reviewers.map(({ provider, model }) => ({ provider, model })) } }),
   branch: parked.branch,
   questions: parked.questions.map((question) => ({
     id: question.id,
@@ -218,9 +216,7 @@ const newCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: Rea
   const waits = open.length === 0 ? "" : " waits " + open.join(",")
   const held = isHeld(record) ? " held (" + record.hold.reason + ")" : ""
   const asked = openQuestions(record)
-  const parked = asked.length > 0
-    ? " parked (" + asked.map((question) => question.id).join(",") + ")"
-    : record.parked?.reviewerWait === undefined ? "" : " parked (reviewer room)"
+  const parked = asked.length === 0 ? "" : " parked (" + asked.map((question) => question.id).join(",") + ")"
   return named(record) + pinOf(record) + doneOf(record, all, merged) + waits + held + parked + " " + record.spec.title
 }
 
@@ -282,14 +278,6 @@ export const formatBoard = (view: BacklogView): string => {
   ])
 }
 
-const parkedLine = (action: Extract<BeatAction, { readonly kind: "parked" | "reviewer-wait" }>): string => {
-  if (action.kind === "reviewer-wait") {
-    return "parked " + action.task + " from run " + action.run + " on " + action.machine + " until a reviewer has room: " + action.reason
-  }
-  const waiting = action.questions.length + action.decider.length > 0
-  return "parked " + action.task + " on " + action.branch + (waiting ? " for " + answersAwaited(action.questions, action.decider) : "")
-}
-
 const actionLine = (action: BeatAction): string => {
   switch (action.kind) {
     case "update": {
@@ -329,9 +317,9 @@ const actionLine = (action: BeatAction): string => {
     case "close-failed": {
       return "close failed " + action.task + " on " + action.machine + ": " + action.reason
     }
-    case "parked":
-    case "reviewer-wait": {
-      return parkedLine(action)
+    case "parked": {
+      const waiting = action.questions.length + action.decider.length > 0
+      return "parked " + action.task + " on " + action.branch + (waiting ? " for " + answersAwaited(action.questions, action.decider) : "") + (action.reason === undefined ? "" : ": " + action.reason)
     }
     case "held": {
       return "held " + action.task + " on " + action.machine + ": " + action.reason

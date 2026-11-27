@@ -7,7 +7,7 @@ import { type DispatchConfig, ownedBySweep, readJsonFileIfPresent, throughFor } 
 import { logWrittenAt, stallMillis } from "./stall"
 import { endSplit } from "./beat-split"
 import { type CloseReading, readClose, serveRunning } from "./beat-close-runner"
-import { type AskedQuestion, parkForReviewerRoom, parkStartedTask, retryStartedTask } from "../../entities/parked-runs/index"
+import { type AskedQuestion, parkForReviewerQuota, parkStartedTask, retryStartedTask } from "../../entities/parked-runs/index"
 import { Asking, askingFileName } from "../../entities/review-gate/index"
 import type { RunEnding } from "../../features/queueing-a-task/index"
 
@@ -58,7 +58,6 @@ export const ownLogEndingOf = (startedAt: string, logAt: string | null, nowMilli
 
 type ParkEnding = Extract<RunEnding, { readonly kind: "park" }>
 type CloseEnding = Extract<RunEnding, { readonly kind: "close" }>
-type ReviewerWaitEnding = Extract<RunEnding, { readonly kind: "wait-reviewer" }>
 
 const endParked = (
   root: string,
@@ -116,16 +115,23 @@ const endClosed = (
       : Option.some({ kind: "closed", task: task.spec.id, machine, outcome: ending.outcome, reason: ending.reason, pr: ending.pr, report: ending.report } satisfies BeatAction)
   })
 
-const endReviewerWait = (
-  root: string,
-  task: TaskRecord,
-  machine: string,
-  ending: ReviewerWaitEnding
-): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const parked = yield* parkForReviewerRoom(root, task.spec.id, machine, ending.run, ending.wait, yield* nowIso).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
-    return parked === null ? Option.none() : Option.some({ kind: "reviewer-wait", task: task.spec.id, machine, run: ending.run, reason: ending.reason } satisfies BeatAction)
-  })
+const endReviewerWait = Effect.fnUntraced(function*(root: string, task: TaskRecord, machine: string, reason: string, run: string | undefined) {
+  if (run === undefined) {
+    return Option.none<BeatAction>()
+  }
+  const parked = yield* parkForReviewerQuota(root, task.spec.id, run, reason, yield* nowIso).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
+  return parked?.parked == null
+    ? Option.none<BeatAction>()
+    : Option.some({
+      kind: "parked",
+      task: task.spec.id,
+      machine,
+      branch: parked.parked.branch,
+      questions: parked.parked.questions.filter((question) => question.answer === null).map((question) => question.id),
+      decider: [],
+      reason
+    } satisfies BeatAction)
+})
 
 const endTask = (
   root: string,
@@ -135,12 +141,9 @@ const endTask = (
   ending: RunEnding,
   run?: string
 ): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
-  ending.kind === "park"
-    ? endParked(root, home, task, machine, ending, run)
-    : ending.kind === "split"
-    ? endSplit(root, task, machine, ending)
-    : ending.kind === "wait-reviewer"
-    ? endReviewerWait(root, task, machine, ending)
+  ending.kind === "reviewer-quota" ? endReviewerWait(root, task, machine, ending.wait.reason, run)
+    : ending.kind === "park" ? endParked(root, home, task, machine, ending, run)
+    : ending.kind === "split" ? endSplit(root, task, machine, ending)
     : endClosed(root, task, machine, ending)
 
 const readSince = (
@@ -288,7 +291,7 @@ export const closeFinished = (
     const ended = yield* endTask(context.root, context.home, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   }).pipe(
-    Effect.tap((progress) => progress.kind === "ended" && (progress.action.kind === "retry" || progress.action.kind === "reviewer-wait" || progress.action.kind === "closed" || (progress.action.kind === "split" && task.spec.parent !== null))
+    Effect.tap((progress) => progress.kind === "ended" && (progress.action.kind === "retry" || progress.action.kind === "closed" || (progress.action.kind === "split" && task.spec.parent !== null))
       ? nowIso.pipe(Effect.flatMap((at) => withdrawTaskItems(context.root, [task.spec.id], at)))
       : Effect.void)
   )

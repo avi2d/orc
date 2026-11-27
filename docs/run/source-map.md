@@ -154,10 +154,6 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/running-a-task/run-exec.ts` | The sandbox a run opens, the install that prepares the copy and the steps that run in it |
 | `packages/run/src/features/running-a-task/run-loop.ts` | The implement, check and fix steps of one run |
 | `packages/run/src/features/running-a-task/run-finish.ts` | The finish after the checks pass: the direct PR or the [no-mistakes](https://github.com/kunchenguid/no-mistakes) gate |
-| `packages/run/src/features/running-a-task/review-turn.ts` | The direct-PR review turn: the branch diff, the reviewer run and its findings |
-| `packages/run/src/features/running-a-task/reviewer-chain.ts` | The reviewer pick by quota room on another provider, `NoReviewerRoom` and `ReviewerRoomWait` |
-| `packages/run/src/features/running-a-task/diagram-turn.ts` | The Pi turn that writes a PR body's Why line and `mermaid` diagram |
-| `packages/run/src/features/running-a-task/review-path-rules.ts` | The path instructions in `.no-mistakes.yaml` that match a changed file, and the review prompt section they make |
 | `packages/run/src/features/running-a-task/run-resume.ts` | The prior run's session and passed steps a resume starts from |
 | `packages/run/src/features/running-a-task/checks.ts` | The check commands `.no-mistakes.yaml` names and their run in the copy |
 | `packages/run/src/features/running-a-task/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
@@ -167,6 +163,17 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/running-a-task/run-deliverer.ts` | The deliverer a run takes: the direct PR opener and reviewer, or the no-mistakes runner |
 | `packages/run/src/features/running-a-task/run-place.ts` | The machine name a run records, read from `ORC_RUN_MACHINE` |
 | `packages/run/src/features/running-a-task/worker-question.ts` | The end reason of a run stopped on an unanswered `orc_ask` and the prompt that resumes it |
+
+## features/running-a-task review
+
+| Path | What it holds |
+| --- | --- |
+| `packages/run/src/features/running-a-task/review-turn.ts` | The direct-PR review turn: the branch diff, the reviewer run and its findings |
+| `packages/run/src/features/running-a-task/reviewer-chain.ts` | The reviewer pick by quota room on another provider, and `NoReviewerRoom` |
+| `packages/run/src/features/running-a-task/review-wait.ts` | The `reviewer-wait.json` a run writes when no reviewer has room, and the checkpoint a resume reads |
+| `packages/run/src/features/running-a-task/diagram-turn.ts` | The Pi turn that writes a PR body's Why line and `mermaid` diagram |
+| `packages/run/src/features/running-a-task/review-path-rules.ts` | The `review.path_instructions` entries of `.no-mistakes.yaml` that match a changed file, and the review prompt section they make |
+| `packages/run/src/features/running-a-task/review-wait-checkpoint.ts` | The shape of the checkpoint `reviewer-wait.json` holds |
 
 ## features/seeing-runs
 
@@ -273,7 +280,6 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/entities/parked-runs/parked.ts` | Parking a run's task on its questions, and the answer to a hold or a question |
-| `packages/run/src/entities/parked-runs/reviewer-wait.ts` | Parking a run's task until a reviewer in its chain has room, and dropping that wait on resume |
 
 ## entities/pull-request
 
@@ -324,7 +330,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the reviewer chain, the review fix round limit, the heavy queue tuning, the `orc update` install command and the implementer, fixer, orchestrator, planner and decider models |
-| `packages/run/src/shared/config/provider-room.ts` | The default credential of a provider, the room reading a reviewer chain entry takes, and the `reviewer-wait.json` a parked run writes |
+| `packages/run/src/shared/config/provider-room.ts` | The default credential of a provider and the room reading a reviewer chain entry takes |
 | `packages/run/src/shared/config/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `packages/run/src/shared/config/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `packages/run/src/shared/config/dispatch-config.ts` | The reading of `dispatch.json` and `projects.json` |

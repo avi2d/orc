@@ -78,3 +78,11 @@ test("refuses a backlog task with no body instead of showing an empty descriptio
   const text = JSON.stringify({ schema: "orc.backlog.v1", tasks: [{ id: "orc-34", title: "t", kind: "ship", created: "2026-11-13T10:00:00.000Z" }] })
   expect(guardJson(text, taskDetails)).toEqual({ kind: "refused", reason: "tasks[0].body is missing" })
 })
+
+test("shows the reviewer-wait reason from a parked task's origin in the Waits for reviewer row, not a dash", () => {
+  const reason = "The review turn waits for a reviewer in the chain to have room"
+  const parkedTask = { id: "orc-34", title: "t", kind: "ship", body: "t", created: "2026-11-13T10:00:00.000Z", status: "new", parked: { branch: "orc/orc-34", questions: [], origin: { machine: "m", run: "20261113-100000-a", reviewerQuota: reason } } }
+  const parsed = guardJson(JSON.stringify({ schema: "orc.backlog.v1", tasks: [parkedTask] }), taskDetails)
+  if (parsed.kind !== "ok") throw new Error(parsed.reason)
+  expect(infoRows(parsed.value[0]!, []).find((row) => row.label === "Waits for reviewer")?.value).toBe(reason)
+})
