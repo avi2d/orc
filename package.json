@@ -88,5 +88,8 @@
   },
   "trustedDependencies": [
     "@swc/core"
-  ]
+  ],
+  "patchedDependencies": {
+    "@hughescr/stryker-bun-runner@1.4.0": "patches/@hughescr%2Fstryker-bun-runner@1.4.0.patch"
+  }
 }

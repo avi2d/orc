@@ -1,0 +1,33 @@
+diff --git a/dist/index.js b/dist/index.js
+index 53ceac152f18ca4b34f068b2f1cd8a3012caa5f6..8d49d3aa0d1131bcbbac316ff4974ed4401afbb5 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -8138,6 +8138,19 @@ function absolutizePathValue(value, projectCwd) {
+   }
+   return absolutizePath(value, projectCwd);
+ }
++function resolvePreload(value, projectCwd) {
++  if (typeof value !== "string" || path2.isAbsolute(value) || value.startsWith(".")) {
++    return absolutizePath(value, projectCwd);
++  }
++  try {
++    return createRequire(path2.join(projectCwd, "package.json")).resolve(value);
++  } catch {
++    return absolutizePath(value, projectCwd);
++  }
++}
++function resolvePreloadValue(value, projectCwd) {
++  return Array.isArray(value) ? value.map((item) => resolvePreload(item, projectCwd)) : resolvePreload(value, projectCwd);
++}
+ async function generateSanitizedBunfig(projectCwd, tmpDir) {
+   await mkdir2(tmpDir, { recursive: true });
+   let rawConfig = {};
+@@ -8158,7 +8171,7 @@ async function generateSanitizedBunfig(projectCwd, tmpDir) {
+   const sanitizedTest = {};
+   for (const key of SAFE_TEST_KEYS) {
+     if (Object.prototype.hasOwnProperty.call(sourceTest, key)) {
+-      sanitizedTest[key] = PATH_VALUED_TEST_KEYS.has(key) ? absolutizePathValue(sourceTest[key], projectCwd) : sourceTest[key];
++      sanitizedTest[key] = key === "preload" ? resolvePreloadValue(sourceTest[key], projectCwd) : PATH_VALUED_TEST_KEYS.has(key) ? absolutizePathValue(sourceTest[key], projectCwd) : sourceTest[key];
+     }
+   }
+   sanitizedTest.coverage = false;
