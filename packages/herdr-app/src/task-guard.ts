@@ -1,4 +1,4 @@
-import { type Guard, type Guarded, arrayOf, boardKinds, child, fields, literal, nullableString, number, ok, oneOf, prStates, refused, runsHead, string } from "./guard"
+import { type Guard, type Guarded, absentOrString, arrayOf, boardKinds, child, fields, literal, nullableString, number, ok, oneOf, prStates, refused, runsHead, string } from "./guard"
 import type { QueuedRun } from "./board"
 import { boardQueue } from "./guard-board"
 import type { Answer, Asked, TaskDetail, TaskHold, TaskParked, TaskRun, TaskState } from "./task"
@@ -52,13 +52,20 @@ const hold: Guard<TaskHold> = (value, at) => {
   return ok({ reason: reason.value, until: until.value, at: when.value, questions: questions.value, answer: given.value })
 }
 
+const reviewerQuotaReason: Guard<string | null> = (value, at) => {
+  const origin = fields(value, at)
+  return origin.kind === "refused" ? origin : absentOrString(origin.value, "reviewerQuota", at)
+}
+
 const parked: Guard<TaskParked> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
   const branch = string(record.value, "branch", at)
   if (branch.kind === "refused") return branch
   const questions = arrayOf(record.value, "questions", at, asked)
-  return questions.kind === "refused" ? questions : ok({ branch: branch.value, questions: questions.value })
+  if (questions.kind === "refused") return questions
+  const waits = absentOr(record.value, "origin", at, reviewerQuotaReason)
+  return waits.kind === "refused" ? waits : ok({ branch: branch.value, questions: questions.value, waitsForReviewer: waits.value })
 }
 
 const account = (record: Fields, at: string): Guarded<string | null> => {

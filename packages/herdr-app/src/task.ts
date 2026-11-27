@@ -23,6 +23,7 @@ export interface TaskHold {
 export interface TaskParked {
   readonly branch: string
   readonly questions: ReadonlyArray<Asked>
+  readonly waitsForReviewer: string | null
 }
 
 export type TaskState =
@@ -86,7 +87,7 @@ export const descriptionOf = (body: string): string => {
   return lines.slice(title + 1).join("\n").trim()
 }
 
-const infoLabels = ["Account", "Run", "Branch", "PR", "Depends on", "Created", "Started", "Closed", "Priority", "Assets"] as const
+const infoLabels = ["Account", "Run", "Branch", "Waits for reviewer", "PR", "Depends on", "Created", "Started", "Closed", "Priority", "Assets"] as const
 type InfoLabel = typeof infoLabels[number]
 
 export interface InfoRow {
@@ -120,6 +121,7 @@ const infoValue = (task: TaskDetail, runs: ReadonlyArray<TaskRun>, label: InfoLa
     case "Account": return accountOf(task.state)
     case "Run": return runValue(runs)
     case "Branch": return runs.at(0)?.branch ?? task.parked?.branch ?? null
+    case "Waits for reviewer": return task.state.status === "new" ? task.parked?.waitsForReviewer ?? null : null
     case "PR": return prValue(task)
     case "Depends on": return task.dependsOn.length === 0 ? null : task.dependsOn.join(", ")
     case "Created": return shortTime(task.created)
