@@ -15,7 +15,7 @@ const lateError = { id: "late", file: "other.txt", line: 3, severity: "error", a
 
 type Finding = Omit<typeof error, "line"> & { line: number | null }
 
-const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramReply = "no diagram") => {
+const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramReply = "no diagram", taskText: string | null = "Do the thing.\n") => {
   let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, prLink: null as string | null, prCreated: false, steps: [] as unknown, metrics: [] as ReadonlyArray<unknown>, reviewEvidence: [] as ReadonlyArray<{ readonly file: string | undefined; readonly log: string }> }
   await withRepo(async (dir) => {
     await withHome(async (home) => {
@@ -36,6 +36,9 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramR
           kinds.push(run.agent.kind)
           if (run.agent.kind === "reviewer") {
             if (run.prompt.includes("no diagram")) {
+              const taskFile = join(home, "runs", "step-run-1", "task.md")
+              if (taskText === null) await rm(taskFile)
+              else await writeFile(taskFile, taskText)
               const sessionFile = join(sessionsDir, "diagram.jsonl")
               await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: diagramReply }], stopReason: "stop", usage: { input: 1, output: 1 } }))
               return { sessionFile, commits: [] }
@@ -175,7 +178,7 @@ test("a drawn diagram lands as a mermaid fence rather than prose", async () => {
   expect(result.prCreated).toBe(true)
   expect(result.body).toContain("## How it fits\n\n```mermaid\nflowchart LR\n  task --> run\n```")
   expect(result.body).not.toContain("Do the thing.")
-  expect(result.body).toContain("## Why\n\nwork\n\nThe change connects the two steps.")
+  expect(result.body).toContain("## Why\n\nThe change connects the two steps.\n\n## What changed")
 }, 60_000)
 
 test("a declined diagram leaves How it fits out rather than an empty section", async () => {
@@ -183,4 +186,56 @@ test("a declined diagram leaves How it fits out rather than an empty section", a
   expect(result.completed).toBe(true)
   expect(result.body).not.toContain("## How it fits")
   expect(result.body).not.toContain("Do the thing.")
+  expect(result.body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
 }, 60_000)
+
+for (const reply of [
+  "**Why:** Cached reads avoid repeated disk access.\nno diagram",
+  "**Why**: Cached reads avoid repeated disk access.\nno diagram",
+  "Why:\nCached reads avoid repeated disk access.\nno diagram",
+  "**Why:**\n\nCached reads avoid repeated disk access.\r\nno diagram"
+]) {
+  test("a formatted reason is not lost or prefixed with the title: " + JSON.stringify(reply), async () => {
+    const result = await exercise([[]], reply)
+    expect(result.completed).toBe(true)
+    expect(result.body).toContain("## Why\n\nCached reads avoid repeated disk access.\n\n## What changed")
+  }, 60_000)
+}
+
+const privateTask = "Keep this internal. The violet otter carries seven sealed crates across the quiet harbor before sunrise.\nDo the thing.\n"
+
+for (const reason of [
+  "Do the thing.",
+  "This matters because the violet otter carries seven sealed crates across the quiet harbor before sunrise.",
+  "Avoid this because VIOLET, otter carries seven sealed crates across the quiet harbor.",
+  "A new path helps. Keep this internal."
+]) {
+  test("a copied task sentence or word run cannot enter Why: " + reason, async () => {
+    const result = await exercise([[]], "Why: " + reason + "\nno diagram", privateTask)
+    expect(result.completed).toBe(true)
+    expect(result.body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
+    expect(result.body).not.toContain(reason)
+  }, 60_000)
+}
+
+test("copied task text in a diagram cannot bypass the public body comparison", async () => {
+  const result = await exercise([[]], "Why: Cached reads avoid repeated disk access.\n```mermaid\nflowchart LR\n  a[Keep this internal.] --> b[Cache]\n```", privateTask)
+  expect(result.completed).toBe(true)
+  expect(result.body).toContain("## Why\n\nCached reads avoid repeated disk access.\n\n## What changed")
+  expect(result.body).not.toContain("Keep this internal.")
+  expect(result.body).not.toContain("## How it fits")
+}, 60_000)
+
+test("an unreadable task cannot bypass the reason comparison", async () => {
+  const result = await exercise([[]], "Why: Cached reads avoid repeated disk access.\nno diagram", null)
+  expect(result.completed).toBe(true)
+  expect(result.body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
+}, 60_000)
+
+for (const reply of ["Why:\nno diagram", "Why:\n```mermaid\nflowchart LR\n  a --> b\n```"]) {
+  test("an empty Why cannot turn diagram output into a reason: " + JSON.stringify(reply), async () => {
+    const result = await exercise([[]], reply)
+    expect(result.completed).toBe(true)
+    expect(result.body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
+  }, 60_000)
+}

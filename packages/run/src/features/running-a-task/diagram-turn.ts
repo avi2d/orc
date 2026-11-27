@@ -52,6 +52,7 @@ export const runDiagramTurn = (
       return { diagram: { kind: "none" }, why: null } as const
     }
     const reply = yield* readReply(run, result.success.sessionFile)
-    const why = reply?.match(/^Why:[ \t]*(.+)$/m)?.[1]?.trim() || null
+    const reason = reply?.split("```", 1)[0]?.match(/^[ \t]*(?:Why:|\*\*Why:\*\*|\*\*Why\*\*:)\s*([^\r\n]+)/m)?.[1]?.trim() ?? ""
+    const why = reason === "" || /^no diagram$/i.test(reason) ? null : reason
     return { diagram: parseDiagramReply(reply), why }
   })

@@ -84,7 +84,8 @@ const leftFindingLines = (left: LeftFinding): string =>
   findingLine(left.finding) + "\n  - " + leftReasonLine(left.reason)
 
 export interface PrBodyInput {
-  readonly goal: string
+  readonly why: string | null
+  readonly taskText: string | null
   readonly subjects: ReadonlyArray<string>
   readonly diagram: string | null
   readonly passed: ReadonlyArray<string>
@@ -111,12 +112,34 @@ const openFindingLines = (section: ReviewSection): string => {
   return "\n## Open review findings\n\n" + lines.join("\n") + "\n"
 }
 
+const reasonFallback = "No reason was recorded for this change; see What changed."
+
+const normalizedWords = (text: string): Array<string> =>
+  text.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []
+
+const repeatsTaskText = (text: string, taskText: string): boolean => {
+  const words = normalizedWords(text)
+  const normalizedText = " " + words.join(" ") + " "
+  const copiedSentence = taskText.split(/(?<=[.!?])\s+|\r?\n/u).some((sentence) => {
+    const normalizedSentence = normalizedWords(sentence).join(" ")
+    return normalizedSentence !== "" && normalizedText.includes(" " + normalizedSentence + " ")
+  })
+  const normalizedTask = " " + normalizedWords(taskText).join(" ") + " "
+  const copiedRun = words.some((_, index) =>
+    index + 8 <= words.length && normalizedTask.includes(" " + words.slice(index, index + 8).join(" ") + " ")
+  )
+  return copiedSentence || copiedRun
+}
+
 export const prBody = (input: PrBodyInput): string => {
+  const reason = input.why?.trim() ?? ""
+  const why = reason === "" || input.taskText === null || repeatsTaskText(reason, input.taskText) ? reasonFallback : reason
+  const chart = input.taskText === null || (input.diagram !== null && repeatsTaskText(input.diagram, input.taskText)) ? null : input.diagram
   const changed = input.subjects.length === 0
     ? "No commits landed on the branch."
     : input.subjects.map((subject) => "- " + subject).join("\n")
-  const diagram = input.diagram === null ? "" : "\n## How it fits\n\n```mermaid\n" + input.diagram + "\n```\n"
-  return "## Why\n\n" + input.goal + "\n\n## What changed\n\n" + changed + "\n" + diagram + "\n## How it was checked\n\n" + checkedSentence(input.passed) + "\n" + reviewStatusLine(input.review) + "\n" + openFindingLines(input.review)
+  const diagram = chart === null ? "" : "\n## How it fits\n\n```mermaid\n" + chart + "\n```\n"
+  return "## Why\n\n" + why + "\n\n## What changed\n\n" + changed + "\n" + diagram + "\n## How it was checked\n\n" + checkedSentence(input.passed) + "\n" + reviewStatusLine(input.review) + "\n" + openFindingLines(input.review)
 }
 
 const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps["runAgent"]): Effect.Effect<DiagramTurnResult> =>
@@ -148,9 +171,9 @@ const openPullRequest = (
     const prepareBody = Effect.gen(function*() {
       const drawn = yield* drawDiagram
       const diagram = drawn.diagram.kind === "mermaid" ? drawn.diagram.chart : null
-      const goal = [head || "No commits landed on the branch.", drawn.why].filter((part) => part !== null).join("\n\n")
+      const taskText = yield* run.fs.readFileString(run.taskPath).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
       const bodyFile = run.path.join(run.runDir, prBodyFileName)
-      yield* run.fs.writeFileString(bodyFile, prBody({ goal, subjects: bodySubjects, diagram, passed: rounds.at(-1)?.checks.map((check) => check.name) ?? [], review })).pipe(
+      yield* run.fs.writeFileString(bodyFile, prBody({ why: drawn.why, taskText, subjects: bodySubjects, diagram, passed: rounds.at(-1)?.checks.map((check) => check.name) ?? [], review })).pipe(
         Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
       )
       return bodyFile

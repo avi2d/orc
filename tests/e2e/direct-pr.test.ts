@@ -103,7 +103,7 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(body).toContain("work")
           expect(body).toContain("after lint passed, without no-mistakes")
           expect(body).not.toContain("Do the thing.")
-          expect(body).toContain("## Why\n\nwork")
+          expect(body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
         })
       })
     })

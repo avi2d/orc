@@ -9,7 +9,8 @@ const twoFindings = [
 
 const headed = (overrides: Partial<PrBodyInput> = {}): string =>
   prBody({
-    goal: "Serve reads from a cache.",
+    why: "Serve reads from a cache.",
+    taskText: "Do the thing.\n",
     subjects: ["Add the cache"],
     diagram: null,
     passed: ["lint"],
