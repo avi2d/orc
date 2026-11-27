@@ -38,7 +38,7 @@ test("the beat resumes the same run instead of waiting when the reviewer account
     const reason = "beta-main 2% left, floor 15%"
     const runDir = join(fixture.home, "runs", "run-1")
     await mkdir(runDir, { recursive: true })
-    await writeFile(join(runDir, "reviewer-wait.json"), JSON.stringify({ implementerProviders: ["acme"], reason, sentPerRound: [] }))
+    await writeFile(join(runDir, "reviewer-wait.json"), JSON.stringify({ implementerProviders: ["acme"], reason, sentPerRound: [], appliedSendBackIds: [] }))
 
     expect(await orcOk(fixture, ["beat"])).toContain("parked orc-1 on orc/orc-1: " + reason)
     expect(await backlogTaskOne(fixture)).toMatchObject({ parked: { questions: [] } })

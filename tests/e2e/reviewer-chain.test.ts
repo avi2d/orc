@@ -142,4 +142,38 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
       expect(resumed.steps).toContainEqual({ name: "review", status: "passed" })
     })
   })
+
+  test("applies only the new send-back instead of dropping it with the one already applied", async () => {
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktreeDir }) => {
+      const opened = await runOrcDeliveryStep(dir, home, cleanReviewer(sha, "beta/reviewer", kinds), lintPasses,
+        pickWith({ acme: room, beta: room, gamma: room }, sameProviderFirst), { worktreeDir })
+      const applied = { question: "send-back", answer: "rename the first flag", decider: "owner" as const }
+      const added = { question: "send-back-2", answer: "remove the old example", decider: "owner" as const }
+      const parked = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses,
+        pickWith({ acme: room, beta: exhausted, gamma: exhausted }, sameProviderFirst),
+        { worktreeDir, resumeRun: opened.report.runId, answers: [applied] })
+      expect(parked.report.waitingForReviewer).toBe(true)
+      kinds.length = 0
+
+      const applyNew = recordingKinds(async (run, sessionsDir) => {
+        if (run.agent.kind === "reviewer") {
+          expect(run.agent.model).toBe("gamma/reviewer")
+          const sessionFile = join(sessionsDir, "review.jsonl")
+          await writeFile(sessionFile, sessionEnding({ ...cleanFinish, content: [{ type: "text", text: "[]" }] }))
+          return { sessionFile, commits: [] }
+        }
+        expect(run.prompt).not.toContain(applied.answer)
+        expect(run.prompt).toContain(added.answer)
+        const sessionFile = join(sessionsDir, "implement.jsonl")
+        await writeFile(sessionFile, sessionEnding(cleanFinish))
+        git(worktreeDir, ["commit", "--allow-empty", "-qm", "Apply the second send-back"])
+        return { sessionFile, commits: [{ sha: git(worktreeDir, ["rev-parse", "HEAD"]) }] }
+      }, kinds)
+      const resumed = await runOrcDeliveryStep(dir, home, applyNew, lintPasses,
+        pickWith({ acme: room, beta: room, gamma: room }, sameProviderFirst),
+        { worktreeDir, resumeRun: parked.report.runId, runId: "step-run-3", answers: [applied, added], implementerModel: "beta/coder" })
+      expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
+      expect(resumed.ghCalls).toContain("pr create --head orc/test")
+    })
+  })
 })

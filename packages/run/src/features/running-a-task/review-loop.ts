@@ -9,6 +9,7 @@ import type { RunStopped } from "./loop-pause"
 import { writeReviewWait } from "./review-wait"
 import type { ResumePlan, ReviewEligibility, RunCheckpoints, SandboxOps } from "./run-ops"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
+import { sentBackAnswersOf } from "./worker-question"
 
 interface ReviewLoop {
   readonly run: HistoryRun
@@ -94,6 +95,9 @@ const reviewEligibility = ({ run, plan, fixes, implementedHere }: ReviewLoop): R
   }
 }
 
+const appliedSendBackIds = (plan: ResumePlan): ReadonlyArray<string> =>
+  Arr.dedupe([...plan.reviewWait?.appliedSendBackIds ?? [], ...sentBackAnswersOf(plan.answers).map(({ question }) => question)])
+
 export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const { run, ops, base, rounds, fixes, commits, plan, checkpoints } = loop
@@ -117,7 +121,7 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, eligibility: reviewEligibility(loop) })
     }).pipe(
       Effect.catchTag("NoReviewerRoom", ({ implementerProviders, message }) =>
-        writeReviewWait(run, { implementerProviders, reason: message, sentPerRound }).pipe(
+        writeReviewWait(run, { implementerProviders, reason: message, sentPerRound, appliedSendBackIds: appliedSendBackIds(plan) }).pipe(
           Effect.as({ ...stopReport(loop, message), waitingForReviewer: true as const })
         )
       )
