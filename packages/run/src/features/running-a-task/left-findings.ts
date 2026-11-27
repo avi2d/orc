@@ -30,5 +30,5 @@ export const leftReasonLine = (reason: LeftReason): string =>
   reason.kind === "below-round-2-bar"
     ? "Left because its severity is below the round 2 bar, which fixes only errors."
     : reason.kind === "repeat"
-    ? "Left because it repeats a finding the fixer received in round " + reason.round.toString() + "."
+    ? "Left because it has the same id and file as a finding the fixer received in round " + reason.round.toString() + "."
     : "Left because the round limit was reached: the review after fix round " + lastFixRound.toString() + " reported it."

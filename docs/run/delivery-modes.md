@@ -49,8 +49,9 @@ After a successful review and any fix rounds, an `orc` run opens its PR the same
 Findings that remain after the fix rounds do not stop the PR.
 Under each remaining finding, a nested line says why the fix loop left it.
 A `warning` or `info` finding is below the round 2 bar, which fixes only errors.
-An `error` finding with the id and file of one the fixer already received is a repeat, and the line names the round that received it.
+For an `error` finding with the same id and file as one the fixer already received, the reason line names that match and the round.
 Any other `error` finding came from the review after fix round 2, so the round limit was reached.
+The ask-user reason belongs to the later step that keeps ask-user findings from the fixer.
 To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
 Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
 

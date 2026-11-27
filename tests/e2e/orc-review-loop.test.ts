@@ -96,6 +96,7 @@ test("warnings left after a fixed round 1 open a PR listing each with its reason
       "  - Left because its severity is below the round 2 bar, which fixes only errors.\n"
   )
   expect(result.body).not.toContain("The result is wrong.")
+  expect(result.body).toContain("The ask-user reason belongs to the later step that keeps ask-user findings from the fixer.")
 })
 
 test("an error left after round 2 names a repeat or the round limit rather than the severity bar", async () => {
@@ -105,7 +106,7 @@ test("an error left after round 2 names a repeat or the round limit rather than 
   expect(result.prCreated).toBe(true)
   expect(result.body).toContain(
     "- error `e` at `work.txt:1`: The result is wrong. Action: Fix the error.\n" +
-      "  - Left because it repeats a finding the fixer received in round 2.\n" +
+      "  - Left because it has the same id and file as a finding the fixer received in round 2.\n" +
       "- error `late` at `other.txt:3`: The handle leaks. Action: Close the file.\n" +
       "  - Left because the round limit was reached: the review after fix round 2 reported it.\n"
   )
