@@ -1,20 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { runStatus } from "../../packages/run/src/entities/run-history/index"
-import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, recordingKinds, runDirectPrResume, runDirectPrStep, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
-
-const withOrigin = async (dir: string, use: (origin: string) => Promise<void>): Promise<void> => {
-  const origin = await mkdtemp(join(tmpdir(), "orc-origin-"))
-  try {
-    git(origin, ["init", "-q", "--bare"])
-    git(dir, ["remote", "add", "origin", origin])
-    await use(origin)
-  } finally {
-    await rm(origin, { recursive: true, force: true })
-  }
-}
+import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, recordingKinds, runDirectPrResume, runDirectPrStep, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withOrigin, withPushedBase, withRepo } from "./run-helpers"
 
 const branchOn = (origin: string): string | null => {
   const shown = Bun.spawnSync(["git", "rev-parse", "--verify", "--quiet", "refs/heads/orc/test"], { cwd: origin })
@@ -29,10 +17,7 @@ describe("orc delivery", () => {
   test("malformed reviewer output fails the review step by name instead of opening a PR", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
-        await withOrigin(dir, async () => {
-          const baseBranch = git(dir, ["branch", "--show-current"])
-          git(dir, ["push", "-u", "origin", baseBranch])
-          git(dir, ["remote", "set-head", "origin", baseBranch])
+        await withPushedBase(dir, async () => {
           const sha = await readyToCheck(dir, home)
           git(dir, ["checkout", "-q", "orc/test"])
           const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(async (run, sessionsDir) => {
@@ -52,10 +37,8 @@ describe("orc delivery", () => {
   test("rebases before checks and records the reviewer findings instead of skipping review", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
-        await withOrigin(dir, async () => {
+        await withPushedBase(dir, async () => {
           const baseBranch = git(dir, ["branch", "--show-current"])
-          git(dir, ["push", "-u", "origin", baseBranch])
-          git(dir, ["remote", "set-head", "origin", baseBranch])
           const sha = await readyToCheck(dir, home)
           await writeFile(join(dir, "base.txt"), "new base\n")
           git(dir, ["add", "base.txt"])
@@ -76,7 +59,7 @@ describe("orc delivery", () => {
             return lintPasses()
           })
           expect(checkedBase).toBe(base)
-          expect(kinds).toEqual(["implementer", "reviewer"])
+          expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
           expect(outcome.steps).toContainEqual({ name: "review", status: "passed" })
           expect(outcome.signals).toContainEqual({ name: "review-findings", value: "0" })
           expect(JSON.parse(await readFile(join(home, "runs", "step-run-1", "review.json"), "utf8"))).toEqual([])
@@ -99,7 +82,7 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           const kinds: Array<string> = []
           const outcome = await runDirectPrStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses)
           const bodyFile = join(home, "runs", "step-run-1", "pr-body.md")
-          expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
+          expect(kinds).toEqual(["implementer", "reviewer", "reviewer", "reviewer"])
           expect(outcome.report.endReason).toContain("The review turn failed, so the review did not pass")
           expect(outcome.nmCalls).toBe("")
           expect(branchOn(origin)).toBe(sha)
@@ -120,6 +103,7 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(body).toContain("work")
           expect(body).toContain("after lint passed, without no-mistakes")
           expect(body).not.toContain("Do the thing.")
+          expect(body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
         })
       })
     })

@@ -1,8 +1,12 @@
 import { expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
-import { cleanFinish, ghPrLink, git, readyToCheck, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+import { basename, join } from "node:path"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
+import { openDatabase } from "../../packages/run/src/entities/run-history/index"
+import { readShow, readStepLog } from "../../packages/run/src/features/seeing-runs/index"
+import { cleanFinish, ghPrLink, git, readyToCheck, recordedMetrics, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const error = { id: "e", file: "work.txt", line: 1, severity: "error", action: "Fix the error.", description: "The result is wrong." }
 const warning = { id: "w", file: "work.txt", line: 1, severity: "warning", action: "Fix the warning.", description: "The result is fragile." }
@@ -11,8 +15,8 @@ const lateError = { id: "late", file: "other.txt", line: 3, severity: "error", a
 
 type Finding = Omit<typeof error, "line"> & { line: number | null }
 
-const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>) => {
-  let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, prLink: null as string | null, prCreated: false }
+const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramReply = "no diagram", taskText = "Do the thing.\n") => {
+  let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, prLink: null as string | null, prCreated: false, steps: [] as unknown, metrics: [] as ReadonlyArray<unknown>, reviewEvidence: [] as ReadonlyArray<{ readonly file: string | undefined; readonly log: string }> }
   await withRepo(async (dir) => {
     await withHome(async (home) => {
       const origin = await mkdtemp(join(tmpdir(), "orc-loop-origin-"))
@@ -31,6 +35,13 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>) => {
         const outcome = await runOrcDeliveryStep(dir, home, async (run, sessionsDir) => {
           kinds.push(run.agent.kind)
           if (run.agent.kind === "reviewer") {
+            if (run.prompt.includes("no diagram")) {
+              const taskFile = join(home, "runs", "step-run-1", "task.md")
+              await writeFile(taskFile, taskText)
+              const sessionFile = join(sessionsDir, "diagram.jsonl")
+              await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: diagramReply }], stopReason: "stop", usage: { input: 1, output: 1 } }))
+              return { sessionFile, commits: [] }
+            }
             const sessionFile = join(sessionsDir, "review-script-" + review.toString() + ".jsonl")
             await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: JSON.stringify(reviews[review++] ?? []) }], stopReason: "stop", usage: { input: 1, output: 1 } }))
             return { sessionFile, commits: [] }
@@ -50,7 +61,22 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>) => {
           checks += 1
           return { stdout: "ok", stderr: "", exitCode: 0 }
         })
-        result = { kinds, evidence, body: await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8"), checks, completed: outcome.report.completed, prLink: outcome.report.prLink, prCreated: outcome.ghCalls.includes("pr create") }
+        const reviewEvidence = await Effect.runPromise(
+          Effect.acquireUseRelease(
+            openDatabase(home),
+            (db) => Effect.gen(function*() {
+              const document = yield* readShow(db, "step-run-1")
+              return yield* Effect.forEach(document?.steps.filter((step) => step.name === "review") ?? [], (step) =>
+                readStepLog(db, "step-run-1", step.id).pipe(Effect.map((log) => {
+                  const file = step.evidence.find((item) => item.direction === "out" && item.kind === "review")?.path
+                  return { file: file === undefined ? undefined : basename(file), log }
+                }))
+              )
+            }),
+            (db) => Effect.sync(() => db.close())
+          ).pipe(Effect.provide(BunServices.layer))
+        )
+        result = { kinds, evidence, reviewEvidence, body: await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8"), checks, completed: outcome.report.completed, steps: outcome.steps, prLink: outcome.report.prLink, prCreated: outcome.ghCalls.includes("pr create"), metrics: await recordedMetrics(home) }
       } finally {
         await rm(origin, { recursive: true, force: true })
       }
@@ -61,37 +87,68 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>) => {
 
 test("an empty review does not start a fixer", async () => {
   const result = await exercise([[]])
-  expect(result.kinds).toEqual(["implementer", "reviewer"])
+  expect(result.kinds).toEqual(["implementer", "reviewer", "reviewer"])
   expect(result.completed).toBe(true)
 }, 60_000)
 
 test("a cleared first fix does not start a second round", async () => {
   const result = await exercise([[error, warning], []])
-  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer"])
+  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "reviewer"])
   expect(result.evidence[0]).toContain('"id": "e"')
   expect(result.evidence[0]).toContain('"id": "w"')
   expect(result.checks).toBe(2)
 }, 60_000)
 
-test("the second fix receives only errors and a third fix never starts", async () => {
+test("a review whose findings one fix round clears counts one gate stop rather than none, and records both review turns", async () => {
+  const result = await exercise([[error, warning], []])
+  expect(result.steps).toEqual([
+    { name: "implement", status: "passed" },
+    { name: "checks", status: "passed" },
+    { name: "review", status: "passed" },
+    { name: "fix", status: "passed" },
+    { name: "checks", status: "passed" },
+    { name: "review", status: "passed" },
+    { name: "pr", status: "passed" }
+  ])
+  expect(result.metrics).toMatchObject([{ run: "step-run-1", delivery: "orc", failedSteps: 0, gateStops: 1, fixRounds: 1 }])
+})
+
+test("the second fix receives only errors and a third review adds neither a fix nor a gate stop", async () => {
   const result = await exercise([[error, warning], [error, warning], [error, warning]])
-  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "fixer", "reviewer"])
+  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "fixer", "reviewer", "reviewer"])
   expect(result.evidence[1]).toContain('"id": "e"')
   expect(result.evidence[1]).not.toContain('"id": "w"')
   expect(result.checks).toBe(3)
+  expect(result.metrics).toMatchObject([{ run: "step-run-1", delivery: "orc", failedSteps: 0, gateStops: 2, fixRounds: 2 }])
   expect(result.completed).toBe(true)
   expect(result.body).toContain("The result is wrong.")
   expect(result.body).toContain("The result is fragile.")
 }, 60_000)
 
+test("each review step log keeps its own findings instead of the final turn's findings", async () => {
+  const result = await exercise([[error, warning], [error], [warning]])
+  expect(result.reviewEvidence).toEqual([
+    { file: "review.json", log: JSON.stringify([error, warning], null, 2) + "\n" },
+    { file: "review-2.json", log: JSON.stringify([error], null, 2) + "\n" },
+    { file: "review-3.json", log: JSON.stringify([warning], null, 2) + "\n" }
+  ])
+}, 60_000)
+
+test("warnings after the first fix do not count as a second gate stop", async () => {
+  const result = await exercise([[error, warning], [warning]])
+  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "reviewer"])
+  expect(result.completed).toBe(true)
+  expect(result.metrics).toMatchObject([{ run: "step-run-1", delivery: "orc", failedSteps: 0, gateStops: 1, fixRounds: 1 }])
+}, 60_000)
+
 test("warnings left after a fixed round 1 open a PR listing each with its reason rather than ending without a PR", async () => {
   const result = await exercise([[error, warning, info], [warning, info]])
-  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer"])
+  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "reviewer"])
   expect(result.completed).toBe(true)
   expect(result.prCreated).toBe(true)
   expect(result.prLink).toBe(ghPrLink)
   expect(result.body).toContain(
-    "Open review findings:\n" +
+    "## Open review findings\n\n" +
       "- warning `w` at `work.txt:1`: The result is fragile. Action: Fix the warning.\n" +
       "  - Left because its severity is below the round 2 bar, which fixes only errors.\n" +
       "- info `i` at `work.txt`: The helper name says nothing. Action: Name the helper.\n" +
@@ -102,13 +159,80 @@ test("warnings left after a fixed round 1 open a PR listing each with its reason
 
 test("an error left after round 2 names a repeat or the round limit rather than the severity bar", async () => {
   const result = await exercise([[error, warning], [error], [error, lateError]])
-  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "fixer", "reviewer"])
+  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "fixer", "reviewer", "reviewer"])
   expect(result.completed).toBe(true)
   expect(result.prCreated).toBe(true)
   expect(result.body).toContain(
+    "## Open review findings\n\n" +
     "- error `e` at `work.txt:1`: The result is wrong. Action: Fix the error.\n" +
       "  - Left because it has the same id and file as a finding the fixer received in round 2.\n" +
       "- error `late` at `other.txt:3`: The handle leaks. Action: Close the file.\n" +
       "  - Left because the round limit was reached: the review after fix round 2 reported it.\n"
   )
 }, 60_000)
+
+test("a drawn diagram lands as a mermaid fence rather than prose", async () => {
+  const result = await exercise([[]], "Why: The change connects the two steps.\n```mermaid\nflowchart LR\n  task --> run\n```")
+  expect(result.completed).toBe(true)
+  expect(result.prCreated).toBe(true)
+  expect(result.body).toContain("## How it fits\n\n```mermaid\nflowchart LR\n  task --> run\n```")
+  expect(result.body).not.toContain("Do the thing.")
+  expect(result.body).toContain("## Why\n\nThe change connects the two steps.\n\n## What changed")
+}, 60_000)
+
+test("a declined diagram leaves How it fits out rather than an empty section", async () => {
+  const result = await exercise([[]])
+  expect(result.completed).toBe(true)
+  expect(result.body).not.toContain("## How it fits")
+  expect(result.body).not.toContain("Do the thing.")
+  expect(result.body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
+}, 60_000)
+
+for (const reply of [
+  "**Why:** Cached reads avoid repeated disk access.\nno diagram",
+  "**Why**: Cached reads avoid repeated disk access.\nno diagram",
+  "Why:\nCached reads avoid repeated disk access.\nno diagram",
+  "**Why:**\n\nCached reads avoid repeated disk access.\r\nno diagram"
+]) {
+  test("a formatted reason is not lost or prefixed with the title: " + JSON.stringify(reply), async () => {
+    const result = await exercise([[]], reply)
+    expect(result.completed).toBe(true)
+    expect(result.body).toContain("## Why\n\nCached reads avoid repeated disk access.\n\n## What changed")
+  }, 60_000)
+}
+
+const privateTask = "Keep this internal. The violet otter carries seven sealed crates across the quiet harbor before sunrise.\nDo the thing.\n"
+
+for (const reason of [
+  "This matters because the violet otter carries seven sealed crates across the quiet harbor before sunrise.",
+  "Avoid this because VIOLET, otter carries seven sealed crates across the quiet harbor."
+]) {
+  test("eight copied task words cannot enter Why: " + reason, async () => {
+    const result = await exercise([[]], "Why: " + reason + "\nno diagram", privateTask)
+    expect(result.completed).toBe(true)
+    expect(result.body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
+    expect(result.body).not.toContain(reason)
+  }, 60_000)
+}
+
+test("copied task text in a diagram cannot bypass the public body comparison", async () => {
+  const result = await exercise([[]], "Why: Cached reads avoid repeated disk access.\n```mermaid\nflowchart LR\n  a[the violet otter carries seven sealed crates across the quiet harbor before sunrise] --> b[Cache]\n```", privateTask)
+  expect(result.completed).toBe(true)
+  expect(result.body).toContain("## Why\n\nCached reads avoid repeated disk access.\n\n## What changed")
+  expect(result.body).not.toContain("the violet otter carries seven sealed crates")
+  expect(result.body).not.toContain("## How it fits")
+}, 60_000)
+
+test("a short shared task label does not discard the reason or diagram", async () => {
+  const result = await exercise([[]], "Why: This fixes a problem with repeated reads.\n```mermaid\nflowchart LR\n  read --> review\n```", "## Problem\n## Review\n")
+  expect(result.body).toContain("This fixes a problem with repeated reads.")
+  expect(result.body).toContain("flowchart LR\n  read --> review")
+}, 60_000)
+
+for (const reply of ["Why:\nno diagram", "Why:\n```mermaid\nflowchart LR\n  a --> b\n```"]) {
+  test("an empty Why cannot turn diagram output into a reason: " + JSON.stringify(reply), async () => {
+    const result = await exercise([[]], reply)
+    expect(result.completed).toBe(true)
+    expect(result.body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
+  }, 60_000)
+}

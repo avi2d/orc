@@ -10,7 +10,7 @@ test("an old empty breaker cannot block a claimant or cause it to remove a repla
   const dir = await mkdtemp(join(tmpdir(), "orc-claim-"))
   try {
     const file = join(dir, "claim")
-    const dead = Bun.spawn(["true"])
+    const dead = Bun.spawn([process.execPath, "-e", ""])
     await dead.exited
     const held = JSON.stringify({ pid: dead.pid, at: Date.now(), token: "dead" })
     const breaker = file + "." + new Bun.CryptoHasher("sha256").update(held).digest("hex").slice(0, 16) + ".break"

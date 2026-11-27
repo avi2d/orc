@@ -50,6 +50,17 @@ describe("parseArgs", () => {
       expect(parseArgs(["refusals", "--frobnicate"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --frobnicate" })
     })
   })
+  describe("metrics", () => {
+    test("metrics counts each run", () => {
+      expect(parseArgs(["metrics"])).toEqual({ kind: "ListMetrics", json: false })
+    })
+    test("metrics --json counts each run as JSON", () => {
+      expect(parseArgs(["metrics", "--json"])).toEqual({ kind: "ListMetrics", json: true })
+    })
+    test("an unknown metrics flag is a usage error", () => {
+      expect(parseArgs(["metrics", "--frobnicate"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --frobnicate" })
+    })
+  })
   test("show takes a run id", () => {
     expect(parseArgs(["show", "step-run-1"])).toEqual({ kind: "ShowRun", id: "step-run-1", json: false })
   })

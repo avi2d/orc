@@ -1,6 +1,6 @@
 import { Clock, DateTime, Effect, type Path, Result, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { duplicateOf, roomAtFloor } from "../../shared/config/index"
+import { type Account, duplicateOf, type ProviderRoom, providerOf, type ReviewerCredential, roomAtFloor } from "../../shared/config/index"
 import { type AccountReading, type CommandFailureCause, runQuotaCommand } from "./quota-command"
 import { decodeSubquo, isSubquoDocument, type SubquoFailureCause } from "./subquo"
 
@@ -157,15 +157,53 @@ export const readQuota = (
       : assessQuota(run.document, settings)
   })
 
+const describeAccount = (account: AccountReading): string =>
+  account.kind === "usable"
+    ? account.account + " " + account.remainingPercent + "% left" + (account.resetsAt === undefined ? "" : " until " + account.resetsAt)
+    : account.account + " unusable, " + account.reason
+
+const defaultAccount = (accounts: ReadonlyArray<Account>, { provider, credential }: ReviewerCredential): Account | string => {
+  switch (credential.kind) {
+    case "token-file":
+      return accounts.find((account) => account.kind === "token-file" && account.tokenFile === credential.tokenFile)
+        ?? "no quota account on " + provider + " holds its default token file " + (credential.tokenFile ?? "from " + credential.origin + ", which is unset")
+    case "claude-config":
+      return accounts.find((account) => account.kind === "claude-config" && Object.values(account.configDirs).includes(credential.configDir))
+        ?? "no quota account on " + provider + " holds its default Claude config folder " + credential.configDir
+    case "only-account":
+      if (accounts.length === 0) {
+        return "the quota names no account on " + provider
+      }
+      return accounts.length === 1 ? accounts[0] : "the quota names " + accounts.length.toString() + " accounts on " + provider + " and its default credential picks none of them"
+  }
+}
+
+export const roomOnCredential = (
+  reading: QuotaReading,
+  quota: { readonly provider: string; readonly accounts: ReadonlyArray<Account> },
+  reviewer: ReviewerCredential
+): ProviderRoom => {
+  if (reading.kind === "unread") {
+    return { kind: "no-room", reason: "quota unread: " + reading.reason }
+  }
+  const account = defaultAccount(quota.accounts.filter((entry) => providerOf(quota, entry) === reviewer.provider), reviewer)
+  if (typeof account === "string") {
+    return { kind: "no-room", reason: account }
+  }
+  const read = reading.accounts.find((entry) => entry.account === account.name)
+  if (read === undefined) {
+    return { kind: "no-room", reason: "the quota reads no account " + account.name }
+  }
+  return read.kind === "usable" && roomAtFloor(read.remainingPercent, reading.floorPercent)
+    ? { kind: "room" }
+    : { kind: "no-room", reason: describeAccount(read) + ", floor " + reading.floorPercent + "%" }
+}
+
 export const describeQuota = (reading: QuotaReading, perTaskRouting = false): string => {
   if (reading.kind === "unread") {
     return "quota unread: " + reading.reason
   }
-  const accounts = reading.accounts.map((account) =>
-    account.kind === "usable"
-      ? account.account + " " + account.remainingPercent + "% left" + (account.resetsAt === undefined ? "" : " until " + account.resetsAt)
-      : account.account + " unusable, " + account.reason
-  )
+  const accounts = reading.accounts.map(describeAccount)
   const verdict = perTaskRouting && reading.accounts.some((account) => account.kind === "usable" && roomAtFloor(account.remainingPercent, reading.floorPercent))
     ? "dispatch rules pick an account for each task"
     : reading.pick === null ? "no account has room at or above the floor" : "runs use " + reading.pick

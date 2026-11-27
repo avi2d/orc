@@ -372,6 +372,7 @@ test("the run report labels only the findings deferred to PR follow-ups", () => 
     findings: [stubFinding("r1", "ask-user"), { ...stubFinding("r2", "auto-fix"), severity: "error" }],
     deferredFindingIds: ["r1"],
     gatesAnswered: 1,
+    gateStops: 1,
     openQuestions: [],
     prLink: null,
     reviewer: null,
@@ -394,7 +395,7 @@ describe("formatReport names the phase the run stopped in", () => {
       checksRounds: [round(1, false), round(2, true)],
       fixAttempts: 1,
       prLink: "https://github.com/o/r/pull/4",
-      noMistakes: { status: "refused", gate: "ci", findings: [], deferredFindingIds: [], gatesAnswered: 0, openQuestions: [], prLink: "https://github.com/o/r/pull/4", reviewer: null, result: "", started: "", ended: "" }
+      noMistakes: { status: "refused", gate: "ci", findings: [], deferredFindingIds: [], gatesAnswered: 0, gateStops: 1, openQuestions: [], prLink: "https://github.com/o/r/pull/4", reviewer: null, result: "", started: "", ended: "" }
     }))
     expect(statusLine(text)).toBe("status: no-mistakes refused, PR open")
   })

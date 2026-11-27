@@ -417,8 +417,8 @@ describe("formatShow", () => {
       try {
         await fixture(db)
         const reviewer = { path: "bundled/reviewer.md", model: "acme/reviewer", thinking: "high" as const }
-        await Effect.runPromise(recordReviewStart(db, "show-1", reviewer, "2026-10-18T10:03:00.000Z"))
-        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, { status: "passed", findings: [], file: "/tmp/show-home/runs/show-1/review.json", reusedFrom: null }, "2026-10-18T10:03:00.000Z", "2026-10-18T10:05:30.000Z"))
+        await Effect.runPromise(recordReviewStart(db, "show-1", reviewer, 1, "2026-10-18T10:03:00.000Z"))
+        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, 1, { status: "passed", findings: [], file: "/tmp/show-home/runs/show-1/review.json", reusedFrom: null }, "2026-10-18T10:03:00.000Z", "2026-10-18T10:05:30.000Z"))
         const document = await Effect.runPromise(readShow(db, "show-1"))
         if (document === null) {
           throw new Error("missing fixture")
@@ -448,12 +448,12 @@ describe("formatShow", () => {
         await fixture(db)
         const reviewer = { path: "bundled/reviewer.md", model: "acme/reviewer", thinking: "high" as const }
         if (started) {
-          await Effect.runPromise(recordReviewStart(db, "show-1", reviewer, "2026-10-18T10:03:00.000Z"))
+          await Effect.runPromise(recordReviewStart(db, "show-1", reviewer, 1, "2026-10-18T10:03:00.000Z"))
         }
         const outcome = status === "passed"
           ? { status, findings: [], file: "/tmp/show-home/runs/show-1/review.json", reusedFrom: "earlier-run" }
           : { status, reason: "cannot write review.json", reusedFrom: "earlier-run" }
-        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, outcome, "2026-10-18T10:03:00.000Z", "2026-10-18T10:03:00.000Z"))
+        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, 1, outcome, "2026-10-18T10:03:00.000Z", "2026-10-18T10:03:00.000Z"))
         const document = await Effect.runPromise(readShow(db, "show-1"))
         if (document === null) {
           throw new Error("missing fixture")
@@ -477,8 +477,8 @@ describe("formatShow", () => {
       try {
         await fixture(db)
         const reviewer = { path: "bundled/reviewer.md", model: "acme/reviewer", thinking: "high" as const }
-        await Effect.runPromise(recordReviewStart(db, "show-1", reviewer, "2026-10-18T10:03:00.000Z"))
-        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, { status: "failed", reason: "the reply did not stop cleanly", reusedFrom: null }, "2026-10-18T10:03:00.000Z", "2026-10-18T10:04:00.000Z"))
+        await Effect.runPromise(recordReviewStart(db, "show-1", reviewer, 1, "2026-10-18T10:03:00.000Z"))
+        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, 1, { status: "failed", reason: "the reply did not stop cleanly", reusedFrom: null }, "2026-10-18T10:03:00.000Z", "2026-10-18T10:04:00.000Z"))
         const document = await Effect.runPromise(readShow(db, "show-1"))
         const review = document?.steps.find((step) => step.name === "review")
         expect(review?.status).toBe("failed")

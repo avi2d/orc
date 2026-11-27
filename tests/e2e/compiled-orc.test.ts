@@ -4,12 +4,10 @@ import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { BunServices } from "@effect/platform-bun"
-import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
-import { Effect, PlatformError, Result } from "effect"
+import { Effect } from "effect"
 import packageJson from "../../packages/run/package.json" with { type: "json" }
 import { openDatabase, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
 import { decodeShowJson } from "../../packages/run/src/features/seeing-runs/index"
-import { withFileClaim } from "../../packages/run/src/shared/lib/file-claim"
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url))
 const windows = process.platform === "win32"
@@ -151,15 +149,6 @@ const seedRun = async (home: string): Promise<void> => {
 }
 
 describe("compiled orc", () => {
-  test.skipIf(!windows)(skipReason("requires Windows", "file claim imports without libc and rejects Windows locking with a typed error"), async () => {
-    const result = await Effect.runPromise(Effect.result(withFileClaim("unused", Effect.void)).pipe(Effect.provide(BunServices.layer)))
-    expect(Result.isFailure(result)).toBe(true)
-    if (Result.isFailure(result)) {
-      expect(result.failure).toBeInstanceOf(PlatformError.PlatformError)
-      expect(String(result.failure)).toContain("file claims are not supported on Windows yet")
-    }
-  })
-
   test.skipIf(windows)("the python assertion rejects a launcher that drops the first tool argument by omitting its own path", async () => {
     await compileOrc()
     await withFixture(async ({ dir, env }) => {

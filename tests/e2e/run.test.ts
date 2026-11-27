@@ -8,6 +8,7 @@ import { ChildProcessSpawner } from "effect/process"
 import { openCheckout } from "../../packages/run/src/entities/task-copy/index"
 import { openTaskCopy } from "../../packages/run/src/entities/task-copy/index"
 import { runAgentStep } from "../../packages/run/src/features/running-a-task/run"
+import { readReviewerRoom } from "../../packages/run/src/widgets/beat/index"
 import { capturedSession, cleanFinish, commitOnBranch, git, passedWithPr, recordedNothing, providerErrorEchoingPrompt, runStep, runStepAs, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const refusal = async (input: {
@@ -21,7 +22,7 @@ const refusal = async (input: {
   process.env["HEAVY_QUEUE_BYPASS"] = "e2e fixture without a pueue daemon"
   try {
     return await Effect.runPromise(
-      runAgentStep({ cwd: input.cwd, taskFile: input.taskFile, branch: input.branch, homeDir: input.home, runId: "test-run-1", agentsDir: input.agentsDir }).pipe(
+      runAgentStep({ cwd: input.cwd, taskFile: input.taskFile, branch: input.branch, homeDir: input.home, runId: "test-run-1", agentsDir: input.agentsDir, readReviewerRoom }).pipe(
         Effect.provide(BunServices.layer),
         Effect.as("ran"),
         Effect.catchTag("OrcRunError", (cause) => Effect.succeed(cause.message))

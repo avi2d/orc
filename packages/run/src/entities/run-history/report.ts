@@ -87,6 +87,7 @@ export const noMistakesSignals = (record: NoMistakesRecord): ReadonlyArray<{ rea
   { name: "finding-count", value: record.findings.length.toString() },
   { name: "result", value: record.status },
   { name: "gates-answered", value: record.gatesAnswered.toString() },
+  { name: "gate-stops", value: record.gateStops.toString() },
   ...(record.gate === null ? [] : [{ name: "gate", value: record.gate }]),
   ...(record.prLink === null ? [] : [{ name: "pr-link", value: record.prLink }]),
   ...(record.reviewer === null ? [] : [{ name: "reviewer", value: record.reviewer }]),
