@@ -9,6 +9,7 @@ const binEntries = [
 
 export default {
   ...preset,
+  logLevel: "debug",
   // The herdr-app tests each mock.module the host modules with their own fakes, which only hold with a fresh module registry per file, as checks-test gives them through --parallel.
   // The coverage preload imports each mutated file before its test file mocks gpui-kit, gpui-base and herdr, which only the Herdr App provides, and bun keeps a failed import failed for that test file.
   bun: { ...preset.bun, bunArgs: ["--isolate"], eagerExclude: ["packages/herdr-app/src/**"] },
