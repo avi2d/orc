@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
@@ -34,15 +34,17 @@ const gitFixture = async (dir: string, args: ReadonlyArray<string>): Promise<voi
   }
 }
 
-const repoWithChange = async (): Promise<{ readonly dir: string; readonly branch: string }> => {
+const repoWithChange = async (changed: string): Promise<{ readonly dir: string; readonly branch: string }> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-review-repo-"))
   await gitFixture(dir, ["init", "-q"])
   await writeFile(join(dir, "a.txt"), "base\n")
   await gitFixture(dir, ["add", "a.txt"])
   await gitFixture(dir, ["commit", "-qm", "base"])
   await gitFixture(dir, ["checkout", "-qb", "orc/test"])
-  await writeFile(join(dir, "a.txt"), "base\nchange\n")
-  await gitFixture(dir, ["commit", "-qam", "work"])
+  await mkdir(join(dir, dirname(changed)), { recursive: true })
+  await writeFile(join(dir, changed), "base\nchange\n")
+  await gitFixture(dir, ["add", changed])
+  await gitFixture(dir, ["commit", "-qm", "work"])
   await gitFixture(dir, ["checkout", "-q", "-"])
   return { dir, branch: "orc/test" }
 }
@@ -58,9 +60,23 @@ const stubAgent = (dir: string, replies: ReadonlyArray<string>, runs: Array<Agen
     return { sessionId: null, sessionFile, end: { kind: "exited", exitCode: 0 }, commits: [] }
   })
 
-const review = async (replies: ReadonlyArray<string>, branch = "orc/test"): Promise<{ readonly outcome: ReviewOutcome; readonly runs: ReadonlyArray<AgentRun>; readonly runDir: string; readonly sessionDir: string; readonly saved: string | null; readonly diff: string | null }> => {
+interface ReviewSetup {
+  readonly branch: string
+  readonly mode: "direct-PR" | "orc"
+  readonly changed: string
+  readonly config: string | null
+}
+
+const directPr: ReviewSetup = { branch: "orc/test", mode: "direct-PR", changed: "a.txt", config: null }
+
+const review = async (replies: ReadonlyArray<string>, setup: Partial<ReviewSetup> = {}): Promise<{ readonly outcome: ReviewOutcome; readonly runs: ReadonlyArray<AgentRun>; readonly runDir: string; readonly sessionDir: string; readonly saved: string | null; readonly diff: string | null }> => {
+  const { branch, mode, changed, config } = { ...directPr, ...setup }
   const runDir = await mkdtemp(join(tmpdir(), "orc-review-"))
-  const repo = await repoWithChange()
+  const repo = await repoWithChange(changed)
+  const worktreeDir = await mkdtemp(join(tmpdir(), "orc-review-worktree-"))
+  if (config !== null) {
+    await writeFile(join(worktreeDir, ".no-mistakes.yaml"), config)
+  }
   try {
     const runs: Array<AgentRun> = []
     const sessionDir = join(runDir, "session")
@@ -69,7 +85,7 @@ const review = async (replies: ReadonlyArray<string>, branch = "orc/test"): Prom
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-      return yield* runReviewTurn({ fs, path, runDir, piSessionDir: sessionDir, spawner, git: gitBin, projectDir: repo.dir, branch }, stubAgent(runDir, replies, runs), reviewer)
+      return yield* runReviewTurn({ fs, path, runDir, piSessionDir: sessionDir, spawner, git: gitBin, projectDir: repo.dir, worktreeDir, branch }, stubAgent(runDir, replies, runs), reviewer, mode)
     }).pipe(Effect.provide(BunServices.layer)))
     const saved = await readFile(join(runDir, "review.json"), "utf8").catch(() => null)
     const diff = await readFile(join(sessionDir, "diff.md"), "utf8").catch(() => null)
@@ -77,6 +93,7 @@ const review = async (replies: ReadonlyArray<string>, branch = "orc/test"): Prom
   } finally {
     await rm(runDir, { recursive: true, force: true })
     await rm(repo.dir, { recursive: true, force: true })
+    await rm(worktreeDir, { recursive: true, force: true })
   }
 }
 
@@ -117,9 +134,50 @@ describe("the direct-PR review turn decodes the reviewer's findings", () => {
   })
 
   test("a missing branch fails the review before the reviewer runs instead of reviewing blind", async () => {
-    const { outcome, runs, saved } = await review(["[]"], "orc/missing")
+    const { outcome, runs, saved } = await review(["[]"], { branch: "orc/missing" })
     expect(runs).toHaveLength(0)
     expect(outcome).toMatchObject({ status: "failed", reason: expect.stringContaining("branch diff") })
+    expect(saved).toBeNull()
+  })
+})
+
+const docsRule = "Flag a page that buries its main point."
+const runRule = "The run package reaches another package only through the schema package."
+
+const configWithRules = [
+  "commands:",
+  "  lint: bun run lint",
+  "review:",
+  "  path_instructions:",
+  "    - path: \"docs/**\"",
+  "      instructions: |",
+  "        " + docsRule,
+  "    - path: \"packages/run/**\"",
+  "      instructions: |",
+  "        " + runRule,
+  ""
+].join("\n")
+
+describe("the orc review turn sends the project's path rules for the changed files", () => {
+  test("a rule whose glob matches no changed file stays out of the prompt while the matching rule goes in", async () => {
+    const { outcome, runs } = await review(["[]"], { mode: "orc", changed: "docs/guide.md", config: configWithRules })
+    expect(outcome.status).toBe("passed")
+    expect(runs).toHaveLength(1)
+    expect(runs[0]?.prompt).toContain("Rule for docs/**:\n" + docsRule)
+    expect(runs[0]?.prompt).not.toContain("packages/run/**")
+    expect(runs[0]?.prompt).not.toContain(runRule)
+  })
+
+  test("a config with no review section sends no path rules instead of failing the review", async () => {
+    const { outcome, runs } = await review(["[]"], { mode: "orc", changed: "docs/guide.md", config: "commands:\n  lint: bun run lint\n" })
+    expect(outcome.status).toBe("passed")
+    expect(runs[0]?.prompt).not.toContain("path rules")
+  })
+
+  test("a path rule with no instructions fails the review before the reviewer runs instead of dropping the rule", async () => {
+    const { outcome, runs, saved } = await review(["[]"], { mode: "orc", changed: "docs/guide.md", config: "review:\n  path_instructions:\n    - path: \"docs/**\"\n" })
+    expect(runs).toHaveLength(0)
+    expect(outcome).toMatchObject({ status: "failed", reason: expect.stringContaining("review.path_instructions") })
     expect(saved).toBeNull()
   })
 })
