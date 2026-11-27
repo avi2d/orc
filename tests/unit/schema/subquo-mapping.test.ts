@@ -37,7 +37,7 @@ describe("subquo quota account mappings", () => {
     expect(result.notSetUp).toEqual([]);
   });
 
-  test("uses the mapped OpenCode monthly window instead of quota-axi's value", () => {
+  const opencodeWindow = (readId: string, windowId: string) => {
     const subquo = {
       version: "subquo.v1",
       writtenAt: "2026-11-22T20:00:00.000Z",
@@ -49,38 +49,23 @@ describe("subquo quota account mappings", () => {
           source: "provider",
           observedAt: "2026-11-22T20:00:00.000Z",
           validUntil: "2026-11-22T20:02:00.000Z",
-          windows: [{ id: "monthly", scope: "all", percentLeft: 37, resetsAt: "2026-12-22T20:00:00.000Z" }],
+          windows: [{ id: readId, scope: "all", percentLeft: 37, resetsAt: "2026-12-22T20:00:00.000Z" }],
         },
       }],
     };
     const result = overlaySubquo(report, subquo, [{ provider: "opencode-go", accountKey: "default", subquoId: "go" }], now);
     const entry = result.providers.find((item) => item.provider === "opencode-go" && !("kind" in item));
     if (entry === undefined || "kind" in entry) throw new Error("OpenCode account missing");
-    const window = entry.windows.find((item) => item.id === "monthly");
-    expect(window && "percentRemaining" in window ? window.percentRemaining : undefined).toBe(37);
+    const window = entry.windows.find((item) => item.id === windowId);
+    return window && "percentRemaining" in window ? window.percentRemaining : undefined;
+  };
+
+  test("uses the mapped OpenCode monthly window instead of quota-axi's value", () => {
+    expect(opencodeWindow("monthly", "monthly")).toBe(37);
   });
 
   test("uses an OpenCode five-hour reading for a five-hour rolling window instead of retaining quota-axi", () => {
-    const subquo = {
-      version: "subquo.v1",
-      writtenAt: "2026-11-22T20:00:00.000Z",
-      accounts: [{
-        id: "go",
-        provider: "opencode-go",
-        observation: {
-          status: "fresh",
-          source: "provider",
-          observedAt: "2026-11-22T20:00:00.000Z",
-          validUntil: "2026-11-22T20:02:00.000Z",
-          windows: [{ id: "five-hour", scope: "all", percentLeft: 37, resetsAt: "2026-12-22T20:00:00.000Z" }],
-        },
-      }],
-    };
-    const result = overlaySubquo(report, subquo, [{ provider: "opencode-go", accountKey: "default", subquoId: "go" }], now);
-    const entry = result.providers.find((item) => item.provider === "opencode-go" && !("kind" in item));
-    if (entry === undefined || "kind" in entry) throw new Error("OpenCode account missing");
-    const window = entry.windows.find((item) => item.id === "rolling");
-    expect(window && "percentRemaining" in window ? window.percentRemaining : undefined).toBe(37);
+    expect(opencodeWindow("five-hour", "rolling")).toBe(37);
   });
 
   test("keeps quota-axi instead of using an expired subquo reading", () => {

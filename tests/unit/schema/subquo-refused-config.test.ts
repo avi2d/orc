@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ConfigProvider, DateTime, Effect, Layer } from "effect";
 import { TaskSamplesSource } from "@avi2dg/orc-schema";
-import { tasksSourcesLive } from "../../../packages/tasks/src/live/layer";
+import { tasksSourcesLive } from "@avi2dg/orc-tasks";
 
 const root = mkdtempSync(join(tmpdir(), "orc-dash-subquo-refused-"));
 
