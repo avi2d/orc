@@ -9,18 +9,34 @@ import type { RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
 import { beatReadsChecks } from "./checks"
+import { leftFindings, leftReasonLine, type LeftFinding } from "./left-findings"
 
-export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], priorDir: string | null, orcReview?: ReviewOutcome): Effect.Effect<OrcRunReport, OrcRunError> =>
+interface OrcLoopEnd {
+  readonly review: ReviewOutcome
+  readonly sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>
+}
+
+type ReviewSection =
+  | { readonly kind: "failed" }
+  | { readonly kind: "unfixed"; readonly findings: ReadonlyArray<ReviewFinding> }
+  | { readonly kind: "left"; readonly findings: ReadonlyArray<LeftFinding> }
+
+const unfixedSection = (review: ReviewOutcome): ReviewSection =>
+  review.status === "failed" ? { kind: "failed" } : { kind: "unfixed", findings: review.findings }
+
+export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], priorDir: string | null, orcLoop?: OrcLoopEnd): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + (rounds.at(-1)?.passed === true ? ", and the checks passed. " : ". No local checks ran. ")
     const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
     if (run.delivery.kind === "orc") {
-      const review = orcReview ?? (yield* reviewOrc(run, run.delivery.reviewer, checkpoints, runAgent))
-      const reviewed = checked + reviewSentence(review)
-      if (review.status === "failed") {
+      if (orcLoop === undefined) {
+        return yield* new OrcRunError({ message: "orc: an orc delivery run reached its PR without the review fix loop" })
+      }
+      const reviewed = checked + reviewSentence(orcLoop.review)
+      if (orcLoop.review.status === "failed") {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, review)
+      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound) })
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
@@ -28,7 +44,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       yield* checkpoints.reviewStart(run.delivery.reviewer, reviewStarted)
       const review = yield* reviewAtHead(run, runAgent, run.delivery.reviewer, priorDir)
       yield* checkpoints.reviewDone(run.delivery.reviewer, review, reviewStarted, new Date().toISOString())
-      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, review)
+      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, unfixedSection(review))
       const reviewed = checked + reviewSentence(review)
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
@@ -54,14 +70,20 @@ export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: Run
 const findingLine = (finding: ReviewFinding): string =>
   "- " + finding.severity + " `" + finding.id + "` at `" + finding.file + (finding.line === null ? "" : ":" + finding.line.toString()) + "`: " + finding.description + " Action: " + finding.action
 
-const reviewSection = (review: ReviewOutcome): string =>
-  review.status === "failed"
-    ? "\nThe review turn failed, so this PR lists no review findings.\n"
-    : review.findings.length === 0
-    ? "\nThe review found nothing.\n"
-    : "\nOpen review findings:\n" + review.findings.map(findingLine).join("\n") + "\n"
+const leftFindingLines = (left: LeftFinding): string =>
+  findingLine(left.finding) + "\n  - " + leftReasonLine(left.reason)
 
-export const prBody = (subjects: ReadonlyArray<string>, passed: ReadonlyArray<string>, review: ReviewOutcome): string => {
+const findingsList = (lines: ReadonlyArray<string>): string =>
+  lines.length === 0 ? "\nThe review found nothing.\n" : "\nOpen review findings:\n" + lines.join("\n") + "\n"
+
+const reviewSection = (section: ReviewSection): string =>
+  section.kind === "failed"
+    ? "\nThe review turn failed, so this PR lists no review findings.\n"
+    : section.kind === "unfixed"
+    ? findingsList(section.findings.map(findingLine))
+    : findingsList(section.findings.map(leftFindingLines))
+
+export const prBody = (subjects: ReadonlyArray<string>, passed: ReadonlyArray<string>, review: ReviewSection): string => {
   const closing = passed.length === 0
     ? "orc opened this PR without local checks or no-mistakes. " + beatReadsChecks + "\n"
     : "orc opened this PR after " + passed.join(", ") + " passed, without no-mistakes.\n"
@@ -73,7 +95,7 @@ const openPullRequest = (
   opener: PullRequestOpener,
   rounds: ReadonlyArray<ChecksRoundSummary>,
   checkpoints: RunCheckpoints,
-  review: ReviewOutcome
+  review: ReviewSection
 ): Effect.Effect<DirectPrRecord, OrcRunError> =>
   Effect.gen(function*() {
     yield* checkpoints.pullRequestStart(new Date().toISOString())
