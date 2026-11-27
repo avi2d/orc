@@ -6,7 +6,7 @@ import { formatHistoryError, openDatabase, stoppedEndReason, type RunRecord, Run
 import { writtenReport } from "../../entities/run-history/index"
 import { gateLogFileName } from "../../entities/review-gate/index"
 import { Asking, OpenQuestion, askingFileName, hasBlockingQuestion, isBlockingQuestion } from "../../entities/review-gate/index"
-import { readJsonFileIfPresent, throughFor, type Machine } from "../../shared/config/index"
+import { readJsonFileIfPresent, ReviewerWait, reviewerWaitFileName, throughFor, type Machine } from "../../shared/config/index"
 import { FailingMark, failingFileName, failingText } from "../../entities/agent/index"
 import { runDirFor, type TaskKind, TaskId, readPlanDocument, SplitDocument, type SplitPlan, splitReasonPrefix, parentBranch, taskBranch } from "../../entities/backlog/index"
 import { orcGroup, PueueResult, PueueStatus } from "../../shared/process/index"
@@ -26,6 +26,7 @@ const RunSummary = Schema.Struct({
   report: Schema.optional(Schema.String),
   asking: Schema.optional(Asking),
   failing: Schema.optional(FailingMark),
+  reviewerWait: Schema.optional(ReviewerWait),
   split: Schema.optional(SplitDocument)
 })
 type RunSummary = typeof RunSummary.Type
@@ -70,6 +71,7 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
 export type RunEnding =
   | { readonly kind: "close"; readonly outcome: "done" | "failed" | "stopped"; readonly reason: string; readonly pr: string | null; readonly report: string | null }
   | { readonly kind: "park"; readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion>; readonly reason: string }
+  | { readonly kind: "wait-reviewer"; readonly wait: ReviewerWait; readonly reason: string }
   | { readonly kind: "split"; readonly plan: SplitPlan }
 
 type FinishedResult = Extract<RunnerResult, { readonly status: "succeeded" | "failed" }>
@@ -91,6 +93,9 @@ const reportEnding = (result: FinishedResult): RunEnding => {
 export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEnding | null => {
   if (result.status !== "queued" && result.status !== "stashed" && result.run?.status === "stopped") {
     return { kind: "close", outcome: "stopped", reason: result.run.endReason ?? stoppedEndReason, pr: result.run.prLink ?? null, report: null }
+  }
+  if (result.status === "failed" && result.run?.reviewerWait !== undefined && result.run.openQuestions.length === 0) {
+    return { kind: "wait-reviewer", wait: result.run.reviewerWait, reason: result.run.endReason ?? result.reason }
   }
   if (kind === "parent" && result.status === "failed") {
     return { kind: "close", outcome: "failed", reason: result.run?.endReason ?? result.reason, pr: null, report: result.run?.report ?? null }
@@ -182,6 +187,7 @@ const splitOf = (reason: string | null) => {
 interface LiveFiles {
   readonly asking: typeof Asking.Type | null
   readonly failing: FailingMark | null
+  readonly reviewerWait: ReviewerWait | null
 }
 
 const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>, report: string | null, live: LiveFiles): RunSummary => {
@@ -195,6 +201,7 @@ const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>, r
     ...(report === null ? {} : { report }),
     ...(live.asking === null ? {} : { asking: live.asking }),
     ...(live.failing === null ? {} : { failing: live.failing }),
+    ...(live.reviewerWait === null ? {} : { reviewerWait: live.reviewerWait }),
     ...(split === null ? {} : { split })
   }
 }
@@ -205,12 +212,16 @@ const withRunDatabase = <A, E>(home: string, use: (db: Database) => Effect.Effec
   )
 
 const liveFilesOf = (run: RunRecord, home: string): Effect.Effect<LiveFiles, never, FileSystem.FileSystem> => {
+  if (run.status === "failed") {
+    const reviewerWait = readJsonFileIfPresent(runDirFor(home, run.id) + "/" + reviewerWaitFileName, ReviewerWait).pipe(Effect.catchTag("ConfigError", () => Effect.succeed(null)))
+    return reviewerWait.pipe(Effect.map((wait) => ({ asking: null, failing: null, reviewerWait: wait })))
+  }
   if (run.status !== "running") {
-    return Effect.succeed({ asking: null, failing: null })
+    return Effect.succeed({ asking: null, failing: null, reviewerWait: null })
   }
   const asking = readJsonFileIfPresent(runDirFor(home, run.id) + "/" + askingFileName, Asking).pipe(Effect.catchTag("ConfigError", () => Effect.succeed(null)))
   const failing = readJsonFileIfPresent(runDirFor(home, run.id) + "/" + failingFileName, FailingMark).pipe(Effect.catchTag("ConfigError", () => Effect.succeed(null)))
-  return Effect.all({ asking, failing })
+  return Effect.all({ asking, failing, reviewerWait: Effect.succeed(null) })
 }
 
 const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
@@ -255,7 +266,7 @@ const readStoppedRun = (home: string, task: string): Effect.Effect<RunSummary | 
       if (latest === null) {
         return null
       }
-      return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), { asking: null, failing: null })
+      return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), { asking: null, failing: null, reviewerWait: null })
     })
   )
 

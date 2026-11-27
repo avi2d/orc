@@ -56,7 +56,7 @@ const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
 const parkedFields = (parked: Parked | null): ReadonlyArray<string> =>
   parked === null
     ? []
-    : [field("parked_branch", parked.branch), field("parked_questions", questionFronts(parked.questions)), ...(parked.origin === undefined ? [] : [field("parked_origin", parked.origin)]), ...(parked.at === undefined ? [] : [field("parked_at", parked.at)]), ...(parked.sentBackAt === undefined ? [] : [field("parked_sent_back_at", parked.sentBackAt)])]
+    : [field("parked_branch", parked.branch), field("parked_questions", questionFronts(parked.questions)), ...(parked.origin === undefined ? [] : [field("parked_origin", parked.origin)]), ...(parked.at === undefined ? [] : [field("parked_at", parked.at)]), ...(parked.sentBackAt === undefined ? [] : [field("parked_sent_back_at", parked.sentBackAt)]), ...(parked.reviewerWait === undefined ? [] : [field("parked_reviewer_wait", parked.reviewerWait)])]
 
 const ranFields = (record: TaskRecord): { readonly started: ReadonlyArray<string>; readonly pr: ReadonlyArray<string> } => {
   const ran = ranClosing(record)

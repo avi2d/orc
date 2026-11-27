@@ -7,6 +7,7 @@ import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 import { type DiagramTurnResult, runDiagramTurn } from "./diagram-turn"
 import type { ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
+import type { ReviewerRoomWait } from "./reviewer-chain"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
 import { beatReadsChecks } from "./checks"
@@ -63,7 +64,13 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number): Effect.Effect<ReviewOutcome, OrcRunError> =>
+const recordUnreviewed = (checkpoints: RunCheckpoints, attempt: number, reason: string): Effect.Effect<ReviewOutcome, OrcRunError> => {
+  const failed: ReviewOutcome = { status: "failed", reason }
+  const at = new Date().toISOString()
+  return checkpoints.reviewDone(null, attempt, { ...failed, reusedFrom: null }, at, at).pipe(Effect.as(failed))
+}
+
+export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number): Effect.Effect<ReviewOutcome, OrcRunError | ReviewerRoomWait> =>
   pick(runAgent).pipe(
     Effect.flatMap((picked) =>
       Effect.gen(function*() {
@@ -74,10 +81,9 @@ export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunC
         return review
       })
     ),
-    Effect.catchTag("NoReviewerRoom", (error) => {
-      const failed: ReviewOutcome = { status: "failed", reason: error.message }
-      const at = new Date().toISOString()
-      return checkpoints.reviewDone(null, attempt, { ...failed, reusedFrom: null }, at, at).pipe(Effect.as(failed))
+    Effect.catchTags({
+      NoReviewerRoom: (error) => recordUnreviewed(checkpoints, attempt, error.message),
+      ReviewerRoomWait: (error) => recordUnreviewed(checkpoints, attempt, error.wait.reason).pipe(Effect.andThen(Effect.fail(error)))
     })
   )
 
@@ -146,6 +152,7 @@ const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps[
     Effect.flatMap((picked) => runDiagramTurn(run, picked.runAgent, picked.reviewer)),
     Effect.catchTags({
       NoReviewerRoom: () => Effect.succeed({ diagram: { kind: "none" }, why: null } as const),
+      ReviewerRoomWait: () => Effect.succeed({ diagram: { kind: "none" }, why: null } as const),
       OrcRunError: () => Effect.succeed({ diagram: { kind: "none" }, why: null } as const)
     })
   )

@@ -46,6 +46,7 @@ export type BeatAction =
     readonly decider: ReadonlyArray<string>
   }
   | { readonly kind: "held"; readonly task: string; readonly machine: string; readonly reason: string }
+  | { readonly kind: "reviewer-wait"; readonly task: string; readonly machine: string; readonly run: string; readonly reason: string }
   | { readonly kind: "asking"; readonly task: string; readonly machine: string; readonly until: string; readonly questions: ReadonlyArray<string> }
   | { readonly kind: "answered"; readonly task: string; readonly machine: string; readonly questions: ReadonlyArray<string> }
   | { readonly kind: "answer-failed"; readonly task: string; readonly machine: string; readonly reason: string }

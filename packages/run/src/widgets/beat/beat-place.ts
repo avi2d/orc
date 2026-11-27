@@ -36,7 +36,7 @@ const startOrder = (left: TaskRecord, right: TaskRecord): number =>
   left.spec.id.localeCompare(right.spec.id, "en", { numeric: true })
 
 export const startable = (tasks: ReadonlyArray<TaskRecord>, closed: ReadonlyArray<BeatAction>): ReadonlyArray<TaskRecord> => {
-  const retried = new Set(closed.flatMap((action) => action.kind === "retry" ? [action.task] : []))
+  const retried = new Set(closed.flatMap((action) => action.kind === "retry" || action.kind === "reviewer-wait" ? [action.task] : []))
   return tasks.filter((task) => task.state.kind === "new" && !retried.has(task.spec.id)).toSorted(startOrder)
 }
 

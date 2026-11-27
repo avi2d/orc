@@ -7,7 +7,7 @@ import { type DispatchConfig, ownedBySweep, readJsonFileIfPresent, throughFor } 
 import { logWrittenAt, stallMillis } from "./stall"
 import { endSplit } from "./beat-split"
 import { type CloseReading, readClose, serveRunning } from "./beat-close-runner"
-import { type AskedQuestion, parkStartedTask, retryStartedTask } from "../../entities/parked-runs/index"
+import { type AskedQuestion, parkForReviewerRoom, parkStartedTask, retryStartedTask } from "../../entities/parked-runs/index"
 import { Asking, askingFileName } from "../../entities/review-gate/index"
 import type { RunEnding } from "../../features/queueing-a-task/index"
 
@@ -58,6 +58,7 @@ export const ownLogEndingOf = (startedAt: string, logAt: string | null, nowMilli
 
 type ParkEnding = Extract<RunEnding, { readonly kind: "park" }>
 type CloseEnding = Extract<RunEnding, { readonly kind: "close" }>
+type ReviewerWaitEnding = Extract<RunEnding, { readonly kind: "wait-reviewer" }>
 
 const endParked = (
   root: string,
@@ -115,6 +116,22 @@ const endClosed = (
       : Option.some({ kind: "closed", task: task.spec.id, machine, outcome: ending.outcome, reason: ending.reason, pr: ending.pr, report: ending.report } satisfies BeatAction)
   })
 
+// The beat resumes only a run it can name, so a wait read without its run closes the task instead.
+const endReviewerWait = (
+  root: string,
+  task: TaskRecord,
+  machine: string,
+  ending: ReviewerWaitEnding,
+  run: string | undefined
+): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    if (run === undefined) {
+      return yield* endClosed(root, task, machine, { kind: "close", outcome: "failed", reason: ending.reason, pr: null, report: null })
+    }
+    const parked = yield* parkForReviewerRoom(root, task.spec.id, machine, run, ending.wait, yield* nowIso).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
+    return parked === null ? Option.none() : Option.some({ kind: "reviewer-wait", task: task.spec.id, machine, run, reason: ending.reason } satisfies BeatAction)
+  })
+
 const endTask = (
   root: string,
   home: string,
@@ -123,7 +140,13 @@ const endTask = (
   ending: RunEnding,
   run?: string
 ): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
-  ending.kind === "park" ? endParked(root, home, task, machine, ending, run) : ending.kind === "split" ? endSplit(root, task, machine, ending) : endClosed(root, task, machine, ending)
+  ending.kind === "park"
+    ? endParked(root, home, task, machine, ending, run)
+    : ending.kind === "split"
+    ? endSplit(root, task, machine, ending)
+    : ending.kind === "wait-reviewer"
+    ? endReviewerWait(root, task, machine, ending, run)
+    : endClosed(root, task, machine, ending)
 
 const readSince = (
   fs: FileSystem.FileSystem,
@@ -270,7 +293,7 @@ export const closeFinished = (
     const ended = yield* endTask(context.root, context.home, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   }).pipe(
-    Effect.tap((progress) => progress.kind === "ended" && (progress.action.kind === "retry" || progress.action.kind === "closed" || (progress.action.kind === "split" && task.spec.parent !== null))
+    Effect.tap((progress) => progress.kind === "ended" && (progress.action.kind === "retry" || progress.action.kind === "reviewer-wait" || progress.action.kind === "closed" || (progress.action.kind === "split" && task.spec.parent !== null))
       ? nowIso.pipe(Effect.flatMap((at) => withdrawTaskItems(context.root, [task.spec.id], at)))
       : Effect.void)
   )

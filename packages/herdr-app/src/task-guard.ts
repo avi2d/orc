@@ -52,13 +52,20 @@ const hold: Guard<TaskHold> = (value, at) => {
   return ok({ reason: reason.value, until: until.value, at: when.value, questions: questions.value, answer: given.value })
 }
 
+const reviewerWaitReason: Guard<string> = (value, at) => {
+  const record = fields(value, at)
+  return record.kind === "refused" ? record : string(record.value, "reason", at)
+}
+
 const parked: Guard<TaskParked> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
   const branch = string(record.value, "branch", at)
   if (branch.kind === "refused") return branch
   const questions = arrayOf(record.value, "questions", at, asked)
-  return questions.kind === "refused" ? questions : ok({ branch: branch.value, questions: questions.value })
+  if (questions.kind === "refused") return questions
+  const waits = absentOr(record.value, "reviewerWait", at, reviewerWaitReason)
+  return waits.kind === "refused" ? waits : ok({ branch: branch.value, questions: questions.value, waitsForReviewer: waits.value })
 }
 
 const account = (record: Fields, at: string): Guarded<string | null> => {

@@ -1,11 +1,13 @@
 import { Effect } from "effect"
 import { OrcRunError } from "../../shared/lib/index"
+import { type ReviewerWait, reviewerWaitFileName } from "../../shared/config/index"
+import type { ReviewerRoomWait } from "./reviewer-chain"
 import { runChecksRound, summarizeChecksRound, type ChecksCommand } from "./checks"
 import { finishAfterChecks, reviewOrc } from "./run-finish"
 import type { ReviewFinding } from "./review-outcome"
 import { passesRoundTwoBar, sameFinding, type ReviewStop } from "./left-findings"
 import type { RunStopped } from "./loop-pause"
-import type { ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
+import type { ResumePlan, ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
 
 interface ReviewLoop {
@@ -87,14 +89,29 @@ const runOneRound = (loop: ReviewLoop, findings: ReadonlyArray<ReviewFinding>, r
     return yield* checkAfterFix(loop)
   })
 
-export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
+export const waitsForReviewerLine = (wait: ReviewerWait): string =>
+  "The review turn waits for a reviewer in the chain to have room, so the run parks and no PR opens: " + wait.reason
+
+// The beat reads the wait from the run folder to know which entries to re-read, and the run's end reason carries only words.
+const parkForReviewer = (loop: ReviewLoop, error: ReviewerRoomWait): Effect.Effect<OrcRunReport, OrcRunError> => {
+  const file = loop.run.path.join(loop.run.runDir, reviewerWaitFileName)
+  return loop.run.fs.writeFileString(file, JSON.stringify(error.wait, null, 2) + "\n").pipe(
+    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + file + ": " + String(cause) })),
+    Effect.as(stopReport(loop, waitsForReviewerLine(error.wait)))
+  )
+}
+
+export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> => {
+  const { run, ops, base, rounds, fixes, commits, plan, checkpoints } = loop
+  if (run.delivery.kind !== "orc") {
+    return finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
+  }
+  return reviewAndFinish(loop, run.delivery.reviewer, run.delivery.maxFixRounds).pipe(Effect.catchTag("ReviewerRoomWait", (error) => parkForReviewer(loop, error)))
+}
+
+const reviewAndFinish = (loop: ReviewLoop, reviewer: ReviewerPick, limit: number): Effect.Effect<OrcRunReport, OrcRunError | RunStopped | ReviewerRoomWait> =>
   Effect.gen(function*() {
     const { run, ops, base, rounds, fixes, commits, plan, checkpoints } = loop
-    if (run.delivery.kind !== "orc") {
-      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
-    }
-    const limit = run.delivery.maxFixRounds
-    const reviewer = run.delivery.reviewer
     let review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, 1)
     const sentPerRound: Array<ReadonlyArray<ReviewFinding>> = []
     const askUserFindings: Array<ReviewFinding> = []

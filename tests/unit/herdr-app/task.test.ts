@@ -20,8 +20,8 @@ const fresh: TaskDetail = {
 
 test("lists the info rows in the fixed order with a dash for each empty one instead of dropping them", () => {
   const rows = infoRows(fresh, [])
-  expect(rows.map((row) => row.label)).toEqual(["Account", "Run", "Branch", "PR", "Depends on", "Created", "Started", "Closed", "Priority", "Assets"])
-  expect(rows.filter((row) => row.label !== "Created").map((row) => row.value)).toEqual(Array.from({ length: 9 }, () => "—"))
+  expect(rows.map((row) => row.label)).toEqual(["Parked", "Account", "Run", "Branch", "PR", "Depends on", "Created", "Started", "Closed", "Priority", "Assets"])
+  expect(rows.filter((row) => row.label !== "Created").map((row) => row.value)).toEqual(Array.from({ length: 10 }, () => "—"))
 })
 
 test("shows a closed task's report file as its asset instead of a dash", () => {

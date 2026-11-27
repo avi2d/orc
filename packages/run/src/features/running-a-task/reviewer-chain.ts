@@ -1,8 +1,12 @@
 import { type Array as Arr, Effect, Schema } from "effect"
-import type { ProviderRoom, ReviewerEntry } from "../../shared/config/index"
+import { type ProviderRoom, type ReviewerEntry, ReviewerWait } from "../../shared/config/index"
 
 export class NoReviewerRoom extends Schema.TaggedError<NoReviewerRoom>()("NoReviewerRoom", {
   message: Schema.String
+}) {}
+
+export class ReviewerRoomWait extends Schema.TaggedError<ReviewerRoomWait>()("ReviewerRoomWait", {
+  wait: ReviewerWait
 }) {}
 
 interface PassedEntry {

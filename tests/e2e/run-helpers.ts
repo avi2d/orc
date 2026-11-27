@@ -275,6 +275,17 @@ export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: Fak
   }
 }
 
+export const runOrcDeliveryResume = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerPick): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+  const gh = await stubGh()
+  try {
+    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
+      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer: reviewerPick }), gh.dir + ":", handRunFacts, { runId: "step-run-2", resumeRun: "step-run-1" })
+    return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
+  } finally {
+    await rm(gh.dir, { recursive: true, force: true })
+  }
+}
+
 export const runDirectPrResume = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, answers: ReadonlyArray<QuestionAnswer>): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const gh = await stubGh()
   try {

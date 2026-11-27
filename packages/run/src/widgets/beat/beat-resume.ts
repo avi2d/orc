@@ -1,7 +1,7 @@
 import { Duration, Effect } from "effect"
 import { runLabel, type TaskRecord } from "../../entities/backlog/index"
 import { readRunResult, type RunnerRequirements, type RunnerResult } from "../../features/queueing-a-task/index"
-import type { Machine } from "../../shared/config/index"
+import type { Machine, RoomReading } from "../../shared/config/index"
 
 export type RunReading =
   | { readonly kind: "read"; readonly run: string | null; readonly status: RunnerResult["status"] }
@@ -24,6 +24,19 @@ export const otherRun = (reading: RunReading, run: string): string | null => {
     return null
   }
   return reading.run === null ? "no matching run was found" : "the runner now reports " + reading.run
+}
+
+// The resumed run picks its reviewer again from the chain, so one entry with room is enough to resume it.
+export const reviewerRoomWait = (task: TaskRecord, roomOf: RoomReading): string | null => {
+  const wait = task.parked?.reviewerWait
+  if (wait === undefined) {
+    return null
+  }
+  const full = wait.reviewers.flatMap((reviewer) => {
+    const room = roomOf(reviewer)
+    return room.kind === "room" ? [] : [reviewer.model + ": " + room.reason]
+  })
+  return full.length < wait.reviewers.length ? null : "parked until a reviewer in the chain has room: " + full.join("; ")
 }
 
 export const parkedResumeWait = (task: TaskRecord, home: string, machine: Machine): Effect.Effect<string | null, never, RunnerRequirements> => {

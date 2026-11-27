@@ -89,6 +89,20 @@ If checks pass and review approves without fixes, no worker reads the release.
 To [overturn a decider's answer](attention-queue.md#overturning-a-decider-answer) on that held task, use `orc backlog answer <task-id> <question-id>=<text>`.
 The hold stays until you release it.
 
+## A run that waits for a reviewer
+An `orc` run whose [reviewer chain](delivery-modes.md#reviewer-chain) has no entry with room parks instead of failing.
+The beat moves its task back to `new` with `parked_branch`, `parked_origin`, `parked_at` and `parked_reviewer_wait`.
+`parked_reviewer_wait` holds the reason and the entries that can review, with each one's default credential.
+The parked task keeps no retry, so a run that parks for a reviewer does not spend the task's one retry.
+It prints `parked <task-id> from run <run-id> on <machine> until a reviewer has room: <end reason>`.
+
+Each later beat re-reads the quota for those entries.
+While none has room, it prints `waits <task-id>: parked until a reviewer in the chain has room: <model>: <reason>` with each entry and why it has no room.
+Once one has room, the beat resumes the task on its original machine and run, the way it resumes a parked task.
+The resumed run keeps the implement it passed, rebases and runs the checks again, picks its reviewer from the chain again, and opens its PR after the review.
+`orc backlog` shows the task as `parked (reviewer room)`.
+`orc backlog --json` gives the wait's reason and entries in the task's `parked.reviewerWait`, and the task panel's Info tab shows the reason in its Parked row.
+
 ## A looping run
 A run whose [Pi](https://pi.dev) fails one command 6 times in a row pauses the run and asks the question `looping`, as [How orc runs Pi](how-orc-runs-pi.md) shows.
 It waits for your answer the way a run waits at its gate, with the same `asking.json`, wait and hand-off.

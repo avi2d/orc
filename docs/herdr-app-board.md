@@ -34,7 +34,7 @@ The panel keeps its state when you switch tabs.
 | --- | --- |
 | Thread | Questions, answers, decisions, and notes in time order, then the answers again under **Decided by the owner** and **Decided by the agent**, each agent answer with its basis or `Not recorded` |
 | Description | The task body |
-| Info | The account, run, branch, PR, dependencies, times, priority, and assets |
+| Info | The reason a task waits for a reviewer with room, then the account, run, branch, PR, dependencies, times, priority, and assets |
 
 Select an answer option, or type an answer and select Send.
 The panel shows an error if the answer command fails.

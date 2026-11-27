@@ -6,7 +6,7 @@ import type { AllowWord, NoMistakesRecord, OpenQuestion, QuestionAnswer } from "
 import type { DirectPrRecord } from "../../entities/pull-request/index"
 import type { ChecksRoundSummary, OrcRunCommit, RecordedFixAttempt } from "../../entities/run-history/index"
 import type { ReviewAtHeadOutcome } from "./review-outcome"
-import type { NoReviewerRoom } from "./reviewer-chain"
+import type { NoReviewerRoom, ReviewerRoomWait } from "./reviewer-chain"
 
 export interface AgentRun {
   readonly agent: AgentFile
@@ -31,7 +31,7 @@ interface PickedReviewer {
   readonly runAgent: SandboxOps["runAgent"]
 }
 
-export type ReviewerPick = (runAgent: SandboxOps["runAgent"]) => Effect.Effect<PickedReviewer, NoReviewerRoom | OrcRunError>
+export type ReviewerPick = (runAgent: SandboxOps["runAgent"]) => Effect.Effect<PickedReviewer, NoReviewerRoom | ReviewerRoomWait | OrcRunError>
 
 export interface ResumePlan {
   readonly implementSessionId: string | null

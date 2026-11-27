@@ -1,6 +1,7 @@
 import { claimOf, startedOf, taskStateFields } from "@avi2dg/orc-schema"
 import { Data, Effect, Schema } from "effect"
 import { Decider } from "../../shared/lib/index"
+import { ReviewerWait } from "../../shared/config/index"
 import { type Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-record-decision"
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 import { deciderAnswerKinds, OverturnedFront, parkedAnswerOf } from "./task-record-answer"
@@ -74,6 +75,7 @@ export interface Parked {
   readonly origin?: typeof ParkedOrigin.Type
   readonly at?: string
   readonly sentBackAt?: string
+  readonly reviewerWait?: ReviewerWait
   readonly branch: string
   readonly questions: ReadonlyArray<ParkedQuestion>
 }
@@ -195,6 +197,7 @@ const Frontmatter = Schema.Struct({
   parked_origin: Schema.optional(ParkedOrigin),
   parked_at: Schema.optional(Schema.String),
   parked_sent_back_at: Schema.optional(Schema.String),
+  parked_reviewer_wait: Schema.optional(ReviewerWait),
   parked_questions: Schema.optional(Schema.Array(QuestionFront)),
   ...taskStateFields,
   landed_in: Schema.optional(Schema.String),
@@ -246,9 +249,27 @@ const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: str
 const holdQuestionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<HoldQuestion> | string =>
   checkedQuestions(fronts, what, () => "owner", (question, answer) => ({ id: question.id, text: question.text, answer }))
 
+const namesNoPark = (front: Frontmatter): boolean =>
+  front.parked_branch === undefined && front.parked_questions === undefined && front.parked_origin === undefined && front.parked_reviewer_wait === undefined
+
+const hasParkReason = (front: Frontmatter, questions: ReadonlyArray<unknown>): boolean =>
+  questions.length > 0 || front.parked_reviewer_wait !== undefined || ((front.retry !== undefined || front.rebase !== undefined) && front.parked_origin !== undefined)
+
+const parkedFrom = (front: Frontmatter, branch: string, questions: Parked["questions"]): Parked => ({
+  branch,
+  questions,
+  ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }),
+  ...(front.parked_at === undefined ? {} : { at: front.parked_at }),
+  ...(front.parked_sent_back_at === undefined ? {} : { sentBackAt: front.parked_sent_back_at }),
+  ...(front.parked_reviewer_wait === undefined ? {} : { reviewerWait: front.parked_reviewer_wait })
+})
+
 const parkedOf = (front: Frontmatter): Parked | null | string => {
-  if (front.parked_branch === undefined && front.parked_questions === undefined && front.parked_origin === undefined) {
+  if (namesNoPark(front)) {
     return null
+  }
+  if (front.parked_reviewer_wait !== undefined && front.parked_origin === undefined) {
+    return "a task parked for reviewer room names no run to resume"
   }
   if (front.parked_branch === undefined || front.parked_branch === "") {
     return "a parked task names no branch"
@@ -257,9 +278,7 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (typeof questions === "string") {
     return questions
   }
-  return questions.length > 0 || ((front.retry !== undefined || front.rebase !== undefined) && front.parked_origin !== undefined)
-    ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }), ...(front.parked_at === undefined ? {} : { at: front.parked_at }), ...(front.parked_sent_back_at === undefined ? {} : { sentBackAt: front.parked_sent_back_at }) }
-    : "a parked task names no question"
+  return hasParkReason(front, questions) ? parkedFrom(front, front.parked_branch, questions) : "a parked task names no question"
 }
 
 const holdOf = (front: Frontmatter): Hold | null | string => {

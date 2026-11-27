@@ -3,17 +3,17 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, taskPr, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
 import { type Account, type ConfigError, type DispatchConfig, isYolo, modeOf, type Machine, type Project, readDispatchConfig, readProjects, type RoutedModels } from "../../shared/config/index"
 import { machineOverfull, type MachinePlacement, type MachineRoom, type Placed, placeTask, readRoom, startable, taskWait } from "./beat-place"
-import { type QuotaReading, readQuota } from "./quota"
+import { type QuotaReading, readQuota, roomOnCredential } from "./quota"
 import { selectTaskRoute } from "./beat-route"
 import { encodeRenewal, encodeToken } from "../../entities/token/index"
 import { checkToken, type Credential, credentialFor, type TokenCache } from "./beat-token"
 import { closeFinished } from "./beat-close"
 import { checkStalledRuns } from "./retry-stall"
-import { parkedResumeWait } from "./beat-resume"
+import { parkedResumeWait, reviewerRoomWait } from "./beat-resume"
 import { type BeatAction, type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems, withdrawTaskItems, type Progress } from "../../entities/attention/index"
 import { attentionActions } from "./beat-attention"
 import { type AskDecider, askDeciderWithPi, decideReviewQuestions } from "../../features/decider/index"
-import { carryRecordedAnswers, handAnswersToResume } from "../../entities/parked-runs/index"
+import { carryRecordedAnswers, handAnswersToResume, withoutReviewerWait } from "../../entities/parked-runs/index"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
 import { readPullRequest } from "../../entities/pull-request/index"
 import { prEvents, type ReadPullRequest } from "./task-events"
@@ -99,7 +99,7 @@ const startTask = (
       return { kind: "given-back", task: task.spec.id, machine: machine.name } satisfies BeatAction
     }
     const log = backlogPaths(root).logFile(task.spec.id)
-    yield* writeTaken(root, { ...handAnswersToResume(task), state: { kind: "started", claim, started: { at: yield* nowIso, log } } })
+    yield* writeTaken(root, { ...withoutReviewerWait(handAnswersToResume(task)), state: { kind: "started", claim, started: { at: yield* nowIso, log } } })
     const env = {
       ORC_TASK_LOG: log,
       ORC_TASK_ID: task.spec.id,
@@ -204,7 +204,8 @@ const considerTask = Effect.fnUntraced(function*(
   deciderOwns: DeciderOwns,
   task: TaskRecord
 ): Effect.fn.Return<TaskConsideration, BacklogError | TaskFileError, BeatRequirements> {
-  const waiting = taskWait(task, context.tasks, context.merged, deciderOwns)
+  const waiting = taskWait(task, context.tasks, context.merged, deciderOwns) ??
+    reviewerRoomWait(task, (reviewer) => roomOnCredential(context.quota, context.config.quota, reviewer))
   if (waiting !== null) {
     return { action: waitForTask(task.spec.id, waiting), placement: null }
   }
@@ -222,13 +223,16 @@ const settledProgress = (
   asking: progress.flatMap((entry) => entry.kind === "running" && entry.action !== null ? [entry.action] : [])
 })
 
+const endsRun = (action: BeatAction): action is Extract<BeatAction, { readonly kind: "retry" | "closed" | "parked" | "held" | "split" | "reviewer-wait" }> =>
+  action.kind === "retry" || action.kind === "closed" || action.kind === "parked" || action.kind === "held" || action.kind === "split" || action.kind === "reviewer-wait"
+
 const failingReads = (started: ReadonlyArray<TaskRecord>, progress: ReadonlyArray<Progress>): ReadonlyArray<FailingRead> =>
   started.flatMap((task, index): ReadonlyArray<FailingRead> => {
     const entry = progress[index]
     if (entry.kind === "running") {
       return [{ task: task.spec.id, failing: entry.failing }]
     }
-    if (entry.kind === "ended" && (entry.action.kind === "retry" || entry.action.kind === "closed" || entry.action.kind === "parked" || entry.action.kind === "held" || entry.action.kind === "split")) {
+    if (entry.kind === "ended" && endsRun(entry.action)) {
       return [{ task: task.spec.id, failing: null }]
     }
     return []
@@ -239,7 +243,7 @@ const routeRunItems = (root: string, started: ReadonlyArray<TaskRecord>, progres
 
 const releaseClosedSlots = (live: BeatContext["live"], closed: ReadonlyArray<BeatAction>): void => {
   for (const action of closed) {
-    if (action.kind === "retry" || action.kind === "closed" || action.kind === "parked" || action.kind === "held" || action.kind === "split") {
+    if (endsRun(action)) {
       const slot = live.find((entry) => entry.machine === action.machine)
       if (slot !== undefined) {
         slot.busy -= 1

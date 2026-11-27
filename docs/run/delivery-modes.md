@@ -69,8 +69,14 @@ The account that holds the default credential is one of these:
 Another account on the same provider does not count, even with room.
 An unreadable quota, or no account that holds the default credential, counts as no room.
 The run log names the chosen model, its place and each entry passed over, with the reason.
-When no entry qualifies, the review turn fails with `NoReviewerRoom` and the run stops without opening a PR.
-For the first review turn, the run history records that `review` step as failed with no model, and the `review-failure` signal holds the reason.
+
+### No reviewer with room
+When no entry qualifies, the review turn records its `review` step as failed with no model, and the `review-failure` signal holds the reason.
+The run opens no PR and ends with `The review turn waits for a reviewer in the chain to have room, so the run parks and no PR opens: <reason>`.
+It writes `reviewer-wait.json` in its run folder with that reason and each entry off the implementer's provider, and the beat parks its task until one of them has room, as [Parked runs](parked-runs.md#a-run-that-waits-for-a-reviewer) shows.
+A chain whose every entry runs on the implementer's provider has nothing to wait for, so its review turn fails with `NoReviewerRoom` and the run stops.
+
+### The reviewer's credential
 A chain reviewer runs Pi with its own provider's credential.
 For a `token-file` or `package` provider, it runs from its own Pi folder `reviewer-agent-<position>` in the run folder.
 The [nono](https://nono.sh) sandbox carries one provider's credential, so a reviewer chain needs `--sandbox none`.
