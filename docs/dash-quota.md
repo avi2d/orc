@@ -50,6 +50,7 @@ For OpenCode Go, it also replaces matching rolling and monthly windows.
 A missing, stale, expired, or mismatched reading leaves the quota-axi window in place.
 Windows subquo does not name also keep their quota-axi readings.
 The panel does not infer a mapping from account names.
+Each subquo account ID, and each provider and account key pair, may appear once, or the config is refused.
 When the config is refused, the panel logs the refusal and reads quota-axi alone.
 
 ### Show the dispatch accounts
