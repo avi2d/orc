@@ -9,7 +9,9 @@ const warning = { id: "w", file: "work.txt", line: 1, severity: "warning", actio
 const info = { id: "i", file: "work.txt", line: null, severity: "info", action: "Name the helper.", description: "The helper name says nothing." }
 const lateError = { id: "late", file: "other.txt", line: 3, severity: "error", action: "Close the file.", description: "The handle leaks." }
 
-const exercise = async (reviews: ReadonlyArray<ReadonlyArray<typeof error>>) => {
+type Finding = Omit<typeof error, "line"> & { line: number | null }
+
+const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>) => {
   let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, prLink: null as string | null, prCreated: false }
   await withRepo(async (dir) => {
     await withHome(async (home) => {
