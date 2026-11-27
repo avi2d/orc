@@ -128,7 +128,7 @@ export const prBody = (input: PrBodyInput): string => {
 const readTaskGoal = (run: Pick<HistoryRun, "fs" | "taskPath">): Effect.Effect<string> =>
   run.fs.readFileString(run.taskPath).pipe(
     Effect.map(taskGoal),
-    Effect.catch(() => Effect.succeed(taskGoal("")))
+    Effect.catchTag("PlatformError", () => Effect.succeed(taskGoal("")))
   )
 
 const openPullRequest = (

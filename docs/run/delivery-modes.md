@@ -55,7 +55,7 @@ A further Pi turn draws that diagram just before the PR opens, and a run that op
 A reply without a `mermaid` fence leaves the heading out.
 `## How it was checked` names the local checks that passed and the review result.
 A review with no findings gives the line `The review found nothing.`, and a failed review turn gives `The review turn failed, so this PR lists no review findings.`
-`## Open review findings` lists each open finding with its severity, id, `file:line`, description and action, and the run leaves the heading out when no finding is open.
+`## Open review findings` lists each open finding with its severity, id, file and line, description and action, and the run leaves the heading out when no finding is open.
 After a successful review and any fix rounds, an `orc` run opens its PR the same way, with the remaining findings.
 Findings that remain after the fix rounds do not stop the PR.
 Under each remaining finding, a nested line says why the fix loop left it.
