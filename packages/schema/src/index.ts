@@ -1,3 +1,4 @@
+export { claimOf, startedOf, taskStateFields } from "./shared/task-front";
 export { acceptsExit, type Command, CommandAbsent, CommandRunner, CommandUnreachable } from "./shared/lib";
 export { decodeJson, decodeValue, type Decoded, decoded, flatMapDecoded, rejected } from "./shared/lib";
 export {

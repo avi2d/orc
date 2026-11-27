@@ -77,18 +77,18 @@ async function launch(): Promise<void> {
       if (codeOf(error) !== "ENOENT") throw error
     }
   }
-  const main = join(packageRoot, "src", isStandin ? "entities/heavy-queue/heavy-standin-main.ts" : "bin.ts")
+  const main = join(packageRoot, "dist", isStandin ? "heavy-standin-main.ts" : "bin.js")
   const config = isStandin ? ["--no-env-file", "--config=/dev/null"] : []
   if (bun) {
     try {
-      await run(bun, [...config, main, ...args], { ...env, ORC_LAUNCHED_BINARY: undefined, ORC_LAUNCHED_MAIN: main })
+      await run(bun, [...config, main, ...args], { ...env, ORC_BUNDLED_APP_DIR: join(packageRoot, "dist", "herdr-app"), ORC_LAUNCHED_BINARY: undefined, ORC_LAUNCHED_MAIN: main })
       return
     } catch (error) {
       if (codeOf(error) !== "ENOENT") throw error
     }
   }
   throw new Error("no compiled binary for " + process.platform + "-" + process.arch +
-    ". Install Bun for the source version, or reinstall Orc without omitting optional dependencies.")
+    ". Install Bun for the bundled version, or reinstall Orc without omitting optional dependencies.")
 }
 
 await launch().catch((error: unknown) => {

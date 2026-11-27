@@ -14,7 +14,7 @@
     "build": "bun run bundle && bun packages/run/scripts/build-heavy-standin.ts && (cd packages/session-quota && bun run build) && (cd packages/cli && bun run build) && checks-effect-scope && checks-changelog && bun run build:pack && bun scripts/docs-commands.ts && bun scripts/docs-diagrams.ts",
     "bundle": "bun packages/run/scripts/sync-run-version.ts && bun packages/run/scripts/bundle.ts",
     "build:pack": "bun run build:launcher && (cd packages/herdr-app && bun run build) && rm -rf packages/run/dist/herdr-app && cp -R packages/herdr-app/dist packages/run/dist/herdr-app && cp CHANGELOG.md packages/run/CHANGELOG.md",
-    "build:launcher": "bun build packages/run/scripts/launch.ts --target node --outfile packages/run/dist/launch.js && install -m 755 packages/run/scripts/launch.sh packages/run/dist/launch",
+    "build:launcher": "bun run bundle && bun build packages/run/scripts/launch.ts --target node --outfile packages/run/dist/launch.js && install -m 755 packages/run/scripts/launch.sh packages/run/dist/launch",
     "compile": "bun packages/run/scripts/compile.ts",
     "release:assets": "bun scripts/release-assets.ts",
     "lint": "bun scripts/check-doc-links.ts && bun scripts/check-vue-styles.ts && mkdir -p .orc-home && RUNTIME_BINS=\"$(dirname \"$(bun -p process.execPath)\"):$(dirname \"$(node -p process.execPath)\")\" && HOME=$PWD/.orc-home PATH=$PWD/packages/run/scripts:$RUNTIME_BINS:$PATH oxlint && CHECKS_SECRETS_PACK=\"${CHECKS_SECRETS_PACK-$HOME/.config/checks/secrets-pack.json}\" HOME=$PWD/.orc-home PATH=$PWD/packages/run/scripts:$RUNTIME_BINS:$PATH checks-lint",
@@ -63,7 +63,7 @@
     "@dagrejs/dagre": "3.1.3",
     "@effect/platform-bun": "4.1.4",
     "@effect/tsgo": "0.45.0",
-    "@hughescr/stryker-bun-runner": "1.4.0",
+    "@hughescr/stryker-bun-runner": "1.6.0",
     "@opentui/core": "0.6.5",
     "@stryker-mutator/core": "10.0.0",
     "@swc/core": "1.16.2",
@@ -84,7 +84,8 @@
   "overrides": {
     "@effect/platform-node-shared": "4.1.4",
     "minimatch": "11.0.3",
-    "qs": "6.16.1"
+    "qs": "6.16.1",
+    "vite": "6.4.6"
   },
   "trustedDependencies": [
     "@swc/core"

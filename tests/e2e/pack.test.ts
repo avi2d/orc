@@ -44,6 +44,15 @@ const expectedFiles = [
   "agents/implementer.md",
   "agents/reviewer.md",
   "agents/support-check-policy.md",
+  "dist/bin.js",
+  "dist/chat-tools.ts",
+  "dist/decider-policy.md",
+  "dist/fixer.md",
+  "dist/heavy-standin-main.ts",
+  "dist/implementer.md",
+  "dist/orc-ask-extension.ts",
+  "dist/reviewer.md",
+  "dist/support-check-policy.md",
   "dist/herdr-app/keys.json",
   "dist/herdr-app/layouts/orc.json",
   "dist/herdr-app/layouts/orc.svg",
@@ -542,7 +551,8 @@ describe("the packed tarball installed into an empty project without orc's lockf
     await rm(project, { recursive: true, force: true })
   })
 
-  test("orc --help prints its usage instead of failing on an effect module a newer resolved dependency asks for", () => {
+  test("orc --help without a native binary prints usage instead of importing the unpublished workspace schema", async () => {
+    expect(await Bun.file(join(project, "node_modules", "@avi2dg", "orc-schema", "package.json")).exists()).toBe(false)
     const path = dirname(process.execPath) + ":" + (Bun.env["PATH"] ?? "")
     const stdout = spawnPassing([join(project, "node_modules", ".bin", "orc"), "--help"], project, { PATH: path, HOME: project })
     expect(stdout).toContain("Usage: orc <command>")
