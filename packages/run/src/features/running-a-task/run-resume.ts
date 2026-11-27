@@ -291,6 +291,16 @@ const checkedReviewWait = (run: HistoryRun, priorDir: string) =>
     return reviewWait
   })
 
+const reviewWaitOf = (
+  reviewWait: ResumePlan["reviewWait"] | null,
+  replaysSendBack: boolean
+): Pick<ResumePlan, "reviewWait"> => {
+  if (reviewWait === null || reviewWait === undefined) {
+    return {}
+  }
+  return { reviewWait: replaysSendBack ? { ...reviewWait, sentPerRound: [] } : reviewWait }
+}
+
 export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePlan, OrcRunError> =>
   Effect.gen(function*() {
     const allow = run.allow ?? []
@@ -332,7 +342,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       fixRunning: fixCarry.running,
       handover,
       priorDir,
-      ...(reviewWait === null ? {} : { reviewWait: replaysSendBack ? { ...reviewWait, sentPerRound: [] } : reviewWait }),
+      ...reviewWaitOf(reviewWait, replaysSendBack),
       cleanupPriorDir: implementSafe && fixSafe ? priorDir : null
     }
   })

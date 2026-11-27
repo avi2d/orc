@@ -47,6 +47,20 @@ const passReview = async (sessionsDir: string) => {
   return { sessionFile, commits: [] }
 }
 
+const passGammaReview = (model: string, sessionsDir: string) => {
+  expect(model).toBe("gamma/reviewer")
+  return passReview(sessionsDir)
+}
+
+const expectGammaReviewOpened = (
+  kinds: ReadonlyArray<string>,
+  resumed: { readonly stepAgents: unknown; readonly ghCalls: string }
+) => {
+  expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
+  expect(resumed.stepAgents).toContainEqual({ name: "review", model: "gamma/reviewer", thinking: "high" })
+  expect(resumed.ghCalls).toContain("pr create --head orc/test")
+}
+
 const cleanReviewer = (sha: string, model: string, kinds: Array<string>) =>
   recordingKinds(async (run, sessionsDir) => {
     if (run.agent.kind !== "reviewer") return sandboxResult(sha)(run, sessionsDir)
@@ -202,10 +216,7 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
       kinds.length = 0
 
       const applyNew = recordingKinds(async (run, sessionsDir) => {
-        if (run.agent.kind === "reviewer") {
-          expect(run.agent.model).toBe("gamma/reviewer")
-          return passReview(sessionsDir)
-        }
+        if (run.agent.kind === "reviewer") return passGammaReview(run.agent.model, sessionsDir)
         expect(run.prompt).not.toContain(applied.answer)
         expect(run.prompt).toContain(added.answer)
         return commitSendBack(worktreeDir, sessionsDir)
@@ -226,19 +237,14 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
       kinds.length = 0
 
       const applySendBack = recordingKinds(async (run, sessionsDir) => {
-        if (run.agent.kind === "reviewer") {
-          expect(run.agent.model).toBe("gamma/reviewer")
-          return passReview(sessionsDir)
-        }
+        if (run.agent.kind === "reviewer") return passGammaReview(run.agent.model, sessionsDir)
         expect(run.agent.model).toBe("beta/coder")
         expect(run.prompt).toContain(sendBack.answer)
         return commitSendBack(worktreeDir, sessionsDir)
       }, kinds)
       const resumed = await runOrcDeliveryStep(dir, home, applySendBack, lintPasses, pick,
         { worktreeDir, resumeRun: opened.report.runId, answers: [sendBack], implementerModel: "beta/coder" })
-      expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
-      expect(resumed.stepAgents).toContainEqual({ name: "review", model: "gamma/reviewer", thinking: "high" })
-      expect(resumed.ghCalls).toContain("pr create --head orc/test")
+      expectGammaReviewOpened(kinds, resumed)
     })
   })
 })
@@ -248,10 +254,7 @@ describe("a provider that ran an interrupted step on the branch never reviews it
     await withReadyBranch(async ({ dir, home, kinds, worktreeDir }) => {
       await seedCrashedRun(home, dir, [{ name: "implement", status: "running", model: "acme/coder" }])
       const resumeWithoutNewCommits = recordingKinds(async (run, sessionsDir) => {
-        if (run.agent.kind === "reviewer") {
-          expect(run.agent.model).toBe("gamma/reviewer")
-          return passReview(sessionsDir)
-        }
+        if (run.agent.kind === "reviewer") return passGammaReview(run.agent.model, sessionsDir)
         expect(run.agent.model).toBe("beta/coder")
         const sessionFile = join(sessionsDir, "implement.jsonl")
         await writeFile(sessionFile, sessionEnding(cleanFinish))
@@ -260,9 +263,7 @@ describe("a provider that ran an interrupted step on the branch never reviews it
       const resumed = await runOrcDeliveryStep(dir, home, resumeWithoutNewCommits, lintPasses,
         pickWith({ acme: room, beta: room, gamma: room }, sameProviderFirst),
         { worktreeDir, resumeRun: "step-run-1", implementerModel: "beta/coder", fixerModel: "beta/coder" })
-      expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
-      expect(resumed.stepAgents).toContainEqual({ name: "review", model: "gamma/reviewer", thinking: "high" })
-      expect(resumed.ghCalls).toContain("pr create --head orc/test")
+      expectGammaReviewOpened(kinds, resumed)
     })
   })
 
