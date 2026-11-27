@@ -368,8 +368,8 @@ describe("the row of a run", () => {
 
   test("running Checks after Fix keeps the last model instead of returning to the Agent model", () => {
     const running = runFacts({ started, ended: null, steps: [
-      ...steps.map((step) => ({ ...step, status: "passed", attempt: 1, piSessionFile: null, from: null })),
-      { id: 4, name: "checks", status: "running", model: null, thinking: null, attempt: 1, piSessionFile: null, from: null }
+      ...steps.map((step) => ({ ...step, status: "passed" as const, attempt: 1, piSessionFile: null, from: null })),
+      { id: 4, name: "checks", status: "running" as const, model: null, thinking: null, attempt: 1, piSessionFile: null, from: null }
     ] })
     const row = rowFacts({ id: "orc-240", title: "Scorecard", standing: { status: "Running" } }, running, Date.parse(ended))
     expect([row.model, row.vendor]).toEqual(["sonnet-5-5 m", "claude"])
