@@ -5,6 +5,8 @@ import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
 import type { AgentFile, LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
+import { runDiagramTurn } from "./diagram-turn"
+import { splitFrontmatter } from "../../entities/backlog/index"
 import type { RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
@@ -14,6 +16,7 @@ import { leftFindings, leftReasonLine, type LeftFinding } from "./left-findings"
 interface OrcLoopEnd {
   readonly review: ReviewOutcome
   readonly sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>
+  readonly diagram: string | null
 }
 
 type ReviewSection =
@@ -36,7 +39,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       if (orcLoop.review.status === "failed") {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound) })
+      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound) }, orcLoop.diagram)
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
@@ -44,7 +47,8 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       yield* checkpoints.reviewStart(run.delivery.reviewer, reviewStarted)
       const review = yield* reviewAtHead(run, runAgent, run.delivery.reviewer, priorDir)
       yield* checkpoints.reviewDone(run.delivery.reviewer, review, reviewStarted, new Date().toISOString())
-      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, unfixedSection(review))
+      const diagram = yield* runDiagramTurn(run, runAgent, run.delivery.reviewer)
+      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, unfixedSection(review), diagram.kind === "mermaid" ? diagram.chart : null)
       const reviewed = checked + reviewSentence(review)
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
@@ -73,29 +77,74 @@ const findingLine = (finding: ReviewFinding): string =>
 const leftFindingLines = (left: LeftFinding): string =>
   findingLine(left.finding) + "\n  - " + leftReasonLine(left.reason)
 
-const findingsList = (lines: ReadonlyArray<string>): string =>
-  lines.length === 0 ? "\nThe review found nothing.\n" : "\nOpen review findings:\n" + lines.join("\n") + "\n"
-
-const reviewSection = (section: ReviewSection): string =>
-  section.kind === "failed"
-    ? "\nThe review turn failed, so this PR lists no review findings.\n"
-    : section.kind === "unfixed"
-    ? findingsList(section.findings.map(findingLine))
-    : findingsList(section.findings.map(leftFindingLines))
-
-export const prBody = (subjects: ReadonlyArray<string>, passed: ReadonlyArray<string>, review: ReviewSection): string => {
-  const closing = passed.length === 0
-    ? "orc opened this PR without local checks or no-mistakes. " + beatReadsChecks + "\n"
-    : "orc opened this PR after " + passed.join(", ") + " passed, without no-mistakes.\n"
-  return (subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing) + reviewSection(review)
+export interface PrBodyInput {
+  readonly goal: string
+  readonly subjects: ReadonlyArray<string>
+  readonly diagram: string | null
+  readonly passed: ReadonlyArray<string>
+  readonly review: ReviewSection
 }
+
+export const taskGoal = (taskText: string): string => {
+  const body = splitFrontmatter(taskText)?.body ?? taskText
+  const lines = body.split("\n")
+  let index = 0
+  while (index < lines.length && lines[index].trim() === "") {
+    index += 1
+  }
+  let title = ""
+  if (index < lines.length && lines[index].trim().startsWith("# ")) {
+    title = lines[index].trim().slice(2).trim()
+    index += 1
+  }
+  const paragraph = lines.slice(index).join("\n").split(/\n[ \t]*\n/)[0]?.trim() ?? ""
+  if (paragraph !== "") {
+    return paragraph
+  }
+  return title === "" ? "The task file states no goal." : title
+}
+
+const checkedSentence = (passed: ReadonlyArray<string>): string =>
+  passed.length === 0
+    ? "orc opened this PR without local checks or no-mistakes. " + beatReadsChecks
+    : "orc opened this PR after " + passed.join(", ") + " passed, without no-mistakes."
+
+const reviewStatusLine = (section: ReviewSection): string =>
+  section.kind === "failed"
+    ? "The review turn failed, so this PR lists no review findings."
+    : section.findings.length === 0
+      ? "The review found nothing."
+      : "The review left " + section.findings.length.toString() + (section.findings.length === 1 ? " finding" : " findings") + " open, listed below."
+
+const openFindingLines = (section: ReviewSection): string => {
+  if (section.kind === "failed" || section.findings.length === 0) {
+    return ""
+  }
+  const lines = section.kind === "unfixed" ? section.findings.map(findingLine) : section.findings.map(leftFindingLines)
+  return "\n## Open review findings\n\n" + lines.join("\n") + "\n"
+}
+
+export const prBody = (input: PrBodyInput): string => {
+  const changed = input.subjects.length === 0
+    ? "No commits landed on the branch."
+    : input.subjects.map((subject) => "- " + subject).join("\n")
+  const diagram = input.diagram === null ? "" : "\n## How it fits\n\n```mermaid\n" + input.diagram + "\n```\n"
+  return "## Why\n\n" + input.goal + "\n\n## What changed\n\n" + changed + "\n" + diagram + "\n## How it was checked\n\n" + checkedSentence(input.passed) + "\n" + reviewStatusLine(input.review) + "\n" + openFindingLines(input.review)
+}
+
+const readTaskGoal = (run: Pick<HistoryRun, "fs" | "taskPath">): Effect.Effect<string> =>
+  run.fs.readFileString(run.taskPath).pipe(
+    Effect.map(taskGoal),
+    Effect.catch(() => Effect.succeed(taskGoal("")))
+  )
 
 const openPullRequest = (
   run: HistoryRun,
   opener: PullRequestOpener,
   rounds: ReadonlyArray<ChecksRoundSummary>,
   checkpoints: RunCheckpoints,
-  review: ReviewSection
+  review: ReviewSection,
+  diagram: string | null
 ): Effect.Effect<DirectPrRecord, OrcRunError> =>
   Effect.gen(function*() {
     yield* checkpoints.pullRequestStart(new Date().toISOString())
@@ -106,8 +155,9 @@ const openPullRequest = (
     const listed = yield* branchCommits(run.spawner, run.git, run.branch, run.projectDir).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed([] as Array<OrcRunCommit>)))
     const subjects = listed.map((commit) => commit.subject.trim()).filter((subject) => subject !== "")
     const bodySubjects = subjects.length > 0 ? subjects : (head !== "" ? [head] : [])
+    const goal = yield* readTaskGoal(run)
     const bodyFile = run.path.join(run.runDir, prBodyFileName)
-    yield* run.fs.writeFileString(bodyFile, prBody(bodySubjects, rounds.at(-1)?.checks.map((check) => check.name) ?? [], review)).pipe(
+    yield* run.fs.writeFileString(bodyFile, prBody({ goal, subjects: bodySubjects, diagram, passed: rounds.at(-1)?.checks.map((check) => check.name) ?? [], review })).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
     )
     const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, bodyFile)

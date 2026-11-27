@@ -17,7 +17,7 @@ const maxReviewAnswers = 2
 
 const decodeFindings = Schema.decodeUnknownResult(Schema.fromJsonString(ReviewFindings))
 
-const readOnlyTools = ["read", "grep", "find", "ls"]
+export const readOnlyTools = ["read", "grep", "find", "ls"]
 
 const readFindings = (reply: string | null, mode: "direct-PR" | "orc"): Result.Result<ReadonlyArray<ReviewFinding>, string> => {
   if (reply === null) {
@@ -33,7 +33,7 @@ const readFindings = (reply: string | null, mode: "direct-PR" | "orc"): Result.R
 
 const diffFileName = "diff.md"
 
-const readDiff = (
+export const readDiff = (
   run: Pick<HistoryRun, "fs" | "path" | "piSessionDir" | "spawner" | "git" | "projectDir" | "branch">
 ): Effect.Effect<string, OrcRunError> =>
   Effect.gen(function*() {
