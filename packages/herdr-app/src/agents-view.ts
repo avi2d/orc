@@ -3,7 +3,7 @@ import { type InputState, type ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { openOverlay } from "herdr"
 import { type MergeOutcome, approvalShown } from "./approval-stage"
 import { monospace } from "./fonts"
-import { type Card, type StepTab, prNumber, sendBackArgs, stepTabs } from "./agents"
+import { type Card, type StepTab, approvalOf, lastTab, prNumber, sendBackArgs, stepTabs } from "./agents"
 import { namedModels, opensTurns } from "./run-agent"
 import { type ChecksSummary, logLines } from "./checks"
 import { checksView } from "./checks-view"
@@ -24,16 +24,6 @@ export type Chosen = { readonly kind: "thread" } | { readonly kind: "step"; read
 export interface AgentsActions extends RunsActions {
   readonly choose: (cx: Context, chosen: Chosen) => void
   readonly askMerge: (card: Card, approval: InboxApproval) => void
-}
-
-export const approvalOf = (card: Card | null): InboxApproval | null =>
-  card?.standing.status === "Awaiting you" && card.standing.waiting.on === "approval" ? card.standing.waiting.item : null
-
-export type LastTab = "Approve" | "Send back"
-
-export const lastTab = (card: Card): LastTab | null => {
-  if (approvalOf(card) !== null) return "Approve"
-  return card.openPr !== null && card.sendBack !== null ? "Send back" : null
 }
 
 const sameTarget = (a: Chosen, b: Chosen | null): boolean => {

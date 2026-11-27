@@ -104,7 +104,7 @@ const everyRow = (_id: unknown, count: number, _key: unknown, row: (index: numbe
   return element
 }
 
-void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow }))
+void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow, image: node, svg: node }))
 void mock.module("gpui-base", () => ({
   h_flex: node, v_flex: node, Scrollbar: { vertical: node }, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
@@ -151,7 +151,7 @@ const loadAttention = async () => {
 test("a stalled remote question request does not hold back local steps and log refresh", async () => {
   const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
   const runId = "20261126-090000-aaaaaa"
-  const step = { id: 1, name: "implement", attempt: 1, status: "running", model: null, thinking: null, piSessionFile: null, from: null }
+  const step = { id: 1, name: "fix", attempt: 1, status: "running", model: null, thinking: null, piSessionFile: null, from: null }
   documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [{ id: runId, project: "/work/garden", branch: "orc/garden-1", status: "running", prLink: null, title: "Local run", step: null, questions: 0, endReason: null, kind: null, delivery: null, worktree: null }] })
   documents.set("orc backlog --json", { schema: "orc.backlog.v1", tasks: [] })
   documents.set(`orc show ${runId} --json`, { schema: "orc.show.v1", run: { taskFile: "/work/garden/task.md" }, steps: [step] })
@@ -159,7 +159,6 @@ test("a stalled remote question request does not hold back local steps and log r
   let release = (): void => undefined
   attentionPending = new Promise((resolve) => { release = () => resolve({ code: 0, stdout: JSON.stringify(fixture), stderr: "" }) })
   const agents = new OrcAgents()
-  agents.pane = "raw"
   try {
     agents.refresh(cx)
     await new Promise((resolve) => setTimeout(resolve, 50))
@@ -172,29 +171,19 @@ test("a stalled remote question request does not hold back local steps and log r
   }
 })
 
-const openedOn = async (menu: "project" | "status") => {
+test("pressing the open Project trigger closes its list instead of reopening it after repaint", async () => {
   const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
   const agents = new OrcAgents()
-  agents.menu = menu
-  return agents
-}
-
-test("pressing the open Project trigger closes its list instead of reopening it after repaint", async () => {
-  const agents = await openedOn("project")
+  agents.menuOpen = true
   press(agents, "filter-project")
-  expect(agents.menu).toBeNull()
+  expect(agents.menuOpen).toBe(false)
 })
 
-test("pressing the open Status trigger closes its list instead of reopening it after repaint", async () => {
-  const agents = await openedOn("status")
-  press(agents, "filter-status")
-  expect(agents.menu).toBeNull()
-})
-
-test("pressing Status while Project is open switches lists instead of closing both", async () => {
-  const agents = await openedOn("project")
-  press(agents, "filter-status")
-  expect(agents.menu).toBe("status")
+test("pressing the closed Project trigger opens its list instead of leaving it shut", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const agents = new OrcAgents()
+  press(agents, "filter-project")
+  expect(agents.menuOpen).toBe(true)
 })
 
 const cmd4 = { name: "layout.select", args: { stack: "orc-views", child: "orc-inbox" } }
@@ -216,51 +205,43 @@ test("the Awaiting you lane count on the Board opens the Inbox as cmd-4 does ins
 
 const queued: Card = {
   key: "garden-20", id: "garden-20", kind: "ship", delivery: null, title: "Another task", project: "garden", known: true,
-  standing: { status: "Queued" }, where: "Waiting to start", runId: null, checkout: null, sendBack: null
+  standing: { status: "Queued" }, where: "Waiting to start", runId: null, checkout: null, sendBack: null, openPr: null
 }
-
-test("the Awaiting you count on the Agents tab opens the Inbox as cmd-4 does instead of filtering the runs", async () => {
-  const { agents } = await loadAttention()
-  const { runsColumn } = await import("../../../packages/herdr-app/src/runs-view")
-  const { palette } = await import("../../../packages/herdr-app/src/palette")
-  const filtered: Array<unknown> = []
-  const act = {
-    select: () => undefined, toggleFold: () => undefined, choose: () => undefined, setPane: () => undefined, askMerge: () => undefined,
-    openMenu: () => undefined, setFilter: (_cx: unknown, filter: unknown) => filtered.push(filter)
-  }
-  ran.length = 0
-  stopped.length = 0
-  const column: object = runsColumn(palette(), { cards: { kind: "ok", value: agents.cards }, filter: { project: null, status: null, allRuns: false }, menu: "status", selectedKey: null, agents: new Map(), folded: false }, act)
-  const count = find(column, "inbox-count")
-  expect(count?.kids).toEqual(["4"])
-  click(count)
-  expect(ran).toEqual([cmd4])
-  expect(stopped.length).toBe(1)
-  expect(filtered).toEqual([])
-})
 
 const wordsOf = (element: object | string): ReadonlyArray<string> =>
   typeof element === "string" ? [element] : (nodes.get(element)?.kids ?? []).flatMap(wordsOf)
 
 const wordsUnder = (element: object, id: string): ReadonlyArray<string> => find(element, id)?.kids.flatMap(wordsOf) ?? []
 
-test("shows the subject, outcomes, and recommendation in an unselected Agents card instead of behind the step list", async () => {
+test("a selected Awaiting you run shows its question, options and recommendation in its Thread tab, not behind a step list", async () => {
   const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
   const data = await loadAttention()
   const agents = new OrcAgents()
-  agents.cards = { kind: "ok", value: [...data.agents.cards, queued] }
+  agents.list = { kind: "ok", cards: [...data.agents.cards, queued], reread: null }
   agents.agent = data.agents.agent
-  agents.selectedKey = queued.key
-  const element = agents.render(cx)
-  const words = wordsOf(element)
+  agents.selectedKey = "garden-8"
+  const words = wordsOf(agents.render(cx))
+  expect(words).toContain("Thread")
   expect(words).toContain("The width of the herb bed")
   expect(words).toContain("Plant one row so the path to the kitchen door stays clear.")
   expect(words).toContain("Narrow")
-  expect(words).toContain("Overdue · Waited 1h 22m")
-  expect(words).toContain("Where should the bench go?")
-  expect(words).toContain("No options recorded")
-  expect(words).not.toContain("Which file format should the export use?")
-  expect(words).not.toContain("Two retries")
+  expect(words).not.toContain("Where should the bench go?")
+  agents.selectedKey = "garden-7"
+  const other = wordsOf(agents.render(cx))
+  expect(other).toContain("Where should the bench go?")
+  expect(other).toContain("No options recorded")
+})
+
+test("an agent's question stays in the folded Agent attention section until it is opened, not in the run list", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const data = await loadAttention()
+  const agents = new OrcAgents()
+  agents.list = { kind: "ok", cards: [...data.agents.cards, queued], reread: null }
+  agents.agent = data.agents.agent
+  agents.selectedKey = queued.key
+  const element = agents.render(cx)
+  expect(wordsOf(element)).not.toContain("Which file format should the export use?")
+  expect(wordsOf(element)).not.toContain("Two retries")
   click(find(element, "toggle-agent-attention"))
   expect(wordsOf(agents.render(cx))).toContain("Which file format should the export use?")
 })

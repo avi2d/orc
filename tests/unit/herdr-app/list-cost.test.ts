@@ -40,7 +40,7 @@ const cx: Context = Object.assign(IdleEntity, {
 
 const documents = new Map<string, unknown>()
 
-void mock.module("gpui-kit", () => ({ View: Object, div: node, list }))
+void mock.module("gpui-kit", () => ({ View: Object, div: node, list, image: node, svg: node }))
 void mock.module("gpui-base", () => ({
   h_flex: node, v_flex: node, Input: { new: node }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   Scrollbar: { vertical: node }, ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
@@ -93,7 +93,7 @@ const agentsFrame = async (count: number) => {
   const read = await readAgents().finally(() => documents.clear())
   if (read.kind !== "ok") throw new Error(read.kind === "failed" ? read.reason : read.kind)
   const agents = new OrcAgents()
-  agents.cards = { kind: "ok", value: read.value.cards }
+  agents.list = { kind: "ok", cards: read.value.cards, reread: null }
   agents.agent = read.value.agent
   return frame(() => agents.render(cx))
 }

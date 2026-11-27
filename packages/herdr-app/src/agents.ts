@@ -289,6 +289,16 @@ export const buildCards = (runs: Runs, backlog: Backlog, items: ReadonlyArray<In
 export const cardAnswers = (card: Pick<Card, "standing"> | null): ReadonlyArray<InboxAnswer> =>
   card?.standing.status === "Awaiting you" && card.standing.waiting.on === "answer" ? card.standing.waiting.items : []
 
+export const approvalOf = (card: Pick<Card, "standing"> | null): InboxApproval | null =>
+  card?.standing.status === "Awaiting you" && card.standing.waiting.on === "approval" ? card.standing.waiting.item : null
+
+export type LastTab = "Approve" | "Send back"
+
+export const lastTab = (card: Pick<Card, "standing" | "openPr" | "sendBack">): LastTab | null => {
+  if (approvalOf(card) !== null) return "Approve"
+  return card.openPr !== null && card.sendBack !== null ? "Send back" : null
+}
+
 export const sendBackArgs = (card: Pick<Card, "sendBack">, words: string): ReadonlyArray<string> | null =>
   card.sendBack === null || words.trim() === "" ? null : ["backlog", "send-back", card.sendBack, words.trim()]
 

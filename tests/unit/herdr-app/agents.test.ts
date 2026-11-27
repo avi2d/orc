@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, cardAnswers, cardStatuses, filterCards, openedFilter, projectsOf, railLabel, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
-import { cardPlace, namedModels, opensTurns, runAgent } from "../../../packages/herdr-app/src/run-agent"
-import { projectMenu, statusMenu } from "../../../packages/herdr-app/src/run-menus"
+import { type StepTab, buildCards, cardAnswers, filterCards, lastTab, openedFilter, projectsOf, railLabel, sendBackArgs, stepTabs } from "../../../packages/herdr-app/src/agents"
+import { durationLabel, rowFacts, shortModel, shortTitle, vendorOf } from "../../../packages/herdr-app/src/agent-row"
+import { namedModels, opensTurns, runFacts } from "../../../packages/herdr-app/src/run-agent"
+import { projectMenu } from "../../../packages/herdr-app/src/run-menus"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 import type { InboxAnswer, InboxApproval } from "../../../packages/herdr-app/src/inbox"
 import { askText } from "../../../packages/herdr-app/src/thread"
@@ -120,7 +121,7 @@ describe("the runs list", () => {
   })
 
   test("says where each run is now rather than its raw status", () => {
-    expect(board.map((card) => card.where)).toEqual(["Approve PR #48", "Question 1", "Fix 1", "Waiting to start", "orc exited 1", "PR #12"])
+    expect(board.map((card) => card.where)).toEqual(["Approve PR #48", "Question 1", "Fix", "Waiting to start", "orc exited 1", "PR #12"])
   })
 
   test("a run started outside the backlog carries no kind rather than a made-up one", () => {
@@ -148,7 +149,7 @@ describe("the runs list", () => {
       [answer("orc-7")]
     )
     expect(cards.map((card) => [card.id, card.runId, card.standing.status])).toEqual([["orc-7", null, "Awaiting you"], ["orc-7", "20261113-090000-aaaaaa", "Failed"]])
-    expect(filterCards(cards, { project: null, status: "Awaiting you", allRuns: false }).map((card) => card.where)).toEqual(["Question 1"])
+    expect(cards.filter((card) => card.standing.status === "Awaiting you").map((card) => card.where)).toEqual(["Question 1"])
   })
 
   test("a stale run count does not leave an answered question's card Awaiting you", () => {
@@ -221,135 +222,149 @@ describe("the runs list", () => {
     expect(cards.map((card) => [card.id, card.runId])).toEqual([["orc-7", "20261113-090000-aaaaaa"], ["orc-7", "20261113-070000-cccccc"], ["orc-7", "20261113-080000-bbbbbb"]])
   })
 
-  test("the Status filter keeps only Failed runs, not the Done ones beside them", () => {
-    expect(filterCards(board, { project: null, status: "Failed", allRuns: false }).map((card) => card.where)).toEqual(["orc exited 1"])
+  test("the find keeps runs whose id or title holds the words, not every run", () => {
+    expect(filterCards(board, { project: null, allRuns: false }, "HERDR").map((card) => card.id)).toEqual(["herdr-1"])
+    expect(filterCards(board, { project: null, allRuns: false }, "  ").length).toBe(board.length)
   })
 
   test("the Project filter keeps one project's runs, not every project's", () => {
-    expect(filterCards(board, { project: "herdr", status: null, allRuns: false }).map((card) => card.where)).toEqual(["Question 1"])
+    expect(filterCards(board, { project: "herdr", allRuns: false }).map((card) => card.where)).toEqual(["Question 1"])
   })
 
-  test("both filters together keep runs that match both, not either", () => {
-    expect(filterCards(board, { project: "herdr", status: "Running", allRuns: false })).toEqual([])
+  test("the find and the Project filter together keep runs that match both, not either", () => {
+    expect(filterCards(board, { project: "herdr", allRuns: false }, "orc-48")).toEqual([])
   })
 
-  test("a status choice does not differ from the count shown by its replaced chip", () => {
-    const filter = { project: "herdr", status: null, allRuns: false } as const
-    expect(statusMenu(board, filter).choices.map(({ name, count }) => [name, count])).toEqual([
-      ["All", 1], ["Awaiting you", 1], ["Running", 0], ["Queued", 0], ["Failed", 0], ["Done", 0]
+  test("each Project choice counts the runs it would show, not the whole list", () => {
+    expect(projectMenu(board, { project: null, allRuns: false }).choices.map(({ name, count }) => [name, count])).toEqual([
+      ["All", 6], ["herdr", 1], ["orc", 5], ["All runs", 6]
     ])
-    expect(statusMenu(board, { project: null, status: null, allRuns: false }).choices.slice(1).map(({ name }) => name)).toEqual([...cardStatuses])
   })
 
   test("a select does not lose its chosen filter when the run list refreshes", () => {
-    const filter = { project: "herdr", status: "Running", allRuns: false } as const
+    const filter = { project: "herdr", allRuns: false } as const
     const refreshed = buildCards(runs([run("20261113-100000-ffffff", { status: "running" })]), backlog([task("orc-50", {}), task("orc-51", {})]))
     expect(projectMenu(refreshed, filter).chosen).toEqual({ value: { project: "herdr", allRuns: false }, name: "herdr", count: 0 })
     expect(projectMenu(refreshed, filter).choices.map(({ name }) => name)).toEqual(["All", "orc", "All runs"])
-    expect(statusMenu(refreshed, filter).chosen).toEqual({ value: "Running", name: "Running", count: 0 })
-    expect(statusMenu(refreshed, { project: null, status: "Queued", allRuns: false }).chosen.count).toBe(2)
   })
-
 })
 
-describe("the selected run's steps", () => {
-  test("a failed Checks step is marked ✗ and the steps still to come ○, not left out", () => {
-    const rows = stepRows({ status: "Running" }, [
+const tabText = (tab: StepTab): string => tab.kind === "next" ? `next ${tab.label}` : `${tab.status} ${tab.label}`
+
+describe("the selected run's step tabs", () => {
+  test("a failed Checks step is followed by the steps still to come, not left out", () => {
+    const tabs = stepTabs({ status: "Running" }, [
       { id: 1, name: "implement", attempt: 1, status: "passed", from: null },
       { id: 2, name: "checks", attempt: 1, status: "failed", from: null }
     ], "ship", null)
-    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✓ Agent", "✗ Checks 1", "○ Fix 1", "○ Checks 2", "○ No mistakes"])
+    expect(tabs.map(tabText)).toEqual(["passed Agent", "failed Checks 1", "next Fix 1", "next Checks 2", "next No mistakes"])
   })
 
-  test("a running step that waits on an answer is ◆, not ●", () => {
-    const rows = stepRows({ status: "Awaiting you", waiting: { on: "answer", items: [answer("orc-7")] } }, [{ id: 1, name: "implement", attempt: 1, status: "running", from: null }], "ship", null)
-    expect(rows.map((row) => row.mark)).toEqual(["◆", "○", "○"])
+  test("a running step that waits on an answer still lists the steps to come, not only itself", () => {
+    const tabs = stepTabs({ status: "Awaiting you", waiting: { on: "answer", items: [answer("orc-7")] } }, [{ id: 1, name: "implement", attempt: 1, status: "running", from: null }], "ship", null)
+    expect(tabs.map(tabText)).toEqual(["running Agent", "next Checks 1", "next No mistakes"])
   })
 
-  test("a run not yet started lists every step as not started, not an empty list", () => {
-    expect(stepRows({ status: "Queued" }, [], "ship", null).map((row) => `${row.mark} ${row.label}`)).toEqual(["○ Agent", "○ Checks 1", "○ No mistakes"])
+  test("a run not yet started lists every step as still to come, not an empty row", () => {
+    expect(stepTabs({ status: "Queued" }, [], "ship", null).map(tabText)).toEqual(["next Agent", "next Checks 1", "next No mistakes"])
   })
 
   test("a failed run lists no steps to come after the one that failed", () => {
-    const rows = stepRows({ status: "Failed" }, [{ id: 1, name: "implement", attempt: 1, status: "failed", from: null }])
-    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✗ Agent"])
+    const tabs = stepTabs({ status: "Failed" }, [{ id: 1, name: "implement", attempt: 1, status: "failed", from: null }])
+    expect(tabs.map(tabText)).toEqual(["failed Agent"])
   })
 
-  test("a stopped run marks its running step ✗, not ●", () => {
-    const rows = stepRows({ status: "Failed" }, [{ id: 1, name: "implement", attempt: 1, status: "running", from: null }], "ship", null)
-    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✗ Agent"])
+  test("a stopped run records its running step as failed, not still running", () => {
+    const tabs = stepTabs({ status: "Failed" }, [{ id: 1, name: "implement", attempt: 1, status: "running", from: null }], "ship", null)
+    expect(tabs.map(tabText)).toEqual(["failed Agent"])
   })
 
   test("a scout run shows only its Agent step, not Checks and PR", () => {
-    expect(stepRows({ status: "Queued" }, [], "scout", null).map((row) => row.label)).toEqual(["Agent"])
+    expect(stepTabs({ status: "Queued" }, [], "scout", null).map(tabText)).toEqual(["next Agent"])
   })
 
-  test("a resumed run groups its carried steps under the earlier run before its own, not carried checks sorted before its own agent step", () => {
-    const rows = stepRows({ status: "Done" }, [
+  test("a resumed run puts its carried steps before its own, not carried checks after its delivery step", () => {
+    const tabs = stepTabs({ status: "Done" }, [
       { id: 1, name: "implement", attempt: 1, status: "passed", from: "run-a" },
       { id: 2, name: "checks", attempt: 1, status: "failed", from: "run-a" },
       { id: 9, name: "no-mistakes", attempt: 1, status: "passed", from: null },
       { id: 3, name: "fix", attempt: 1, status: "passed", from: "run-a" },
-      { id: 4, name: "checks", attempt: 2, status: "passed", from: "run-a" }
+      { id: 4, name: "checks", attempt: 2, status: "passed", from: "run-b" }
     ], "ship", null)
-    expect(rows.map((row) => `${row.mark ?? "-"} ${row.label}`)).toEqual(["- From run run-a", "✓ Agent", "✗ Checks 1", "✓ Fix 1", "✓ Checks 2", "✓ No mistakes"])
-    expect(rows[0]?.stepId).toBeNull()
+    expect(tabs.map(tabText)).toEqual(["passed Agent", "failed Checks 1", "passed Fix 1", "passed Checks 2", "passed No mistakes"])
+    expect(tabs.map((tab) => tab.kind === "step" ? tab.from : "next")).toEqual(["run-a", "run-a", "run-a", "run-b", null])
   })
 
-  test("a resume of a resume groups carried steps under one row per origin run, not one row for both origins", () => {
-    const rows = stepRows({ status: "Done" }, [
-      { id: 1, name: "implement", attempt: 1, status: "passed", from: "run-a" },
-      { id: 2, name: "checks", attempt: 1, status: "passed", from: "run-a" },
-      { id: 9, name: "no-mistakes", attempt: 1, status: "passed", from: null },
-      { id: 3, name: "fix", attempt: 1, status: "passed", from: "run-a" },
-      { id: 4, name: "checks", attempt: 2, status: "passed", from: "run-b" },
-      { id: 5, name: "fix", attempt: 2, status: "passed", from: "run-b" }
-    ], "ship", null)
-    expect(rows.map((row) => `${row.mark ?? "-"} ${row.label}`)).toEqual(["- From run run-a", "✓ Agent", "✓ Checks 1", "✓ Fix 1", "- From run run-b", "✓ Checks 2", "✓ Fix 2", "✓ No mistakes"])
-    expect(rows[4]?.stepId).toBeNull()
-  })
-
-  test("a restarted checks round predicts the next round from the restart, not the inherited maximum", () => {
-    const rows = stepRows({ status: "Running" }, [
+  test("Checks are numbered by their place in the run, not by an attempt that restarts at 1", () => {
+    const tabs = stepTabs({ status: "Running" }, [
       { id: 1, name: "implement", attempt: 1, status: "passed", from: null },
       { id: 2, name: "checks", attempt: 1, status: "failed", from: null },
       { id: 3, name: "checks", attempt: 2, status: "failed", from: null },
       { id: 4, name: "fix", attempt: 1, status: "passed", from: null },
       { id: 5, name: "fix", attempt: 2, status: "passed", from: null },
       { id: 6, name: "checks", attempt: 1, status: "failed", from: null },
-      { id: 7, name: "fix", attempt: 3, status: "running", from: null }
+      { id: 7, name: "fix", attempt: 1, status: "running", from: null }
     ], "ship", null)
-    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["\u2713 Agent", "\u2717 Checks 1", "\u2717 Checks 2", "\u2713 Fix 1", "\u2713 Fix 2", "\u2717 Checks 1", "\u25cf Fix 3", "\u25cb Checks 2", "\u25cb No mistakes"])
+    expect(tabs.map(tabText)).toEqual(["passed Agent", "failed Checks 1", "failed Checks 2", "passed Fix 1", "passed Fix 2", "failed Checks 3", "running Fix 3", "next Checks 4", "next No mistakes"])
   })
 
-  test("a restarted failed checks round numbers its fix after the inherited fixes", () => {
-    const rows = stepRows({ status: "Running" }, [
+  test("a failed checks round names its next fix after the fixes before it, not Fix 1 again", () => {
+    const tabs = stepTabs({ status: "Running" }, [
       { id: 1, name: "implement", attempt: 1, status: "passed", from: null },
       { id: 2, name: "checks", attempt: 1, status: "failed", from: null },
-      { id: 3, name: "checks", attempt: 2, status: "failed", from: null },
-      { id: 4, name: "fix", attempt: 1, status: "passed", from: null },
-      { id: 5, name: "fix", attempt: 2, status: "passed", from: null },
-      { id: 6, name: "checks", attempt: 1, status: "failed", from: null }
+      { id: 3, name: "fix", attempt: 1, status: "passed", from: null },
+      { id: 4, name: "checks", attempt: 1, status: "failed", from: null }
     ], "ship", null)
-    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["\u2713 Agent", "\u2717 Checks 1", "\u2717 Checks 2", "\u2713 Fix 1", "\u2713 Fix 2", "\u2717 Checks 1", "\u25cb Fix 3", "\u25cb Checks 2", "\u25cb No mistakes"])
+    expect(tabs.map(tabText)).toEqual(["passed Agent", "failed Checks 1", "passed Fix 1", "failed Checks 2", "next Fix 2", "next Checks 3", "next No mistakes"])
+  })
+
+  test("a PR-delivered run ends in PR, not No mistakes", () => {
+    expect(stepTabs({ status: "Queued" }, [], "ship", "direct-PR").map(tabText)).toEqual(["next Agent", "next Checks 1", "next PR"])
   })
 })
 
-describe("the model and effort of a run", () => {
+describe("the row of a run", () => {
   const steps = [
-    { id: 1, name: "implement", model: "claude-opus-5-5", thinking: "high" },
-    { id: 2, name: "checks", model: null, thinking: null },
-    { id: 3, name: "fix", model: "claude-sonnet-5-5", thinking: "medium" },
-    { id: 4, name: "fix", model: "claude-opus-5-5", thinking: "high" }
-  ]
+    { id: 1, name: "implement", status: "passed", model: "claude-opus-5-5", thinking: "high" },
+    { id: 2, name: "checks", status: "passed", model: null, thinking: null },
+    { id: 3, name: "fix", status: "running", model: "claude-sonnet-5-5", thinking: "medium" }
+  ] as const
+  const started = "2026-11-13T14:25:09Z"
+  const ended = "2026-11-13T15:15:07Z"
+  const facts = runFacts({ started, ended: null, steps: steps.map((step) => ({ ...step, attempt: 1, piSessionFile: null, from: null })) })
 
-  test("a card names the Agent step's model and effort before where the run is, not the last step's", () => {
-    expect(cardPlace({ where: "Fix 2" }, runAgent(steps))).toBe("claude-opus-5-5 high · Fix 2")
+  test("a short model drops the vendor prefix and shortens the effort, as in opus-5-5 h", () => {
+    expect(shortModel({ model: "claude-opus-5-5", thinking: "high" })).toBe("opus-5-5 h")
+    expect(shortModel({ model: "openai-codex/gpt-5.5", thinking: null })).toBe("5.5")
   })
 
-  test("a card whose run recorded no model says only where the run is, not an empty separator", () => {
-    expect(cardPlace({ where: "orc exited 1" }, runAgent([{ name: "implement", model: null, thinking: null }]))).toBe("orc exited 1")
-    expect(cardPlace({ where: "Waiting to start" }, null)).toBe("Waiting to start")
+  test("the logo names the model's vendor, not a guess for an unknown model", () => {
+    expect([vendorOf("claude-opus-5-5"), vendorOf("openai-codex/gpt-5.5"), vendorOf("llama-4")]).toEqual(["claude", "openai", null])
+  })
+
+  test("a short title joins the id and the first title words, as in orc-258-agents-pane-ux", () => {
+    expect(shortTitle("orc-258", "Agents pane UX")).toBe("orc-258-agents-pane-ux")
+    expect(shortTitle("orc-7", "orc: Fix the beat lock")).toBe("orc-7-fix-the-beat")
+    expect(shortTitle("orc-9", "—")).toBe("orc-9")
+  })
+
+  test("a duration rounds down to its largest whole unit, not a long sum of units", () => {
+    expect([30_000, 59 * 60_000, 61 * 60_000, 25 * 3_600_000].map(durationLabel)).toEqual(["<1m", "59m", "1h", "1d"])
+  })
+
+  test("a running run shows the running step's model and the time since it started, not the Agent step's", () => {
+    const row = rowFacts({ id: "orc-240", title: "Scorecard", standing: { status: "Running" } }, facts, Date.parse(ended))
+    expect(row).toEqual({ title: "orc-240-scorecard", model: "sonnet-5-5 m", vendor: "claude", duration: "49m" })
+  })
+
+  test("a finished run shows the Agent step's model and its start to end time, not the time since it started", () => {
+    const done = runFacts({ started, ended, steps: steps.map((step) => ({ ...step, status: "passed", attempt: 1, piSessionFile: null, from: null })) })
+    const row = rowFacts({ id: "orc-240", title: "Scorecard", standing: { status: "Done" } }, done, Date.parse("2026-11-14T00:00:00Z"))
+    expect([row.model, row.duration]).toEqual(["opus-5-5 h", "49m"])
+  })
+
+  test("a queued task shows no model and no duration, not a made-up one", () => {
+    expect(rowFacts({ id: "orc-7", title: "A task", standing: { status: "Queued" } }, null, 0)).toEqual({ title: "orc-7-a-task", model: null, vendor: null, duration: null })
   })
 
   test("only the step whose model differs from the run's names it, not every agent step", () => {
@@ -376,19 +391,21 @@ describe("the pane a step opens in", () => {
 })
 
 describe("the Approve step and the Changes column of a run", () => {
-  test("a Code run awaiting approval ends in Approve, not in its delivery step", () => {
-    const cards = buildCards(
-      runs([run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })]),
-      backlog([task("orc-48", { status: "closed" })]),
-      [approval]
-    )
-    const standing = cards[0]?.standing ?? { status: "Queued" as const }
-    const rows = stepRows(standing, [
-      { id: 1, name: "implement", attempt: 1, status: "passed", from: null },
-      { id: 2, name: "checks", attempt: 1, status: "passed", from: null },
-      { id: 3, name: "no-mistakes", attempt: 1, status: "passed", from: null }
-    ], "ship", null)
-    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✓ Agent", "✓ Checks 1", "✓ No mistakes", "◆ Approve PR #48"])
+  const prRun = run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })
+
+  test("a run awaiting approval ends its tab row in Approve, not in its delivery step", () => {
+    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed" })]), [approval])
+    expect(lastTab(card)).toBe("Approve")
+  })
+
+  test("an open PR that waits on no one ends in Send back, not Approve", () => {
+    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed", prState: "open" })]))
+    expect([card.openPr, lastTab(card)]).toEqual([prRun.prLink, "Send back"])
+  })
+
+  test("a merged PR ends the tab row at its last step, with no Approve or Send back", () => {
+    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed" })], ["orc-48"]))
+    expect(lastTab(card)).toBeNull()
   })
 
   test("a run that recorded no worktree has no checkout to diff, not its project folder", () => {
@@ -410,11 +427,11 @@ describe("the Project row", () => {
   )
 
   test("a run of a project orc does not know is hidden by default, not counted in the list", () => {
-    expect(filterCards(mixed, { project: null, status: null, allRuns: false }).map((card) => card.where)).toEqual(["known failure"])
+    expect(filterCards(mixed, { project: null, allRuns: false }).map((card) => card.where)).toEqual(["known failure"])
   })
 
   test("All runs still shows the runs of projects orc does not know, not only the known ones", () => {
-    expect(filterCards(mixed, { project: null, status: null, allRuns: true }).map((card) => card.project)).toEqual(["orc-dash", "orc", "orc-clone"])
+    expect(filterCards(mixed, { project: null, allRuns: true }).map((card) => card.project)).toEqual(["orc-dash", "orc", "orc-clone"])
   })
 
   test("the Project row offers only projects in orc's projects file, not every project a run names", () => {
@@ -432,7 +449,7 @@ describe("the Project row", () => {
       backlog([], [], [{ name: "herdr", paths: ["/work/herdr-app"] }])
     )
     expect(cards.map((card) => [card.project, card.known])).toEqual([["herdr", true]])
-    expect(filterCards(cards, { project: null, status: null, allRuns: false }).map((card) => card.key)).toEqual(["20261113-090000-aaaaaa"])
+    expect(filterCards(cards, { project: null, allRuns: false }).map((card) => card.key)).toEqual(["20261113-090000-aaaaaa"])
   })
 
   test("a taskless run in no known checkout keeps its folder name, not another project's", () => {
@@ -441,21 +458,20 @@ describe("the Project row", () => {
       backlog([], [], [{ name: "herdr", paths: ["/work/herdr-app"] }])
     )
     expect(cards.map((card) => [card.project, card.known])).toEqual([["stranger-app", false]])
-    expect(filterCards(cards, { project: null, status: null, allRuns: false })).toEqual([])
+    expect(filterCards(cards, { project: null, allRuns: false })).toEqual([])
   })
 
   test("a run of an unknown project opened from the Inbox switches to All runs, not a list that hides it", () => {
     const opened = openedFilter(mixed, "20261113-080000-bbbbbb")
-    expect(opened).toEqual({ project: null, status: null, allRuns: true })
+    expect(opened).toEqual({ project: null, allRuns: true })
     expect(filterCards(mixed, opened).map((card) => card.key)).toContain("20261113-080000-bbbbbb")
   })
 
   test("a run of a known project opened from the Inbox keeps the default view, not All runs", () => {
-    expect(openedFilter(mixed, "20261113-090000-aaaaaa")).toEqual({ project: null, status: null, allRuns: false })
+    expect(openedFilter(mixed, "20261113-090000-aaaaaa")).toEqual({ project: null, allRuns: false })
   })
 
   test("leaving All runs for All drops an unknown project's selected run, not keeps it listed", () => {
-    expect(filterCards(mixed, { project: null, status: null, allRuns: false }).map((card) => card.key)).not.toContain("20261113-080000-bbbbbb")
-    expect(filterCards(mixed, { project: null, status: "Failed", allRuns: false }).map((card) => card.where)).toEqual(["known failure"])
+    expect(filterCards(mixed, { project: null, allRuns: false }).map((card) => card.key)).not.toContain("20261113-080000-bbbbbb")
   })
 })

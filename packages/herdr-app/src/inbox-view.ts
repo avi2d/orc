@@ -128,9 +128,9 @@ export class InboxAnswers {
   item(t: Palette, item: InboxItem, askMerge: AskMerge, named: "named" | "unnamed" = "named"): Element {
     const ask = item.ask
     return card().id(`item-${item.key}`).gap(6).p(12).min_w_0().flex_shrink_0()
-      .children(named === "unnamed" ? [] : [h_flex().gap(8).flex_wrap()
-        .child(div().font_semibold().child(item.task))
-        .child(div().min_w_0().text_color(t.muted).whitespace_normal().child(item.title))])
+      .child(h_flex().gap(8).flex_wrap()
+        .children(named === "unnamed" ? [] : [div().font_semibold().child(item.task)])
+        .child(div().min_w_0().text_color(named === "unnamed" ? t.foreground : t.muted).font_weight(named === "unnamed" ? 600 : 400).whitespace_normal().child(item.title)))
       .child(h_flex().gap(6).text_size(12).flex_wrap()
         .child(div().font_semibold().child(whoLabel(item)))
         .child(div().text_color(t.muted).child(inboxKind[item.kind]))
