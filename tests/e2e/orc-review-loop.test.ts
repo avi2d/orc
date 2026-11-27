@@ -1,14 +1,18 @@
 import { expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { basename, join } from "node:path"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
+import { openDatabase } from "../../packages/run/src/entities/run-history/index"
+import { readShow, readStepLog } from "../../packages/run/src/features/seeing-runs/index"
 import { cleanFinish, git, readyToCheck, recordedMetrics, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const error = { id: "e", file: "work.txt", line: 1, severity: "error", action: "Fix the error.", description: "The result is wrong." }
 const warning = { id: "w", file: "work.txt", line: 1, severity: "warning", action: "Fix the warning.", description: "The result is fragile." }
 
 const exercise = async (reviews: ReadonlyArray<ReadonlyArray<typeof error>>) => {
-  let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, steps: [] as unknown, metrics: [] as ReadonlyArray<unknown> }
+  let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, steps: [] as unknown, metrics: [] as ReadonlyArray<unknown>, reviewEvidence: [] as ReadonlyArray<{ readonly file: string | undefined; readonly log: string }> }
   await withRepo(async (dir) => {
     await withHome(async (home) => {
       const origin = await mkdtemp(join(tmpdir(), "orc-loop-origin-"))
@@ -46,7 +50,22 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<typeof error>>) => 
           checks += 1
           return { stdout: "ok", stderr: "", exitCode: 0 }
         })
-        result = { kinds, evidence, body: await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8"), checks, completed: outcome.report.completed, steps: outcome.steps, metrics: await recordedMetrics(home) }
+        const reviewEvidence = await Effect.runPromise(
+          Effect.acquireUseRelease(
+            openDatabase(home),
+            (db) => Effect.gen(function*() {
+              const document = yield* readShow(db, "step-run-1")
+              return yield* Effect.forEach(document?.steps.filter((step) => step.name === "review") ?? [], (step) =>
+                readStepLog(db, "step-run-1", step.id).pipe(Effect.map((log) => {
+                  const file = step.evidence.find((item) => item.direction === "out" && item.kind === "review")?.path
+                  return { file: file === undefined ? undefined : basename(file), log }
+                }))
+              )
+            }),
+            (db) => Effect.sync(() => db.close())
+          ).pipe(Effect.provide(BunServices.layer))
+        )
+        result = { kinds, evidence, reviewEvidence, body: await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8"), checks, completed: outcome.report.completed, steps: outcome.steps, metrics: await recordedMetrics(home) }
       } finally {
         await rm(origin, { recursive: true, force: true })
       }
@@ -83,13 +102,30 @@ test("a review whose findings one fix round clears counts one gate stop rather t
   expect(result.metrics).toMatchObject([{ run: "step-run-1", delivery: "orc", failedSteps: 0, gateStops: 1, fixRounds: 1 }])
 })
 
-test("the second fix receives only errors and a third fix never starts", async () => {
+test("the second fix receives only errors and a third review adds neither a fix nor a gate stop", async () => {
   const result = await exercise([[error, warning], [error, warning], [error, warning]])
   expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "fixer", "reviewer"])
   expect(result.evidence[1]).toContain('"id": "e"')
   expect(result.evidence[1]).not.toContain('"id": "w"')
   expect(result.checks).toBe(3)
+  expect(result.metrics).toMatchObject([{ run: "step-run-1", delivery: "orc", failedSteps: 0, gateStops: 2, fixRounds: 2 }])
   expect(result.completed).toBe(true)
   expect(result.body).toContain("The result is wrong.")
   expect(result.body).toContain("The result is fragile.")
+})
+
+test("each review step log keeps its own findings instead of the final turn's findings", async () => {
+  const result = await exercise([[error, warning], [error], [warning]])
+  expect(result.reviewEvidence).toEqual([
+    { file: "review.json", log: JSON.stringify([error, warning], null, 2) + "\n" },
+    { file: "review-2.json", log: JSON.stringify([error], null, 2) + "\n" },
+    { file: "review-3.json", log: JSON.stringify([warning], null, 2) + "\n" }
+  ])
+})
+
+test("warnings after the first fix do not count as a second gate stop", async () => {
+  const result = await exercise([[error, warning], [warning]])
+  expect(result.kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer"])
+  expect(result.completed).toBe(true)
+  expect(result.metrics).toMatchObject([{ run: "step-run-1", delivery: "orc", failedSteps: 0, gateStops: 1, fixRounds: 1 }])
 })

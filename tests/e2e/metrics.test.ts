@@ -127,6 +127,20 @@ const fixtureReviewRuns = (db: Database) =>
       { name: "checks", attempt: 1, status: "passed", at: "2026-11-30T10:03:00.000Z", signals: [["check test", "passed"]] },
       { name: "review", attempt: 1, status: "failed", at: "2026-11-30T10:09:00.000Z", signals: [["review-failure", "the reply did not stop cleanly"]] }
     ])
+    yield* fixtureRun(db, { id: "orc-review-unfixed", status: "succeeded", started: "2026-12-02T10:00:00.000Z", ended: "2026-12-02T10:20:00.000Z" }, [
+      { name: "implement", attempt: 1, status: "passed", at: "2026-12-02T10:01:00.000Z" },
+      { name: "checks", attempt: 1, status: "passed", at: "2026-12-02T10:03:00.000Z" },
+      { name: "review", attempt: 1, status: "passed", at: "2026-12-02T10:06:00.000Z", signals: [["review-findings", "2"]] },
+      { name: "fix", attempt: 1, status: "passed", at: "2026-12-02T10:10:00.000Z" },
+      { name: "checks", attempt: 2, status: "passed", at: "2026-12-02T10:12:00.000Z" },
+      { name: "review", attempt: 2, status: "passed", at: "2026-12-02T10:15:00.000Z", signals: [["review-findings", "1"]] },
+      { name: "pr", attempt: 1, status: "passed", at: "2026-12-02T10:19:00.000Z" }
+    ])
+    yield* fixtureRun(db, { id: "orc-review-last", status: "failed", started: "2026-12-03T10:00:00.000Z", ended: "2026-12-03T10:10:00.000Z" }, [
+      { name: "implement", attempt: 1, status: "passed", at: "2026-12-03T10:01:00.000Z" },
+      { name: "checks", attempt: 1, status: "passed", at: "2026-12-03T10:03:00.000Z" },
+      { name: "review", attempt: 1, status: "passed", at: "2026-12-03T10:09:00.000Z", signals: [["review-findings", "2"]] }
+    ])
     yield* fixtureRun(db, { id: "direct-review", delivery: "direct-PR", status: "succeeded", started: "2026-12-01T10:00:00.000Z", ended: "2026-12-01T10:10:00.000Z" }, [
       { name: "implement", attempt: 1, status: "passed", at: "2026-12-01T10:01:00.000Z" },
       { name: "checks", attempt: 1, status: "passed", at: "2026-12-01T10:03:00.000Z", signals: [["check test", "passed"]] },
@@ -139,7 +153,7 @@ const metricsRuns = async (home: string) => {
   const result = await runOrc(["metrics", "--json"], home)
   expect(result.stderr).toBe("")
   expect(result.exitCode).toBe(0)
-  expect(result.stdout.startsWith('{"schema":"orc.metrics.v2"')).toBe(true)
+  expect(result.stdout.startsWith('{"schema":"orc.metrics.v1"')).toBe(true)
   return (await Effect.runPromise(decodeMetricsJson(JSON.parse(result.stdout)))).runs
 }
 
@@ -179,9 +193,11 @@ describe("orc metrics", () => {
     }, fixtureGateRuns)
   }, 30_000)
 
-  test("one review stop counts once in either mode, rather than zero in orc mode or two in no-mistakes mode", async () => {
+  test("review findings without a following fix do not add gate stops, while failed reviews and parked gates still count", async () => {
     await withHistory(async (home) => {
       expect(await metricsRuns(home)).toEqual([
+        { run: "orc-review-last", task: "orc-review-last", delivery: "orc", status: "failed", failedSteps: 0, gateStops: 0, minutes: 10, fixRounds: 0 },
+        { run: "orc-review-unfixed", task: "orc-review-unfixed", delivery: "orc", status: "succeeded", failedSteps: 0, gateStops: 1, minutes: 20, fixRounds: 1 },
         { run: "direct-review", task: "direct-review", delivery: "direct-PR", status: "succeeded", failedSteps: 0, gateStops: 0, minutes: 10, fixRounds: 0 },
         { run: "orc-review-failed", task: "orc-review-failed", delivery: "orc", status: "failed", failedSteps: 1, gateStops: 1, minutes: 10, fixRounds: 0 },
         { run: "nm-fix-review", task: "nm-fix-review", delivery: "no-mistakes", status: "succeeded", failedSteps: 0, gateStops: 1, minutes: 20, fixRounds: 0 },

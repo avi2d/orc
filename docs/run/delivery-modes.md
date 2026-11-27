@@ -20,18 +20,18 @@ The first round fixes every finding, and the second round fixes only the `error`
 The run history records each review turn as its own `review` step, numbered by attempt.
 If a review turn fails, a fix does not finish, or a check fails after a fix, the run stops without opening a PR.
 Otherwise, the run pushes the branch and opens or reuses a PR.
-
 The run does not wait for a CI verdict.
 To select this delivery for a project, set its `mode` to `orc` in `projects.json`.
 For a run or resume you start by hand, pass `--delivery orc`.
 
 ## Review the branch
 Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one [Pi](https://pi.dev) turn with the reviewer agent over that diff and the task file.
-Orc decodes the findings JSON array from the reviewer's last reply and writes it to `review.json` in the run folder.
+Orc decodes the findings JSON array from the reviewer's last reply and writes it to the run folder.
+The first turn writes `review.json`, and later orc turns write `review-2.json` and `review-3.json`.
 An unreadable reply gets one rerun on the same session, and a second unreadable reply fails the review turn.
 The run's end reason names the finding count or the review failure.
 The run history records the turn as the `review` step with its start and end time and the reviewer's model.
-A passed `review` step names `review.json` as evidence and gives the finding count as the `review-findings` signal.
+A passed `review` step names that turn's findings file as evidence and gives the finding count as the `review-findings` signal.
 A failed `review` step gives the failure as the `review-failure` signal.
 In `direct-PR` delivery, the review turn fixes nothing, and a review failure does not block opening the PR.
 After a successful `direct-PR` review, if orc can read the branch head, it writes `review-checkpoint.json` in the run folder with the head and findings.

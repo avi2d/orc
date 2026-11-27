@@ -46,7 +46,7 @@ export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: Run
   Effect.gen(function*() {
     const started = new Date().toISOString()
     yield* checkpoints.reviewStart(reviewer, attempt, started)
-    const review = yield* runReviewTurn(run, runAgent, reviewer, "orc")
+    const review = yield* runReviewTurn(run, runAgent, reviewer, "orc", attempt)
     yield* checkpoints.reviewDone(reviewer, attempt, { ...review, reusedFrom: null }, started, new Date().toISOString())
     return review
   })

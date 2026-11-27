@@ -92,7 +92,7 @@ It prints one row per run, newest first, with four counts:
 
 - `FAILED STEPS` counts the run's steps that failed, such as a checks round a fix then passed.
 - `GATE STOPS` counts each review or checks round that stopped the run for findings, the same way in each delivery mode.
-  It counts each failed checks round and, in an orc run, each review turn that returned findings or failed.
+  It counts each failed checks round and, in an orc run, each review turn that started a fix round or failed.
   A no-mistakes run counts each no-mistakes step it parked at once, so a review gate answered with a fix and then approved at its fix review counts one stop.
   A no-mistakes run recorded before orc kept gate stops counts each answered gate and a final unanswered gate instead.
 - `MINUTES` counts the minutes from the run's start to its end, and prints `-` while it runs.
@@ -100,5 +100,5 @@ It prints one row per run, newest first, with four counts:
 
 A resumed run counts only the steps it ran itself, so a step it carries from an earlier run counts once, in that run.
 To print the same counts as JSON, run `orc metrics --json`.
-Its JSON document starts with `"schema": "orc.metrics.v2"`.
+Its JSON document starts with `"schema": "orc.metrics.v1"`.
 Each row stores its gate-stop count as `gateStops`.

@@ -4,7 +4,7 @@ import { listAllRuns, RunStatusSchema, type RunRecord, type SqliteFailure } from
 import { formatTable } from "../../shared/lib/index"
 import { readShow, type ShowJsonDocument } from "./show"
 
-const METRICS_JSON_SCHEMA = "orc.metrics.v2" as const
+const METRICS_JSON_SCHEMA = "orc.metrics.v1" as const
 
 const GateStopsSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 const decodeCount = Schema.decodeUnknownEffect(Schema.fromJsonString(GateStopsSchema))
@@ -39,13 +39,6 @@ const minutesOf = (started: string, ended: string | null): number | null => {
 
 const signalOf = (step: ShowStep, name: string): string | undefined => step.signals.findLast((signal) => signal.name === name)?.value
 
-const reviewStopped = (step: ShowStep): Effect.Effect<boolean, Schema.SchemaError> => {
-  const findings = signalOf(step, "review-findings")
-  return step.status === "failed"
-    ? Effect.succeed(true)
-    : findings === undefined ? Effect.succeed(false) : decodeCount(findings).pipe(Effect.map((count) => count > 0))
-}
-
 // A step recorded before the gate-stops signal holds only its answered gates and its final gate.
 const noMistakesStops = (run: RunRecord, step: ShowStep, isLast: boolean): Effect.Effect<number, Schema.SchemaError> => {
   const stops = signalOf(step, "gate-stops")
@@ -61,7 +54,7 @@ const gateStopsOf = (run: RunRecord, own: ReadonlyArray<ShowStep>): Effect.Effec
   Effect.gen(function*() {
     let stops = own.filter((step) => step.name === "checks" && step.status === "failed").length
     for (const [index, step] of own.entries()) {
-      if (step.name === "review" && run.delivery === "orc" && (yield* reviewStopped(step))) {
+      if (step.name === "review" && run.delivery === "orc" && (step.status === "failed" || (step.status === "passed" && own[index + 1]?.name === "fix"))) {
         stops += 1
       }
       if (step.name === "no-mistakes") {
