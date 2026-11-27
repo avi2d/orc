@@ -3,7 +3,7 @@ import { driveNoMistakes, waitForAnswers, type AllowWord, type QuestionAnswer } 
 import { type DirectPrRecord, openDirectPr, type PullRequestOpener } from "../../entities/pull-request/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
-import type { AgentFile, LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
+import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 import { type DiagramResult, runDiagramTurn } from "./diagram-turn"
 import { splitFrontmatter } from "../../entities/backlog/index"
@@ -143,7 +143,10 @@ const readTaskGoal = (run: Pick<HistoryRun, "fs" | "taskPath">): Effect.Effect<s
 const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps["runAgent"]): Effect.Effect<DiagramResult> =>
   pick(runAgent).pipe(
     Effect.flatMap((picked) => runDiagramTurn(run, picked.runAgent, picked.reviewer)),
-    Effect.catch(() => Effect.succeed({ kind: "none" } as const))
+    Effect.catchTags({
+      NoReviewerRoom: () => Effect.succeed({ kind: "none" } as const),
+      OrcRunError: () => Effect.succeed({ kind: "none" } as const)
+    })
   )
 
 const openPullRequest = (
