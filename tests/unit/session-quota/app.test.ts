@@ -202,7 +202,7 @@ describe("the session quota commands over the fixture home matching the hand-wor
 });
 
 describe("the session quota commands with a remote machine configured, against the in-memory view and the invented south contract", () => {
-  test("--composed-json prints one version 2 report holding this machine's sessions and the remote's, each on its machine", async () => {
+  test("--composed-json prints one version 4 report holding this machine's sessions and the remote's, each on its machine", async () => {
     const lines = await printedFrom(printComposedSessionQuotaJson, answered(southAtRecordedNow));
     expect(lines).toHaveLength(1);
     const report = decodeComposed(lines[0] ?? "");
@@ -218,7 +218,7 @@ describe("the session quota commands with a remote machine configured, against t
     ]);
   });
 
-  test("--json stays this machine's version 1 report", async () => {
+  test("--json stays this machine's version 3 report", async () => {
     const lines = await printedFrom(printSessionQuotaJson, answered(southAtRecordedNow));
     expect(JSON.parse(unrelocated(lines[0] ?? "", home))).toEqual(
       JSON.parse(JSON.stringify(sessionQuotaReport(fixtureSessionView()))),

@@ -192,8 +192,8 @@ describe("the subscriptions table over a subquo reading", () => {
     ])
     const expected = [
       { label: "rolling", usedPercent: 0, resets: "3h 21m", notch: null, red: false, runsOut: null },
-      { label: "weekly", usedPercent: 9, resets: "2d 14h" },
-      { label: "monthly", usedPercent: 71, resets: "11d 1h", notch: null, red: false, runsOut: null }
+      { label: "week", usedPercent: 9, resets: "2d 14h" },
+      { label: "month", usedPercent: 71, resets: "11d 1h", notch: null, red: false, runsOut: null }
     ]
     const assertRows = (reading: typeof view) => {
       const groups = rowsFrom(reading)

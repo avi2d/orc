@@ -338,7 +338,7 @@ export const composedSessionQuotaReport = (view: SessionQuotaView, localName: st
   const composition = view.composition ?? { local: localName, remotes: [], failedAccounts: [] };
   const machineOf = (machine: string | undefined): string => machine ?? composition.local;
   return {
-    schemaVersion: 2,
+    schemaVersion: 4,
     generatedAt: instant(view.now),
     scope: "composed",
     estimate: { basis: "machine-logs", upperBound: true, priceRatios: { ...priceRatios } },

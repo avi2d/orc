@@ -56,14 +56,16 @@ A warning line beside them names the machine and the account, with the reason.
 To print the merged report once, run `orc-dash report session-quota-composed`.
 It prints this machine's report alone, in the composed shape, when no second machine is configured.
 `ComposedSessionQuotaReport` in `packages/schema/src/entities/session-quota/contract/composed-session-quota.ts` decodes it.
-Its `schemaVersion` is `2`, so a reader of the single-machine report, version 1 or 3, never mistakes one for the other.
+Its `schemaVersion` is `4`, so a reader of the single-machine report, version 1 or 3, never mistakes one for the other.
+A version 2 composed report still reads.
+In version 4, a window with no known cycle stays in the report with `startsAt` and `elapsedFraction` both `null`.
 `orc-dash report session-quota` prints this machine's single-machine report alone, and the alert stream reads this machine alone.
 
 The composed report keeps the fields of the version 3 single-machine report, except `sources`, and changes these:
 
 | Field | What it holds |
 | --- | --- |
-| `schemaVersion` | `2` |
+| `schemaVersion` | `4`, or `2` from an older machine |
 | `scope` | `composed` |
 | `estimate.basis` | `machine-logs`, and `upperBound` stays `true` |
 | `machines` | Each machine's `name`, `role` `local` or `remote`, `status` `ok`, `unreachable`, `invalid` or `stale` with a `detail`, `generatedAt` and whether its calls are `combined` |

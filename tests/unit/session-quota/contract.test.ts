@@ -144,14 +144,6 @@ describe("a window with no cycle in a single-machine report", () => {
     windows: report.windows.map((window, index) => (index === 0 ? { ...window, startsAt: null, elapsedFraction: null } : window)),
   });
 
-  test("refuses a version 1 report carrying a null startsAt instead of reading it", () => {
-    const report = withoutCycle(machineReport("north"));
-    expect(report.schemaVersion).toBe(1);
-    expect(() => Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(JSON.stringify(report)))).toThrow(
-      "a version 1 report gives every window a startsAt and an elapsedFraction",
-    );
-  });
-
   test("reads it at version 3 instead of refusing the null startsAt", () => {
     const report = { ...withoutCycle(machineReport("north")), schemaVersion: 3 as const };
     const decoded = Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(JSON.stringify(report)));
@@ -198,11 +190,11 @@ describe("a pre-ledger version-1 report and the via of its harvested windows", (
   });
 });
 
-describe("the composed session quota JSON contract, version 2", () => {
+describe("the composed session quota JSON contract, version 4", () => {
   test("survives a JSON round trip and decodes against its own published schema", () => {
     const decoded = composedReport();
     expect([decoded.schemaVersion, decoded.scope, decoded.estimate.basis, decoded.estimate.upperBound]).toEqual([
-      2,
+      4,
       "composed",
       "machine-logs",
       true,

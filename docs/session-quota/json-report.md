@@ -6,7 +6,7 @@ To print the report once, run `orc-dash report session-quota`.
 The report is one JSON object on one line, and `SessionQuotaReport` in `packages/schema/src/entities/session-quota/contract/session-quota.ts` decodes it.
 A reader checks `schemaVersion` first.
 This report is version 3, and a version 1 report from an older machine still reads.
-Version 2 is the composed report of [Compose two machines](compose-two-machines.md).
+The [composed report](compose-two-machines.md) uses version 4.
 
 ## Report fields
 
@@ -29,7 +29,8 @@ The window rows detail each tracked window.
 
 | Field | What it holds |
 | --- | --- |
-| `windows[]` timing | `startsAt` and `elapsedFraction`, both `null` for a window whose reading names no cycle, such as a subquo monthly window, which reads unknown pace and no fair share |
+| `windows[].startsAt` | The ISO instant of the window's start, or `null` when the reading names no cycle |
+| `windows[].elapsedFraction` | The fraction of the cycle elapsed, or `null` when the reading names no cycle |
 | `windows[].gate` | `aheadOfPace`, `pastFirstTenth`, and `open` when both hold |
 | `windows[].exhaustsBeforeReset` | Whether the window runs out before its reset, from the quota-axi verdict or the live sessions' total rate |
 | `windows[].verdict` | The quota-axi verdict for the window, `null` when the live rate decides instead |
@@ -49,7 +50,6 @@ The window rows detail each tracked window.
 ## Older reports
 
 Version 3 differs from version 1 in one way: a window with no known cycle stays in the report, with `startsAt` and `elapsedFraction` both `null`.
-A version 1 report gives every window both, and a version 1 report with a `null` in either is refused.
 A report written before window sources and credential keys has no `windows[].source`, `accounts[].credentialKey` or `accounts[].accountKeys`, and still reads.
 Its windows count as read by quota-axi at its `generatedAt`.
 A report written before the capture ledger has no `windows[].source.via`, and its harvested windows read as read from a log.

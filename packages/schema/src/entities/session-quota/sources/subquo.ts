@@ -91,12 +91,11 @@ interface WindowShape {
   readonly windowSeconds?: number;
 }
 
-// The labels follow the ones quota-axi publishes for each provider, so one window reads the same whichever source read it.
-const windowShape = (provider: QuotaProviderId, id: string, subquoId: string): WindowShape => {
+const windowShape = (id: string, subquoId: string): WindowShape => {
   if (id === "five_hour") return { label: "session", kind: "session", windowSeconds: 18_000 };
   if (id === "rolling" && subquoId === "five-hour") return { label: "rolling", kind: "unknown", windowSeconds: 18_000 };
-  if (id === "seven_day" || id === "weekly") return { label: provider === "opencode-go" ? "weekly" : "week", kind: "weekly", windowSeconds: 604_800 };
-  if (id === "monthly") return { label: "monthly", kind: "monthly" };
+  if (id === "seven_day" || id === "weekly") return { label: "week", kind: "weekly", windowSeconds: 604_800 };
+  if (id === "monthly") return { label: "month", kind: "monthly" };
   return { label: "rolling", kind: "unknown" };
 };
 
@@ -136,7 +135,7 @@ const standaloneSubquo = (
   const windows = observation.windows.flatMap((window): ReadonlyArray<QuotaWindow> => {
     const id = quotaWindowId(mapping.provider, window.id, window.scope);
     if (id === undefined || window.percentLeft === null || window.resetsAt === null) return [];
-    const shape = windowShape(mapping.provider, id, window.id);
+    const shape = windowShape(id, window.id);
     return [{
       id,
       ...shape,
