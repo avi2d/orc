@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { Schema } from "effect"
-import { type SnapshotFields, SnapshotReport } from "@avi2dg/orc-schema"
+import { DateTime, Schema } from "effect"
+import { composedSessionQuotaReport, decodeQuota, overlaySubquo, type QuotaReport, type SnapshotFields, SnapshotReport, sessionQuotaView } from "@avi2dg/orc-schema"
+import { fixture as fixtureText } from "../../lib/fixtures"
+import { noOrcAccounts } from "../../lib/orc-quota"
+import { ledgerOf } from "../../lib/quota-view-fixture"
+import { quotaAxiJsonFor, quotaAxiRead } from "../../lib/quota-read"
 import { type Guard, guardJson } from "../../../packages/herdr-app/src/guard"
 import { type AccountRows, type QuotaWindow, type Subscriptions, type WindowRow, countdown, machineRows, machinesSnapshot, unreadLines, pastPace, runsOutAt, subscriptionRows, subscriptionsSnapshot } from "../../../packages/herdr-app/src/resources"
 
@@ -142,6 +146,48 @@ describe("the subscriptions table", () => {
   test("refuses a window with no elapsedFraction rather than drawing a bar with no notch", () => {
     const text = fixture.replace('"elapsedFraction": 0.4,', "")
     expect(guardJson(text, subscriptionsSnapshot)).toEqual({ kind: "refused", reason: "sources.quota.report.windows[0].elapsedFraction is missing" })
+  })
+})
+
+describe("the subscriptions table over a subquo reading", () => {
+  const subquoRead: unknown = JSON.parse(fixtureText("subquo/fresh-read.json"))
+  const readAt = DateTime.makeUnsafe("2026-11-27T09:35:00.000Z")
+  const claudeMain = { provider: "claude", accountKey: "default", subquoId: "main" } as const
+
+  const rowsOver = (quotaAxi: QuotaReport): ReadonlyArray<readonly [string, ReadonlyArray<readonly [string, number]> | string]> => {
+    const view = sessionQuotaView({
+      quota: quotaAxiRead({ kind: "ok", capturedAt: readAt, value: overlaySubquo(quotaAxi, subquoRead, [claudeMain], readAt) }),
+      orcQuota: noOrcAccounts(readAt),
+      panes: undefined,
+      processes: undefined,
+      ledger: ledgerOf([]),
+      sessions: [],
+      sessionOfFile: new Map(),
+      unmatched: [],
+      now: readAt,
+      timeZone: DateTime.zoneMakeNamedUnsafe("UTC")
+    })
+    const quota = { status: "ok", report: composedSessionQuotaReport(view, "mac") }
+    const text = JSON.stringify({ schemaVersion: 1, generatedAt: DateTime.formatIso(readAt), machine: "mac", sources: { quota } })
+    expect(() => Schema.decodeUnknownSync(SnapshotReport)(JSON.parse(text))).not.toThrow()
+    return subscriptionRows(subscriptionsOf(text), DateTime.toEpochMillis(readAt)).map((group) =>
+      [group.account, group.kind === "unread" ? group.reason : group.windows.map((row) => [row.label, row.usedPercent] as const)])
+  }
+
+  const claudeWeekOnly = (): QuotaReport => {
+    const decoded = decodeQuota(quotaAxiJsonFor(["--provider", "claude"], fixtureText("quota-axi/full.json")))
+    if (decoded.kind !== "ok") throw new Error(decoded.issue)
+    const providers = decoded.value.providers.map((entry) =>
+      "kind" in entry ? entry : { ...entry, windows: entry.windows.filter((window) => window.id !== "five_hour") })
+    return { ...decoded.value, providers }
+  }
+
+  test("shows the week subquo read for a mapped Claude account, not an account with windows read as holding none", () => {
+    expect(rowsOver(claudeWeekOnly())).toEqual([["claude", [["week", 30]]]])
+  })
+
+  test("shows the week of a Claude account only subquo reads, not an account with windows read as holding none", () => {
+    expect(rowsOver({ generatedAt: readAt, providers: [], notSetUp: ["claude"] })).toEqual([["claude", [["week", 30]]]])
   })
 })
 

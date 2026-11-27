@@ -2,6 +2,7 @@ import { DateTime, Duration, Effect, Layer, Result, Schema } from "effect";
 import { type QuotaProvider, type QuotaProviderId, type QuotaReport, QuotaSource, type QuotaWindow, readQuotaAxi } from "./quota";
 import type { DashConfig } from "../../../shared/config";
 import { CommandRunner, decodeJson, failureOf, runDecoded } from "../../../shared/lib";
+import { linearPace } from "./window-sources";
 
 const Instant = Schema.DateTimeUtcFromString;
 const Label = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9_-]{0,63}$/u));
@@ -78,6 +79,12 @@ const freshAt = (observation: SubquoObservation, now: DateTime.Utc): observation
   DateTime.toEpochMillis(observation.observedAt) <= DateTime.toEpochMillis(now) &&
   DateTime.toEpochMillis(now) < DateTime.toEpochMillis(observation.validUntil);
 
+// quota-axi's pace rests on its own reading, so a subquo reading paces itself on the window's cycle.
+const paceOf = (cycleSeconds: number | undefined, percentLeft: number, resetsAt: DateTime.Utc, now: DateTime.Utc) =>
+  cycleSeconds === undefined
+    ? {}
+    : { pace: linearPace(cycleSeconds, percentLeft, DateTime.toEpochMillis(resetsAt), DateTime.toEpochMillis(now)) };
+
 const overlayProvider = (
   entry: QuotaProvider,
   match: MatchedSubquo,
@@ -93,8 +100,14 @@ const overlayProvider = (
     );
     const reading = found.length === 1 ? found[0] : undefined;
     if (reading === undefined || reading.percentLeft === null || reading.resetsAt === null) return window;
-    const { pace: _pace, ...rest } = window;
-    return { ...rest, percentRemaining: reading.percentLeft, resetsAt: reading.resetsAt, subquoReadAt: observation.observedAt };
+    const { pace, ...rest } = window;
+    return {
+      ...rest,
+      ...paceOf(pace?.cycleSeconds ?? window.windowSeconds, reading.percentLeft, reading.resetsAt, now),
+      percentRemaining: reading.percentLeft,
+      resetsAt: reading.resetsAt,
+      subquoReadAt: observation.observedAt,
+    };
   });
   return { ...entry, windows };
 };
@@ -120,6 +133,7 @@ const standaloneSubquo = (
     return [{
       id,
       ...shape,
+      ...paceOf("windowSeconds" in shape ? shape.windowSeconds : undefined, window.percentLeft, window.resetsAt, now),
       percentRemaining: window.percentLeft,
       resetsAt: window.resetsAt,
       subquoReadAt: observation.observedAt,

@@ -43,7 +43,7 @@ export type WindowShape = Pick<QuotaWindow, "id" | "label" | "kind">;
 // quota-axi's published deadband: a reserve within a point of zero reads on pace.
 const onPaceDeadband = 1;
 
-const linearPace = (cycleSeconds: number, percentRemaining: number, resetsAt: number, now: number): Pace => {
+export const linearPace = (cycleSeconds: number, percentRemaining: number, resetsAt: number, now: number): Pace => {
   const timeRemainingPercent = (100 * (resetsAt - now)) / (cycleSeconds * 1000);
   const reservePercentPoints = percentRemaining - timeRemainingPercent;
   const status =

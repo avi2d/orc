@@ -47,6 +47,7 @@ The panel runs `subquo read --json` from its PATH.
 The subquo copy installed with Orc's [npm](https://www.npmjs.com) package is not used here, so install subquo where the dashboard's PATH finds it.
 A fresh subquo reading replaces the matching five-hour and weekly windows.
 For OpenCode Go, it also replaces matching rolling and monthly windows.
+A replaced window takes its pace from the subquo reading over the window's cycle, not from quota-axi.
 A missing, stale, expired, or mismatched reading leaves the quota-axi window in place.
 Windows subquo does not name also keep their quota-axi readings.
 The panel does not infer a mapping from account names.
