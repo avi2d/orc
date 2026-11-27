@@ -85,7 +85,7 @@ const leftFindingLines = (left: LeftFinding): string =>
 
 export interface PrBodyInput {
   readonly why: string | null
-  readonly taskText: string | null
+  readonly taskText: string
   readonly subjects: ReadonlyArray<string>
   readonly diagram: string | null
   readonly passed: ReadonlyArray<string>
@@ -128,8 +128,8 @@ const repeatsTaskText = (text: string, taskText: string): boolean => {
 
 export const prBody = (input: PrBodyInput): string => {
   const reason = input.why?.trim() ?? ""
-  const why = reason === "" || (input.taskText !== null && repeatsTaskText(reason, input.taskText)) ? reasonFallback : reason
-  const chart = input.taskText !== null && input.diagram !== null && repeatsTaskText(input.diagram, input.taskText) ? null : input.diagram
+  const why = reason === "" || repeatsTaskText(reason, input.taskText) ? reasonFallback : reason
+  const chart = input.diagram !== null && repeatsTaskText(input.diagram, input.taskText) ? null : input.diagram
   const changed = input.subjects.length === 0
     ? "No commits landed on the branch."
     : input.subjects.map((subject) => "- " + subject).join("\n")
@@ -166,7 +166,7 @@ const openPullRequest = (
     const prepareBody = Effect.gen(function*() {
       const drawn = yield* drawDiagram
       const diagram = drawn.diagram.kind === "mermaid" ? drawn.diagram.chart : null
-      const taskText = yield* run.fs.readFileString(run.taskPath).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(null)))
+      const taskText = yield* run.fs.readFileString(run.taskPath).pipe(Effect.catchTag("PlatformError", () => Effect.succeed("")))
       const bodyFile = run.path.join(run.runDir, prBodyFileName)
       yield* run.fs.writeFileString(bodyFile, prBody({ why: drawn.why, taskText, subjects: bodySubjects, diagram, passed: rounds.at(-1)?.checks.map((check) => check.name) ?? [], review })).pipe(
         Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))

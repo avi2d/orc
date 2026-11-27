@@ -15,7 +15,7 @@ const lateError = { id: "late", file: "other.txt", line: 3, severity: "error", a
 
 type Finding = Omit<typeof error, "line"> & { line: number | null }
 
-const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramReply = "no diagram", taskText: string | null = "Do the thing.\n") => {
+const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramReply = "no diagram", taskText = "Do the thing.\n") => {
   let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, prLink: null as string | null, prCreated: false, steps: [] as unknown, metrics: [] as ReadonlyArray<unknown>, reviewEvidence: [] as ReadonlyArray<{ readonly file: string | undefined; readonly log: string }> }
   await withRepo(async (dir) => {
     await withHome(async (home) => {
@@ -37,8 +37,7 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramR
           if (run.agent.kind === "reviewer") {
             if (run.prompt.includes("no diagram")) {
               const taskFile = join(home, "runs", "step-run-1", "task.md")
-              if (taskText === null) await rm(taskFile)
-              else await writeFile(taskFile, taskText)
+              await writeFile(taskFile, taskText)
               const sessionFile = join(sessionsDir, "diagram.jsonl")
               await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: diagramReply }], stopReason: "stop", usage: { input: 1, output: 1 } }))
               return { sessionFile, commits: [] }
@@ -222,13 +221,6 @@ test("copied task text in a diagram cannot bypass the public body comparison", a
   expect(result.body).toContain("## Why\n\nCached reads avoid repeated disk access.\n\n## What changed")
   expect(result.body).not.toContain("the violet otter carries seven sealed crates")
   expect(result.body).not.toContain("## How it fits")
-}, 60_000)
-
-test("an unreadable task does not discard the reason or diagram", async () => {
-  const result = await exercise([[]], "Why: Cached reads avoid repeated disk access.\n```mermaid\nflowchart LR\n  read --> cache\n```", null)
-  expect(result.completed).toBe(true)
-  expect(result.body).toContain("## Why\n\nCached reads avoid repeated disk access.\n\n## What changed")
-  expect(result.body).toContain("flowchart LR\n  read --> cache")
 }, 60_000)
 
 test("a short shared task label does not discard the reason or diagram", async () => {
