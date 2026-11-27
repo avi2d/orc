@@ -63,7 +63,7 @@ Orc prints the branch, its commits, the checks, the PR link when its run opened 
 `--sandbox none` runs the agent on the host as your user without a per-agent sandbox.
 Queued tasks always pass that flag.
 Their safety boundary is the isolated space around the whole agent system, as [Running without a sandbox](docs/run/running-without-a-sandbox.md) describes.
-That is the default: orc runs without a per-agent sandbox.
+Running without a per-agent sandbox is the default.
 To sandbox a run you start by hand, pass `--sandbox nono` instead.
 
 ## Run a backlog from the chat

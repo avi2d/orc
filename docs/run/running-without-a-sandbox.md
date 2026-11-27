@@ -6,7 +6,7 @@ Queued tasks always pass `--sandbox none`, so [Pi](https://pi.dev) and the check
 That is the default: orc runs without a per-agent sandbox.
 For a run you start by hand, `--sandbox nono` runs it inside the [nono](https://nono.sh) sandbox instead.
 
-The safety boundary is the isolated space that runs the whole agent system.
+The safety boundary is the isolated space around the whole agent system.
 Use a separate Linux system without admin rights or host drives, with narrow, revocable logins and a memory and CPU cap per task.
 Orc does not create or enforce that space.
 

@@ -1,4 +1,11 @@
 import { describe, expect, test } from "bun:test"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
+import { openDatabase } from "../../packages/run/src/entities/run-history/index"
+import { resolveSandboxKind } from "../../packages/run/src/features/running-a-task/run-resume"
 import { parseArgs } from "../../packages/run/src/app/args"
 import { closestWord, helpText, helpTopic, overview, usageErrorText } from "../../packages/run/src/app/help"
 import { formatOverview, terminalWidth } from "../../packages/run/src/app/help-format"
@@ -150,14 +157,31 @@ describe("orc help", () => {
     expect(pages).toEqual(invocations.map((invocation) => ({ path: invocation.path.join(" "), usageNamesOnlyIt: true, overview: false })))
   })
 
-  test("run help never names nono as the default sandbox", () => {
-    const text = helpText(["run"]).replace(/\s+/g, " ")
-    expect(text).not.toContain("default to nono")
-    expect(text).not.toContain("nono sandbox by default")
-    expect(text).toContain("The default is no per-agent sandbox")
-    expect(text).toContain("machine space")
-    expect(text).toContain("Queued tasks always run that way")
-    expect(text).toContain("Pass nono to sandbox a run you start by hand")
+  test("run help agrees with the resolved host default instead of hiding a nono default", async () => {
+    const home = await mkdtemp(join(tmpdir(), "orc-help-"))
+    try {
+      const db = await Effect.runPromise(openDatabase(home).pipe(Effect.provide(BunServices.layer)))
+      try {
+        const args = parseArgs(["run", "task.md"])
+        if (args.kind !== "RunAgent") {
+          throw new Error("orc run task.md must parse as a run")
+        }
+        const sandbox = await Effect.runPromise(resolveSandboxKind(db, "orc/help", home, args.sandbox))
+        expect(sandbox).toBe("none")
+        const text = helpText(["run"]).replace(/\s+/g, " ")
+        expect(text).not.toContain("default to nono")
+        expect(text).not.toContain("nono sandbox by default")
+        expect(text).toContain("The default is no per-agent sandbox")
+        expect(text).toContain(sandbox + " runs the agent on the host as you")
+        expect(text).toContain("the isolated space around the whole agent system")
+        expect(text).toContain("Queued tasks always run that way")
+        expect(text).toContain("Pass nono to sandbox a run you start by hand")
+      } finally {
+        db.close()
+      }
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
   })
 
   test("a wrong subcommand prints only its own command's usage instead of every command", () => {
