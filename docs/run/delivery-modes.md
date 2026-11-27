@@ -62,8 +62,11 @@ The account that holds the default credential is one of these:
 Another account on the same provider does not count, even with room.
 An unreadable quota, or no account that holds the default credential, counts as no room.
 The run log names the chosen model, its place and each entry passed over, with the reason.
-When no entry qualifies, the review turn fails with `NoReviewerRoom` and the run stops without opening a PR.
-For the first review turn, the run history records that `review` step as failed with no model, and the `review-failure` signal holds the reason.
+When no entry qualifies, Orc records `NoReviewerRoom` and does not open a PR.
+The run history records the `review` step as failed with no model, and the `review-failure` signal holds the reason.
+The beat parks the task with that reason and checks reviewer quota on the machine where the run stopped.
+When a reviewer qualifies, the beat resumes the same branch at the pending review turn.
+Orc still excludes the original implementer's provider, even if dispatch assigns a different account for the resume.
 A chain reviewer runs Pi with its own provider's credential.
 For a `token-file` or `package` provider, it runs from its own Pi folder `reviewer-agent-<position>` in the run folder.
 The [nono](https://nono.sh) sandbox carries one provider's credential, so a reviewer chain needs `--sandbox none`.

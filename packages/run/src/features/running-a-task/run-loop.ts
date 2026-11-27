@@ -12,6 +12,7 @@ import { freshFixOf, releaseGuidanceOf, resumedFix } from "./fix-guidance"
 import { finishAfterChecks } from "./run-finish"
 import { rebaseDelivery, runRebase } from "./rebase-delivery"
 import { finishChecked, runRecordedChecks } from "./review-loop"
+import { reviewHead } from "./review-wait"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
 import type { AgentOutcome, AgentRun, AgentRunResult, AgentStep, ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
@@ -282,11 +283,19 @@ const runChecksFixLoop = (
     if (resumed !== null) {
       return resumed
     }
+    const readChecks = (number: number) => readProjectChecks(run, number)
+    const finish = () => finishChecked({
+      run, ops, base, rounds, fixes, commits, plan, checkpoints, readChecks,
+      fixReview: (evidence, attempt) => fixOnce(run, ops.runAgent, evidence, attempt, null, checkpoints, null, true)
+    })
+    if (plan.reviewWait !== undefined && rounds.at(-1)?.passed === true && (yield* reviewHead(run)) === plan.reviewWait.head) {
+      return yield* finish()
+    }
     for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
-      const summary = yield* runRecordedChecks(run, ops, checkpoints, rounds, round, (number) => readProjectChecks(run, number))
+      const summary = yield* runRecordedChecks(run, ops, checkpoints, rounds, rounds.length + 1, readChecks)
       const failed = summary.failed
       if (failed.length === 0) {
-        return yield* finishChecked({ run, ops, base, rounds, fixes, commits, plan, checkpoints, fixReview: (evidence, attempt) => fixOnce(run, ops.runAgent, evidence, attempt, null, checkpoints, null, true), readChecks: (number) => readProjectChecks(run, number) })
+        return yield* finish()
       }
       if (fixes.length >= maxFixAttempts) {
         return {

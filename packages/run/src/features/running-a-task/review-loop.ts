@@ -5,6 +5,7 @@ import { finishAfterChecks, reviewOrc } from "./run-finish"
 import type { ReviewFinding, ReviewOutcome } from "./review-outcome"
 import { lastFixRound, passesRoundTwoBar } from "./left-findings"
 import type { RunStopped } from "./loop-pause"
+import { reviewHead, writeReviewWait } from "./review-wait"
 import type { ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
 
@@ -86,15 +87,28 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
     }
     const reviewer = run.delivery.reviewer
-    let review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, 1)
-    const sentPerRound: Array<ReadonlyArray<ReviewFinding>> = []
-    for (let round = 1; mayStartRound(round, review); round += 1) {
-      if (review.status !== "passed") break
-      const sent = findingsForRound(review.findings, round)
-      sentPerRound.push(sent)
-      const failure = yield* runOneRound(loop, sent, round)
-      if (failure !== null) return stopReport(loop, failure)
-      review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, round + 1)
-    }
-    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound })
+    const parkedImplementerProvider = plan.reviewWait?.implementerProvider
+    const sentPerRound = [...plan.reviewWait?.sentPerRound ?? []]
+    const reviewNext = () => reviewOrc(run, reviewer, checkpoints, ops.runAgent, sentPerRound.length + 1, parkedImplementerProvider)
+    return yield* Effect.gen(function*() {
+      let review = yield* reviewNext()
+      while (mayStartRound(sentPerRound.length + 1, review)) {
+        if (review.status !== "passed") break
+        const round = sentPerRound.length + 1
+        const sent = findingsForRound(review.findings, round)
+        sentPerRound.push(sent)
+        const failure = yield* runOneRound(loop, sent, round)
+        if (failure !== null) return stopReport(loop, failure)
+        review = yield* reviewNext()
+      }
+      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, parkedImplementerProvider })
+    }).pipe(
+      Effect.catchTag("NoReviewerRoom", ({ implementerProvider, message }) =>
+        Effect.gen(function*() {
+          const head = yield* reviewHead(run)
+          yield* writeReviewWait(run, { implementerProvider, reason: message, head, sentPerRound })
+          return { ...stopReport(loop, message), waitingForReviewer: true as const }
+        })
+      )
+    )
   })

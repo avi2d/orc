@@ -2,7 +2,8 @@ import { type Array as Arr, Effect, Schema } from "effect"
 import type { ProviderRoom, ReviewerEntry } from "../../shared/config/index"
 
 export class NoReviewerRoom extends Schema.TaggedError<NoReviewerRoom>()("NoReviewerRoom", {
-  message: Schema.String
+  message: Schema.String,
+  implementerProvider: Schema.String
 }) {}
 
 interface PassedEntry {
@@ -37,6 +38,7 @@ export const pickChainEntry = <T extends ReviewerEntry>(
     passed.push({ entry, reason: room.reason })
   }
   return Effect.fail(new NoReviewerRoom({
+    implementerProvider,
     message: "no reviewer in the chain has quota room on a provider other than the implementer's " + implementerProvider + ": " + passedText(passed)
   }))
 }

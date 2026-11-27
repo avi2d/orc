@@ -262,11 +262,11 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
   }
 }
 
-export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerPick = fixedReviewer(reviewer)): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerPick = fixedReviewer(reviewer), options: { readonly resumeRun?: string; readonly worktreeDir?: string } = {}): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const gh = await stubGh()
   try {
     const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
-      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer: reviewerPick }), gh.dir + ":")
+      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir: options.worktreeDir ?? worktreeDir, branch: "orc/test" }), reviewer: reviewerPick }), gh.dir + ":", { ...handRunFacts, worktreeDir: options.worktreeDir }, options.resumeRun === undefined ? null : { runId: "step-run-2", resumeRun: options.resumeRun })
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
     await rm(gh.dir, { recursive: true, force: true })
@@ -293,6 +293,7 @@ const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: F
       const runId = resume?.runId ?? "step-run-1"
       const runDir = path.join(home, "runs", runId)
       yield* fs.makeDirectory(path.join(runDir, "sessions"), { recursive: true })
+      yield* fs.makeDirectory(path.join(runDir, "session"), { recursive: true })
       const stub = yield* Effect.promise(() => stubNoMistakes(nmReplies))
       yield* fs.writeFileString(path.join(runDir, "task.md"), "Do the thing.\n")
       const hostGit = yield* prepareGit(fs, path, Bun.which("git") ?? "git")

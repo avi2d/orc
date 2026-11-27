@@ -11,6 +11,7 @@ import { handoverFileName, inheritedHandoverFileName } from "../../entities/agen
 import { OrcRunError } from "../../shared/lib/index"
 import { sentBackAnswersOf } from "./worker-question"
 import { isNewHoldRelease } from "../../entities/review-gate/index"
+import { readReviewWait } from "./review-wait"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
 
@@ -278,6 +279,10 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
         Effect.mapError((cause) => historyFailure("read", cause))
       )
     const priorDir = run.path.join(run.path.dirname(run.runDir), prior.id)
+    const reviewWait = yield* readReviewWait(run, priorDir)
+    if (reviewWait !== null && run.delivery.kind !== "orc") {
+      return yield* refuse("orc: a run waiting for reviewer quota needs --delivery orc")
+    }
     const own = yield* readNote(run.path.join(priorDir, handoverFileName))
     const forwarded = own === null ? yield* readNote(run.path.join(priorDir, inheritedHandoverFileName)) : null
     const handover = own ?? forwarded
@@ -312,6 +317,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       fixRunning: fixCarry.running,
       handover,
       priorDir,
+      ...(reviewWait === null ? {} : { reviewWait }),
       cleanupPriorDir: implementSafe && fixSafe ? priorDir : null
     }
   })
