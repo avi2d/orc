@@ -31,7 +31,7 @@ For a run or resume you start by hand, pass `--delivery orc`.
 
 ## Review the branch
 Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one [Pi](https://pi.dev) turn with the reviewer agent over that diff and the task file.
-In `orc` delivery, orc also reads `review.path_instructions` from `.no-mistakes.yaml` in the run's worktree.
+In `orc` delivery, orc also reads the `path_instructions` list under `review` in `.no-mistakes.yaml` in the run's worktree.
 Each entry holds a `path` glob and its `instructions`.
 Orc adds each entry whose glob matches a changed file to the review prompt, and the reviewer names that glob in each finding the entry raises.
 An entry missing either string fails the review turn.
