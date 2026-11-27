@@ -172,6 +172,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/seeing-runs/run-history-view.ts` | The `orc runs` table and its `orc.runs.v1` JSON |
 | `packages/run/src/features/seeing-runs/run-facts.ts` | The facts `orc runs --json` reads beside each run: its title, latest step and open questions |
 | `packages/run/src/features/seeing-runs/step-log.ts` | The `orc log` reading of one step's output file |
+| `packages/run/src/features/seeing-runs/run-metrics.ts` | The `orc metrics` counts of each run's failed steps, gate stop, minutes and fix rounds, and its `orc.metrics.v1` JSON |
 | `packages/run/src/features/seeing-runs/run-scores.ts` | The `orc score` step score writes: the 1 to 5 check, the note and the unknown run and step errors |
 | `packages/run/src/features/seeing-runs/other-machines.ts` | The other dispatch machines’ runs `orc runs --json` adds, and the `machines` it names for those that fail |
 | `packages/run/src/features/seeing-runs/machine-versions.ts` | The `orc version --json` and `orc machines --json` version reading of each dispatch machine, and the error for a machine that does not answer |

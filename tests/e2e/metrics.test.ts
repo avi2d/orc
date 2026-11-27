@@ -1,0 +1,141 @@
+import { bundlePath, ensureBundle } from "./bundle"
+import { describe, expect, test } from "bun:test"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
+import type { Database } from "bun:sqlite"
+import { openDatabase, recordEvidence, recordRun, recordSignal, recordStep, type RunRecord } from "../../packages/run/src/entities/run-history/index"
+import { decodeMetricsJson } from "../../packages/run/src/features/seeing-runs/index"
+
+ensureBundle()
+
+const runOrc = async (args: ReadonlyArray<string>, home: string): Promise<{ readonly exitCode: number; readonly stdout: string; readonly stderr: string }> => {
+  const proc = Bun.spawn([process.execPath, bundlePath, ...args], {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, HOME: home, ORC_HOME: "" }
+  })
+  const stdout = proc.stdout
+  const stderr = proc.stderr
+  if (!(stdout instanceof ReadableStream) || !(stderr instanceof ReadableStream)) {
+    throw new Error("the orc process has no piped output")
+  }
+  const [out, err, exitCode] = await Promise.all([new Response(stdout).text(), new Response(stderr).text(), proc.exited])
+  return { exitCode, stdout: out, stderr: err }
+}
+
+const withHistory = async (use: (home: string) => Promise<void>): Promise<void> => {
+  const home = await mkdtemp(join(tmpdir(), "orc-metrics-e2e-"))
+  try {
+    const db = await Effect.runPromise(openDatabase(join(home, ".orc")).pipe(Effect.provide(BunServices.layer)))
+    try {
+      await Effect.runPromise(fixtureRuns(db))
+    } finally {
+      db.close()
+    }
+    await use(home)
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+}
+
+const runsDir = "/tmp/metrics-home/runs/"
+
+interface FixtureStep {
+  readonly name: string
+  readonly attempt: number
+  readonly status: "passed" | "failed"
+  readonly at: string
+  readonly signals?: ReadonlyArray<readonly [string, string]>
+  readonly out?: { readonly kind: string; readonly path: string }
+}
+
+const fixtureRun = (db: Database, run: { readonly id: string; readonly status: RunRecord["status"]; readonly started: string; readonly ended: string }, steps: ReadonlyArray<FixtureStep>) =>
+  Effect.gen(function*() {
+    yield* recordRun(db, { id: run.id, project: "orc", branch: "orc/" + run.id, taskFile: runsDir + run.id + "/task.md", status: run.status, started: run.started, ended: run.ended, prLink: null, endReason: null, task: run.id, delivery: "orc" })
+    for (const step of steps) {
+      const stepId = yield* recordStep(db, { runId: run.id, name: step.name, attempt: step.attempt, status: step.status, started: step.at, ended: step.at, agentFile: null, piSessionFile: null })
+      for (const [name, value] of step.signals ?? []) {
+        yield* recordSignal(db, { stepId, name, value })
+      }
+      if (step.out !== undefined) {
+        yield* recordEvidence(db, { stepId, direction: "out", ...step.out })
+      }
+    }
+  })
+
+const fixtureRuns = (db: Database) =>
+  Effect.gen(function*() {
+    yield* fixtureRun(db, { id: "delivered", status: "succeeded", started: "2026-11-20T10:00:00.000Z", ended: "2026-11-20T10:42:00.000Z" }, [
+      { name: "implement", attempt: 1, status: "passed", at: "2026-11-20T10:01:00.000Z" },
+      { name: "checks", attempt: 1, status: "failed", at: "2026-11-20T10:10:00.000Z", signals: [["check lint", "failed"], ["check test", "passed"]] },
+      { name: "fix", attempt: 1, status: "passed", at: "2026-11-20T10:15:00.000Z" },
+      { name: "checks", attempt: 2, status: "failed", at: "2026-11-20T10:20:00.000Z", signals: [["check lint", "passed"], ["check test", "failed"]] },
+      { name: "fix", attempt: 2, status: "passed", at: "2026-11-20T10:25:00.000Z" },
+      { name: "checks", attempt: 3, status: "passed", at: "2026-11-20T10:30:00.000Z", signals: [["check lint", "passed"], ["check test", "passed"]] },
+      { name: "review", attempt: 1, status: "passed", at: "2026-11-20T10:35:00.000Z" },
+      { name: "pr", attempt: 1, status: "passed", at: "2026-11-20T10:40:00.000Z" }
+    ])
+    yield* fixtureRun(db, { id: "gate-stopped", status: "failed", started: "2026-11-21T11:00:00.000Z", ended: "2026-11-21T11:15:30.000Z" }, [
+      { name: "implement", attempt: 1, status: "passed", at: "2026-11-21T11:01:00.000Z" },
+      { name: "checks", attempt: 1, status: "passed", at: "2026-11-21T11:05:00.000Z", signals: [["check test", "passed"]] },
+      { name: "no-mistakes", attempt: 1, status: "failed", at: "2026-11-21T11:15:00.000Z", signals: [["gates-answered", "1"], ["gate", "review"]] }
+    ])
+    yield* fixtureRun(db, { id: "resumed", status: "failed", started: "2026-11-22T12:00:00.000Z", ended: "2026-11-22T12:07:00.000Z" }, [
+      { name: "implement", attempt: 1, status: "passed", at: "2026-11-19T09:01:00.000Z" },
+      { name: "checks", attempt: 1, status: "failed", at: "2026-11-19T09:05:00.000Z", signals: [["check typecheck", "failed"]], out: { kind: "checks", path: runsDir + "earlier/session/checks-1.txt" } },
+      { name: "fix", attempt: 1, status: "passed", at: "2026-11-19T09:10:00.000Z", out: { kind: "log", path: runsDir + "earlier/fix-1.log" } },
+      { name: "checks", attempt: 2, status: "failed", at: "2026-11-22T12:02:00.000Z", signals: [["check typecheck", "failed"]] },
+      { name: "fix", attempt: 2, status: "passed", at: "2026-11-22T12:04:00.000Z" },
+      { name: "checks", attempt: 3, status: "failed", at: "2026-11-22T12:06:00.000Z", signals: [["check typecheck", "failed"], ["check test", "passed"]] }
+    ])
+  })
+
+const expectedRows = [
+  { run: "resumed", task: "resumed", delivery: "orc", status: "failed", failedSteps: 2, gateStop: "checks: typecheck", minutes: 7, fixRounds: 1 },
+  { run: "gate-stopped", task: "gate-stopped", delivery: "orc", status: "failed", failedSteps: 1, gateStop: "no-mistakes: review", minutes: 15.5, fixRounds: 0 },
+  { run: "delivered", task: "delivered", delivery: "orc", status: "succeeded", failedSteps: 2, gateStop: null, minutes: 42, fixRounds: 2 }
+]
+
+const printedRows = (stdout: string): ReadonlyArray<ReadonlyArray<string>> =>
+  stdout.trimEnd().split("\n").map((line) => line.split(/ {2,}/))
+
+describe("orc metrics", () => {
+  test("the JSON counts of three known runs match their hand counts instead of counting carried steps, passed-over failed rounds as a gate stop, or step time as run minutes", async () => {
+    await withHistory(async (home) => {
+      const result = await runOrc(["metrics", "--json"], home)
+      expect(result.stderr).toBe("")
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.startsWith('{"schema":"orc.metrics.v1"')).toBe(true)
+      const decoded = await Effect.runPromise(decodeMetricsJson(JSON.parse(result.stdout)))
+      expect(decoded.runs).toEqual(expectedRows)
+    })
+  }, 30_000)
+
+  test("the table prints the same counts per run rather than a resumed run's two fix rounds or three failed steps", async () => {
+    await withHistory(async (home) => {
+      const result = await runOrc(["metrics"], home)
+      expect(result.stderr).toBe("")
+      expect(result.exitCode).toBe(0)
+      expect(printedRows(result.stdout)).toEqual([
+        ["RUN", "TASK", "DELIVERY", "STATUS", "FAILED STEPS", "GATE STOP", "MINUTES", "FIX ROUNDS"],
+        ["resumed", "resumed", "orc", "failed", "2", "checks: typecheck", "7.0", "1"],
+        ["gate-stopped", "gate-stopped", "orc", "failed", "1", "no-mistakes: review", "15.5", "0"],
+        ["delivered", "delivered", "orc", "succeeded", "2", "-", "42.0", "2"]
+      ])
+    })
+  }, 30_000)
+
+  test("an empty history prints that no runs are recorded instead of a bare header", async () => {
+    const home = await mkdtemp(join(tmpdir(), "orc-metrics-e2e-"))
+    try {
+      const result = await runOrc(["metrics"], home)
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.trim()).toBe("no runs recorded")
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  }, 30_000)
+})

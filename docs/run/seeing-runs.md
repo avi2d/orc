@@ -84,3 +84,17 @@ To count the gates and rules past runs kept hitting, run `orc refusals`.
 To print the same facts as JSON, run `orc refusals --json`.
 Its JSON document names its version first as `schema`, starting at `orc.refusals.v1`.
 Each row counts the runs that hit one gate, and one rule where the failure names a stable rule code, so two failing rounds in one run count once.
+
+## Count each run
+
+To count what each run took, run `orc metrics`.
+It prints one row per run, newest first, with four counts:
+
+- `FAILED STEPS` counts the run's steps that failed, such as a checks round a fix then passed.
+- `GATE STOP` names the step the run stopped at when its last step failed, such as `checks: lint` or `no-mistakes: review`, and prints `-` when it did not stop.
+- `MINUTES` counts the minutes from the run's start to its end, and prints `-` while it runs.
+- `FIX ROUNDS` counts the run's fix steps.
+
+A resumed run counts only the steps it ran itself, so a step it carries from an earlier run counts once, in that run.
+To print the same counts as JSON, run `orc metrics --json`.
+Its JSON document names its version first as `schema`, starting at `orc.metrics.v1`.

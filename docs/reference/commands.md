@@ -24,6 +24,7 @@ Runs and their results:
   log        Print the output of one step of a run
   score      Score one step of a run from 1 to 5
   refusals   Count the gates and rules past runs kept hitting
+  metrics    Count each run's failed steps, gate stop, minutes and fix rounds
 
 The backlog and the beat:
   backlog    See the backlog, and add, hold, answer or close its tasks
@@ -182,6 +183,22 @@ Options:
 
 Examples:
   orc refusals
+```
+
+### orc metrics
+
+```text
+Usage: orc metrics [--json]
+
+Prints one row per run, newest first: its failed steps, the gate it stopped at,
+its minutes from start to end and its fix rounds. A resumed run counts only the
+steps it ran itself.
+
+Options:
+  --json  Print the counts as an orc.metrics.v1 JSON document.
+
+Examples:
+  orc metrics
 ```
 
 ## The backlog and the beat

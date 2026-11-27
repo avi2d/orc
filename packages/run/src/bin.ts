@@ -19,7 +19,7 @@ import { decodeJson, pueue, PueueState, queuedTasks, RunnerError, selfCommand } 
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
 import { backlogPaths, backlogRoot as backlogRootOf, Rebase, type ReportKind, runDirFor } from "./entities/backlog/index"
 import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listAllRuns, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
-import { encodeMachinesJson, encodeRunsJson, encodeShowJson, encodeVersionJson, formatRunsTable, formatShow, readListedRuns, readMachineVersions, readOtherMachinesFrom, readRunsJsonRuns, readShow, readStepLog, recordStepScore, runsJson, withOtherMachines, withQueued } from "./features/seeing-runs/index"
+import { encodeMachinesJson, encodeMetricsJson, encodeRunsJson, encodeShowJson, encodeVersionJson, formatMetricsTable, formatRunsTable, formatShow, readListedRuns, readMachineVersions, readOtherMachinesFrom, readRunMetrics, readRunsJsonRuns, readShow, readStepLog, recordStepScore, runsJson, withOtherMachines, withQueued } from "./features/seeing-runs/index"
 
 const self = launcherCommand(Bun.env, process.execPath, Bun.main) ?? selfCommand(process.execPath, Bun.main)
 
@@ -184,6 +184,12 @@ const printRefusals = (args: Extract<OrcArgs, { readonly kind: "ListRefusals" }>
     }
   })
 
+const printMetrics = (args: Extract<OrcArgs, { readonly kind: "ListMetrics" }>) =>
+  Effect.gen(function*() {
+    const runs = yield* readHistory((db) => readRunMetrics(db))
+    yield* Console.log(args.json ? yield* encodeMetricsJson(runs) : formatMetricsTable(runs))
+  })
+
 const printShow = (args: Extract<OrcArgs, { readonly kind: "ShowRun" }>) =>
   Effect.gen(function*() {
     const document = yield* readHistory((db) => readShow(db, args.id))
@@ -278,6 +284,9 @@ const program = Effect.gen(function*() {
     }
     case "ListRefusals": {
       return yield* printRefusals(args)
+    }
+    case "ListMetrics": {
+      return yield* printMetrics(args)
     }
     case "ShowRun": {
       return yield* printShow(args)
