@@ -1,4 +1,4 @@
-import type { Card } from "./agents"
+import { type Card, type Standing, prNumber } from "./agents"
 import type { Vendor } from "./kit"
 import type { RunFacts, StepAgent } from "./run-agent"
 
@@ -7,6 +7,7 @@ export interface RowFacts {
   readonly model: string | null
   readonly vendor: Vendor | null
   readonly duration: string | null
+  readonly waits: string | null
 }
 
 const efforts: Readonly<Record<string, string>> = { off: "", minimal: "mn", low: "l", medium: "m", high: "h", xhigh: "xh", max: "mx" }
@@ -90,12 +91,21 @@ const rowDuration = (card: Timed, facts: RunFacts | null, now: number): string |
   }
 }
 
+const waitsOn = (standing: Standing): string | null => {
+  if (standing.status !== "Awaiting you") return null
+  const waiting = standing.waiting
+  if (waiting.on === "approval") return prNumber(waiting.item.link)
+  const only = waiting.items.length === 1 ? waiting.items.at(0) : undefined
+  return only === undefined ? `${waiting.items.length} items` : only.kind
+}
+
 export const rowFacts = (card: Pick<Card, "id" | "title" | "standing">, facts: RunFacts | null, now: number): RowFacts => {
   const agent = rowAgent(card, facts)
   return {
     title: shortTitle(card.id, card.title),
     model: agent === null ? null : shortModel(agent),
     vendor: agent === null ? null : vendorOf(agent.model),
-    duration: rowDuration(card, facts, now)
+    duration: rowDuration(card, facts, now),
+    waits: waitsOn(card.standing)
   }
 }

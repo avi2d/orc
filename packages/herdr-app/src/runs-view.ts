@@ -1,12 +1,12 @@
 import { type Context, type Element, div } from "gpui-kit"
 import { type InputState, h_flex, v_flex } from "gpui-base"
 import { type Card, type CardStatus, type Filter, cardStatuses, filterCards, railLabel, unfoldedCards } from "./agents"
-import { rowFacts } from "./agent-row"
+import { type RowFacts, rowFacts } from "./agent-row"
 import { type AlertAction, type AlertShown, alert, button, field, selectTrigger, statusDot, vendorLogo, zinc } from "./kit"
 import type { palette } from "./palette"
 import type { RunFacts } from "./run-agent"
 import { projectMenu } from "./run-menus"
-import { rowsList } from "./rows-list"
+import { uniformRows } from "./rows-list"
 import { shortTime } from "./task"
 
 type Palette = ReturnType<typeof palette>
@@ -49,6 +49,10 @@ export interface RunsShown {
 type ListRow =
   | { readonly kind: "group"; readonly status: CardStatus; readonly count: number }
   | { readonly kind: "card"; readonly card: Card }
+
+type ShownRow =
+  | { readonly kind: "group"; readonly status: CardStatus; readonly count: number }
+  | { readonly kind: "card"; readonly card: Card; readonly facts: RowFacts }
 
 interface Note {
   readonly key: string
@@ -103,35 +107,36 @@ const listBody = (shown: RunsShown, act: RunsActions): ListBody => {
   return { notes: reread, rows: groupRows(visible, shown.foldedGroups) }
 }
 
-const rowKey = (row: ListRow): string => row.kind === "group" ? `group-${row.status}` : `card-${row.card.key}`
+const shownRow = (shown: RunsShown) => (row: ListRow): ShownRow =>
+  row.kind === "group" ? row : { ...row, facts: rowFacts(row.card, row.card.runId === null ? null : shown.facts.get(row.card.runId) ?? null, shown.now) }
 
-const pickRow = (act: RunsActions) => (row: ListRow, cx: Context): void => {
+const rowKey = (row: ShownRow): string => row.kind === "group" ? `group-${row.status}` : `card-${row.card.key}`
+
+const pickRow = (act: RunsActions) => (row: ShownRow, cx: Context): void => {
   if (row.kind === "group") act.toggleGroup(cx, row.status)
   else act.select(cx, row.card.key)
 }
 
 const groupView = (t: Palette, status: CardStatus, count: number, folded: boolean): Element =>
-  h_flex().id(`group-${status}`).h(28).px(8).gap(6).items_center().rounded(6).text_size(12).text_color(t.muted).cursor_pointer()
+  h_flex().id(`group-${status}`).h(rowHeight).px(8).gap(6).items_center().rounded(6).text_size(12).text_color(t.muted).cursor_pointer()
     .hover((style) => style.text_color(t.foreground))
     .child(`${status} (${count.toString()})`)
     .children(folded ? [div().text_color(t.dim).child("▸")] : [])
 
-const cardView = (t: Palette, card: Card, selected: boolean, shown: RunsShown): Element => {
-  const facts = rowFacts(card, card.runId === null ? null : shown.facts.get(card.runId) ?? null, shown.now)
-  return h_flex().id(`card-${card.key}`).h(rowHeight).px(8).gap(8).items_center().rounded(6).text_size(13).cursor_pointer()
+const cardView = (t: Palette, card: Card, facts: RowFacts, selected: boolean): Element =>
+  h_flex().id(`card-${card.key}`).h(rowHeight).px(8).gap(8).items_center().rounded(6).text_size(13).cursor_pointer()
     .when(selected, (row) => row.bg(t.selected))
     .hover((style) => style.bg(selected ? t.selected : zinc.s2))
     .child(statusDot(card.standing.status).tooltip(card.standing.status))
     .child(vendorLogo(facts.vendor))
     .child(div().flex_1().min_w_0().truncate().text_color(t.foreground).child(facts.title))
-    .child(div().flex_none().text_size(12).text_color(t.muted).child(facts.model ?? ""))
+    .child(div().flex_none().text_size(12).text_color(t.muted).child(facts.waits ?? facts.model ?? ""))
     .child(div().w(30).flex_none().flex().justify_end().text_size(12).text_color(t.muted).child(facts.duration ?? ""))
-}
 
-const listRow = (t: Palette, shown: RunsShown, row: ListRow): Element =>
+const listRow = (t: Palette, shown: RunsShown, row: ShownRow): Element =>
   row.kind === "group"
     ? groupView(t, row.status, row.count, shown.foldedGroups.has(row.status))
-    : cardView(t, row.card, row.card.key === shown.selectedKey, shown)
+    : cardView(t, row.card, row.facts, row.card.key === shown.selectedKey)
 
 const notesView = (t: Palette, notes: ReadonlyArray<Note>): ReadonlyArray<Element> =>
   notes.length === 0 ? [] : [v_flex().px(12).pt(12).gap(8).flex_none().children(notes.map((note) => alert(t, `list-${note.key}`, note.shown)))]
@@ -175,12 +180,12 @@ const rail = (t: Palette, shown: RunsShown, act: RunsActions): Element => {
   const cards = shown.list.kind === "ok" ? unfoldedCards(filterCards(shown.list.cards, shown.filter, findWords(shown)), shown.foldedGroups) : []
   return v_flex().id("rail").w(railWidth).h_full().flex_shrink_0().bg(t.chrome).border_r(1).border_color(t.border)
     .child(h_flex().h(titleRow + headerTop * 2).px(8).items_center().child(button(t, "unfold", "»", "ghost", 24, act.toggleFold)))
-    .child(rowsList("rail-ids", cards, (card) => card.key, (card) =>
+    .child(uniformRows("rail-ids", cards, (card) => card.key, (card) =>
       h_flex().id(`rail-${card.key}`).h(rowHeight).px(6).gap(6).items_center().rounded(6).cursor_pointer()
         .when(card.key === shown.selectedKey, (row) => row.bg(t.selected))
         .hover((style) => style.bg(card.key === shown.selectedKey ? t.selected : zinc.s2))
         .child(statusDot(card.standing.status).tooltip(card.standing.status))
-        .child(div().min_w_0().truncate().child(railLabel(card))), { x: 6, y: 0, gap: 0 }, (card, cx) => act.select(cx, card.key)))
+        .child(div().min_w_0().truncate().child(railLabel(card))), { x: 6, y: 0 }, (card, cx) => act.select(cx, card.key)))
 }
 
 export const runsColumn = (t: Palette, shown: RunsShown, act: RunsActions): Element => {
@@ -190,7 +195,7 @@ export const runsColumn = (t: Palette, shown: RunsShown, act: RunsActions): Elem
   return v_flex().relative().w(listWidth).h_full().flex_shrink_0().bg(t.chrome).border_r(1).border_color(t.border)
     .child(header(t, all, shown, act))
     .children(notesView(t, body.notes))
-    .child(rowsList("cards", body.rows, rowKey, (row) => listRow(t, shown, row), { x: 6, y: 6, gap: 0 }, pickRow(act)))
+    .child(uniformRows("cards", body.rows.map(shownRow(shown)), rowKey, (row) => listRow(t, shown, row), { x: 6, y: 6 }, pickRow(act)))
     .children(attentionView(t, shown))
     .children(shown.menuOpen ? [menuList(t, all, shown.filter, headerTop + titleRow + headerGap + controlHeight + 4, act)] : [])
 }

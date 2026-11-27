@@ -52,7 +52,8 @@ For an open PR, select **Merge** and confirm to run `orc merge <task> --basis ca
 ![Resources tab with example quota windows for two accounts and two machines](images/herdr-resources.png)
 
 Subscriptions shows each account's quota windows.
-An account with no window shows the reason the quota report gives in place of its windows.
+An account with no window shows the reason it has none in place of its windows, such as [quota-axi](https://github.com/kunchenguid/quota-axi) reading it as `auth_required`.
+When the reason is another machine's failure, it starts with that machine's name.
 The Used bar compares usage with elapsed time and turns red when usage is ahead.
 A window with no known cycle shows its usage with no elapsed-time mark.
 Runs out shows an estimate only when the quota will run out before reset.

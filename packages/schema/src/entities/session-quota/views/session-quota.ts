@@ -1,5 +1,5 @@
 import { DateTime } from "effect";
-import { type Failed, failureOf, type Outcome } from "../../../shared/lib";
+import { type Failed, failureOf, type Outcome, unreachable } from "../../../shared/lib";
 import { withCaptured } from "../sources/capture";
 import { type CountedCall, countedCalls, type Ledger } from "../sources/ledger";
 import { resolveSessions, type Session, sessionLabel, type UnmatchedRuns } from "../sources/live";
@@ -289,6 +289,11 @@ interface AccountContext {
   readonly sessionsById: ReadonlyMap<string, Session>;
 }
 
+const unreadStates = new Set<SourcedProvider["state"]["status"]>(["unavailable", "auth_required", "rate_limited", "error"]);
+
+const unreadBody = ({ provider, state }: SourcedProvider): Failed =>
+  unreachable(`quota-axi reads ${provider} as ${state.status}${state.error === undefined ? "" : `: ${state.error}`}`);
+
 const accountView = (
   entry: SourcedEntry,
   joined: ReadonlyArray<{ readonly call: CountedCall; readonly join: AccountJoin }>,
@@ -310,6 +315,7 @@ const accountView = (
     const metered = meteredWindow(window);
     return metered === undefined ? [] : [windowView(metered, calls, inputs, sessionsById, availability)];
   });
+  if (windows.length === 0 && unreadStates.has(entry.state.status)) return { ...head, body: unreadBody(entry) };
   return { ...head, body: { kind: "windows", windows } };
 };
 

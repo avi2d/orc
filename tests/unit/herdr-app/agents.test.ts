@@ -152,6 +152,19 @@ describe("the runs list", () => {
     expect(cards.filter((card) => card.standing.status === "Awaiting you").map((card) => card.where)).toEqual(["Worker asks a question"])
   })
 
+  test("a bare hold the owner set parks its task in Queued, not in Awaiting you", () => {
+    const hold: InboxAnswer = { ...answer("orc-90", "user"), key: "orc-90/hold", kind: "hold", action: { kind: "answer", target: { kind: "hold" } } }
+    const cards = buildCards(runs([]), backlog([task("orc-90", { hold: 0 })]), [hold])
+    expect(cards.map((card) => [card.id, card.standing.status, card.where])).toEqual([["orc-90", "Queued", "Held"]])
+  })
+
+  test("a hold question and an overdue hold still put their tasks in Awaiting you, not in Queued", () => {
+    const question: InboxAnswer = { ...answer("orc-91", "user"), kind: "hold", action: { kind: "answer", target: { kind: "question", id: "q1" } } }
+    const overdue: InboxAnswer = { ...answer("orc-92", "user"), kind: "hold", action: { kind: "overdue-hold" } }
+    const cards = buildCards(runs([]), backlog([task("orc-91", { hold: 1 }), task("orc-92", { hold: 0 })]), [question, overdue])
+    expect(cards.map((card) => [card.id, card.standing.status])).toEqual([["orc-91", "Awaiting you"], ["orc-92", "Awaiting you"]])
+  })
+
   test("a stale run count does not leave an answered question's card Awaiting you", () => {
     const running = run("20261113-090000-aaaaaa", { branch: "orc/orc-7", questions: 1 })
     const [card] = buildCards(runs([running]), backlog([task("orc-7", { status: "started", parked: 1 })]), [])
@@ -354,7 +367,7 @@ describe("the row of a run", () => {
 
   test("a running run shows the running step's model and the time since it started, not the Agent step's", () => {
     const row = rowFacts({ id: "orc-240", title: "Scorecard", standing: { status: "Running" } }, facts, Date.parse(ended))
-    expect(row).toEqual({ title: "orc-240-scorecard", model: "sonnet-5-5 m", vendor: "claude", duration: "49m" })
+    expect(row).toEqual({ title: "orc-240-scorecard", model: "sonnet-5-5 m", vendor: "claude", duration: "49m", waits: null })
   })
 
   test.each(["checks", "pr", "no-mistakes"])("a running %s step keeps the Agent model and logo instead of dropping them", (name) => {
@@ -382,7 +395,19 @@ describe("the row of a run", () => {
   })
 
   test("a queued task shows no model and no duration, not a made-up one", () => {
-    expect(rowFacts({ id: "orc-7", title: "A task", standing: { status: "Queued" } }, null, 0)).toEqual({ title: "orc-7-a-task", model: null, vendor: null, duration: null })
+    expect(rowFacts({ id: "orc-7", title: "A task", standing: { status: "Queued" } }, null, 0)).toEqual({ title: "orc-7-a-task", model: null, vendor: null, duration: null, waits: null })
+  })
+
+  test("an Awaiting you row names what it waits on instead of leaving the model column blank", () => {
+    const asked = "2026-11-25T14:00:00Z"
+    const decision: InboxAnswer = { ...answer("orc-240"), kind: "decision", asked }
+    const now = Date.parse("2026-11-27T14:00:00Z")
+    const rows = [
+      rowFacts({ id: "orc-240", title: "Scorecard", standing: { status: "Awaiting you", waiting: { on: "answer", items: [decision] } } }, null, now),
+      rowFacts({ id: "orc-48", title: "Merge", standing: { status: "Awaiting you", waiting: { on: "approval", item: { ...approval, asked } } } }, null, now),
+      rowFacts({ id: "orc-7", title: "Two asks", standing: { status: "Awaiting you", waiting: { on: "answer", items: [decision, { ...answer("orc-7"), asked }] } } }, null, now)
+    ]
+    expect(rows.map((row) => [row.waits, row.duration])).toEqual([["decision", "2d"], ["PR #48", "2d"], ["2 items", "2d"]])
   })
 
   test("only the step whose model differs from the run's names it, not every agent step", () => {

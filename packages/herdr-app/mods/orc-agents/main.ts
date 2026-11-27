@@ -86,6 +86,8 @@ export default class OrcAgents extends View {
         this.refresh(tick)
       }
     })
+    // Taking an Open run ask notifies, which the App refuses during render.
+    cx.timer.every(150, (tick) => this.openAsked(tick))
   }
 
   refresh(cx: Context): void {
@@ -345,8 +347,7 @@ export default class OrcAgents extends View {
     setShared(agentsOpenKey, null)
   }
 
-  render(cx: Context): Element {
-    this.openAsked(cx)
+  render(): Element {
     const t = palette()
     const card = this.selectedCard()
     this.shownKey = card?.key ?? null

@@ -50,6 +50,8 @@ When this machine's [quota-axi](https://github.com/kunchenguid/quota-axi) readin
 A warning line says that calls on the accounts quota-axi reads are not counted, with the reason.
 When one machine's read of an account fails and the other machine reads its windows, those windows still show.
 A warning line beside them names the machine and the account, with the reason.
+When no machine reads a window of an account, the account shows one failure as its body.
+A failure from the other machine starts with that machine's name, such as `south: no claude work reading`, and stays listed under that machine.
 
 ## Read the composed report
 

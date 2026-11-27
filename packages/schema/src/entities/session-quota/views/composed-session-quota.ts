@@ -210,12 +210,15 @@ const logins = (found: ReadonlyArray<Found>): ReadonlyArray<Login> => {
 const joinsOf = (accounts: ReadonlyArray<AccountView>): ReadonlyArray<AccountJoin> =>
   distinctJoins(accounts.flatMap((account) => account.joins));
 
+const failedOn = (machine: string, failure: Failed): Failed =>
+  failure.kind === "unreachable" ? { ...failure, reason: `${machine}: ${failure.reason}` } : { ...failure, issue: `${machine}: ${failure.issue}` };
+
 interface MergedAccount {
   readonly account: AccountView;
   readonly failed: ReadonlyArray<FailedAccount>;
 }
 
-// An account shows one machine's failure as its body only when no machine read its windows, and every other failure is kept beside it.
+// An account shows one machine's failure as its body only when no machine read a window of it, and every other failure is kept beside it.
 const mergedAccounts = (machines: ReadonlyArray<Machine>): ReadonlyArray<MergedAccount> => {
   const everyAccount = machines
     .flatMap((machine) => machine.view.accounts.map((account) => ({ machine, account })))
@@ -224,10 +227,12 @@ const mergedAccounts = (machines: ReadonlyArray<Machine>): ReadonlyArray<MergedA
     const head = found.at(0)?.account;
     if (head === undefined) return [];
     const metered = found.flatMap(({ machine, account }) =>
-      account.body.kind === "windows" ? [{ machine, account, windows: account.body.windows }] : [],
+      account.body.kind === "windows" && account.body.windows.length > 0 ? [{ machine, account, windows: account.body.windows }] : [],
     );
+    const shownFound = metered.length > 0 ? undefined : (found.find(({ account }) => account.body.kind !== "windows") ?? found.at(0));
+    const shownIsLocal = shownFound?.machine === machines[0];
     const failed = found.flatMap(({ machine, account }): ReadonlyArray<FailedAccount> =>
-      account.body.kind === "windows" || (metered.length === 0 && account === head)
+      account.body.kind === "windows" || (account === shownFound?.account && shownIsLocal)
         ? []
         : [{ machine: machine.name, account, failure: account.body }],
     );
@@ -236,7 +241,11 @@ const mergedAccounts = (machines: ReadonlyArray<Machine>): ReadonlyArray<MergedA
       accountKeys: [...new Set(found.flatMap(({ account }) => account.accountKeys))],
       joins: joinsOf(found.map(({ account }) => account)),
     };
-    if (metered.length === 0) return [{ account: merged, failed }];
+    if (shownFound !== undefined) {
+      const { machine, account } = shownFound;
+      const body = shownIsLocal || account.body.kind === "windows" ? account.body : failedOn(machine.name, account.body);
+      return [{ account: { ...merged, body }, failed }];
+    }
     const windows = groupedWindows(metered).flatMap(windowOfGroup);
     return [{ account: { ...merged, body: { kind: "windows" as const, windows } }, failed }];
   });

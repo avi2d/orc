@@ -72,6 +72,7 @@ const mouseDown = (made: Node): void => {
 }
 
 export const documents = new Map<string, unknown>()
+export const sharedValues = new Map<string, unknown>()
 export const sessionFiles = new Map<string, string>()
 export const stalledAttention: { pending: Promise<{ code: number; stdout: string; stderr: string }> | null } = { pending: null }
 export const executed: Array<string> = []
@@ -122,6 +123,14 @@ const everyRow = (id: unknown, count: number, _key: unknown, row: (index: number
   return element
 }
 
+const everyRange = (id: unknown, count: number, _key: unknown, rows: (range: { start: number; end: number }, cx: Context) => ReadonlyArray<object>): object => {
+  const element = node()
+  const made = nodes.get(element)
+  made?.kids.push(...rows({ start: 0, end: count }, cx))
+  if (made !== undefined) listIds.set(made, id)
+  return element
+}
+
 export const handlersInRows = (element: object): ReadonlyArray<string> =>
   paths(element).flatMap((path) => {
     const list = path.findIndex((made) => listIds.has(made))
@@ -136,7 +145,7 @@ export const pressRow = (element: object, listId: string, key: string): void => 
   handler(key, cx)
 }
 
-void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow, image: node, svg: node }))
+void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow, uniform_list: everyRange, image: node, svg: node }))
 void mock.module("gpui-base", () => ({
   h_flex: node, v_flex: node, Scrollbar: { vertical: node }, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
@@ -169,7 +178,7 @@ void mock.module("herdr", () => ({
     executed.push(line)
     return line === "orc attention --json" && stalledAttention.pending !== null ? stalledAttention.pending : reply(line)
   },
-  shared: () => null, setShared: () => undefined, layout: () => null, theme: () => ({}),
+  shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => ({}),
   settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined
 }))
 

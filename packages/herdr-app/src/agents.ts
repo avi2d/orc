@@ -179,10 +179,14 @@ const waitingRunByTask = (runs: Runs, byBranch: ReadonlyMap<string, Task>): Map<
   return waiting
 }
 
+// A bare hold parks its task until the event its reason names, and asks the owner nothing.
+const parksTask = (item: InboxAnswer): boolean =>
+  item.kind === "hold" && item.action.kind === "answer" && item.action.target.kind === "hold"
+
 const answersByTask = (items: ReadonlyArray<InboxItem>): Map<string, Array<InboxAnswer>> => {
   const byTask = new Map<string, Array<InboxAnswer>>()
   for (const item of items) {
-    if (item.kind === "pr") continue
+    if (item.kind === "pr" || parksTask(item)) continue
     const existing = byTask.get(item.task)
     if (existing === undefined) byTask.set(item.task, [item])
     else existing.push(item)
