@@ -188,9 +188,9 @@ describe("orc run --kind scout", () => {
     })
   }, 60_000)
 
-  test("a scout run without --sandbox none is refused before Pi starts instead of running unsandboxed", async () => {
+  test("a scout run with --sandbox nono is refused before Pi starts instead of running unsandboxed", async () => {
     await withReportFixture(true, async ({ repo, fakeBin, env }) => {
-      const result = await runOrc(["run", "task.md", "--kind", "scout", "--branch", "orc/task-1"], repo, env)
+      const result = await runOrc(["run", "task.md", "--kind", "scout", "--branch", "orc/task-1", "--sandbox", "nono"], repo, env)
       expect({ exitCode: result.exitCode, stderr: result.stderr.trim() }).toEqual({
         exitCode: 1,
         stderr: "orc: a scout run starts Pi on the host in its run folder, so it takes --sandbox none and refuses --sandbox nono"

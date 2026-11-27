@@ -144,7 +144,7 @@ describe("orc bin", () => {
   test("a login provider config.json gives no nono entry is refused in the nono sandbox instead of sending its key nowhere", async () => {
     await withLoginFixture("echo ready; exit 0", async ({ dir, home, fakeBin }) => {
       await writeConfig(join(home, "orc"), { ...loginConfig, providers: [{ id: "acme-go", credential: "pi-login" }] })
-      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], dir, { HOME: home, ORC_HOME: join(home, "orc"), PI_CODING_AGENT_DIR: undefined, PATH: fakeBin + ":" + (process.env["PATH"] ?? "") })
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "nono"], dir, { HOME: home, ORC_HOME: join(home, "orc"), PI_CODING_AGENT_DIR: undefined, PATH: fakeBin + ":" + (process.env["PATH"] ?? "") })
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toContain("gives the provider acme-go no nono entry, so the nono sandbox cannot carry its key")
       expect(await Bun.file(join(fakeBin, "auth-checks")).exists()).toBe(false)
@@ -162,7 +162,7 @@ describe("orc bin", () => {
 
   test("run refuses a key pi reads only from the environment, which nono's credential capture does not see", async () => {
     await withLoginFixture("if [ -n \"$ACME_API_KEY\" ]; then echo ready; exit 0; fi; echo not_ready; exit 1", async ({ dir, home, fakeBin }) => {
-      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], dir, {
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "nono"], dir, {
         HOME: home,
         ORC_HOME: join(home, "orc"),
         PI_CODING_AGENT_DIR: undefined,
@@ -195,7 +195,7 @@ describe("orc bin", () => {
       await chmod(join(fakeBin, "no-mistakes"), 0o755)
       await chmod(join(fakeBin, "nono"), 0o755)
       const orcHome = join(home, "orc")
-      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], dir, {
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "nono"], dir, {
         HOME: home,
         ORC_HOME: orcHome,
         ORC_NO_MISTAKES_BIN: join(fakeBin, "no-mistakes"),
