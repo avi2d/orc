@@ -7,7 +7,10 @@ const binEntries = [
   "packages/run/src/entities/heavy-queue/heavy-standin-main.ts",
 ];
 
+// The Herdr App supplies herdr, gpui-kit and gpui-base only inside its own runtime, so the tests mock them before importing these files, and the runner's preload imports every mutated file first, which leaves each failed import cached.
+const herdrAppSources = "packages/herdr-app/src/**";
+
 export default {
   ...preset,
-  mutate: ["packages/*/src/**/*.{ts,tsx}", "!packages/*/src/**/*.test.{ts,tsx}", ...binEntries.map((file) => `!${file}`)],
+  mutate: ["packages/*/src/**/*.{ts,tsx}", "!packages/*/src/**/*.test.{ts,tsx}", ...binEntries.map((file) => `!${file}`), `!${herdrAppSources}`],
 };
