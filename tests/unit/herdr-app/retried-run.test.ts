@@ -67,7 +67,7 @@ test("the Agents panel labels a run the beat retried after its PR opened Retried
       const card = agents.allCards().find((candidate) => candidate.runId === runId)
       if (card === undefined) throw new Error("No card for " + runId)
       agents.selectedKey = card.key
-      return wordsOf(agents.render(cx))
+      return wordsOf(agents.render())
     }
     const retried = openedRun(retriedRun)
     expect(retried).toContain("Retried PR #48")

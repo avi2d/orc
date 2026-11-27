@@ -72,6 +72,7 @@ const mouseDown = (made: Node): void => {
 }
 
 export const documents = new Map<string, unknown>()
+export const sharedValues = new Map<string, unknown>()
 export const sessionFiles = new Map<string, string>()
 export const stalledAttention: { pending: Promise<{ code: number; stdout: string; stderr: string }> | null } = { pending: null }
 export const executed: Array<string> = []
@@ -177,7 +178,7 @@ void mock.module("herdr", () => ({
     executed.push(line)
     return line === "orc attention --json" && stalledAttention.pending !== null ? stalledAttention.pending : reply(line)
   },
-  shared: () => null, setShared: () => undefined, layout: () => null, theme: () => ({}),
+  shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => ({}),
   settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined
 }))
 

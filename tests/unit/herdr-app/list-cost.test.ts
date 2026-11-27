@@ -104,7 +104,7 @@ const agentsFrame = async (count: number, folded = false) => {
   agents.list = { kind: "ok", cards: read.value.cards, reread: null }
   agents.agent = read.value.agent
   agents.folded = folded
-  return frame(() => agents.render(cx))
+  return frame(() => agents.render())
 }
 
 test("an Agents frame with 300 cards awaiting you builds as many elements as one with 30 instead of building every card", async () => {

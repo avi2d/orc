@@ -76,14 +76,14 @@ test("a selected Awaiting you run shows its question, options and recommendation
   agents.list = { kind: "ok", cards: [...data.agents.cards, queued], reread: null }
   agents.agent = data.agents.agent
   agents.selectedKey = "garden-8"
-  const words = wordsOf(agents.render(cx))
+  const words = wordsOf(agents.render())
   expect(words).toContain("Thread")
   expect(words).toContain("The width of the herb bed")
   expect(words).toContain("Plant one row so the path to the kitchen door stays clear.")
   expect(words).toContain("Narrow")
   expect(words).not.toContain("Where should the bench go?")
   agents.selectedKey = "garden-7"
-  const other = wordsOf(agents.render(cx))
+  const other = wordsOf(agents.render())
   expect(other).toContain("Where should the bench go?")
   expect(other).toContain("No options recorded")
 })
@@ -97,10 +97,10 @@ test("pressing an option in a run's Thread puts its text in the answer box and m
   agents.answers.sync(cx, data.inbox.items)
   const key = "garden-8/garden-8.ask-1.2026-11-25T07_48_00_000Z"
   executed.length = 0
-  click(find(agents.render(cx), `option-${key}-B`))
+  click(find(agents.render(), `option-${key}-B`))
   expect(executed).toEqual([])
   expect(agents.answers.boxes.get(key)?.value()).toBe("Narrow")
-  const marked = agents.render(cx)
+  const marked = agents.render()
   expect(checkedRadio(marked, `option-${key}-B`)).toBe(true)
   expect(checkedRadio(marked, `option-${key}-A`)).toBe(false)
 })
@@ -118,7 +118,7 @@ test("typing an option's number into an empty answer box picks that option inste
   expect(box?.value()).toBe("Narrow")
   typeIn(box, "Narrow, then 1")
   expect(box?.value()).toBe("Narrow, then 1")
-  expect(checkedRadio(agents.render(cx), `option-${key}-B`)).toBe(false)
+  expect(checkedRadio(agents.render(), `option-${key}-B`)).toBe(false)
 })
 
 test("a failed reread keeps its Could not reread card when the agents' questions arrive after it, instead of the questions clearing it", async () => {
@@ -132,7 +132,7 @@ test("a failed reread keeps its Could not reread card when the agents' questions
     spawned.length = 0
     agents.refreshQuestions(cx)
     await Promise.all(spawned)
-    const words = wordsOf(agents.render(cx))
+    const words = wordsOf(agents.render())
     expect(words).toContain("Could not reread the runs")
     expect(words.some((said) => said.includes("The list below is from"))).toBe(true)
   } finally {
@@ -147,11 +147,11 @@ test("an agent's question stays in the folded Agent attention section until it i
   agents.list = { kind: "ok", cards: [...data.agents.cards, queued], reread: null }
   agents.agent = data.agents.agent
   agents.selectedKey = queued.key
-  const element = agents.render(cx)
+  const element = agents.render()
   expect(wordsOf(element)).not.toContain("Which file format should the export use?")
   expect(wordsOf(element)).not.toContain("Two retries")
   click(find(element, "toggle-agent-attention"))
-  expect(wordsOf(agents.render(cx))).toContain("Which file format should the export use?")
+  expect(wordsOf(agents.render())).toContain("Which file format should the export use?")
 })
 
 test("a run row in the Runs list registers no press handler of its own, which the App refuses inside a virtual list row", async () => {
@@ -160,10 +160,10 @@ test("a run row in the Runs list registers no press handler of its own, which th
   const agents = new OrcAgents()
   agents.list = { kind: "ok", cards: [...data.agents.cards, queued], reread: null }
   agents.agent = data.agents.agent
-  click(find(agents.render(cx), "toggle-agent-attention"))
-  expect(handlersInRows(agents.render(cx))).toEqual([])
+  click(find(agents.render(), "toggle-agent-attention"))
+  expect(handlersInRows(agents.render())).toEqual([])
   agents.folded = true
-  expect(handlersInRows(agents.render(cx))).toEqual([])
+  expect(handlersInRows(agents.render())).toEqual([])
 })
 
 test("pressing a run row through the list selects that run, not the run selected before", async () => {
@@ -172,10 +172,10 @@ test("pressing a run row through the list selects that run, not the run selected
   const agents = new OrcAgents()
   agents.list = { kind: "ok", cards: [...data.agents.cards, queued], reread: null }
   agents.selectedKey = "garden-8"
-  pressRow(agents.render(cx), "cards", `card-${queued.key}`)
+  pressRow(agents.render(), "cards", `card-${queued.key}`)
   expect(agents.selectedKey).toBe(queued.key)
   agents.folded = true
-  pressRow(agents.render(cx), "rail-ids", "garden-8")
+  pressRow(agents.render(), "rail-ids", "garden-8")
   expect(agents.selectedKey).toBe("garden-8")
 })
 
@@ -194,20 +194,20 @@ test("folded groups stay absent from the rail instead of offering rows that sele
     const other: Card = { ...queued, key: "other", standing: { status: card.standing.status === "Queued" ? "Running" : "Queued" } }
     agents.list = { kind: "ok", cards: [other, card], reread: null }
     agents.selectedKey = card.key
-    expect(find(agents.render(cx), `card-${card.key}`)).not.toBeNull()
-    pressRow(agents.render(cx), "cards", `group-${card.standing.status}`)
-    expect(find(agents.render(cx), `card-${card.key}`)).toBeNull()
+    expect(find(agents.render(), `card-${card.key}`)).not.toBeNull()
+    pressRow(agents.render(), "cards", `group-${card.standing.status}`)
+    expect(find(agents.render(), `card-${card.key}`)).toBeNull()
     expect(agents.selectedCard()?.key).toBe(other.key)
     press(agents, "fold")
-    expect(find(agents.render(cx), `rail-${card.key}`)).toBeNull()
-    pressRow(agents.render(cx), "rail-ids", other.key)
+    expect(find(agents.render(), `rail-${card.key}`)).toBeNull()
+    pressRow(agents.render(), "rail-ids", other.key)
     expect(agents.selectedCard()?.key).toBe(other.key)
     press(agents, "unfold")
-    pressRow(agents.render(cx), "cards", `group-${card.standing.status}`)
-    pressRow(agents.render(cx), "cards", `card-${card.key}`)
+    pressRow(agents.render(), "cards", `group-${card.standing.status}`)
+    pressRow(agents.render(), "cards", `card-${card.key}`)
     expect(agents.selectedCard()?.key).toBe(card.key)
     press(agents, "fold")
-    pressRow(agents.render(cx), "rail-ids", card.key)
+    pressRow(agents.render(), "rail-ids", card.key)
     expect(agents.selectedCard()?.key).toBe(card.key)
   }
 })
@@ -230,8 +230,8 @@ test.each([
   try {
     await agents.readSelectedRun()
     expect(executed).toContain(`orc log ${runId} 1`)
-    expect(wordsUnder(agents.render(cx), "log")).toContain(JSON.stringify(error))
-    expect(wordsOf(agents.render(cx))).not.toContain("No turn yet. Pi writes its session after its first reply.")
+    expect(wordsUnder(agents.render(), "log")).toContain(JSON.stringify(error))
+    expect(wordsOf(agents.render())).not.toContain("No turn yet. Pi writes its session after its first reply.")
   } finally {
     documents.clear()
     sessionFiles.clear()
@@ -250,15 +250,15 @@ test("a Pi session's first reply replaces the startup log instead of leaving the
   sessionFiles.set(file, "")
   try {
     await agents.readSelectedRun()
-    expect(find(agents.render(cx), "log")).not.toBeNull()
+    expect(find(agents.render(), "log")).not.toBeNull()
     sessionFiles.set(file, JSON.stringify({
       type: "message", id: "reply-1", parentId: null,
       message: { role: "assistant", content: [{ type: "text", text: "Ready to work" }], usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 }, timestamp: 0 }
     }) + "\n")
     executed.length = 0
     await agents.readSelectedRun()
-    expect(find(agents.render(cx), "turn-reply-1")).not.toBeNull()
-    expect(find(agents.render(cx), "log")).toBeNull()
+    expect(find(agents.render(), "turn-reply-1")).not.toBeNull()
+    expect(find(agents.render(), "log")).toBeNull()
     expect(executed).not.toContain(`orc log ${runId} 1`)
   } finally {
     documents.clear()

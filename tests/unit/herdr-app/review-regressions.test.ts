@@ -33,7 +33,7 @@ test.each([true, false])("Find does not carry another run's draft or Changes int
   agents.list = { kind: "ok", cards: [done("garden-1", "Alpha"), done("garden-2", "Beta")], reread: null }
   expect(agents.selectedCard()?.key).toBe("garden-1")
   if (drafting) {
-    click(find(agents.render(cx), "tab-approve"))
+    click(find(agents.render(), "tab-approve"))
     typeIn(agents.review, "Fix Alpha")
   }
   agents.told = { of: "garden-1", reading: { kind: "ok", value: { task: "garden-1", entries: [] } } }
@@ -82,7 +82,7 @@ test("Find resets the open tab and the run's state while it keeps the same run s
   agents.refresh = () => undefined
   agents.init(null, idleCx)
   agents.list = { kind: "ok", cards: [done("garden-1", "Alpha"), done("garden-2", "Beta")], reread: null }
-  click(find(agents.render(cx), "tab-approve"))
+  click(find(agents.render(), "tab-approve"))
   typeIn(agents.review, "Fix Alpha")
   const told = { of: "garden-1", reading: { kind: "ok", value: { task: "garden-1", entries: [] } } } as const
   agents.told = told
@@ -159,7 +159,7 @@ type Agents = InstanceType<typeof OrcAgents>
 const showsEachOnce = (agents: Agents, items: ReadonlyArray<InboxAnswer>, entries: ReadonlyArray<ThreadLine>): void => {
   agents.told = { of: task.id, reading: { kind: "ok", value: { task: task.id, entries } } }
   agents.answers.sync(cx, items)
-  const words = wordsOf(agents.render(cx))
+  const words = wordsOf(agents.render())
   expect(words.filter((word) => word === "How many retries?")).toHaveLength(1)
   expect(words.filter((word) => word === "Where should the bench go?")).toHaveLength(1)
 }
@@ -210,8 +210,8 @@ test.each(["Running", "Failed", "Done", "Queued", "Awaiting you"] as const)("the
   agents.list = { kind: "ok", cards: [{ ...done("garden-8", "Herb bed"), standing }], reread: null }
   agents.local = localFor(task)
   agents.told = { of: task.id, reading: { kind: "ok", value: { task: task.id, entries: [otherQuestion] } } }
-  click(find(agents.render(cx), "tab-thread"))
-  const rendered = agents.render(cx)
+  click(find(agents.render(), "tab-thread"))
+  const rendered = agents.render()
   expect(wordsOf(rendered)).toContain("Where should the bench go?")
   expect(find(rendered, "send-back")).toBeNull()
   expect(agents.answers.boxes.size).toBe(0)
