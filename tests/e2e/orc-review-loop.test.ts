@@ -319,6 +319,16 @@ test("a retained ask-user finding is not listed twice when a later review change
   expect(result.body).not.toContain("## Findings that need a person")
 }, 60_000)
 
+test("a finding handed to the fixer is not still listed as needing a person", async () => {
+  const asked = { ...warning, action: "ask-user" }
+  const reclassified = { ...asked, severity: "error", action: "Fix it." }
+  const result = await exercise([[error, asked], [reclassified], []])
+  expect(result.evidence.map((value) => JSON.parse(value))).toEqual([[error], [reclassified]])
+  expect(result.completed).toBe(true)
+  expect(result.body).not.toContain("## Findings that need a person")
+  expect(result.body).not.toContain("The result is fragile.")
+}, 60_000)
+
 test("a re-asked finding does not keep an earlier review's wording", async () => {
   const asked = { ...warning, action: "ask-user" }
   const result = await exercise([[error, asked], [{ ...asked, description: "The result breaks on empty input." }]])
