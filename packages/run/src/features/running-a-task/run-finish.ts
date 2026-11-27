@@ -81,7 +81,7 @@ const reviewSection = (section: ReviewSection): string =>
     ? "\nThe review turn failed, so this PR lists no review findings.\n"
     : section.kind === "unfixed"
     ? findingsList(section.findings.map(findingLine))
-    : findingsList(section.findings.map(leftFindingLines)) + "\nThe ask-user reason belongs to the later step that keeps ask-user findings from the fixer.\n"
+    : findingsList(section.findings.map(leftFindingLines))
 
 export const prBody = (subjects: ReadonlyArray<string>, passed: ReadonlyArray<string>, review: ReviewSection): string => {
   const closing = passed.length === 0

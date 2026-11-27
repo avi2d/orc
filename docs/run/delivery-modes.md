@@ -51,7 +51,7 @@ Under each remaining finding, a nested line says why the fix loop left it.
 A `warning` or `info` finding is below the round 2 bar, which fixes only errors.
 For an `error` finding with the same id and file as one the fixer already received, the reason line names that match and the round.
 Any other `error` finding came from the review after fix round 2, so the round limit was reached.
-The ask-user reason belongs to the later step that keeps ask-user findings from the fixer.
+Orc does not yet mark a finding as left because it needs a person's decision.
 To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
 Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
 

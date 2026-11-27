@@ -41,7 +41,6 @@ test("an id-and-file repeat names its match rather than claiming issue identity"
       "- warning `loose-type` at `src/types.ts`: The parameter accepts any string. Action: Narrow the parameter to the three modes.\n" +
       "  - Left because its severity is below the round 2 bar, which fixes only errors.\n" +
       "- error `late-leak` at `src/cache.ts:42`: A write leaves the old value in the cache. Action: Clear the cache on write.\n" +
-      "  - Left because the round limit was reached: the review after fix round 2 reported it.\n" +
-      "\nThe ask-user reason belongs to the later step that keeps ask-user findings from the fixer.\n"
+      "  - Left because the round limit was reached: the review after fix round 2 reported it.\n"
   )
 })

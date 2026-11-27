@@ -98,7 +98,6 @@ test("warnings left after a fixed round 1 open a PR listing each with its reason
       "  - Left because its severity is below the round 2 bar, which fixes only errors.\n"
   )
   expect(result.body).not.toContain("The result is wrong.")
-  expect(result.body).toContain("The ask-user reason belongs to the later step that keeps ask-user findings from the fixer.")
 }, 60_000)
 
 test("an error left after round 2 names a repeat or the round limit rather than the severity bar", async () => {
