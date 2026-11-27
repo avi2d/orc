@@ -64,7 +64,7 @@ To run it:
 
 Orc prints the branch, its commits, the checks, the review and the pull request link.
 `--sandbox none` runs the agent on the host as your user.
-With [nono](https://nono.sh) installed, drop the flag and the run works inside the nono sandbox.
+With [nono](https://nono.sh) installed, swap the flag for `--sandbox nono` and the run works inside the nono sandbox.
 
 ## See what happened
 

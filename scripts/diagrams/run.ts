@@ -6,7 +6,7 @@ const desc =
   "The runner starts most runs, and you can start one by hand. A run makes a copy of the project on a new branch, runs the prepare command, and starts the Pi agent, which writes the change and commits it. The project's checks run, a fixer repairs what failed up to three times, and the run delivers a pull request or a report. Orc watches Pi while it works, and keeps the record of every run in its own folder."
 
 const byRunner: Part = { title: "The runner", text: "The beat starts most runs through it, on the host.", href: "runner" }
-const byHand: Part = { title: "You, by hand", text: "`orc run <task-file>` in a clean checkout. It works inside the nono sandbox unless you say otherwise." }
+const byHand: Part = { title: "You, by hand", text: "`orc run <task-file>` in a clean checkout, with no per-agent sandbox unless you pass `--sandbox nono`." }
 
 const steps: readonly Part[] = [
   { step: "1", title: "A copy", text: "A git worktree on a new branch, under `~/.orc/worktrees`. Your own checkout is never touched." },

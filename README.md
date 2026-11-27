@@ -18,7 +18,7 @@ One chat to run your AI agent work on all your machines and models, with a backl
 
 - Git 2.48 or later.
 - Node, which orc's npm launcher and the agent both run on.
-- nono from https://nono.sh, for a run you start by hand with `orc run` unless you pass `--sandbox none`.
+- nono from https://nono.sh, to sandbox a run you start by hand with `orc run --sandbox nono`.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
 - no-mistakes v1.90.0 or later, installed as [Installing no-mistakes](docs/run/installing-no-mistakes.md) says, for every run except `direct-PR` and `orc`.
 - pueue, to queue runs on each machine, with its daemon started by `pueued -d`.
@@ -63,7 +63,8 @@ Orc prints the branch, its commits, the checks, the PR link when its run opened 
 `--sandbox none` runs the agent on the host as your user without a per-agent sandbox.
 Queued tasks always pass that flag.
 Their safety boundary is the isolated space around the whole agent system, as [Running without a sandbox](docs/run/running-without-a-sandbox.md) describes.
-A run you start by hand with `orc run` uses the nono sandbox by default unless you pass `--sandbox none`.
+Running without a per-agent sandbox is the default.
+To sandbox a run you start by hand, pass `--sandbox nono` instead.
 
 ## Run a backlog from the chat
 
