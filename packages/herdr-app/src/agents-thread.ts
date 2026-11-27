@@ -34,8 +34,8 @@ export const threadShown = (t: Palette, card: Card | null, act: AgentsActions, f
   const history = threadCards(told.value, task, waitsOn).filter((entry) =>
     entry.reply === null || !answers.some((item) => {
       if (item.key === `${task.id}/${entry.line.id}`) return true
-      if (item.kind !== "hold" || item.asked !== entry.line.at) return false
       if (item.action.kind === "overdue-hold") return entry.reply?.kind === "hold"
+      if (item.kind !== "hold" || item.asked !== entry.line.at) return false
       if (item.action.kind !== "answer") return false
       const target = item.action.target
       const reply = entry.reply

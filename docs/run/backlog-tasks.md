@@ -85,7 +85,8 @@ Retry keeps the recorded PR and withdraws the task's open attention items.
 
 Run `orc backlog send-back <task-id> <words>` to request another pass on a closed task's open PR.
 For example, run `orc backlog send-back orc-9 rename the flag`.
-You can also write what to change on the **Approve** or **Send back** tab of a run with an open PR in the Agents tab, and select **Send back**.
+You can also send a run back from the Agents tab.
+Open the **Approve** or **Send back** tab of a run with an open PR, write what to change, and select **Send back**.
 
 Orc moves the task to `new` and parks it on `orc/<task-id>`.
 It records your words as the answer to `send-back` and saves the closing machine, run, and PR in `parked_origin`.

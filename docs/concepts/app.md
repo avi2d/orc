@@ -24,7 +24,8 @@ Selecting a card opens the task panel, with the task's whole conversation and it
 ## The Agents tab
 
 The Agents tab lists the runs and the queued tasks.
-For the selected run it shows the task's thread, one tab per step with the agent's turns or the checks, and the changes on the branch.
+For the selected run it shows the task's thread and one tab per step with the agent's turns or the checks.
+It also shows the changes on the branch.
 
 ![Agents tab on the Thread of a run whose worker asks a question, with two options and an answer box](../images/herdr-agents-thread.png)
 

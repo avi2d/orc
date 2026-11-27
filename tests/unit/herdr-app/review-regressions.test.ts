@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import type OrcAgents from "../../../packages/herdr-app/mods/orc-agents/main"
 import type { Card } from "../../../packages/herdr-app/src/agents"
 import type { LocalAgents } from "../../../packages/herdr-app/src/agents-read"
 import type { InboxAnswer } from "../../../packages/herdr-app/src/inbox"
@@ -8,6 +9,9 @@ import { click, cx, documents, executed, find, nodes, spawned, typeIn } from "./
 
 const wordsOf = (element: object | string): ReadonlyArray<string> =>
   typeof element === "string" ? [element] : (nodes.get(element)?.kids ?? []).flatMap(wordsOf)
+
+const idle = () => ({ cancel: () => undefined, is_done: () => true })
+const idleCx = Object.assign(class extends cx {}, { spawn: idle, timer: { ...cx.timer, every: idle } })
 
 const localFor = (detail: TaskDetail): LocalAgents => ({
   details: [detail], backlog: { schema: "orc.backlog.v1", tasks: [], projects: [], merged: [] },
@@ -25,8 +29,7 @@ test.each([true, false])("Find does not carry another run's draft or Changes int
   const agents = new OrcAgents()
   let refreshes = 0
   agents.refresh = () => { refreshes++ }
-  const idle = () => ({ cancel: () => undefined, is_done: () => true })
-  agents.init(null, { ...cx, spawn: idle, timer: { ...cx.timer, every: idle } })
+  agents.init(null, idleCx)
   agents.list = { kind: "ok", cards: [done("garden-1", "Alpha"), done("garden-2", "Beta")], reread: null }
   expect(agents.selectedCard()?.key).toBe("garden-1")
   if (drafting) {
@@ -71,6 +74,29 @@ test.each([true, false])("Find does not carry another run's draft or Changes int
   } finally {
     documents.clear()
   }
+})
+
+test("Find resets the open tab and the run's state while it keeps the same run selected", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const agents = new OrcAgents()
+  agents.refresh = () => undefined
+  agents.init(null, idleCx)
+  agents.list = { kind: "ok", cards: [done("garden-1", "Alpha"), done("garden-2", "Beta")], reread: null }
+  click(find(agents.render(cx), "tab-approve"))
+  typeIn(agents.review, "Fix Alpha")
+  const told = { of: "garden-1", reading: { kind: "ok", value: { task: "garden-1", entries: [] } } } as const
+  agents.told = told
+  agents.changesProblem = "Alpha's checkout is unavailable"
+  agents.shareChanges({ worktree: "/work/alpha", branch: "orc/garden-1", base: "main", files: [] })
+  const shared = agents.sharedChanges
+  typeIn(agents.find, "Alp")
+  typeIn(agents.find, "Alph")
+  expect(agents.selectedKey).toBe("garden-1")
+  expect(agents.chosen).toEqual({ kind: "approve" })
+  expect(agents.review.value()).toBe("Fix Alpha")
+  expect(agents.told).toBe(told)
+  expect(agents.changesProblem).toBe("Alpha's checkout is unavailable")
+  expect(agents.sharedChanges).toBe(shared)
 })
 
 const at = "2026-11-25T07:48:00.000Z"
@@ -128,17 +154,28 @@ const task: TaskDetail = {
   parent: null, dependsOn: [], prState: null, hold: null, parked: null, state: { status: "new" }
 }
 
-test.each(["question", "hold", "overdue"] as const)("a %s answer does not duplicate its hold entry or hide another question", async (kind) => {
+type Agents = InstanceType<typeof OrcAgents>
+
+const showsEachOnce = (agents: Agents, items: ReadonlyArray<InboxAnswer>, entries: ReadonlyArray<ThreadLine>): void => {
+  agents.told = { of: task.id, reading: { kind: "ok", value: { task: task.id, entries } } }
+  agents.answers.sync(cx, items)
+  const words = wordsOf(agents.render(cx))
+  expect(words.filter((word) => word === "How many retries?")).toHaveLength(1)
+  expect(words.filter((word) => word === "Where should the bench go?")).toHaveLength(1)
+}
+
+test.each(["question", "hold", "overdue"] as const)("a %s answer is drawn twice, as a hold entry and as its card, or hides another question", async (kind) => {
   const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
   const agents = new OrcAgents()
   agents.refresh = () => undefined
   const item: InboxAnswer = {
     ...question, kind: "hold", key: "garden-8/hold/current",
+    ...(kind === "overdue" ? { asked: "2026-11-25T00:00:00.000Z" } : {}),
     action: kind === "overdue" ? { kind: "overdue-hold" }
       : { kind: "answer", target: kind === "question" ? { kind: "question", id: "question-1" } : { kind: "hold" } }
   }
   const heldTask: TaskDetail = {
-    ...task, hold: { at, reason: "How many retries?", until: null, answer: null,
+    ...task, hold: { at, reason: "How many retries?", until: kind === "overdue" ? "2026-11-24" : null, answer: null,
       questions: kind === "question" ? [{ id: "question-1", text: "How many retries?", asked: at, answer: null }] : [] }
   }
   const entry: ThreadLine = {
@@ -152,11 +189,7 @@ test.each(["question", "hold", "overdue"] as const)("a %s answer does not duplic
   agents.list = { kind: "ok", cards: [{
     ...done("garden-8", "Herb bed"), standing: { status: "Awaiting you", waiting: { on: "answer", items: [item] } }
   }], reread: null }
-  agents.told = { of: task.id, reading: { kind: "ok", value: { task: task.id, entries: [earlier, entry] } } }
-  agents.answers.sync(cx, [item])
-  const words = wordsOf(agents.render(cx))
-  expect(words.filter((word) => word === "How many retries?")).toHaveLength(1)
-  expect(words.filter((word) => word === "Where should the bench go?")).toHaveLength(1)
+  showsEachOnce(agents, [item], [earlier, entry])
 })
 
 const ownQuestion: ThreadLine = { at, who: "worker", kind: "question", id: questionId, text: "How many retries?" }
@@ -192,9 +225,5 @@ test("an answer card's Thread does not hide a different open question or duplica
     ...done("garden-8", "Herb bed"), standing: { status: "Awaiting you", waiting: { on: "answer", items: [question] } }
   }], reread: null }
   agents.local = localFor(task)
-  agents.told = { of: task.id, reading: { kind: "ok", value: { task: task.id, entries: [ownQuestion, otherQuestion] } } }
-  agents.answers.sync(cx, [question])
-  const words = wordsOf(agents.render(cx))
-  expect(words.filter((word) => word === "How many retries?")).toHaveLength(1)
-  expect(words.filter((word) => word === "Where should the bench go?")).toHaveLength(1)
+  showsEachOnce(agents, [question], [ownQuestion, otherQuestion])
 })

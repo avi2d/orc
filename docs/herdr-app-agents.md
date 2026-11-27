@@ -13,7 +13,8 @@ Press `cmd-k` to open or close the chat drawer.
 The list shows runs and queued tasks under five headers: **Awaiting you**, **Running**, **Queued**, **Failed** and **Done**.
 Each header shows its count after its name.
 Select a header to fold or unfold its rows.
-Each row shows a status dot, the agent's logo, the task ID with the first words of its title, the model and effort, such as `opus-5-5 h`, and a time.
+Each row shows a status dot, the agent's logo, the task ID with the first words of its title, and a time.
+The model and effort sit before the time, such as `opus-5-5 h`.
 The time is how long a question has waited on you, how long a running run has run, or how long a finished run took.
 Type in **Find a run** to show only the runs whose task ID or title holds those words.
 A queued task whose hold waits on other tasks reads **Waits on** and their IDs.
@@ -38,7 +39,8 @@ A Thread that cannot be read shows the same kind of card with **Retry**.
 ### Open a run
 
 Select a run to open it on the right.
-Its header shows the task's title, a status dot with what the run waits on or why it stopped, and the project, route and run ID.
+Its header shows the task's title and a status dot with what the run waits on or why it stopped.
+It also shows the project, route and run ID.
 Below the header, one row of tabs holds **Thread** first, then one tab per step, then **Approve** or **Send back** while a PR is open.
 Steps that share a name are numbered by their place in the run, such as **Checks 1** and **Checks 2**.
 Steps still to come are dim.

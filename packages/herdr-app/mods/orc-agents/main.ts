@@ -43,6 +43,7 @@ export default class OrcAgents extends View {
   find = InputState.new({ placeholder: "Find a run" })
   menuOpen = false
   selectedKey: string | null = null
+  shownKey: string | null = null
   chosen: Chosen | null = null
   opened = 0
   folded = false
@@ -77,7 +78,7 @@ export default class OrcAgents extends View {
       this.selectedKey = this.selectedCard()?.key ?? null
       changed.notify()
     })
-    this.find.on("change", (_event, changed) => this.moveSelection(changed, () => undefined, this.selectedKey))
+    this.find.on("change", (_event, changed) => this.moveSelection(changed, () => undefined, this.shownKey))
     this.refresh(cx)
     cx.spawn((task) => watchMerges(task, (spot, id) => this.startMerge(spot, id)))
     cx.timer.every(everyMs, (tick) => {
@@ -211,9 +212,7 @@ export default class OrcAgents extends View {
 
   labelRuns(cx: AsyncContext): void {
     const wanted = this.allCards().flatMap((card) => card.runId !== null && (!this.facts.has(card.runId) || goesOn(card.standing)) ? [card.runId] : [])
-    if (this.labelling || wanted.length === 0) {
-      return
-    }
+    if (this.labelling || wanted.length === 0) return
     this.labelling = true
     const label = (runId: string): Promise<void> =>
       readJson("orc", ["show", runId, "--json"], show).then((reading) => {
@@ -234,9 +233,7 @@ export default class OrcAgents extends View {
   }
 
   startMerge(cx: AsyncContext, task: string): void {
-    if (this.merge?.outcome.kind === "merging") {
-      return
-    }
+    if (this.merge?.outcome.kind === "merging") return
     const approval = this.allCards().map(approvalOf).find((item) => item?.task === task)
     if (approval === undefined || approval === null || this.answers.busy(approval.key)) return
     this.answers.sent.set(approval.key, { kind: "sending" })
@@ -295,11 +292,12 @@ export default class OrcAgents extends View {
   }
 
   moveSelection(cx: Context, change: () => void, before: string | null = this.selectedCard()?.key ?? null): void {
-    this.chosen = null
     this.menuOpen = false
     change()
     this.selectedKey = this.selectedCard()?.key ?? null
+    this.shownKey = this.selectedKey
     if (before === null || this.selectedKey !== before) {
+      this.chosen = null
       this.changesProblem = null
       this.told = null
       this.shareChanges(null)
@@ -351,6 +349,7 @@ export default class OrcAgents extends View {
     this.openAsked(cx)
     const t = palette()
     const card = this.selectedCard()
+    this.shownKey = card?.key ?? null
     const act: AgentsActions = {
       select: (spot, key) => this.select(spot, key),
       toggleFold: (spot) => { this.folded = !this.folded; this.menuOpen = false; spot.notify() },
