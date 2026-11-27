@@ -42,8 +42,18 @@ const textOf = (screen: Screen, row: number, from: number, to: number): string =
 
 const where = (box: Box): string => `the box at row ${box.top}, column ${box.left}`;
 
+const foundBoxes = new WeakMap<Screen, ReadonlyArray<Box>>();
+
+const boxesOf = (screen: Screen): ReadonlyArray<Box> => {
+  const known = foundBoxes.get(screen);
+  if (known !== undefined) return known;
+  const found = boxesIn(screen);
+  foundBoxes.set(screen, found);
+  return found;
+};
+
 // A box opens at a top-left corner and closes at the first top-right corner along its row and the first bottom-left corner down its column.
-const boxesOf = (screen: Screen): ReadonlyArray<Box> =>
+const boxesIn = (screen: Screen): ReadonlyArray<Box> =>
   screen.rows.flatMap((cells, top) =>
     cells.flatMap((cell, left): ReadonlyArray<Box> => {
       if (!topLeft.test(cell)) return [];

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { ellipsize, span, widthOf } from "@avi2dg/orc-ui";
+import * as fc from "fast-check";
+import { ellipsize, fit, plain, span, truncate, widthOf } from "@avi2dg/orc-ui";
 
 const family = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}";
 
@@ -46,5 +47,61 @@ describe("format characters that shape graphemes", () => {
     const cut = ellipsize(`${england} ships today`, 12);
     expect(cut).toContain("\u{E0067}");
     expect(widthOf(cut)).toBeLessThanOrEqual(12);
+  });
+});
+
+const referencePrintable = (text: string): string =>
+  text.replaceAll(/(?:(?!\u200C)(?!\u200D)(?![\u{E0020}-\u{E007F}])\p{Cf})/gu, "").replaceAll(/\p{Cc}/gu, (control) => (/\s/.test(control) ? " " : ""));
+
+const referenceWidth = (text: string): number => Bun.stringWidth(referencePrintable(text).replaceAll(/(?:(?!\u200D)\p{Cf})/gu, ""));
+
+const referenceCut = (text: string, width: number): string => {
+  let kept = "";
+  let used = 0;
+  for (const { segment } of new Intl.Segmenter().segment(text)) {
+    const next = referenceWidth(segment);
+    if (used + next > width) break;
+    kept += segment;
+    used += next;
+  }
+  return kept;
+};
+
+const referenceFit = (text: string, width: number): string => {
+  const cut = referenceCut(referencePrintable(text), width);
+  return cut + " ".repeat(Math.max(0, width - referenceWidth(cut)));
+};
+
+const referenceEllipsize = (text: string, width: number): string => {
+  const flat = referencePrintable(text).replaceAll(/\s+/g, " ").trim();
+  if (referenceWidth(flat) <= width) return flat;
+  if (width <= 0) return "";
+  return `${referenceCut(flat, width - 1).trimEnd()}\u2026`;
+};
+
+const drawnCharacters = Array.from(new Intl.Segmenter().segment("abcXYZ019 -_./:%()[]·–…›←↑→↓≥⏎─━│┃┏┓┗┛╭╮╯╰╸▶○●⚑✓✗"), ({ segment }) => segment);
+
+const joiningCharacters = ["e\u0301", "\u0301", "\u200D", "\uFE0F", "\u20E3", "\u{1F44D}", "\u{1F3FB}", "\u4E2D", "\u1100", "\u1161", "\u{1F1FA}", "\u{1F1F8}", "\t", "\r", "\n", "\u2063", "\u00AD", "\u200C", family];
+
+const mixedText = fc.array(fc.constantFrom(...drawnCharacters, ...joiningCharacters), { maxLength: 24 }).map((characters) => characters.join(""));
+
+describe("measuring and cutting text", () => {
+  test("every character of the basic plane measures as it does grapheme by grapheme, rejecting one the length shortcut counts as a cell when it is not", () => {
+    const wrong = Array.from({ length: 0x10000 }, (_, code) => String.fromCharCode(code))
+      .filter((character) => !/\p{Cs}/u.test(character))
+      .filter((character) => widthOf(character) !== referenceWidth(character));
+    expect(wrong).toEqual([]);
+  });
+
+  test("a text of drawn and joining characters measures, fits and ellipsizes as it does grapheme by grapheme, rejecting a joined pair cut apart", () => {
+    fc.assert(
+      fc.property(mixedText, fc.integer({ min: -2, max: 30 }), (text, width) => {
+        expect(widthOf(text)).toBe(referenceWidth(text));
+        expect(plain(fit([span(text, "foreground")], width))).toBe(referenceFit(text, width));
+        expect(ellipsize(text, width)).toBe(referenceEllipsize(text, width));
+        expect(referenceWidth(plain(truncate([span(text, "foreground")], width)))).toBeLessThanOrEqual(Math.max(0, width));
+      }),
+      { numRuns: 2000 },
+    );
   });
 });
