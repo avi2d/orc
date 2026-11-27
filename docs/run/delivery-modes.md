@@ -19,9 +19,9 @@ After the checks pass, the run reviews the branch and fixes findings in up to tw
 Set `review.maxFixRounds` in `$ORC_HOME/config.json` to a positive integer to change the limit.
 When the first round runs, it sends every finding to the fixer, except findings marked `ask-user`.
 Later rounds send only `error` findings.
-The loop stops when no `error` or `warning` remains, the round limit is reached, a finding repeats, or an `ask-user` error is open.
-It also stops when no finding can go to the fixer.
-That stop names the later rounds' severity bar or the need for the user's decision.
+The loop stops when no fixable `error` or `warning` remains, the round limit is reached, a finding repeats, or no finding meets the later rounds' severity bar.
+Findings marked `ask-user` do not stop the loop.
+The PR body lists them under findings that need a person.
 The run's end reason records why the loop stopped.
 The run history records each review turn as its own `review` step, numbered by attempt.
 If a review turn fails, a fix does not finish, or a check fails after a fix, the run stops without opening a PR.

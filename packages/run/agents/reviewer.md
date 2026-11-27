@@ -24,5 +24,6 @@ The file is the path from the repository root.
 The line is the line number in the changed file, or null when the finding covers the whole file.
 The severity is one of blocker, major or minor.
 The action says in one sentence what to change.
+Set action to exactly ask-user when a finding needs a person to decide.
 The description names the mechanism that goes wrong and the case that shows it.
 Print an empty array when the change brings in no problem.

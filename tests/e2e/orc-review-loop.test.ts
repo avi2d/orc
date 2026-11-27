@@ -99,17 +99,18 @@ test("a malformed path rule fails the review without erasing implement or checks
   expect(result.kinds).toEqual(["implementer"])
 }, 60_000)
 
-test("an ask-user warning alone stops for a decision rather than a first-round severity bar", async () => {
+test("an ask-user warning alone does not park the run", async () => {
   const result = await exercise([[{ ...warning, action: "ask-user" }]])
   expect(result.evidence).toHaveLength(0)
-  expect(result.endReason).toContain("The review fix loop stopped because a finding needs the user's decision.")
-  expect(result.body).toContain("Left because it asks the user.")
+  expect(result.completed).toBe(true)
+  expect(result.body).toContain("## Findings that need a person")
 }, 60_000)
 
-test("an ask-user warning after a fix stops for a decision rather than a severity bar", async () => {
+test("an ask-user warning after a fix does not park the run", async () => {
   const result = await exercise([[error], [{ ...warning, action: "ask-user" }]])
   expect(result.evidence).toHaveLength(1)
-  expect(result.endReason).toContain("The review fix loop stopped because a finding needs the user's decision.")
+  expect(result.completed).toBe(true)
+  expect(result.body).toContain("## Findings that need a person")
 }, 60_000)
 
 test("an empty review does not start a fixer", async () => {
@@ -308,14 +309,14 @@ test("a retained ask-user finding does not inflate the recorded final review cou
   expect(result.body).toContain("warning `w`")
 }, 60_000)
 
-test("a retained ask-user finding does not overwrite the final review's newer wording or action", async () => {
+test("a retained ask-user finding is not lost when a later review changes its action", async () => {
   const asked = { ...warning, topic: "result-fragile", action: "ask-user" }
   const current = { ...error, id: "updated", topic: "result-fragile", description: "The result corrupts saved data." }
   const result = await exercise([[error, asked], [current]], "no diagram", undefined, 1)
   expect(result.body).toContain("error `updated`")
   expect(result.body).toContain("The result corrupts saved data.")
-  expect(result.body).not.toContain("The result is fragile.")
-  expect(result.body).not.toContain("Left because it asks the user.")
+  expect(result.body).toContain("The result is fragile.")
+  expect(result.body).toContain("## Findings that need a person")
 }, 60_000)
 
 test("a drawn diagram lands as a mermaid fence rather than prose", async () => {
