@@ -3,10 +3,10 @@ import type { Database } from "bun:sqlite"
 import type { ChildProcessSpawner } from "effect/process"
 import { latestRunForBranchName, openQuestionsForRun, runsForBranch } from "../../entities/run-history/index"
 import { formatHistoryError, openDatabase, stoppedEndReason, type RunRecord, RunStatusSchema } from "../../entities/run-history/index"
-import { writtenReport } from "../../entities/run-history/index"
+import { ReviewerWait, reviewerWaitFileName, writtenReport } from "../../entities/run-history/index"
 import { gateLogFileName } from "../../entities/review-gate/index"
 import { Asking, OpenQuestion, askingFileName, hasBlockingQuestion, isBlockingQuestion } from "../../entities/review-gate/index"
-import { readJsonFileIfPresent, throughFor, type Machine } from "../../shared/config/index"
+import { readJsonFileIfPresent, throughFor, type Machine, ProviderRoom } from "../../shared/config/index"
 import { FailingMark, failingFileName, failingText } from "../../entities/agent/index"
 import { runDirFor, type TaskKind, TaskId, readPlanDocument, SplitDocument, type SplitPlan, splitReasonPrefix, parentBranch, taskBranch } from "../../entities/backlog/index"
 import { orcGroup, PueueResult, PueueStatus } from "../../shared/process/index"
@@ -26,7 +26,8 @@ const RunSummary = Schema.Struct({
   report: Schema.optional(Schema.String),
   asking: Schema.optional(Asking),
   failing: Schema.optional(FailingMark),
-  split: Schema.optional(SplitDocument)
+  split: Schema.optional(SplitDocument),
+  reviewerWait: Schema.optional(Schema.Struct({ ...ReviewerWait.fields, room: Schema.optional(ProviderRoom) }))
 })
 type RunSummary = typeof RunSummary.Type
 
@@ -71,6 +72,7 @@ export type RunEnding =
   | { readonly kind: "close"; readonly outcome: "done" | "failed" | "stopped"; readonly reason: string; readonly pr: string | null; readonly report: string | null }
   | { readonly kind: "park"; readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion>; readonly reason: string }
   | { readonly kind: "split"; readonly plan: SplitPlan }
+  | { readonly kind: "reviewer-quota"; readonly wait: typeof ReviewerWait.Type }
 
 type FinishedResult = Extract<RunnerResult, { readonly status: "succeeded" | "failed" }>
 
@@ -106,6 +108,9 @@ export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEndin
   }
   if (result.run?.split !== undefined) {
     return { kind: "split", plan: result.run.split }
+  }
+  if (result.run?.reviewerWait !== undefined) {
+    return { kind: "reviewer-quota", wait: result.run.reviewerWait }
   }
   const questions = result.run?.openQuestions ?? []
   return Arr.isReadonlyArrayNonEmpty(questions)
@@ -213,7 +218,20 @@ const liveFilesOf = (run: RunRecord, home: string): Effect.Effect<LiveFiles, nev
   return Effect.all({ asking, failing })
 }
 
-const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
+export type ReviewerRoomCheck = (home: string, implementerProviders: (typeof ReviewerWait.Type)["implementerProviders"]) => Effect.Effect<ProviderRoom, never, RunnerRequirements>
+
+const readReviewerWait = (home: string, run: RunRecord, checkRoom: ReviewerRoomCheck | undefined) =>
+  Effect.gen(function*() {
+    if (run.status !== "failed") {
+      return null
+    }
+    const wait = yield* readJsonFileIfPresent(runDirFor(home, run.id) + "/" + reviewerWaitFileName, ReviewerWait)
+    return wait === null || checkRoom === undefined
+      ? wait
+      : { ...wait, room: yield* checkRoom(home, wait.implementerProviders) }
+  })
+
+const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null, checkRoom: ReviewerRoomCheck | undefined): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const project = yield* resolveProjectDir(checkout)
     return yield* withRunDatabase(home, (db) =>
@@ -221,9 +239,12 @@ const readRun = (home: string, checkout: string, task: string, interval: PueueIn
         const grouped = yield* Effect.forEach([taskBranch(task), parentBranch(task)], (branch) => runsForBranch(db, project, branch))
         const runs = grouped.flat().toSorted((left, right) => Date.parse(right.started) - Date.parse(left.started) || (right.id < left.id ? -1 : 1))
         const run = runs.find((candidate) => interval === null || startsWithin(candidate.started, interval)) ?? null
-        return run === null
-            ? null
-            : toSummary(run, yield* openQuestionsForRun(db, run.id), yield* writtenReport(runDirFor(home, run.id)), yield* liveFilesOf(run, home))
+        if (run === null) {
+          return null
+        }
+        const summary = toSummary(run, yield* openQuestionsForRun(db, run.id), yield* writtenReport(runDirFor(home, run.id)), yield* liveFilesOf(run, home))
+        const reviewerWait = yield* readReviewerWait(home, run, checkRoom)
+        return reviewerWait === null ? summary : { ...summary, reviewerWait }
       })
     )
   })
@@ -259,7 +280,7 @@ const readStoppedRun = (home: string, task: string): Effect.Effect<RunSummary | 
     })
   )
 
-export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
+export const readResult = (task: string, home: string, label?: string | null, checkRoom?: ReviewerRoomCheck): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const held = yield* readHeld(home, task, label)
     if (held === null) {
@@ -271,7 +292,7 @@ export const readResult = (task: string, home: string, label?: string | null): E
     const status = yield* Schema.decodeUnknownEffect(PueueStatus)(held.status).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
     )
-    const run = yield* readRun(home, held.path, task, pueueIntervalOf(status))
+    const run = yield* readRun(home, held.path, task, pueueIntervalOf(status), checkRoom)
     const result = assessHeld(task, held.id, status, run)
     if (result.status !== "running" && result.status !== "paused") {
       return result
@@ -321,9 +342,9 @@ export const readResultReaching = (command: Command, task: string, label?: strin
 export const readResultThrough = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   readResultReaching(command, task, label).pipe(Effect.catchTag("MachineUnreached", (error) => refuse(error.detail)))
 
-export const readRunResult = (id: string, home: string, label: string | null | undefined, machine: Machine): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> => {
+export const readRunResult = (id: string, home: string, label: string | null | undefined, machine: Machine, checkRoom?: ReviewerRoomCheck): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> => {
   const through = throughFor(machine)
-  return through === null ? readResult(id, home, label) : readResultThrough(through, id, label)
+  return through === null ? readResult(id, home, label, checkRoom) : readResultThrough(through, id, label)
 }
 
 export const killHeldThrough = (command: Command, task: string, label?: string | null): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> => {

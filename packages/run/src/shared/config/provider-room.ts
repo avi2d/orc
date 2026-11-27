@@ -1,9 +1,12 @@
+import { Schema } from "effect"
 import { tokenFileSource } from "./model-route"
 import type { Provider } from "./orc-config"
 
-export type ProviderRoom =
-  | { readonly kind: "room" }
-  | { readonly kind: "no-room"; readonly reason: string }
+export const ProviderRoom = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("room") }),
+  Schema.Struct({ kind: Schema.Literal("no-room"), reason: Schema.String })
+])
+export type ProviderRoom = typeof ProviderRoom.Type
 
 export type DefaultCredential =
   | { readonly kind: "token-file"; readonly tokenFile: string | undefined; readonly origin: string }

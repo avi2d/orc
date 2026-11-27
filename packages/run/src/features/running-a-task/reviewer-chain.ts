@@ -1,8 +1,10 @@
 import { type Array as Arr, Effect, Schema } from "effect"
+import { ReviewerWait } from "../../entities/run-history/index"
 import type { ProviderRoom, ReviewerEntry } from "../../shared/config/index"
 
 export class NoReviewerRoom extends Schema.TaggedError<NoReviewerRoom>()("NoReviewerRoom", {
-  message: Schema.String
+  message: Schema.String,
+  implementerProviders: ReviewerWait.fields.implementerProviders
 }) {}
 
 interface PassedEntry {
@@ -21,13 +23,13 @@ const passedText = (passed: ReadonlyArray<PassedEntry>): string =>
 
 export const pickChainEntry = <T extends ReviewerEntry>(
   chain: Arr.NonEmptyReadonlyArray<T>,
-  implementerProvider: string,
+  implementerProviders: ReadonlyArray<string>,
   roomOf: (entry: T) => ProviderRoom
 ): Effect.Effect<ChainPick<T>, NoReviewerRoom> => {
   const passed: Array<PassedEntry> = []
   for (const [index, entry] of chain.entries()) {
-    if (entry.provider === implementerProvider) {
-      passed.push({ entry, reason: "the implementer runs on " + implementerProvider })
+    if (implementerProviders.includes(entry.provider)) {
+      passed.push({ entry, reason: entry.provider + " implemented or fixed this change" })
       continue
     }
     const room = roomOf(entry)
@@ -37,7 +39,8 @@ export const pickChainEntry = <T extends ReviewerEntry>(
     passed.push({ entry, reason: room.reason })
   }
   return Effect.fail(new NoReviewerRoom({
-    message: "no reviewer in the chain has quota room on a provider other than the implementer's " + implementerProvider + ": " + passedText(passed)
+    implementerProviders,
+    message: "no reviewer in the chain has quota room on a provider that did not implement or fix the change: " + passedText(passed)
   }))
 }
 

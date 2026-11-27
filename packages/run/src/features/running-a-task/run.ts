@@ -26,7 +26,7 @@ import { isRunId, newRunId } from "../../shared/lib/index"
 import { dropEndedPiAgentDir, dropResumedPiAgentDir, reviewerAgentDirOf, runInstructions } from "./run-folders"
 import { prepareAgents } from "./run-prepare"
 import { chainReviewer, subprocessDeliverer } from "./run-deliverer"
-import { providerOfModel, type RoomReading, type RunDelivery } from "../../shared/config/index"
+import type { RoomReading, RunDelivery } from "../../shared/config/index"
 import { closeTaskCopy, openTaskCopy, writeAgentGitConfig } from "../../entities/task-copy/index"
 import { ensureHeavyQueue, readHeavySettings } from "../../entities/heavy-queue/index"
 import { ciOnlyBashFile, runStepPath, withHeavyPath } from "../../entities/heavy-queue/index"
@@ -233,7 +233,6 @@ export const runAgentStep = (
     const services = yield* Effect.context<FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner | Scope.Scope>()
     const pickChain = (chain: Parameters<typeof chainReviewer>[0]["chain"]) => chainReviewer({
       chain,
-      implementerProvider: providerOfModel(agent.model),
       readRoom: request.readReviewerRoom(home).pipe(Effect.provideContext(services)),
       openReviewer: (entry, position) => {
         const reviewerFolders = { ...folders, piAgentDir: reviewerAgentDirOf(path, folders.runDir, position) }

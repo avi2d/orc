@@ -134,6 +134,8 @@ export interface RunFacts {
   readonly branch: string
   readonly machine: string | null
   readonly worktreeDir?: string | undefined
+  readonly implementerModel?: string | undefined
+  readonly fixerModel?: string | undefined
 }
 
 const handRunFacts: RunFacts = { branch: "orc/test", machine: null }
@@ -263,12 +265,12 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
   }
 }
 
-export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerPick = fixedReviewer(reviewer)): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerPick = fixedReviewer(reviewer), options: Pick<RunFacts, "worktreeDir" | "implementerModel" | "fixerModel"> & { readonly resumeRun?: string; readonly runId?: string; readonly answers?: ReadonlyArray<QuestionAnswer> } = {}): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const config = await Effect.runPromise(readOrcConfig(home).pipe(Effect.provide(BunServices.layer)))
   const gh = await stubGh()
   try {
-    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
-      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer: reviewerPick, maxFixRounds: config.review.maxFixRounds }), gh.dir + ":")
+    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, options.answers ?? [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
+      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir: options.worktreeDir ?? worktreeDir, branch: "orc/test" }), reviewer: reviewerPick, maxFixRounds: config.review.maxFixRounds }), gh.dir + ":", { ...handRunFacts, ...options }, options.resumeRun === undefined ? null : { runId: options.runId ?? "step-run-2", resumeRun: options.resumeRun })
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
     await rm(gh.dir, { recursive: true, force: true })
@@ -295,6 +297,7 @@ const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: F
       const runId = resume?.runId ?? "step-run-1"
       const runDir = path.join(home, "runs", runId)
       yield* fs.makeDirectory(path.join(runDir, "sessions"), { recursive: true })
+      yield* fs.makeDirectory(path.join(runDir, "session"), { recursive: true })
       const stub = yield* Effect.promise(() => stubNoMistakes(nmReplies))
       yield* fs.writeFileString(path.join(runDir, "task.md"), "Do the thing.\n")
       const hostGit = yield* prepareGit(fs, path, Bun.which("git") ?? "git")
@@ -309,7 +312,9 @@ const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: F
             const report = yield* runWithHistory(db, {
               fs, path, spawner, git: hostGit, projectDir: dir, runId, runDir, resumeRun: resume?.resumeRun,
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
-              taskPath: path.join(runDir, "task.md"), instructions: null, agent: implementer, fixer, branch: facts.branch, sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
+              taskPath: path.join(runDir, "task.md"), instructions: null, branch: facts.branch, sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
+              agent: { ...implementer, model: facts.implementerModel ?? implementer.model },
+              fixer: { ...fixer, model: facts.fixerModel ?? fixer.model },
               asks: askSetupFor(runDir, path.join(runDir, "session"), 600, answers, priorOpen),
               worktreeDir: facts.worktreeDir ?? dir, machine: facts.machine,
               delivery: deliver(spawner, hostGit, extraPath + stub.dir + ":" + (process.env.PATH ?? ""), dir),

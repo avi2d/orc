@@ -56,7 +56,7 @@ Without it, the review turn runs the reviewer agent on its usual model.
 With it, orc picks the reviewer before each review turn:
 
 1. Orc runs the quota command in `dispatch.json` once, as [Accounts on other providers](backlog-configuration.md#accounts-on-other-providers) describes.
-2. Orc skips each entry on the implementer's provider.
+2. Orc skips every provider that ran an implementation or fix step on this branch, in any run, even when the step was interrupted or made no commit.
 3. For each other entry, orc reads the quota account that holds the provider's default credential in `config.json`, because the review turn runs on that credential.
 4. Orc takes the first entry whose account is at or above `floorPercent`, and the review turn runs the reviewer agent on that entry's model.
 
@@ -69,11 +69,22 @@ The account that holds the default credential is one of these:
 Another account on the same provider does not count, even with room.
 An unreadable quota, or no account that holds the default credential, counts as no room.
 The run log names the chosen model, its place and each entry passed over, with the reason.
-When no entry qualifies, the review turn fails with `NoReviewerRoom` and the run stops without opening a PR.
-For the first review turn, the run history records that `review` step as failed with no model, and the `review-failure` signal holds the reason.
 A chain reviewer runs Pi with its own provider's credential.
 For a `token-file` or `package` provider, it runs from its own Pi folder `reviewer-agent-<position>` in the run folder.
 The [nono](https://nono.sh) sandbox carries one provider's credential, so a reviewer chain needs `--sandbox none`.
+
+## No reviewer room
+When no entry qualifies, Orc records `NoReviewerRoom` and does not open a PR.
+The run history records the `review` step as failed with no model, and the `review-failure` signal holds the reason.
+The beat parks the task with that reason and checks reviewer quota on the machine where the run stopped.
+When a reviewer qualifies, the beat resumes the same branch.
+The resumed run keeps the implementation, runs the checks again and then runs the pending review turn.
+It keeps the fix rounds the parked run spent and its ask-user findings for the PR body, so the two-round cap holds across the wait.
+It does not apply again a send-back that the parked run already applied.
+A new send-back runs the implementer again and starts a fresh review cycle with up to two fix rounds.
+The resumed run excludes the providers saved when it parked.
+An account that dispatch assigns to the resumed run can still review until its provider runs an implementation or fix step.
+If the run parks again, it saves the updated list of excluded providers for the beat.
 
 ## Open the PR
 After the review turn, a direct-PR run runs `git push --set-upstream origin <branch>` from the run's worktree.
