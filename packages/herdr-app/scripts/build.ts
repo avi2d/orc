@@ -21,6 +21,7 @@ for await (const entry of new Bun.Glob("*/main.ts").scan({ cwd: `${root}/mods` }
     process.exitCode = 1
   }
   await $`cp ${root}/mods/${mod}/mod.json ${out}/mods/${mod}/mod.json`
+  if (await Bun.file(`${root}/mods/${mod}/icons/LICENSE-Lucide.txt`).exists()) await $`cp -R ${root}/mods/${mod}/icons ${out}/mods/${mod}/icons`
 }
 
 await $`cp -R ${root}/layouts ${out}/layouts`

@@ -1,6 +1,7 @@
 import { type Context, type Element, div } from "gpui-kit"
-import { Input, InputState, h_flex, v_flex } from "gpui-base"
-import { type Sent, actionButton, failureLine, optionView, section, sendOrc } from "./ask-view"
+import { InputState, h_flex, v_flex } from "gpui-base"
+import { type Sent, failureLine, optionView, section, sendOrc } from "./ask-view"
+import { button, card, fieldWithButton } from "./kit"
 import { type InboxApproval, type InboxItem, choice, inboxArgv } from "./inbox"
 import { linkedText } from "./links-view"
 import type { palette } from "./palette"
@@ -117,24 +118,23 @@ export class InboxAnswers {
     if (this.recorded.has(item.key)) return [div().text_color(t.done).child("Answer recorded")]
     if (this.sent.get(item.key)?.kind === "sending") return [div().text_color(t.muted).child("Sending answer")]
     if (item.action.kind === "unavailable") return [div().text_color(t.muted).child("This answer cannot be sent from the app.")]
-    if (item.kind === "pr" && item.ask.options.length === 0) return [h_flex().child(actionButton(t, `approve-${item.key}`, "Merge PR", false, () => askMerge(item)))]
+    if (item.kind === "pr" && item.ask.options.length === 0) return [h_flex().justify_end().child(button(t, `approve-${item.key}`, "Merge PR", "primary", 32, () => askMerge(item)))]
     const box = this.boxes.get(item.key)
     if (box === undefined) return []
-    return [section(t, this.writing.get(item.key)?.label ?? "Your answer", h_flex().gap(8).items_center()
-      .child(Input.new(box).flex_1().min_w_0().h(32).px(8).rounded(6).border(1).border_color(t.border).bg(t.background))
-      .child(actionButton(t, `send-${item.key}`, "Send", false, (cx) => this.answerFromBox(cx, item))))]
+    return [section(t, this.writing.get(item.key)?.label ?? "Your answer",
+      fieldWithButton(box, button(t, `send-${item.key}`, "Send", "primary", 32, (cx) => this.answerFromBox(cx, item))))]
   }
 
-  item(t: Palette, item: InboxItem, askMerge: AskMerge): Element {
+  item(t: Palette, item: InboxItem, askMerge: AskMerge, named: "named" | "unnamed" = "named"): Element {
     const ask = item.ask
-    return v_flex().id(`item-${item.key}`).gap(6).p(10).rounded(6).bg(t.raised).min_w_0().flex_shrink_0()
-      .child(h_flex().gap(8).flex_wrap()
+    return card().id(`item-${item.key}`).gap(6).p(12).min_w_0().flex_shrink_0()
+      .children(named === "unnamed" ? [] : [h_flex().gap(8).flex_wrap()
         .child(div().font_semibold().child(item.task))
-        .child(div().min_w_0().text_color(t.muted).whitespace_normal().child(item.title)))
+        .child(div().min_w_0().text_color(t.muted).whitespace_normal().child(item.title))])
       .child(h_flex().gap(6).text_size(12).flex_wrap()
         .child(div().font_semibold().child(whoLabel(item)))
         .child(div().text_color(t.muted).child(inboxKind[item.kind]))
-        .children(item.asked === null ? [] : [div().text_color(t.dim).child(shortTime(item.asked))])
+        .children(item.asked === null ? [] : [div().text_color(t.muted).child(shortTime(item.asked))])
         .children(item.overdueSeconds === undefined ? [] : [div().text_color(t.blocked).child(`Overdue · Waited ${ageLabel(item.overdueSeconds)}`)]))
       .child(section(t, "About", linkedText(`question-${item.key}`, ask.question).whitespace_normal()))
       .child(ask.options.length === 0 ? div().text_color(t.muted).child("No options recorded")

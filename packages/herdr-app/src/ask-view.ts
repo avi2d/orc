@@ -44,7 +44,7 @@ export const listenFor = (command: string, act: () => void): Promise<void> =>
   })
 
 export const section = (t: Palette, label: string, content: Element): Element =>
-  v_flex().gap(2).child(div().text_size(11).text_color(t.dim).child(label)).child(content)
+  v_flex().gap(2).child(div().text_size(12).text_color(t.muted).child(label)).child(content)
 
 export const optionView = (t: Palette, id: string, option: AskOption): Element => {
   const label = `${option.letter}) ${option.text}`

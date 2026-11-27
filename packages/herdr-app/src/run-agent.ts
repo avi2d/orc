@@ -1,32 +1,33 @@
-import type { Card } from "./agents"
-import type { ShownStep } from "./guard"
+import type { Show, ShownStep } from "./guard"
 
-export interface RunAgent {
-  readonly model: string | null
-  readonly effort: string | null
+export interface StepAgent {
+  readonly model: string
+  readonly thinking: string | null
 }
 
-export const runAgent = (steps: ReadonlyArray<Pick<ShownStep, "name" | "model" | "thinking">>): RunAgent | null => {
-  const agent = steps.find((step) => step.name === "implement")
-  return agent === undefined ? null : { model: agent.model, effort: agent.thinking }
+export interface RunFacts {
+  readonly implement: StepAgent | null
+  readonly running: StepAgent | null
+  readonly started: string | null
+  readonly ended: string | null
 }
+
+const agentOf = (step: Pick<ShownStep, "model" | "thinking"> | undefined): StepAgent | null =>
+  step === undefined || step.model === null ? null : { model: step.model, thinking: step.thinking }
+
+export const runFacts = (shown: Pick<Show, "started" | "ended" | "steps">): RunFacts => ({
+  implement: agentOf(shown.steps.find((step) => step.name === "implement")),
+  running: agentOf(shown.steps.filter((step) => step.status === "running").at(-1)),
+  started: shown.started,
+  ended: shown.ended
+})
 
 const piSteps: ReadonlySet<string> = new Set(["implement"])
 
 export const opensTurns = (step: Pick<ShownStep, "name" | "piSessionFile">): boolean =>
   piSteps.has(step.name) || step.piSessionFile !== null
 
-export const agentLabel = (agent: RunAgent | null): string | null => {
-  const words = agent === null ? [] : [agent.model, agent.effort].filter((word) => word !== null)
-  return words.length === 0 ? null : words.join(" ")
-}
-
-export const cardPlace = (card: Pick<Card, "where">, agent: RunAgent | null): string => {
-  const label = agentLabel(agent)
-  return label === null ? card.where : `${label} · ${card.where}`
-}
-
 export const namedModels = (steps: ReadonlyArray<Pick<ShownStep, "id" | "name" | "model" | "thinking">>): ReadonlyMap<number, string> => {
-  const runModel = runAgent(steps)?.model ?? null
+  const runModel = agentOf(steps.find((step) => step.name === "implement"))?.model ?? null
   return new Map(steps.flatMap((step) => step.model === null || step.model === runModel ? [] : [[step.id, step.model] as const]))
 }
