@@ -279,13 +279,14 @@ const runChecksFixLoop = (
   checkpoints: RunCheckpoints
 ): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
+    const implementedHere = !plan.skipImplement && commits.length > 0
     const resumed = yield* retryParkedFix(run, ops, base, rounds, fixes, commits, plan, checkpoints)
     if (resumed !== null) {
       return resumed
     }
     const readChecks = (number: number) => readProjectChecks(run, number)
     const finish = () => finishChecked({
-      run, ops, base, rounds, fixes, commits, plan, checkpoints, readChecks,
+      run, ops, base, rounds, fixes, commits, plan, checkpoints, readChecks, implementedHere,
       fixReview: (evidence, attempt) => fixOnce(run, ops.runAgent, evidence, attempt, null, checkpoints, null, true)
     })
     if (plan.reviewWait !== undefined && rounds.at(-1)?.passed === true && (yield* reviewHead(run)) === plan.reviewWait.head) {

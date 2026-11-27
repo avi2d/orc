@@ -29,7 +29,7 @@ const configureReviewers = async (fixture: Fixture) => {
   }))
 }
 
-test("the beat parks without a question or a retry and resumes the same Orc run when reviewer quota returns", async () => {
+test("the beat resumes the same run instead of waiting when the reviewer account recovers above the original account", async () => {
   await withFixture(async (fixture) => {
     await startOnLinux(fixture)
     await configureReviewers(fixture)
@@ -48,13 +48,13 @@ test("the beat parks without a question or a retry and resumes the same Orc run 
     expect(waiting).not.toContain("started orc-1")
     expect(await Bun.file(join(fixture.pueue, "add-args")).exists()).toBe(false)
 
-    await writeQuota(fixture, 80)
-    expect(await orcOk(fixture, ["beat"])).toContain("started orc-1 on linux")
+    await writeQuota(fixture, 95)
+    expect(await orcOk(fixture, ["beat"])).toContain("started orc-1 on linux with beta-main")
     const added = await queuedArgs(fixture)
     expect(added).toContain("ORC_DISPATCH_RESUME_RUN=run-1")
     expect(added?.slice(added.indexOf("--branch"))).toEqual([
-      "--branch", "orc/orc-1", "--sandbox", "none", "--provider", "acme",
-      "--delivery", "orc", "--token-file", mainToken
+      "--branch", "orc/orc-1", "--sandbox", "none", "--provider", "beta",
+      "--implementer-model", "beta/coder", "--fixer-model", "beta/coder", "--delivery", "orc"
     ])
   })
 }, runnerTimeout)

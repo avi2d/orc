@@ -5,7 +5,7 @@ import { Effect } from "effect"
 import { chainReviewer } from "../../packages/run/src/features/running-a-task/run-deliverer"
 import type { ReviewerPick } from "../../packages/run/src/features/running-a-task/run-ops"
 import type { ProviderRoom } from "../../packages/run/src/shared/config/index"
-import { chainEntry, git, readyToCheck, recordingKinds, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withPushedBase, withRepo } from "./run-helpers"
+import { chainEntry, cleanFinish, git, readyToCheck, recordingKinds, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withPushedBase, withRepo } from "./run-helpers"
 
 const withReadyBranch = (use: (ready: { readonly dir: string; readonly home: string; readonly sha: string; readonly kinds: Array<string>; readonly worktreeDir: string }) => Promise<void>): Promise<void> =>
   withRepo((dir) =>
@@ -29,14 +29,13 @@ const exhausted = { kind: "no-room", reason: "2% left, floor 10%" } as const
 const chain = [chainEntry("beta/reviewer"), chainEntry("gamma/reviewer")] as const
 const sameProviderFirst = [chainEntry("acme/coder"), ...chain] as const
 
-const pickWith = (rooms: Readonly<Record<string, ProviderRoom>>, entries: typeof chain | typeof sameProviderFirst = chain, implementerProvider = "acme"): ReviewerPick =>
-  (runAgent, parkedImplementerProviders) =>
+const pickWith = (rooms: Readonly<Record<string, ProviderRoom>>, entries: typeof chain | typeof sameProviderFirst = chain): ReviewerPick =>
+  (runAgent, eligibility) =>
     chainReviewer({
       chain: entries,
-      implementerProvider,
       readRoom: Effect.succeed(({ provider }) => rooms[provider] ?? { kind: "no-room", reason: "no reading" }),
       openReviewer: () => Effect.succeed(runAgent)
-    })(runAgent, parkedImplementerProviders)
+    })(runAgent, eligibility)
 
 const cleanReviewer = (sha: string, model: string, kinds: Array<string>) =>
   recordingKinds(async (run, sessionsDir) => {
@@ -66,7 +65,7 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
     })
   })
 
-  test("opens no unreviewed PR during quota exhaustion and resumes review with the original implementer's provider excluded", async () => {
+  test("parks without a PR and lets the only eligible provider review after dispatch assigns it the resumed run", async () => {
     await withReadyBranch(async ({ dir, home, sha, kinds, worktreeDir }) => {
       const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses,
         pickWith({ acme: room, beta: exhausted, gamma: exhausted }, sameProviderFirst), { worktreeDir })
@@ -79,32 +78,39 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
       expect(outcome.ghCalls).not.toContain("pr create")
 
       const resumed = await runOrcDeliveryStep(dir, home, cleanReviewer(sha, "beta/reviewer", kinds), lintPasses,
-        pickWith({ acme: room, beta: room, gamma: exhausted }, sameProviderFirst, "gamma"), { worktreeDir, resumeRun: outcome.report.runId })
+        pickWith({ acme: room, beta: room, gamma: exhausted }, sameProviderFirst),
+        { worktreeDir, resumeRun: outcome.report.runId, implementerModel: "beta/coder", fixerModel: "beta/coder" })
       expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
       expect(resumed.stepAgents).toContainEqual({ name: "review", model: "beta/reviewer", thinking: "high" })
       expect(resumed.ghCalls).toContain("pr create --head orc/test")
     })
   })
 
-  test("a run resumed on another provider skips its own provider as well, instead of reviewing on the provider that fixes the change", async () => {
+  test("does not let the resumed provider review its own fix and saves both writers when it parks again", async () => {
     await withReadyBranch(async ({ dir, home, sha, kinds, worktreeDir }) => {
       const parked = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses,
         pickWith({ acme: room, beta: exhausted, gamma: exhausted }, sameProviderFirst), { worktreeDir })
-      expect(parked.report.prLink).toBeNull()
 
-      const resumed = await runOrcDeliveryStep(dir, home, cleanReviewer(sha, "gamma/reviewer", kinds), lintPasses,
-        pickWith({ acme: room, beta: room, gamma: room }, sameProviderFirst, "beta"), { worktreeDir, resumeRun: parked.report.runId })
-      expect(resumed.stepAgents).toContainEqual({ name: "review", model: "gamma/reviewer", thinking: "high" })
-      expect(resumed.ghCalls).toContain("pr create --head orc/test")
-    })
-  })
+      const reviewThenFix = recordingKinds(async (run, sessionsDir) => {
+        const sessionFile = join(sessionsDir, run.agent.kind + ".jsonl")
+        if (run.agent.kind === "reviewer") {
+          expect(run.agent.model).toBe("beta/reviewer")
+          const findings = [{ id: "missing-file", file: "fix.txt", line: null, severity: "error", action: "Add the file.", description: "The file is missing." }]
+          await writeFile(sessionFile, sessionEnding({ ...cleanFinish, content: [{ type: "text", text: JSON.stringify(findings) }] }))
+          return { sessionFile, commits: [] }
+        }
+        expect(run.agent.model).toBe("beta/coder")
+        await writeFile(join(worktreeDir, "fix.txt"), "fixed")
+        git(worktreeDir, ["add", "fix.txt"])
+        git(worktreeDir, ["commit", "-qm", "Add the missing file"])
+        await writeFile(sessionFile, sessionEnding(cleanFinish))
+        return { sessionFile, commits: [{ sha: git(worktreeDir, ["rev-parse", "HEAD"]) }] }
+      }, kinds)
 
-  test("a resumed run that stops again for reviewer quota saves every implementer's provider, instead of only its own", async () => {
-    await withReadyBranch(async ({ dir, home, sha, kinds, worktreeDir }) => {
-      const parked = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses,
-        pickWith({ acme: room, beta: exhausted, gamma: exhausted }, sameProviderFirst), { worktreeDir })
-      const resumed = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses,
-        pickWith({ acme: room, beta: room, gamma: exhausted }, sameProviderFirst, "beta"), { worktreeDir, resumeRun: parked.report.runId })
+      const resumed = await runOrcDeliveryStep(dir, home, reviewThenFix, lintPasses,
+        pickWith({ acme: room, beta: room, gamma: exhausted }, sameProviderFirst),
+        { worktreeDir, resumeRun: parked.report.runId, implementerModel: "beta/coder", fixerModel: "beta/coder" })
+      expect(kinds).toEqual(["implementer", "reviewer", "fixer"])
       expect(resumed.ghCalls).not.toContain("pr create")
       const wait: unknown = await Bun.file(join(home, "runs", resumed.report.runId, "reviewer-wait.json")).json()
       expect(wait).toMatchObject({ implementerProviders: ["acme", "beta"] })

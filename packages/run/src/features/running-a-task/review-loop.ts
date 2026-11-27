@@ -1,4 +1,5 @@
-import { Effect } from "effect"
+import { Array as Arr, Effect } from "effect"
+import { providerOfModel } from "../../shared/config/index"
 import { OrcRunError } from "../../shared/lib/index"
 import { runChecksRound, summarizeChecksRound, type ChecksCommand } from "./checks"
 import { finishAfterChecks, reviewOrc } from "./run-finish"
@@ -6,7 +7,7 @@ import type { ReviewFinding, ReviewOutcome } from "./review-outcome"
 import { lastFixRound, passesRoundTwoBar } from "./left-findings"
 import type { RunStopped } from "./loop-pause"
 import { reviewHead, writeReviewWait } from "./review-wait"
-import type { ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
+import type { ResumePlan, ReviewEligibility, RunCheckpoints, SandboxOps } from "./run-ops"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
 
 interface ReviewLoop {
@@ -17,6 +18,7 @@ interface ReviewLoop {
   readonly fixes: Array<RecordedFixAttempt>
   readonly commits: Array<OrcRunCommit>
   readonly plan: ResumePlan
+  readonly implementedHere: boolean
   readonly checkpoints: RunCheckpoints
   readonly fixReview: (evidence: string, attempt: number) => Effect.Effect<{ readonly fix: RecordedFixAttempt; readonly commits: ReadonlyArray<OrcRunCommit>; readonly paused: string | null }, OrcRunError | RunStopped>
   readonly readChecks: (round: number) => Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError>
@@ -80,6 +82,18 @@ const runOneRound = (loop: ReviewLoop, findings: ReadonlyArray<ReviewFinding>, r
     return yield* checkAfterFix(loop)
   })
 
+const reviewEligibility = ({ run, plan, fixes, implementedHere }: ReviewLoop): ReviewEligibility => {
+  const originalImplementer = providerOfModel(plan.inheritedImplement?.model ?? run.agent.model)
+  const parkedProviders = plan.reviewWait?.implementerProviders
+  const implementerProviders = parkedProviders ?? Arr.of(originalImplementer)
+  const recentImplementer = implementedHere ? [providerOfModel(run.agent.model)] : []
+  const fixerProviders = fixes.flatMap(({ commits, model }) => commits > 0 && model !== null ? [providerOfModel(model)] : [])
+  return {
+    implementerProviders: Arr.dedupe(Arr.appendAll(implementerProviders, [...recentImplementer, ...fixerProviders])),
+    resumedForQuota: parkedProviders !== undefined
+  }
+}
+
 export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const { run, ops, base, rounds, fixes, commits, plan, checkpoints } = loop
@@ -87,9 +101,8 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
     }
     const reviewer = run.delivery.reviewer
-    const parkedImplementerProviders = plan.reviewWait?.implementerProviders
     const sentPerRound = [...plan.reviewWait?.sentPerRound ?? []]
-    const reviewNext = () => reviewOrc(run, reviewer, checkpoints, ops.runAgent, sentPerRound.length + 1, parkedImplementerProviders)
+    const reviewNext = () => reviewOrc(run, reviewer, checkpoints, ops.runAgent, sentPerRound.length + 1, reviewEligibility(loop))
     return yield* Effect.gen(function*() {
       let review = yield* reviewNext()
       while (mayStartRound(sentPerRound.length + 1, review)) {
@@ -101,7 +114,7 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
         if (failure !== null) return stopReport(loop, failure)
         review = yield* reviewNext()
       }
-      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, parkedImplementerProviders })
+      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, eligibility: reviewEligibility(loop) })
     }).pipe(
       Effect.catchTag("NoReviewerRoom", ({ implementerProviders, message }) =>
         Effect.gen(function*() {

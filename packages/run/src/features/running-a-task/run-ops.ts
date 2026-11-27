@@ -1,4 +1,4 @@
-import type { Effect } from "effect"
+import type { Array as Arr, Effect } from "effect"
 import type { AgentFile, PiRun, PiTokenUse, LongSessionCounts } from "../../entities/agent/index"
 import type { CommandResult } from "../../shared/sandbox/index"
 import type { OrcRunError } from "../../shared/lib/index"
@@ -32,7 +32,12 @@ interface PickedReviewer {
   readonly runAgent: SandboxOps["runAgent"]
 }
 
-export type ReviewerPick = (runAgent: SandboxOps["runAgent"], parkedImplementerProviders?: ReadonlyArray<string>) => Effect.Effect<PickedReviewer, NoReviewerRoom | OrcRunError>
+export interface ReviewEligibility {
+  readonly implementerProviders: Arr.NonEmptyReadonlyArray<string>
+  readonly resumedForQuota: boolean
+}
+
+export type ReviewerPick = (runAgent: SandboxOps["runAgent"], eligibility: ReviewEligibility) => Effect.Effect<PickedReviewer, NoReviewerRoom | OrcRunError>
 
 export interface ResumePlan {
   readonly implementSessionId: string | null
