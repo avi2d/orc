@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { rm } from "node:fs/promises"
+import { mkdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { backlogTaskOne, refuseOnQuestions, startOnLinux } from "./parked-helpers"
 import { orcOk, queuedArgs, runnerTimeout, withFixture, type Fixture } from "./runner-helpers"
@@ -35,13 +35,33 @@ describe("an ask-user finding parks as a question", () => {
 })
 
 describe("a worker question about a low image allowance parks as a question", () => {
-  test("an unanswered orc_ask about a generate-assets allowance below 20 percent parks the task with that question instead of closing it failed", async () => {
+  test("an orc_ask about a generate-assets allowance below 20 percent that times out parks the task with its options and recommendation instead of closing it failed", async () => {
     await withFixture(async (fixture: Fixture) => {
-      const question = {
-        id: "ask-1",
-        text: "The generate-assets reading shows the Codex weekly allowance at 12 percent, below its 20 percent threshold, so make the images anyway?\nA) Make them now\n   Leads to: Codex spends the rest of the weekly allowance\nB) Wait for the reset\n   Leads to: The design lands without images until the allowance resets"
-      }
-      await parksWith(fixture, await failedRunAsking(fixture, "implement", question), question)
+      const options = [
+        { text: "Make them now", outcome: "Codex spends the rest of the weekly allowance" },
+        { text: "Wait for the reset", outcome: "The design lands without images until the allowance resets" }
+      ]
+      const recommendation = "Wait for the reset"
+      const text = [
+        "Make the images with the Codex weekly allowance at 12 percent?",
+        "Context: generate-assets read the allowance below its 20 percent threshold.",
+        "A) Make them now",
+        "   Leads to: Codex spends the rest of the weekly allowance",
+        "B) Wait for the reset",
+        "   Leads to: The design lands without images until the allowance resets",
+        "Recommended: B) Wait for the reset"
+      ].join("\n")
+      const question = { id: "ask-1", text, options, recommendation }
+      await startOnLinux(fixture)
+      await refuseOnQuestions(fixture, [{ id: "ask-1", text }], "implement")
+      const runDir = join(fixture.home, "runs", "run-1")
+      await mkdir(runDir, { recursive: true })
+      await writeFile(join(runDir, "asking.json"), JSON.stringify({
+        asked: "2026-11-02T10:20:00.000Z",
+        until: "2026-11-02T10:30:00.000Z",
+        questions: [question]
+      }))
+      await parksWith(fixture, await orcOk(fixture, ["beat"]), question)
     })
   }, runnerTimeout)
 })
