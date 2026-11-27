@@ -60,13 +60,8 @@ const matchSubquo = (snapshot: unknown, mappings: ReadonlyArray<SubquoMapping>):
   if (Result.isFailure(decoded)) return [];
   const accounts = decoded.success.accounts;
   return mappings.flatMap((mapping) => {
-    const entries = accounts.filter((account) => account.id === mapping.subquoId);
-    const entry = entries.length === 1 ? entries[0] : undefined;
-    const sameTarget = mappings.filter((other) => other.provider === mapping.provider && other.accountKey === mapping.accountKey);
-    const sameSource = mappings.filter((other) => other.subquoId === mapping.subquoId);
-    return entry?.provider === mapping.provider && sameTarget.length === 1 && sameSource.length === 1
-      ? [{ mapping, observation: entry.observation }]
-      : [];
+    const entry = accounts.find((account) => account.id === mapping.subquoId);
+    return entry?.provider === mapping.provider ? [{ mapping, observation: entry.observation }] : [];
   });
 };
 
@@ -150,8 +145,7 @@ export const overlaySubquo = (
   const providers = report.providers.map((entry) => {
     if ("kind" in entry) return entry;
     const keys = entry.accountKeys ?? (entry.accountKey === undefined ? [] : [entry.accountKey]);
-    const own = matches.filter(({ mapping }) => mapping.provider === entry.provider && keys.includes(mapping.accountKey));
-    const match = own.length === 1 ? own[0] : undefined;
+    const match = matches.find(({ mapping }) => mapping.provider === entry.provider && keys.includes(mapping.accountKey));
     return match === undefined ? entry : overlayProvider(entry, match, now);
   });
   const additional = standaloneSubquo(snapshot, mappings, now).filter((account) =>

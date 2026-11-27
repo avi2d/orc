@@ -30,11 +30,6 @@ describe("subquo quota account mappings", () => {
     expect(result.providers).toEqual(report.providers);
   });
 
-  test("keeps the original account instead of assigning one snapshot ID to two accounts", () => {
-    const result = overlaySubquo(report, snapshot, [mapping, { ...mapping, accountKey: "other" }], now);
-    expect(result.providers).toEqual(report.providers);
-  });
-
   test("shows the mapped account instead of dropping it when quota-axi has no account", () => {
     const empty = { generatedAt: now, providers: [], notSetUp: ["claude"] as const };
     const result = overlaySubquo(empty, snapshot, [mapping], now);

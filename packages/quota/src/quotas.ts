@@ -168,7 +168,6 @@ const liveRow = (
     const text = `read ${countdown(stale)} ago`;
     return staleCell(shortLabel(window), text, shape);
   }
-  // Each countdown runs on the clock its verdict was read at: quota-axi's report, or now for a harvested reading.
   const reset = resetCell(shape, window.source.kind === "harvested" ? now : body.reportedAt, window.resetsAt);
   if (!("percentRemaining" in window)) {
     const parent = body.windows.find((candidate) => candidate.id === window.shareOf);
@@ -254,7 +253,7 @@ const groupTexts = (group: SourceGroup, room: number): ReadonlyArray<string> => 
   return lines;
 };
 
-// A block read wholly by quota-axi keeps quota-axi's own layout, so only a block holding a harvested window names its sources.
+// A block read wholly by quota-axi keeps quota-axi's own layout, so only a block holding a window not read by quota-axi names its sources.
 const sourceLines = (windows: ReadonlyArray<SourcedWindow>, width: number, now: DateTime.Utc): Block => {
   if (windows.every((window) => window.source.kind === "quota-axi")) return [];
   const room = width - sourceIndent.length;
