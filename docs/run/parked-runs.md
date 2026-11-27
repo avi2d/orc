@@ -71,6 +71,9 @@ A task whose every blocking question has an answer can resume when its original 
 `orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag, whether the decider owns them, their answers, and for a worker question its options and recommendation.
 Older parked records have no `origin` field.
 
+A run that [found no reviewer with room](delivery-modes.md#reviewer-chain) parks the same way, with the machine and run in `parked_origin` and the reason in its `reviewerQuota`.
+The task has no question, and the beat resumes it without an answer once a reviewer has room.
+
 ## A resume that parks again
 
 A resumed run can park again with no open blocking question and no answer given since it started.

@@ -156,6 +156,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/running-a-task/run-finish.ts` | The finish after the checks pass: the direct PR or the [no-mistakes](https://github.com/kunchenguid/no-mistakes) gate |
 | `packages/run/src/features/running-a-task/review-turn.ts` | The direct-PR review turn: the branch diff, the reviewer run and its findings |
 | `packages/run/src/features/running-a-task/reviewer-chain.ts` | The reviewer pick by quota room on another provider, and `NoReviewerRoom` |
+| `packages/run/src/features/running-a-task/review-wait.ts` | The `reviewer-wait.json` a run writes when no reviewer has room, and the checkpoint a resume reads |
 | `packages/run/src/features/running-a-task/diagram-turn.ts` | The Pi turn that draws a PR body's `mermaid` diagram |
 | `packages/run/src/features/running-a-task/review-path-rules.ts` | The `review.path_instructions` entries of `.no-mistakes.yaml` that match a changed file, and the review prompt section they make |
 | `packages/run/src/features/running-a-task/run-resume.ts` | The prior run's session and passed steps a resume starts from |
