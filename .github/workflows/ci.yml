@@ -220,7 +220,7 @@ jobs:
           DRAFT: ${{ github.event.pull_request.draft }}
         run: bunx checks-ci draft-hold
       - id: test
-        run: bun test ./tests/e2e/compiled-orc.test.ts
+        run: bun test ./tests/e2e/compiled-orc.test.ts ./tests/e2e/file-claim.test.ts
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
