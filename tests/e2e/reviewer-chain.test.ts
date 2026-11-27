@@ -68,7 +68,7 @@ const cleanReviewer = (sha: string, model: string, kinds: Array<string>) =>
     return passReview(sessionsDir)
   }, kinds)
 
-const errorFinding = [{ id: "missing-file", file: "fix.txt", line: null, severity: "error", action: "Add the file.", description: "The file is missing." }]
+const errorFinding = (topic: string) => [{ topic, id: "missing-file", file: "fix.txt", line: null, severity: "error", action: "Add the file.", description: "The file is missing." }]
 
 const replyFindings = async (sessionsDir: string, name: string, findings: ReadonlyArray<unknown>) => {
   const sessionFile = join(sessionsDir, name + ".jsonl")
@@ -157,9 +157,7 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
         const sessionFile = join(sessionsDir, run.agent.kind + ".jsonl")
         if (run.agent.kind === "reviewer") {
           expect(run.agent.model).toBe("beta/reviewer")
-          const findings = [{ id: "missing-file", file: "fix.txt", line: null, severity: "error", action: "Add the file.", description: "The file is missing." }]
-          await writeFile(sessionFile, sessionEnding({ ...cleanFinish, content: [{ type: "text", text: JSON.stringify(findings) }] }))
-          return { sessionFile, commits: [] }
+          return replyFindings(sessionsDir, "review", errorFinding("missing-file"))
         }
         expect(run.agent.model).toBe("beta/coder")
         await writeFile(join(worktreeDir, "fix.txt"), "fixed")
@@ -298,7 +296,7 @@ describe("a new send-back on a reviewer quota resume starts a fresh review cycle
 
       let fixesInParkedRun = 0
       const spendBothRounds = recordingKinds(async (run, sessionsDir) => {
-        if (run.agent.kind === "reviewer") return replyFindings(sessionsDir, "review-" + kinds.length.toString(), errorFinding)
+        if (run.agent.kind === "reviewer") return replyFindings(sessionsDir, "review-" + kinds.length.toString(), errorFinding("parked-" + kinds.length.toString()))
         if (run.agent.kind === "implementer") return commitSendBack(worktreeDir, sessionsDir)
         fixesInParkedRun += 1
         if (fixesInParkedRun === 2) rooms.beta = exhausted
@@ -310,14 +308,14 @@ describe("a new send-back on a reviewer quota resume starts a fresh review cycle
       expect(kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "fixer"])
       expect(parked.report.waitingForReviewer).toBe(true)
       const wait: unknown = await Bun.file(join(home, "runs", parked.report.runId, "reviewer-wait.json")).json()
-      expect(wait).toMatchObject({ sentPerRound: [errorFinding, errorFinding] })
+      expect(wait).toMatchObject({ sentPerRound: [errorFinding("parked-2"), errorFinding("parked-4")] })
 
       rooms.beta = room
       let reviewsInResumedRun = 0
       const fixNewFindings = recordingKinds(async (run, sessionsDir) => {
         if (run.agent.kind === "reviewer") {
           reviewsInResumedRun += 1
-          return replyFindings(sessionsDir, "resumed-review-" + reviewsInResumedRun.toString(), reviewsInResumedRun === 1 ? errorFinding : [])
+          return replyFindings(sessionsDir, "resumed-review-" + reviewsInResumedRun.toString(), reviewsInResumedRun === 1 ? errorFinding("resumed") : [])
         }
         if (run.agent.kind === "implementer") {
           expect(run.prompt).toContain(second.answer)
