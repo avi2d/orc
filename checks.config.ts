@@ -72,7 +72,7 @@ export default defineConfig({
   },
   releaseAssets: true,
   testTierShards: { e2e: 2 },
-  mutationShardCount: 4,
+  mutationShardCount: 12,
   testFileTimings: {
     "tests/e2e/agent-environment.test.ts": 0.042,
     "tests/e2e/alerts/print.test.ts": 1.444,
