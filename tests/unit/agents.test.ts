@@ -161,6 +161,11 @@ describe("resolveAgentFile", () => {
     }
   })
 
+  test("the bundled implementer prompt asks through orc_ask when a skill says to stop, instead of ending the step", async () => {
+    const found = await resolved("implementer", { projectDir: tmpdir(), orcHome: tmpdir(), configModel: { file: "/orc-home/config.json", model: "acme/configured" } })
+    expect(typeof found === "string" ? found : found.body).toContain("When a skill tells you to stop and ask or tell the person, ask through orc_ask instead of ending the step.")
+  })
+
   test("the bundled files with no configured model are refused instead of running on a built-in model", async () => {
     for (const kind of ["implementer", "fixer"] as const) {
       expect(await resolved(kind, { projectDir: tmpdir(), orcHome: tmpdir(), configModel: noConfigModel })).toBe(

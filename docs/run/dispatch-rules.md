@@ -97,6 +97,17 @@ The task ID, category, account, and model names reflect the projects, quota acco
 }
 ```
 
+## Images for design work
+
+A design task's worker makes its raster images itself through the `generate-assets` skill.
+The worker loads that skill from the user's skills folder, because the run's [Pi](https://pi.dev) loads skills on the host under `--sandbox none`, which every queued task passes.
+The worker reaches the `winwsl` machine over [ssh](https://www.openssh.com) and uses the ChatGPT login of [Codex](https://github.com/openai/codex) there.
+It runs Codex with `gpt-6-astra` and then with `gpt-6.1-sol`.
+The worker keeps the design and the code itself, and orc starts no second worker for images.
+When the skill reads the Codex allowance below its 20 percent weekly threshold, or gets no reading, it tells the worker to stop and ask.
+The bundled implementer prompt tells the worker to ask through `orc_ask` then instead of ending the step.
+The run then parks with that question, as [A worker question](parked-runs.md#a-worker-question) shows.
+
 ## Related topics
 
 - [Backlog configuration](backlog-configuration.md)

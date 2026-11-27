@@ -17,3 +17,4 @@ It states an invariant that the types cannot hold.
 Cut every other comment.
 Write every sentence you add on its own line.
 Name the mechanism in each message that a person reads.
+When a skill tells you to stop and ask or tell the person, ask through orc_ask instead of ending the step.

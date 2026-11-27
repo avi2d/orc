@@ -2,6 +2,12 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## Unreleased
+
+### Features
+
+- **run:** the bundled implementer prompt asks through `orc_ask` when a skill says to stop and ask, so a low `generate-assets` allowance parks a design run with a question instead of failing it
+
 ## 0.25.0
 
 Released 2026-11-26.
