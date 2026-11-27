@@ -59,7 +59,7 @@ describe("routeOfAgents", () => {
   })
 
   test("a config with no providers refuses every model instead of falling back to a built-in one", () => {
-    expect(Result.isFailure(routeOfAgents({ file: config.file, providers: [] }, { agent: model, fixer: model }, undefined))).toBe(true)
+    expect(Result.isFailure(routeOfAgents({ file: config.file, providers: [], review: config.review }, { agent: model, fixer: model }, undefined))).toBe(true)
   })
 
   test("an implementer on a configured provider with a fixer elsewhere is refused with the config file only", () => {
