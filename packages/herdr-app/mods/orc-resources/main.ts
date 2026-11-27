@@ -21,7 +21,7 @@ const bar = (t: Palette, row: WindowRow): Element =>
   div().relative().w(barWidth).h(12).flex_none()
     .child(div().absolute().top(3).left(0).w(barWidth).h(6).rounded(3).bg(t.raised))
     .child(div().absolute().top(3).left(0).w(Math.round(barWidth * row.filled)).h(6).rounded(3).bg(row.red ? t.ansi1 : t.done))
-    .child(div().absolute().top(0).left(Math.min(barWidth - 2, Math.round(barWidth * row.notch))).w(2).h(12).bg(t.foreground))
+    .children(row.notch === null ? [] : [div().absolute().top(0).left(Math.min(barWidth - 2, Math.round(barWidth * row.notch))).w(2).h(12).bg(t.foreground)])
 
 const used = (t: Palette, row: WindowRow): Element =>
   h_flex().gap(8).items_center()

@@ -95,7 +95,7 @@ export const windowJson = (account: AccountView, window: WindowView): typeof Win
   label: window.label,
   kind: window.kind,
   source: sourceJson(window.source),
-  startsAt: instant(window.startsAt),
+  startsAt: window.startsAt === null ? null : instant(window.startsAt),
   resetsAt: instant(window.resetsAt),
   usedPoints: window.usedPoints,
   leftPoints: window.leftPoints,
@@ -171,7 +171,7 @@ const panePresenceJson = (pane: NonNullable<SessionQuotaView["panePresence"]>[nu
 });
 
 export const sessionQuotaReport = (view: SessionQuotaView): SessionQuotaReport => ({
-  schemaVersion: 1,
+  schemaVersion: 3,
   generatedAt: instant(view.now),
   panePresence: (view.panePresence ?? []).map(panePresenceJson),
   headlessFolders: (view.headlessFolders ?? []).map(({ cwd }) => ({ cwd })),

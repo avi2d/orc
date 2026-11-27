@@ -19,8 +19,13 @@ const droppedFormat = /(?:(?!\u200C)(?!\u200D)(?![\u{E0020}-\u{E007F}])\p{Cf})/g
 
 const unmeasuredFormat = /(?:(?!\u200D)\p{Cf})/gu;
 
+const formatOrControl = /[\p{Cf}\p{Cc}]/u;
+
 const printable = (text: string): string =>
-  text.replaceAll(droppedFormat, "").replaceAll(/\p{Cc}/gu, (control) => (/\s/.test(control) ? " " : ""));
+  formatOrControl.test(text) ? text.replaceAll(droppedFormat, "").replaceAll(/\p{Cc}/gu, (control) => (/\s/.test(control) ? " " : "")) : text;
+
+// Each of these is a grapheme of its own one cell wide next to any other of them, so a text of only these measures and cuts by its length.
+const singleCells = /^[\x20-\x7E\u00B7\u2013\u2026\u203A\u2190-\u2193\u2265\u23CE\u2500-\u257F\u25B6\u25CB\u25CF\u2691\u2713\u2717]*$/;
 
 export const rightSpan = (text: string, tone: Tone): Span => ({ ...span(text, tone), right: true });
 
@@ -29,7 +34,8 @@ export const span = (text: string, tone: Tone, emphasis: Omit<Style, "tone"> = {
   style: { tone, ...emphasis },
 });
 
-export const widthOf = (text: string): number => Bun.stringWidth(printable(text).replaceAll(unmeasuredFormat, ""));
+export const widthOf = (text: string): number =>
+  singleCells.test(text) ? text.length : Bun.stringWidth(printable(text).replaceAll(unmeasuredFormat, ""));
 
 export const lineWidth = (line: Line): number => line.reduce((sum, part) => sum + widthOf(part.text), 0);
 
@@ -40,6 +46,7 @@ const ellipsis = "…";
 const graphemes = new Intl.Segmenter();
 
 const cutToWidth = (text: string, width: number): string => {
+  if (singleCells.test(text)) return text.slice(0, Math.max(0, width));
   let kept = "";
   let used = 0;
   for (const { segment } of graphemes.segment(text)) {

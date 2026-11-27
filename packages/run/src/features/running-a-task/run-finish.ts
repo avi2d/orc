@@ -20,7 +20,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       if (review.status === "failed") {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, review.findings)
+      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, review)
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
@@ -28,7 +28,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       yield* checkpoints.reviewStart(run.delivery.reviewer, reviewStarted)
       const review = yield* reviewAtHead(run, runAgent, run.delivery.reviewer, priorDir)
       yield* checkpoints.reviewDone(run.delivery.reviewer, review, reviewStarted, new Date().toISOString())
-      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
+      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, review)
       const reviewed = checked + reviewSentence(review)
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
@@ -51,15 +51,21 @@ export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: Run
     return review
   })
 
-const openFindings = (findings: ReadonlyArray<ReviewFinding>): string =>
-  findings.length === 0 ? "" : "\nOpen review findings:\n" + findings.map((finding) => "- " + finding.severity + " " + finding.id + " (" + finding.file + (finding.line === null ? "" : ":" + finding.line.toString()) + "): " + finding.description + " " + finding.action).join("\n") + "\n"
+const findingLine = (finding: ReviewFinding): string =>
+  "- " + finding.severity + " `" + finding.id + "` at `" + finding.file + (finding.line === null ? "" : ":" + finding.line.toString()) + "`: " + finding.description + " Action: " + finding.action
 
-const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>, findings: ReadonlyArray<ReviewFinding>): string => {
-  const passed = rounds.at(-1)?.checks.map((check) => check.name) ?? []
+const reviewSection = (review: ReviewOutcome): string =>
+  review.status === "failed"
+    ? "\nThe review turn failed, so this PR lists no review findings.\n"
+    : review.findings.length === 0
+    ? "\nThe review found nothing.\n"
+    : "\nOpen review findings:\n" + review.findings.map(findingLine).join("\n") + "\n"
+
+export const prBody = (subjects: ReadonlyArray<string>, passed: ReadonlyArray<string>, review: ReviewOutcome): string => {
   const closing = passed.length === 0
     ? "orc opened this PR without local checks or no-mistakes. " + beatReadsChecks + "\n"
     : "orc opened this PR after " + passed.join(", ") + " passed, without no-mistakes.\n"
-  return (subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing) + openFindings(findings)
+  return (subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing) + reviewSection(review)
 }
 
 const openPullRequest = (
@@ -67,7 +73,7 @@ const openPullRequest = (
   opener: PullRequestOpener,
   rounds: ReadonlyArray<ChecksRoundSummary>,
   checkpoints: RunCheckpoints,
-  findings: ReadonlyArray<ReviewFinding> = []
+  review: ReviewOutcome
 ): Effect.Effect<DirectPrRecord, OrcRunError> =>
   Effect.gen(function*() {
     yield* checkpoints.pullRequestStart(new Date().toISOString())
@@ -79,7 +85,7 @@ const openPullRequest = (
     const subjects = listed.map((commit) => commit.subject.trim()).filter((subject) => subject !== "")
     const bodySubjects = subjects.length > 0 ? subjects : (head !== "" ? [head] : [])
     const bodyFile = run.path.join(run.runDir, prBodyFileName)
-    yield* run.fs.writeFileString(bodyFile, prBody(bodySubjects, rounds, findings)).pipe(
+    yield* run.fs.writeFileString(bodyFile, prBody(bodySubjects, rounds.at(-1)?.checks.map((check) => check.name) ?? [], review)).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
     )
     const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, bodyFile)

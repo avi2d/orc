@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { Schema } from "effect"
-import { type SnapshotFields, SnapshotReport } from "@avi2dg/orc-schema"
+import { DateTime, Schema } from "effect"
+import { composedSessionQuota, composedSessionQuotaReport, decodeQuota, overlaySubquo, type QuotaReport, SessionQuotaReport, sessionQuotaReport, sessionQuotaViewOf, SessionsCodec, type SnapshotFields, SnapshotReport, sessionQuotaView } from "@avi2dg/orc-schema"
+import { fixture as fixtureText } from "../../lib/fixtures"
+import { noOrcAccounts } from "../../lib/orc-quota"
+import { ledgerOf } from "../../lib/quota-view-fixture"
+import { quotaAxiJsonFor, quotaAxiRead } from "../../lib/quota-read"
 import { type Guard, guardJson } from "../../../packages/herdr-app/src/guard"
 import { type AccountRows, type QuotaWindow, type Subscriptions, type WindowRow, countdown, machineRows, machinesSnapshot, unreadLines, pastPace, runsOutAt, subscriptionRows, subscriptionsSnapshot } from "../../../packages/herdr-app/src/resources"
 
@@ -142,6 +146,112 @@ describe("the subscriptions table", () => {
   test("refuses a window with no elapsedFraction rather than drawing a bar with no notch", () => {
     const text = fixture.replace('"elapsedFraction": 0.4,', "")
     expect(guardJson(text, subscriptionsSnapshot)).toEqual({ kind: "refused", reason: "sources.quota.report.windows[0].elapsedFraction is missing" })
+  })
+})
+
+describe("the subscriptions table over a subquo reading", () => {
+  const subquoRead: unknown = JSON.parse(fixtureText("subquo/fresh-read.json"))
+  const readAt = DateTime.makeUnsafe("2026-11-27T09:35:00.000Z")
+  const claudeMain = { provider: "claude", accountKey: "default", subquoId: "main" } as const
+
+  const viewOver = (quotaAxi: QuotaReport, mappings: Parameters<typeof overlaySubquo>[2] = [claudeMain]) =>
+    sessionQuotaView({
+      quota: quotaAxiRead({ kind: "ok", capturedAt: readAt, value: overlaySubquo(quotaAxi, subquoRead, mappings, readAt) }),
+      orcQuota: noOrcAccounts(readAt),
+      panes: undefined,
+      processes: undefined,
+      ledger: ledgerOf([]),
+      sessions: [],
+      sessionOfFile: new Map(),
+      unmatched: [],
+      now: readAt,
+      timeZone: DateTime.zoneMakeNamedUnsafe("UTC")
+    })
+
+  const rowsFrom = (view: ReturnType<typeof viewOver>) => {
+    const quota = { status: "ok", report: composedSessionQuotaReport(view, "mac") }
+    const text = JSON.stringify({ schemaVersion: 1, generatedAt: DateTime.formatIso(readAt), machine: "mac", sources: { quota } })
+    expect(() => Schema.decodeUnknownSync(SnapshotReport)(JSON.parse(text))).not.toThrow()
+    return subscriptionRows(subscriptionsOf(text), DateTime.toEpochMillis(readAt))
+  }
+
+  const rowsOver = (quotaAxi: QuotaReport) => rowsFrom(viewOver(quotaAxi)).map((group) =>
+    [group.account, group.kind === "unread" ? group.reason : group.windows.map((row) => [row.label, row.usedPercent] as const)])
+
+  const claudeWeekOnly = (): QuotaReport => {
+    const decoded = decodeQuota(quotaAxiJsonFor(["--provider", "claude"], fixtureText("quota-axi/full.json")))
+    if (decoded.kind !== "ok") throw new Error(decoded.issue)
+    const providers = decoded.value.providers.map((entry) =>
+      "kind" in entry ? entry : { ...entry, windows: entry.windows.filter((window) => window.id !== "five_hour") })
+    return { ...decoded.value, providers }
+  }
+
+  test("keeps a subquo window with no cycle instead of dropping it from the table", () => {
+    const view = viewOver({ generatedAt: readAt, providers: [], notSetUp: ["opencode-go"] }, [
+      { provider: "opencode-go", accountKey: "default", subquoId: "opencode-go" }
+    ])
+    const expected = [
+      { label: "rolling", usedPercent: 0, resets: "3h 21m", notch: null, red: false, runsOut: null },
+      { label: "week", usedPercent: 9, resets: "2d 14h" },
+      { label: "month", usedPercent: 71, resets: "11d 1h", notch: null, red: false, runsOut: null }
+    ]
+    const assertRows = (reading: typeof view) => {
+      const groups = rowsFrom(reading)
+      expect(groups.map((group) => group.account)).toEqual(["opencode-go"])
+      expect(windowsOf(groups[0])).toMatchObject(expected)
+    }
+    assertRows(view)
+    const report = Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(JSON.stringify(sessionQuotaReport(view))))
+    expect(report.windows.map((window) => [window.id, window.usedPoints, window.resetsAt])).toEqual([
+      ["rolling", 0, "2026-11-27T12:56:43.000Z"],
+      ["weekly", 9, "2026-11-30T00:00:00.000Z"],
+      ["monthly", 71, "2026-12-08T10:59:08.000Z"]
+    ])
+    const remote = sessionQuotaViewOf(report, "remote")
+    if (remote.kind !== "ok") throw new Error(remote.issue)
+    assertRows(remote.value)
+    const saved = Schema.toCodecJson(SessionsCodec)
+    const cached = Schema.decodeUnknownSync(saved)(JSON.parse(JSON.stringify(Schema.encodeSync(saved)(view))))
+    assertRows(cached)
+    assertRows(composedSessionQuota(view, "mac", [{ name: "remote", reading: { kind: "ok", value: remote.value } }]))
+  })
+
+  test("shows the week subquo read for a mapped Claude account, not an account with windows read as holding none", () => {
+    expect(rowsOver(claudeWeekOnly())).toEqual([["claude", [["week", 30]]]])
+  })
+
+  test("shows the week of a Claude account only subquo reads, not an account with windows read as holding none", () => {
+    expect(rowsOver({ generatedAt: readAt, providers: [], notSetUp: ["claude"] })).toEqual([["claude", [["week", 30]]]])
+  })
+
+  test("labels the week of a Codex account only subquo reads as quota-axi does, not as weekly", () => {
+    const view = viewOver({ generatedAt: readAt, providers: [], notSetUp: ["codex"] }, [
+      { provider: "codex", accountKey: "default", subquoId: "codex" }
+    ])
+    expect(rowsFrom(view).map((group) => [group.account, windowsOf(group).map((row) => [row.label, row.usedPercent])])).toEqual([
+      ["codex", [["week", 70]]]
+    ])
+  })
+
+  test("dates a window two machines share from the machine that knows its cycle, not from the first machine's reading with no start", () => {
+    const local = viewOver({ generatedAt: readAt, providers: [], notSetUp: ["opencode-go"] }, [
+      { provider: "opencode-go", accountKey: "default", subquoId: "opencode-go" }
+    ])
+    const decoded = decodeQuota(quotaAxiJsonFor(["--provider", "opencode-go"], fixtureText("quota-axi/full.json")))
+    if (decoded.kind !== "ok") throw new Error(decoded.issue)
+    const sameReset = DateTime.makeUnsafe("2026-12-08T10:59:08.000Z")
+    const remote = viewOver({
+      ...decoded.value,
+      providers: decoded.value.providers.map((entry) => "kind" in entry ? entry : {
+        ...entry,
+        windows: entry.windows.filter((window) => window.id === "monthly").map((window) => ({ ...window, resetsAt: sameReset }))
+      })
+    }, [])
+    const composed = composedSessionQuota(local, "mac", [{ name: "remote", reading: { kind: "ok", value: remote } }])
+    const monthly = composed.accounts
+      .flatMap((account) => account.body.kind === "windows" ? account.body.windows : [])
+      .filter((window) => window.id === "monthly")
+    expect(monthly.map((window) => window.startsAt === null ? null : DateTime.formatIso(window.startsAt))).toEqual(["2026-11-07T10:59:08.000Z"])
   })
 })
 

@@ -8,7 +8,7 @@ import { RunnerError } from "../../shared/process/index"
 import { type Command } from "../../shared/process/index"
 import { tokenLive } from "../../entities/token/index"
 
-const pollSeconds = 5
+const pollMillis = 250
 
 const waitForLiveToken = (home: string, task: string, label?: string | null): Effect.Effect<DateTime.Utc, RunnerError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
@@ -26,7 +26,7 @@ const waitForLiveToken = (home: string, task: string, label?: string | null): Ef
         yield* Console.log(task + " waits for a fresh token from the machine that runs the beat: the one held here runs out at " + DateTime.formatIso(expiry.value))
         told = true
       }
-      yield* Effect.sleep(Duration.seconds(pollSeconds))
+      yield* Effect.sleep(Duration.millis(pollMillis))
     }
   })
 
