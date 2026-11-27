@@ -33,7 +33,7 @@ export interface WaitResult {
 
 const defaultAnswerWaitSeconds = 30 * 60
 
-const pollSeconds = 5
+const pollMillis = 250
 
 export const answerWaitFromEnv = (value: string | undefined): Effect.Effect<number, OrcRunError> => {
   const text = (value ?? "").trim()
@@ -107,7 +107,7 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
       const answeredOf = (answers: ReadonlyArray<QuestionAnswer>) => answers.filter((entry) => missing.some((finding) => finding.id === entry.question))
       let answered = answeredOf(yield* readRelayed(relayed, asked))
       while (answered.length < missing.length && Date.now() < deadline) {
-        yield* Effect.sleep(Duration.seconds(Math.min(pollSeconds, Math.max(0, (deadline - Date.now()) / 1000))))
+        yield* Effect.sleep(Duration.millis(Math.min(pollMillis, Math.max(0, deadline - Date.now()))))
         answered = answeredOf(yield* readRelayed(relayed, asked))
       }
       const remaining = (yield* readJsonFileIfPresent(asking, Asking).pipe(Effect.catchTag("ConfigError", () => Effect.succeed(null))))?.questions.filter((question) => !missing.some((finding) => finding.id === question.id)) ?? []

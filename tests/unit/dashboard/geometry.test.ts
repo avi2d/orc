@@ -12,31 +12,31 @@ import { taskReadings } from "../../lib/task-levels-fixture";
 
 const widths = Array.from({ length: 161 }, (_, index) => 80 + index);
 
-const unsetTasks = (): BandedReadings => {
-  const banded = bandedReadings();
-  const levels = taskLevels({ ...taskReadings({ tasks: { kind: "unset" } }), interval: "all" });
-  return { ...banded, tasks: { ...banded.tasks, levels, byMachine: new Map([["north", levels]]) } };
-};
+const banded = bandedReadings();
+
+const unsetLevels = taskLevels({ ...taskReadings({ tasks: { kind: "unset" } }), interval: "all" });
+
+const unsetTasks: BandedReadings = { ...banded, tasks: { ...banded.tasks, levels: unsetLevels, byMachine: new Map([["north", unsetLevels]]) } };
 
 interface Shown {
   readonly name: string;
   readonly rows: number;
   readonly steps: ReadonlyArray<Step>;
-  readonly readings: () => BandedReadings;
+  readonly readings: BandedReadings;
 }
 
 const shown: ReadonlyArray<Shown> = [
-  { name: "home", rows: 24, steps: [], readings: bandedReadings },
-  { name: "home", rows: 40, steps: [], readings: bandedReadings },
-  { name: "home", rows: 60, steps: [], readings: bandedReadings },
+  { name: "home", rows: 24, steps: [], readings: banded },
+  { name: "home", rows: 40, steps: [], readings: banded },
+  { name: "home", rows: 60, steps: [], readings: banded },
   { name: "home with no tasks report", rows: 40, steps: [], readings: unsetTasks },
-  { name: "alerts tab", rows: 40, steps: [{ press: "a" }], readings: bandedReadings },
-  { name: "scheduled tab", rows: 40, steps: [{ press: "s" }], readings: bandedReadings },
-  { name: "projects", rows: 40, steps: [{ press: "p" }], readings: bandedReadings },
+  { name: "alerts tab", rows: 40, steps: [{ press: "a" }], readings: banded },
+  { name: "scheduled tab", rows: 40, steps: [{ press: "s" }], readings: banded },
+  { name: "projects", rows: 40, steps: [{ press: "p" }], readings: banded },
   { name: "projects with no tasks report", rows: 40, steps: [{ press: "p" }], readings: unsetTasks },
-  { name: "a project's tasks", rows: 40, steps: [{ press: "p" }, { move: "in" }, { move: "in" }], readings: bandedReadings },
-  { name: "ledger", rows: 40, steps: [{ press: "l" }], readings: bandedReadings },
-  { name: "an open message", rows: 40, steps: [{ press: "l" }, { move: "in" }], readings: bandedReadings },
+  { name: "a project's tasks", rows: 40, steps: [{ press: "p" }, { move: "in" }, { move: "in" }], readings: banded },
+  { name: "ledger", rows: 40, steps: [{ press: "l" }], readings: banded },
+  { name: "an open message", rows: 40, steps: [{ press: "l" }, { move: "in" }], readings: banded },
 ];
 
 const drawnAt = new Map<number, ReadonlyArray<readonly [string, Screen]>>();
@@ -45,7 +45,7 @@ const drawnAt = new Map<number, ReadonlyArray<readonly [string, Screen]>>();
 const screensAt = (columns: number): ReadonlyArray<readonly [string, Screen]> => {
   const known = drawnAt.get(columns);
   if (known !== undefined) return known;
-  const drawn = shown.map(({ name, rows, steps, readings }) => [`${name} at ${columns}x${rows}`, screenOf(bandedLines(columns, rows, steps, readings()), columns)] as const);
+  const drawn = shown.map(({ name, rows, steps, readings }) => [`${name} at ${columns}x${rows}`, screenOf(bandedLines(columns, rows, steps, readings), columns)] as const);
   drawnAt.set(columns, drawn);
   return drawn;
 };
