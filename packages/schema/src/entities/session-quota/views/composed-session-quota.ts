@@ -228,7 +228,7 @@ const mergedAccounts = (machines: ReadonlyArray<Machine>): ReadonlyArray<MergedA
     );
     const shown = metered.length > 0 ? undefined : (found.find(({ account }) => account.body.kind !== "windows") ?? found.at(0))?.account;
     const failed = found.flatMap(({ machine, account }): ReadonlyArray<FailedAccount> =>
-      account.body.kind === "windows" || account === shown ? [] : [{ machine: machine.name, account, failure: account.body }],
+      account.body.kind === "windows" || (account === shown && shown === head) ? [] : [{ machine: machine.name, account, failure: account.body }],
     );
     const merged = {
       ...head,

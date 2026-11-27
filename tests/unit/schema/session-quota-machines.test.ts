@@ -177,16 +177,27 @@ describe("an account one machine could not read", () => {
     ]);
   });
 
+  const noClaudeWindow = (report: SessionQuotaReport): SessionQuotaReport => ({
+    ...report,
+    windows: report.windows.filter((window) => window.account.provider !== "claude"),
+  });
+
   test("shows the failure when the other machine read the account but no window, not a read account holding no window", () => {
-    const noClaudeWindow = (report: SessionQuotaReport): SessionQuotaReport => ({
-      ...report,
-      windows: report.windows.filter((window) => window.account.provider !== "claude"),
-    });
     const view = composedSessionQuota(machineView("north", claudeUnread(unread)), "north", [
       southReading({ kind: "ok", value: machineView("south", noClaudeWindow) }),
     ]);
     expect(view.accounts.find((account) => account.title === "claude work")?.body).toEqual({ kind: "invalid", issue: unread });
     expect(view.composition?.failedAccounts).toEqual([]);
+  });
+
+  test("names the remote beside its failure shown as the body when this machine read the account but no window", () => {
+    const north = machineView("north", noClaudeWindow);
+    expect(north.accounts.find((account) => account.title === "claude work")?.body).toEqual({ kind: "windows", windows: [] });
+    const view = composedSessionQuota(north, "north", [southReading({ kind: "ok", value: machineView("south", claudeUnread(unread)) })]);
+    expect(view.accounts.find((account) => account.title === "claude work")?.body).toEqual({ kind: "invalid", issue: unread });
+    expect(view.composition?.failedAccounts.map(({ machine, failure }) => [machine, failure])).toEqual([
+      ["south", { kind: "invalid", issue: unread }],
+    ]);
   });
 
   test("lists no failed account when every machine read every account", () => {
