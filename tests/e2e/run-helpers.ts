@@ -9,6 +9,7 @@ import { subprocessNoMistakesRunner, type QuestionAnswer } from "../../packages/
 import type { OpenQuestion } from "../../packages/run/src/entities/review-gate/index"
 import { subprocessPullRequestOpener } from "../../packages/run/src/entities/pull-request/direct-pr"
 import { hostGitShim } from "../../packages/run/src/shared/sandbox/host"
+import { readOrcConfig } from "../../packages/run/src/shared/config/index"
 import { askSetupFor, orcCompletionLine } from "../../packages/run/src/entities/agent/index"
 import { runWithHistory } from "../../packages/run/src/features/running-a-task/run"
 import { type ChainReviewer, fixedReviewer } from "../../packages/run/src/features/running-a-task/run-deliverer"
@@ -265,10 +266,11 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
 }
 
 export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerPick = fixedReviewer(reviewer), options: Pick<RunFacts, "worktreeDir" | "implementerModel" | "fixerModel"> & { readonly resumeRun?: string; readonly runId?: string; readonly answers?: ReadonlyArray<QuestionAnswer> } = {}): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+  const config = await Effect.runPromise(readOrcConfig(home).pipe(Effect.provide(BunServices.layer)))
   const gh = await stubGh()
   try {
     const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, options.answers ?? [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
-      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir: options.worktreeDir ?? worktreeDir, branch: "orc/test" }), reviewer: reviewerPick }), gh.dir + ":", { ...handRunFacts, ...options }, options.resumeRun === undefined ? null : { runId: options.runId ?? "step-run-2", resumeRun: options.resumeRun })
+      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir: options.worktreeDir ?? worktreeDir, branch: "orc/test" }), reviewer: reviewerPick, maxFixRounds: config.review.maxFixRounds }), gh.dir + ":", { ...handRunFacts, ...options }, options.resumeRun === undefined ? null : { runId: options.runId ?? "step-run-2", resumeRun: options.resumeRun })
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
     await rm(gh.dir, { recursive: true, force: true })

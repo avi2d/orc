@@ -329,7 +329,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the reviewer chain, the heavy queue tuning, the `orc update` install command and the implementer, fixer, orchestrator, planner and decider models |
+| `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the reviewer chain, the review fix round limit, the heavy queue tuning, the `orc update` install command and the implementer, fixer, orchestrator, planner and decider models |
 | `packages/run/src/shared/config/provider-room.ts` | The default credential of a provider and the room reading a reviewer chain entry takes |
 | `packages/run/src/shared/config/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `packages/run/src/shared/config/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |

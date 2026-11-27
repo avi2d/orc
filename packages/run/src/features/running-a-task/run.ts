@@ -212,7 +212,7 @@ export const runAgentStep = (
     const opened = yield* openRun(request)
     const { fs, path, spawner, home, runId, git, checkout, sandboxKind } = opened
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: withHeavyPath(home, hostPath ?? ""), git: checkout.git }
-    const { folders, agent, fixer, reviewer, plan, planReviewer } = yield* prepareRunAgents(opened, request).pipe(
+    const { folders, agent, fixer, reviewer, plan, planReviewer, maxFixRounds } = yield* prepareRunAgents(opened, request).pipe(
       Effect.tap(() => request.delivery !== undefined && request.delivery !== "no-mistakes" ? Effect.void : requireNoMistakes(noMistakes, checkout.projectDir)),
       Effect.onError(() => removeRunDir(opened))
     )
@@ -249,7 +249,7 @@ export const runAgentStep = (
       taskPath: folders.taskPath, instructions: folders.instructionsPath, agent, fixer, branch: checkout.branch, sandbox: sandboxKind, started,
       worktreeDir: copy.dir,
       machine: opened.machine,
-      delivery: subprocessDeliverer({ ...noMistakes, worktreeDir: copy.dir, branch: checkout.branch }, reviewer, pickChain),
+      delivery: subprocessDeliverer({ ...noMistakes, worktreeDir: copy.dir, branch: checkout.branch, maxFixRounds }, reviewer, pickChain),
       allow: request.allow ?? [],
       answers: request.answers ?? [],
       resumeRun: request.resumeRun,
