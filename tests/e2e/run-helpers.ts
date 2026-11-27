@@ -11,6 +11,8 @@ import { subprocessPullRequestOpener } from "../../packages/run/src/entities/pul
 import { hostGitShim } from "../../packages/run/src/shared/sandbox/host"
 import { askSetupFor, orcCompletionLine } from "../../packages/run/src/entities/agent/index"
 import { runWithHistory } from "../../packages/run/src/features/running-a-task/run"
+import { type ChainReviewer, fixedReviewer } from "../../packages/run/src/features/running-a-task/run-deliverer"
+import type { ReviewerPick } from "../../packages/run/src/features/running-a-task/run-ops"
 import type { OrcRunReport, RunDeliverer } from "../../packages/run/src/features/running-a-task/run-record"
 import { listRuns, openDatabase, openQuestionsForRun, type RunRecord } from "../../packages/run/src/entities/run-history/index"
 import { type FakeAgent, type FakeCheck, fakeOps } from "../lib/fake-ops"
@@ -50,6 +52,25 @@ export const withHome = async (use: (home: string) => Promise<void>): Promise<vo
     await rm(home, { recursive: true, force: true })
   }
 }
+
+export const withOrigin = async (dir: string, use: (origin: string) => Promise<void>): Promise<void> => {
+  const origin = await mkdtemp(join(tmpdir(), "orc-origin-"))
+  try {
+    git(origin, ["init", "-q", "--bare"])
+    git(dir, ["remote", "add", "origin", origin])
+    await use(origin)
+  } finally {
+    await rm(origin, { recursive: true, force: true })
+  }
+}
+
+export const withPushedBase = (dir: string, use: (origin: string) => Promise<void>): Promise<void> =>
+  withOrigin(dir, async (origin) => {
+    const baseBranch = git(dir, ["branch", "--show-current"])
+    git(dir, ["push", "-u", "origin", baseBranch])
+    git(dir, ["remote", "set-head", "origin", baseBranch])
+    await use(origin)
+  })
 
 const implementer: AgentFile = {
   kind: "implementer",
@@ -237,11 +258,11 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
   }
 }
 
-export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerPick = fixedReviewer(reviewer)): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const gh = await stubGh()
   try {
     const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
-      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer }), gh.dir + ":")
+      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer: reviewerPick }), gh.dir + ":")
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
     await rm(gh.dir, { recursive: true, force: true })
@@ -320,6 +341,11 @@ const reviewer: AgentFile = {
   body: "Review the change.",
   path: "bundled/reviewer.md",
   source: "bundled"
+}
+
+export const chainEntry = (model: string): ChainReviewer => {
+  const provider = model.slice(0, model.indexOf("/"))
+  return { provider, model, reviewer: { ...reviewer, model }, credential: { kind: "only-account" } }
 }
 
 const sessionFileName = "2026-10-19T10-00-00-000Z_" + sessionId + ".jsonl"
