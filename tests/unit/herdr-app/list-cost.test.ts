@@ -11,22 +11,30 @@ const node = (): object => {
   return element
 }
 
-interface Shown {
-  readonly id: unknown
-  readonly count: number
-  readonly row: (index: number, cx: Context) => unknown
+interface Range {
+  readonly start: number
+  readonly end: number
 }
+
+type Shown =
+  | { readonly kind: "list"; readonly id: unknown; readonly count: number; readonly row: (index: number, cx: Context) => unknown }
+  | { readonly kind: "uniform"; readonly id: unknown; readonly count: number; readonly rows: (range: Range, cx: Context) => unknown }
 
 const lists: Array<Shown> = []
 
-const list = (id: unknown, count: number, _key: unknown, row: Shown["row"]): object => {
-  lists.push({ id, count, row })
+const list = (id: unknown, count: number, _key: unknown, row: (index: number, cx: Context) => unknown): object => {
+  lists.push({ kind: "list", id, count, row })
+  return node()
+}
+
+const uniformList = (id: unknown, count: number, _key: unknown, rows: (range: Range, cx: Context) => unknown): object => {
+  lists.push({ kind: "uniform", id, count, rows })
   return node()
 }
 
 const documents = new Map<string, unknown>()
 
-void mock.module("gpui-kit", () => ({ View: Object, div: node, list, image: node, svg: node }))
+void mock.module("gpui-kit", () => ({ View: Object, div: node, list, uniform_list: uniformList, image: node, svg: node }))
 void mock.module("gpui-base", () => ({
   h_flex: node, v_flex: node, Input: { new: node }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   Scrollbar: { vertical: node }, ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
@@ -62,17 +70,31 @@ const awaiting = (count: number): void => {
   documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [] })
 }
 
-const frame = (render: () => unknown): { readonly built: number; readonly held: ReadonlyArray<number> } => {
+interface Frame {
+  readonly built: number
+  readonly held: ReadonlyArray<number>
+  readonly entries: ReadonlyMap<unknown, number>
+}
+
+const frame = (render: () => unknown): Frame => {
   lists.length = 0
   built = 0
   render()
+  const entries = new Map<unknown, number>()
   for (const shown of [...lists]) {
-    for (let index = 0; index < Math.min(shown.count, rowsOnScreen); index += 1) shown.row(index, cx)
+    const onScreen = Math.min(shown.count, rowsOnScreen)
+    if (shown.kind === "uniform") {
+      shown.rows({ start: 0, end: onScreen }, cx)
+      entries.set(shown.id, 1)
+    } else {
+      for (let index = 0; index < onScreen; index += 1) shown.row(index, cx)
+      entries.set(shown.id, onScreen)
+    }
   }
-  return { built, held: lists.map((shown) => shown.count) }
+  return { built, held: lists.map((shown) => shown.count), entries }
 }
 
-const agentsFrame = async (count: number) => {
+const agentsFrame = async (count: number, folded = false) => {
   const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
   const { readAgents } = await import("../../../packages/herdr-app/src/agents-read")
   awaiting(count)
@@ -81,6 +103,7 @@ const agentsFrame = async (count: number) => {
   const agents = new OrcAgents()
   agents.list = { kind: "ok", cards: read.value.cards, reread: null }
   agents.agent = read.value.agent
+  agents.folded = folded
   return frame(() => agents.render(cx))
 }
 
@@ -100,6 +123,13 @@ test("an Agents frame with 300 cards awaiting you builds as many elements as one
   const statusHeader = 1
   expect(many.held).toContain(300 + statusHeader)
   expect(many.built).toBe(few.built)
+})
+
+test("an Agents frame enters the script once for the card rows on screen instead of once per row", async () => {
+  const shown = await agentsFrame(300)
+  const rail = await agentsFrame(300, true)
+  expect(shown.entries.get("cards")).toBe(1)
+  expect(rail.entries.get("rail-ids")).toBe(1)
 })
 
 test("an Inbox frame with 300 questions builds as many elements as one with 30 instead of building every question", async () => {
