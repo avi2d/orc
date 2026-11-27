@@ -73,25 +73,22 @@ const awaiting = (count: number): void => {
 interface Frame {
   readonly built: number
   readonly held: ReadonlyArray<number>
-  readonly entries: ReadonlyMap<unknown, number>
+  readonly rangeRows: ReadonlyMap<unknown, number>
 }
+
+const rowsReturned = (rows: unknown): number => Array.isArray(rows) ? rows.length : -1
 
 const frame = (render: () => unknown): Frame => {
   lists.length = 0
   built = 0
   render()
-  const entries = new Map<unknown, number>()
+  const rangeRows = new Map<unknown, number>()
   for (const shown of [...lists]) {
     const onScreen = Math.min(shown.count, rowsOnScreen)
-    if (shown.kind === "uniform") {
-      shown.rows({ start: 0, end: onScreen }, cx)
-      entries.set(shown.id, 1)
-    } else {
-      for (let index = 0; index < onScreen; index += 1) shown.row(index, cx)
-      entries.set(shown.id, onScreen)
-    }
+    if (shown.kind === "uniform") rangeRows.set(shown.id, rowsReturned(shown.rows({ start: 0, end: onScreen }, cx)))
+    else for (let index = 0; index < onScreen; index += 1) shown.row(index, cx)
   }
-  return { built, held: lists.map((shown) => shown.count), entries }
+  return { built, held: lists.map((shown) => shown.count), rangeRows }
 }
 
 const agentsFrame = async (count: number, folded = false) => {
@@ -115,9 +112,9 @@ test("an Agents frame with 300 cards awaiting you builds as many elements as one
   expect(many.built).toBe(few.built)
 })
 
-test("an Agents frame enters the script once for the card rows on screen instead of once per row", async () => {
+test("an Agents frame hands its card rows to uniform_list, whose one range call returns the rows on screen instead of every row", async () => {
   const shown = await agentsFrame(300)
   const rail = await agentsFrame(300, true)
-  expect(shown.entries.get("cards")).toBe(1)
-  expect(rail.entries.get("rail-ids")).toBe(1)
+  expect(shown.rangeRows.get("cards")).toBe(rowsOnScreen)
+  expect(rail.rangeRows.get("rail-ids")).toBe(rowsOnScreen)
 })
