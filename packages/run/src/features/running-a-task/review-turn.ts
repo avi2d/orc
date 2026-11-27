@@ -91,7 +91,7 @@ export const runReviewTurn = (
     if (Result.isFailure(rules)) {
       return { status: "failed", reason: rules.failure.message }
     }
-    const first = reviewPrompt(reviewer, run.path.join(run.piSessionDir, "task.md"), diffed.success) + (mode === "orc" ? "\nFor this review, severity must be error, warning or info, instead of any other severity names." : "") + pathRulesSection(rules.success)
+    const first = reviewPrompt(reviewer, run.path.join(run.piSessionDir, "task.md"), diffed.success) + (mode === "orc" ? "\nFor this review, severity must be error, warning or info, instead of any other severity names. Add a topic field to each finding: a short stable slug for the problem. Keep the same topic for the same problem across review rounds. Set action to exactly ask-user when the finding needs the user's decision; otherwise describe the fix." : "") + pathRulesSection(rules.success)
     let prompt = first
     let resumeSession: string | null = null
     let problem = ""

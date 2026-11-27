@@ -174,10 +174,19 @@ describe("the orc review turn sends the project's path rules for the changed fil
     expect(runs[0]?.prompt).not.toContain("path rules")
   })
 
+  test("an orc finding without a topic is retried rather than accepted for id matching", async () => {
+    const missing = { ...finding, severity: "error" }
+    const complete = { ...missing, topic: "stray-comment" }
+    const { outcome, runs, saved } = await review([JSON.stringify([missing]), JSON.stringify([complete])], { mode: "orc", config: "commands: {}\n" })
+    expect(runs).toHaveLength(2)
+    expect(outcome).toMatchObject({ status: "passed", findings: [complete] })
+    expect(JSON.parse(saved ?? "null")).toEqual([complete])
+  })
+
   test("a path rule with no instructions fails the review before the reviewer runs instead of dropping the rule", async () => {
     const { outcome, runs, saved } = await review(["[]"], { mode: "orc", changed: "docs/guide.md", config: "review:\n  path_instructions:\n    - path: \"docs/**\"\n" })
     expect(runs).toHaveLength(0)
-    expect(outcome).toMatchObject({ status: "failed", reason: expect.stringContaining("review.path_instructions") })
+    expect(outcome).toMatchObject({ status: "failed", reason: expect.stringContaining("path_instructions") })
     expect(saved).toBeNull()
   })
 })

@@ -13,7 +13,7 @@ const login = { id: "acme", credential: "pi-login" } as const
 
 const keyed = { id: "keyed", credential: "token-file", tokenFile: { env: "ACME_TOKEN_FILE" } } as const
 
-const config: OrcConfig = { file: "/home/me/.orc/config.json", providers: [login, keyed] }
+const config: OrcConfig = { file: "/home/me/.orc/config.json", providers: [login, keyed], review: { maxFixRounds: 2 } }
 
 const tokenFileProblem = (source: TokenFileSource): Promise<string | null> =>
   Effect.runPromise(Effect.gen(function*() {
@@ -59,7 +59,7 @@ describe("routeOfAgents", () => {
   })
 
   test("a config with no providers refuses every model instead of falling back to a built-in one", () => {
-    expect(Result.isFailure(routeOfAgents({ file: config.file, providers: [] }, { agent: model, fixer: model }, undefined))).toBe(true)
+    expect(Result.isFailure(routeOfAgents({ file: config.file, providers: [], review: config.review }, { agent: model, fixer: model }, undefined))).toBe(true)
   })
 
   test("an implementer on a configured provider with a fixer elsewhere is refused with the config file only", () => {

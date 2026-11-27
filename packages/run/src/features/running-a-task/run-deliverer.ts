@@ -41,14 +41,14 @@ export const chainReviewer = (options: ReviewerChainOptions): ReviewerPick => {
     })
 }
 
-export const subprocessDeliverer = (host: SubprocessRunnerOptions & { readonly branch: string }, prepared: PreparedReviewer, pickChain: (chain: Arr.NonEmptyReadonlyArray<ChainReviewer>) => ReviewerPick): RunDeliverer => {
+export const subprocessDeliverer = (host: SubprocessRunnerOptions & { readonly branch: string; readonly maxFixRounds: number }, prepared: PreparedReviewer, pickChain: (chain: Arr.NonEmptyReadonlyArray<ChainReviewer>) => ReviewerPick): RunDeliverer => {
   switch (prepared.kind) {
     case "direct-PR":
       return { kind: "direct-PR", opener: subprocessPullRequestOpener({ ...host, gh: "gh" }), reviewer: prepared.reviewer }
     case "orc":
-      return { kind: "orc", opener: subprocessPullRequestOpener({ ...host, gh: "gh" }), reviewer: fixedReviewer(prepared.reviewer) }
+      return { kind: "orc", opener: subprocessPullRequestOpener({ ...host, gh: "gh" }), reviewer: fixedReviewer(prepared.reviewer), maxFixRounds: host.maxFixRounds }
     case "orc-chain":
-      return { kind: "orc", opener: subprocessPullRequestOpener({ ...host, gh: "gh" }), reviewer: pickChain(prepared.chain) }
+      return { kind: "orc", opener: subprocessPullRequestOpener({ ...host, gh: "gh" }), reviewer: pickChain(prepared.chain), maxFixRounds: host.maxFixRounds }
     case "no-mistakes":
       return { kind: "no-mistakes", runner: subprocessNoMistakesRunner(host) }
   }

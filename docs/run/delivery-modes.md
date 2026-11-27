@@ -15,8 +15,14 @@ A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: 
 ## Orc delivery
 An `orc` run fetches `origin` and rebases its branch onto the default branch recorded by `refs/remotes/origin/HEAD` before running the project checks.
 If the rebase fails, the run does not open a PR.
-After the checks pass, the run reviews the branch and fixes the findings in at most two rounds.
-The first round fixes every finding, and the second round fixes only the `error` findings the next review still reports.
+After the checks pass, the run reviews the branch and fixes findings in up to two rounds by default.
+Set `review.maxFixRounds` in `$ORC_HOME/config.json` to a positive integer to change the limit.
+When the first round runs, it sends every finding to the fixer, except findings marked `ask-user`.
+Later rounds send only `error` findings.
+The loop stops when no `error` or `warning` remains, the round limit is reached, a finding repeats, or an `ask-user` error is open.
+It also stops when no finding can go to the fixer.
+That stop names the later rounds' severity bar or the need for the user's decision.
+The run's end reason records why the loop stopped.
 The run history records each review turn as its own `review` step, numbered by attempt.
 If a review turn fails, a fix does not finish, or a check fails after a fix, the run stops without opening a PR.
 Otherwise, the run pushes the branch and opens or reuses a PR.
@@ -25,12 +31,13 @@ To select this delivery for a project, set its `mode` to `orc` in `projects.json
 For a run or resume you start by hand, pass `--delivery orc`.
 
 ## Review the branch
-Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one [Pi](https://pi.dev) turn with the reviewer agent over that diff and the task file.
-In `orc` delivery, orc also reads `review.path_instructions` from `.no-mistakes.yaml` in the run's worktree.
+After local checks pass, orc writes the branch diff to `diff.md` in the session folder.
+A [Pi](https://pi.dev) reviewer reads the diff and task file.
+In `orc` delivery, orc also reads the `path_instructions` list under `review` in `.no-mistakes.yaml` in the run's worktree.
 Each entry holds a `path` glob and its `instructions`.
 Orc adds each entry whose glob matches a changed file to the review prompt, and the reviewer names that glob in each finding the entry raises.
 An entry missing either string fails the review turn.
-Orc decodes the findings JSON array from the reviewer's last reply and writes it to the run folder as `review.json`, then `review-2.json` and `review-3.json` in later orc turns.
+Orc decodes the findings JSON array from the reviewer's last reply and writes it to the run folder as `review.json`, then `review-2.json`, `review-3.json` and so on in later orc turns.
 An unreadable reply gets one rerun on the same session, and a second one fails the review turn.
 The run's end reason names the finding count or the review failure.
 The run history records the turn as the `review` step with its times and the reviewer's model.
@@ -94,10 +101,16 @@ A review with no findings gives the line `The review found nothing.`, and a fail
 After a successful review and any fix rounds, an `orc` run opens its PR the same way, with the remaining findings.
 Findings that remain after the fix rounds do not stop the PR.
 Under each remaining finding, a nested line says why the fix loop left it.
-A `warning` or `info` finding is below the round 2 bar, which fixes only errors.
-For an `error` finding with the same id and file as one the fixer already received, the reason line names that match and the round.
-Any other `error` finding came from the review after fix round 2, so the round limit was reached.
-Orc does not yet mark a finding as left because it needs a person's decision.
+An `ask-user` finding stays out of the fixer input and remains in the PR body.
+If the final review reports the same finding again, the PR uses that review's wording and action.
+When a later round is available, a `warning` or `info` finding is below its severity bar, which fixes only errors.
+If no fix round runs because no `error` or `warning` remains, the reason line names that stop.
+If no fix round is left, the reason line names the round limit.
+A repeat has the same file and topic as a finding the fixer received earlier.
+Only findings eligible for the next fix round can trigger the repeat stop.
+The reviewer supplies a stable topic slug for each finding and keeps it across review rounds.
+A finding without a topic fails decoding and follows the unreadable-reply retry rule.
+The reason line names the match and the round, or the stop that left the finding open.
 
 ## After the PR opens
 A direct-PR run succeeds as soon as the PR opens.

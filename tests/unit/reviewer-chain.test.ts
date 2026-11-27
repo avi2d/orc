@@ -122,6 +122,20 @@ describe("the reviewers config", () => {
   }
   const providers = [{ id: "anthropic", credential: "pi-login" }, { id: "openai", credential: "pi-login" }]
 
+  test.each([{}, { review: {} }])("an omitted round limit defaults to two rather than remaining unset: %j", async (settings) => {
+    const exit = await readWith({ providers, ...settings })
+    expect(Exit.isSuccess(exit) ? exit.value : null).toMatchObject({ review: { maxFixRounds: 2 } })
+  })
+
+  test.each([1, 3])("keeps the configured round limit %s rather than replacing it with two", async (maxFixRounds) => {
+    const exit = await readWith({ providers, review: { maxFixRounds } })
+    expect(Exit.isSuccess(exit) ? exit.value : null).toMatchObject({ review: { maxFixRounds } })
+  })
+
+  test.each([0, -1, 1.5, "2", null])("refuses an invalid round limit rather than running an unbounded loop: %j", async (maxFixRounds) => {
+    expect(Exit.isFailure(await readWith({ providers, review: { maxFixRounds } }))).toBe(true)
+  })
+
   test("keeps the entries in their written order", async () => {
     const exit = await readWith({ providers, reviewers: [openai, anthropic] })
     expect(Exit.isSuccess(exit) ? exit.value.reviewers : null).toEqual([openai, anthropic])
