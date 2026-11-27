@@ -103,7 +103,7 @@ After a successful review and any fix rounds, an `orc` run opens its PR the same
 Findings that remain after the fix rounds do not stop the PR.
 Under each remaining finding, a nested line says why the fix loop left it.
 An `ask-user` finding stays out of the fixer input and remains in the PR body.
-If the final review reports the same finding again, the PR uses that review's wording and action.
+If a later review reports the same finding again, its wording and action replace the earlier report.
 When a later round is available, a `warning` or `info` finding is below its severity bar, which fixes only errors.
 If no fix round runs because no fixable `error` or `warning` remains, the reason line names that stop.
 If no fix round is left, the reason line names the round limit.
