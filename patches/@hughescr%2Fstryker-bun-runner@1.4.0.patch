@@ -1,5 +1,5 @@
 diff --git a/dist/index.js b/dist/index.js
-index 53ceac152f18ca4b34f068b2f1cd8a3012caa5f6..8d49d3aa0d1131bcbbac316ff4974ed4401afbb5 100644
+index 53ceac152f18ca4b34f068b2f1cd8a3012caa5f6..981d723534cd29edcc623ff842e395dc56664e93 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -8138,6 +8138,19 @@ function absolutizePathValue(value, projectCwd) {
@@ -31,3 +31,42 @@ index 53ceac152f18ca4b34f068b2f1cd8a3012caa5f6..8d49d3aa0d1131bcbbac316ff4974ed4
      }
    }
    sanitizedTest.coverage = false;
+@@ -8357,6 +8370,7 @@ class BunTestRunner {
+   bunArgs;
+   testFilesOverride;
+   mutateGlobs;
++  eagerExclude;
+   smol;
+   maxChildRss;
+   rssCheckIntervalMs;
+@@ -8383,6 +8397,7 @@ class BunTestRunner {
+     this.inspectorTimeout = bunOptions.inspectorTimeout ?? 5000;
+     this.env = bunOptions.env;
+     this.bunArgs = bunOptions.bunArgs;
++    this.eagerExclude = bunOptions.eagerExclude ?? [];
+     this.smol = bunOptions.smol ?? false;
+     this.maxChildRss = bunOptions.maxChildRss;
+     this.rssCheckIntervalMs = bunOptions.rssCheckIntervalMs;
+@@ -8490,7 +8505,7 @@ class BunTestRunner {
+     this.logger.debug("Generating coverage preload script...");
+     const eagerCwd = process.cwd();
+     if (this.cachedEagerModules === undefined || this.cachedEagerModulesCwd !== eagerCwd) {
+-      this.cachedEagerModules = await resolveEagerModulesFromGlobs(this.mutateGlobs);
++      this.cachedEagerModules = await resolveEagerModulesFromGlobs([...this.mutateGlobs, ...this.eagerExclude.map((glob2) => '!' + glob2)]);
+       this.cachedEagerModulesCwd = eagerCwd;
+       this.logger.debug("Resolved %d eager modules from mutate globs", this.cachedEagerModules.length);
+     }
+@@ -9263,6 +9278,13 @@ var strykerValidationSchema = {
+             type: "string"
+           }
+         },
++        eagerExclude: {
++          type: "array",
++          description: "Globs of mutated source files the coverage preload does not import before the tests. A failed import stays failed for the test file that follows, so list the files that only load once a test has mocked a module they import.",
++          items: {
++            type: "string"
++          }
++        },
+         testFiles: {
+           type: "array",
+           description: "Explicit list of test file paths (relative paths preferred in Stryker context — absolute paths bypass the sandbox copy and will NOT be mutated). When provided, skips auto-discovery and uses this list verbatim. Relative paths resolve against the bun subprocess's cwd. An empty array is invalid (use undefined/omit to enable auto-discovery).",
