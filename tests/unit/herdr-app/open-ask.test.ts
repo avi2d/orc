@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test"
 import type { AsyncContext, Context } from "gpui-kit"
 import type { Card } from "../../../packages/herdr-app/src/agents"
-import { agentsOpenKey } from "../../../packages/herdr-app/src/views"
 import { cx, sharedValues } from "./gpui-fakes"
 
 const idle = () => ({ cancel: () => undefined, is_done: () => true })
@@ -14,6 +13,7 @@ const done = (id: string): Card => ({
 
 test("an Open run ask is taken on a timer tick, not inside render where the App refuses a notify", async () => {
   const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const { agentsOpenKey } = await import("../../../packages/herdr-app/src/views")
   const ticks: Array<(tick: Context) => void> = []
   let notifies = 0
   const counting = Object.assign(class extends cx {}, {

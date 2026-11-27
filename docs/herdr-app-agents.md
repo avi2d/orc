@@ -15,11 +15,11 @@ Each header shows its count after its name.
 Select a header to fold or unfold its rows.
 Each row shows a status dot, the agent's logo, the task ID with the first words of its title, and a time.
 The model and effort sit before the time, such as `opus-5-5 h`.
-On an **Awaiting you** row, what the task waits on takes the place of the model: the kind of the one item, `PR #48` for a PR to approve, or a count such as `2 items`.
+On an **Awaiting you** row, what the task waits on replaces the model, such as `PR #48`, `question` or `2 items`.
 The time is how long a question has waited on you, how long a running run has run, or how long a finished run took.
 Type in **Find a run** to show only the runs whose task ID or title holds those words.
-A hold you set without a question parks its task under **Queued**, not **Awaiting you**.
-A hold question or an overdue hold still puts its task under **Awaiting you**.
+A hold you set without a question parks its task under **Queued**.
+A hold question or an overdue hold still puts it under **Awaiting you**.
 A queued task whose hold waits on other tasks reads **Waits on** and their IDs.
 Those tasks are its open children and dependencies, its children done as ship tasks whose PR is not merged, the same kind of dependency when the held task is a ship task, and a dependency the backlog does not hold.
 The **Project** select shows runs for configured projects by default.
