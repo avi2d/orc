@@ -1,6 +1,6 @@
 import { type Context, type Element, div } from "gpui-kit"
 import { type InputState, h_flex, v_flex } from "gpui-base"
-import { type Card, type CardStatus, type Filter, cardStatuses, filterCards, railLabel } from "./agents"
+import { type Card, type CardStatus, type Filter, cardStatuses, filterCards, railLabel, unfoldedCards } from "./agents"
 import { rowFacts } from "./agent-row"
 import { type AlertAction, type AlertShown, alert, button, field, selectTrigger, statusDot, vendorLogo, zinc } from "./kit"
 import type { palette } from "./palette"
@@ -73,7 +73,7 @@ const groupRows = (visible: ReadonlyArray<Card>, folded: ReadonlySet<CardStatus>
     const cards = visible.filter((card) => card.standing.status === status)
     if (cards.length === 0) return []
     const group: ListRow = { kind: "group", status, count: cards.length }
-    return folded.has(status) ? [group] : [group, ...cards.map((card): ListRow => ({ kind: "card", card }))]
+    return [group, ...unfoldedCards(cards, folded).map((card): ListRow => ({ kind: "card", card }))]
   })
 
 const noMatch = (shown: RunsShown, all: ReadonlyArray<Card>, act: RunsActions): AlertShown => {
@@ -172,7 +172,7 @@ const header = (t: Palette, all: ReadonlyArray<Card>, shown: RunsShown, act: Run
       .child(selectTrigger(t, "filter-project", `Project: ${projectMenu(all, shown.filter).chosen.name}`, controlHeight, (cx) => act.openMenu(cx, !shown.menuOpen))))
 
 const rail = (t: Palette, shown: RunsShown, act: RunsActions): Element => {
-  const cards = shown.list.kind === "ok" ? filterCards(shown.list.cards, shown.filter, findWords(shown)) : []
+  const cards = shown.list.kind === "ok" ? unfoldedCards(filterCards(shown.list.cards, shown.filter, findWords(shown)), shown.foldedGroups) : []
   return v_flex().id("rail").w(railWidth).h_full().flex_shrink_0().bg(t.chrome).border_r(1).border_color(t.border)
     .child(h_flex().h(titleRow + headerTop * 2).px(8).items_center().child(button(t, "unfold", "»", "ghost", 24, act.toggleFold)))
     .child(rowsList("rail-ids", cards, (card) => card.key, (card) =>

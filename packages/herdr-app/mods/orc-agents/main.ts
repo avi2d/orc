@@ -4,7 +4,7 @@ import { layout, run, setShared, shared } from "herdr"
 import { AgentAttentionSection } from "../../src/agent-attention-view"
 import { type InboxItem, holdsOnTasks } from "../../src/inbox"
 import type { AgentAttention } from "../../src/inbox-read"
-import { type Card, type CardStatus, type Filter, approvalOf, cardAnswers, filterCards, goesOn, lastTab, openedFilter, recordedStatus } from "../../src/agents"
+import { type Card, type CardStatus, type Filter, approvalOf, cardAnswers, filterCards, goesOn, lastTab, openedFilter, recordedStatus, unfoldedCards } from "../../src/agents"
 import { type RunFacts, runFacts } from "../../src/run-agent"
 import { type LocalAgents, agentsDocuments, readAgentQuestions, readLocalAgents } from "../../src/agents-read"
 import type { AttentionQueue } from "../../src/guard-attention"
@@ -272,7 +272,7 @@ export default class OrcAgents extends View {
 
   visibleCards(): ReadonlyArray<Card> {
     const words = this.find.value()
-    return filterCards(this.allCards(), this.filter, words).filter((card) => !this.foldedGroups.has(card.standing.status))
+    return unfoldedCards(filterCards(this.allCards(), this.filter, words), this.foldedGroups)
   }
 
   selectedCard(): Card | null {

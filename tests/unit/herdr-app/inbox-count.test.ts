@@ -72,6 +72,7 @@ const mouseDown = (made: Node): void => {
 }
 
 const documents = new Map<string, unknown>()
+const sessionFiles = new Map<string, string>()
 let attentionPending: Promise<{ code: number; stdout: string; stderr: string }> | null = null
 const executed: Array<string> = []
 const spawned: Array<Promise<unknown>> = []
@@ -164,7 +165,7 @@ void mock.module("herdr", () => ({
       ? { code: 1, stdout: "", stderr: `Unexpected command: ${line}` }
       : { code: 0, stdout: JSON.stringify(document), stderr: "" })
   },
-  settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined, readTextFile: () => undefined,
+  settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined, readTextFile: (file: string) => Promise.resolve(sessionFiles.get(file) ?? null),
   run: (name: string, args: unknown) => ran.push({ name, args })
 }))
 
@@ -363,6 +364,93 @@ test("pressing a run row through the list selects that run, not the run selected
   agents.folded = true
   pressRow(agents.render(cx), "rail-ids", "garden-8")
   expect(agents.selectedKey).toBe("garden-8")
+})
+
+test("folded groups stay absent from the rail instead of offering rows that select another run", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const data = await loadAttention()
+  const cards: ReadonlyArray<Card> = [
+    ...data.agents.cards, queued,
+    ...(["Running", "Failed", "Done"] as const).map((status) => ({
+      ...queued, key: status, id: status, standing: { status }
+    }))
+  ]
+  for (const card of cards) {
+    const agents = new OrcAgents()
+    agents.refresh = () => undefined
+    const other: Card = { ...queued, key: "other", standing: { status: card.standing.status === "Queued" ? "Running" : "Queued" } }
+    agents.list = { kind: "ok", cards: [other, card], reread: null }
+    agents.selectedKey = card.key
+    expect(find(agents.render(cx), `card-${card.key}`)).not.toBeNull()
+    pressRow(agents.render(cx), "cards", `group-${card.standing.status}`)
+    expect(find(agents.render(cx), `card-${card.key}`)).toBeNull()
+    expect(agents.selectedCard()?.key).toBe(other.key)
+    press(agents, "fold")
+    expect(find(agents.render(cx), `rail-${card.key}`)).toBeNull()
+    pressRow(agents.render(cx), "rail-ids", other.key)
+    expect(agents.selectedCard()?.key).toBe(other.key)
+    press(agents, "unfold")
+    pressRow(agents.render(cx), "cards", `group-${card.standing.status}`)
+    pressRow(agents.render(cx), "cards", `card-${card.key}`)
+    expect(agents.selectedCard()?.key).toBe(card.key)
+    press(agents, "fold")
+    pressRow(agents.render(cx), "rail-ids", card.key)
+    expect(agents.selectedCard()?.key).toBe(card.key)
+  }
+})
+
+test.each([
+  { name: "implement", file: null },
+  { name: "implement", file: "empty-agent.jsonl" },
+  { name: "fix", file: "empty-fix.jsonl" },
+  { name: "review", file: "empty-review.jsonl" }
+])("a failed $name step with session $file shows its log instead of an empty Turns pane", async ({ name, file }) => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const runId = "20261126-090000-aaaaaa"
+  const agents = new OrcAgents()
+  agents.list = { kind: "ok", cards: [{ ...queued, key: runId, runId, standing: { status: "Failed" } }], reread: null }
+  const step = { id: 1, name, attempt: 1, status: "failed", model: "claude-opus-5-5", thinking: "high", piSessionFile: file, from: null }
+  documents.set(`orc show ${runId} --json`, { schema: "orc.show.v1", run: { taskFile: "task.md" }, steps: [step] })
+  const error = "Agent could not start: provider unavailable"
+  documents.set(`orc log ${runId} 1`, error)
+  if (file !== null) sessionFiles.set(file, "")
+  try {
+    await agents.readSelectedRun()
+    expect(executed).toContain(`orc log ${runId} 1`)
+    expect(wordsUnder(agents.render(cx), "log")).toContain(JSON.stringify(error))
+    expect(wordsOf(agents.render(cx))).not.toContain("No turn yet. Pi writes its session after its first reply.")
+  } finally {
+    documents.clear()
+    sessionFiles.clear()
+  }
+})
+
+test("a Pi session's first reply replaces the startup log instead of leaving the step in log view", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const runId = "20261126-090000-aaaaaa"
+  const file = "agent-session.jsonl"
+  const agents = new OrcAgents()
+  agents.list = { kind: "ok", cards: [{ ...queued, key: runId, runId, standing: { status: "Running" } }], reread: null }
+  const step = { id: 1, name: "implement", attempt: 1, status: "running", model: "claude-opus-5-5", thinking: "high", piSessionFile: file, from: null }
+  documents.set(`orc show ${runId} --json`, { schema: "orc.show.v1", run: { taskFile: "task.md" }, steps: [step] })
+  documents.set(`orc log ${runId} 1`, "Starting agent")
+  sessionFiles.set(file, "")
+  try {
+    await agents.readSelectedRun()
+    expect(find(agents.render(cx), "log")).not.toBeNull()
+    sessionFiles.set(file, JSON.stringify({
+      type: "message", id: "reply-1", parentId: null,
+      message: { role: "assistant", content: [{ type: "text", text: "Ready to work" }], usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 }, timestamp: 0 }
+    }) + "\n")
+    executed.length = 0
+    await agents.readSelectedRun()
+    expect(find(agents.render(cx), "turn-reply-1")).not.toBeNull()
+    expect(find(agents.render(cx), "log")).toBeNull()
+    expect(executed).not.toContain(`orc log ${runId} 1`)
+  } finally {
+    documents.clear()
+    sessionFiles.clear()
+  }
 })
 
 test("an Inbox choice sends the option text to the right question once instead of sending the outcome or both options", async () => {

@@ -315,6 +315,9 @@ export const filterCards = (cards: ReadonlyArray<Card>, filter: Filter, find = "
   cards.filter((card) =>
     (filter.project === null ? filter.allRuns || card.known : card.project === filter.project) && findsCard(card, find))
 
+export const unfoldedCards = (cards: ReadonlyArray<Card>, folded: ReadonlySet<CardStatus>): ReadonlyArray<Card> =>
+  cards.filter((card) => !folded.has(card.standing.status))
+
 export const openedFilter = (cards: ReadonlyArray<Card>, key: string): Filter =>
   ({ project: null, allRuns: cards.some((card) => card.key === key && !card.known) })
 

@@ -8,6 +8,8 @@ Press `cmd-k` to open or close the chat drawer.
 
 ## Follow a run in the Agents tab
 
+### Read the run list
+
 The list shows runs and queued tasks under five headers: **Awaiting you**, **Running**, **Queued**, **Failed** and **Done**.
 Each header shows its count after its name.
 Select a header to fold or unfold its rows.
@@ -24,6 +26,8 @@ A merged PR shows its run as Done.
 A closed PR shows its run as Failed.
 Select « to collapse the list and » to open it.
 
+### When the list cannot be reread
+
 The list rereads the runs while you watch.
 If a reread fails, a card above the list says why and when the list below was read.
 Select **Retry** on it to read the runs again.
@@ -31,12 +35,14 @@ A Thread that cannot be read shows the same kind of card with **Retry**.
 
 ![Agents tab with a card that could not reread the runs above the list, and a card that could not read the selected run's thread](images/herdr-agents-reread-failed.png)
 
+### Open a run
+
 Select a run to open it on the right.
 Its header shows the task's title, a status dot with what the run waits on or why it stopped, and the project, route and run ID.
 Below the header, one row of tabs holds **Thread** first, then one tab per step, then **Approve** or **Send back** while a PR is open.
 Steps that share a name are numbered by their place in the run, such as **Checks 1** and **Checks 2**.
 Steps still to come are dim.
-Point at a step's tab to see its model.
+If a step's model differs from the Agent step's, point at its tab to see the model.
 
 A run opens on the tab that needs you:
 
@@ -51,6 +57,7 @@ A run opens on the tab that needs you:
 | Done otherwise | the last step |
 
 [Pi](https://pi.dev) steps show a card for each reply.
+If a Pi step has no replies yet, it shows its log.
 Checks steps show one row per check, as [Read a Checks step](herdr-app.md#read-a-checks-step) describes.
 Other steps show their log.
 

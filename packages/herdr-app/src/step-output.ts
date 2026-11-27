@@ -19,7 +19,14 @@ export class StepOutput {
 
   read(of: string, runId: string, step: ShownStep, taskFile: string): Promise<void> {
     if (step.name === "checks") return this.readSummary(of, runId, step, taskFile)
-    if (opensTurns(step)) return this.readTurns(of, step.piSessionFile)
+    if (opensTurns(step)) {
+      return this.readTurns(of, step.piSessionFile).then(() => {
+        const turns = this.turns
+        if (turns?.of === of && turns.reading.kind === "ok" && turns.reading.value.length === 0) {
+          return this.readLog(of, runId, step.id).then(() => undefined)
+        }
+      })
+    }
     return this.readLog(of, runId, step.id).then(() => undefined)
   }
 

@@ -156,7 +156,9 @@ const stepBody = (t: Palette, card: Card, runId: string, step: ShownStep, shown:
     return [div().flex_1().min_h_0().pt(12).child(checksView(t, shown.summary, { of: `${runId}/${step.id.toString()}`, flipped: shown.checks, flip: shown.flipCheck }, shown.checksScroll, () => logBody(t, shown.log, shown.logScroll)))]
   }
   if (opensTurns(step)) {
-    return [...(step.status === "running" ? askedLine(t, card, act) : []),
+    const asked = step.status === "running" ? askedLine(t, card, act) : []
+    if (shown.turns.kind === "ok" && shown.turns.value.length === 0) return [...asked, logBody(t, shown.log, shown.logScroll)]
+    return [...asked,
       div().flex_1().min_h_0().child(turnsView(t, shown.turns, { thinking: shown.thinking, calls: shown.calls }, {
         toggleThinking: (turn, cx) => shown.flipThinking(turn, cx),
         toggleCall: (call, cx) => shown.flipCall(call, cx)

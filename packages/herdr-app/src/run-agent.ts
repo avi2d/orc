@@ -17,7 +17,7 @@ const agentOf = (step: Pick<ShownStep, "model" | "thinking"> | undefined): StepA
 
 export const runFacts = (shown: Pick<Show, "started" | "ended" | "steps">): RunFacts => ({
   implement: agentOf(shown.steps.find((step) => step.name === "implement")),
-  running: agentOf(shown.steps.filter((step) => step.status === "running").at(-1)),
+  running: agentOf(shown.steps.filter((step) => step.status === "running").at(-1)) ?? agentOf(shown.steps.filter((step) => step.model !== null).at(-1)),
   started: shown.started,
   ended: shown.ended
 })

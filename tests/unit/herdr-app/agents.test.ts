@@ -357,6 +357,24 @@ describe("the row of a run", () => {
     expect(row).toEqual({ title: "orc-240-scorecard", model: "sonnet-5-5 m", vendor: "claude", duration: "49m" })
   })
 
+  test.each(["checks", "pr", "no-mistakes"])("a running %s step keeps the Agent model and logo instead of dropping them", (name) => {
+    const running = runFacts({ started, ended: null, steps: [
+      { ...steps[0], attempt: 1, piSessionFile: null, from: null },
+      { id: 2, name, status: "running", model: null, thinking: null, attempt: 1, piSessionFile: null, from: null }
+    ] })
+    const row = rowFacts({ id: "orc-240", title: "Scorecard", standing: { status: "Running" } }, running, Date.parse(ended))
+    expect([row.model, row.vendor]).toEqual(["opus-5-5 h", "claude"])
+  })
+
+  test("running Checks after Fix keeps the last model instead of returning to the Agent model", () => {
+    const running = runFacts({ started, ended: null, steps: [
+      ...steps.map((step) => ({ ...step, status: "passed", attempt: 1, piSessionFile: null, from: null })),
+      { id: 4, name: "checks", status: "running", model: null, thinking: null, attempt: 1, piSessionFile: null, from: null }
+    ] })
+    const row = rowFacts({ id: "orc-240", title: "Scorecard", standing: { status: "Running" } }, running, Date.parse(ended))
+    expect([row.model, row.vendor]).toEqual(["sonnet-5-5 m", "claude"])
+  })
+
   test("a finished run shows the Agent step's model and its start to end time, not the time since it started", () => {
     const done = runFacts({ started, ended, steps: steps.map((step) => ({ ...step, status: "passed", attempt: 1, piSessionFile: null, from: null })) })
     const row = rowFacts({ id: "orc-240", title: "Scorecard", standing: { status: "Done" } }, done, Date.parse("2026-11-14T00:00:00Z"))
