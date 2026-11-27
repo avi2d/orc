@@ -23,10 +23,12 @@ export const sameFinding = (one: ReviewFinding, other: ReviewFinding): boolean =
   return oneTopic !== undefined && otherTopic !== undefined ? oneTopic === otherTopic : one.id === other.id
 }
 
-export const leftFindings = (remaining: ReadonlyArray<ReviewFinding>, sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>, stop: ReviewStop = "round-limit"): ReadonlyArray<LeftFinding> =>
-  remaining.map((finding) => {
+export const leftFindings = (remaining: ReadonlyArray<ReviewFinding>, sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>, stop: ReviewStop, askUserFindings: ReadonlyArray<ReviewFinding>): ReadonlyArray<LeftFinding> =>
+  [...remaining, ...askUserFindings.filter((finding) => !remaining.some((current) => sameFinding(current, finding)))].map((finding) => {
     if (finding.action === "ask-user") return { finding, reason: { kind: "ask-user" } }
-    if (!passesRoundTwoBar(finding)) return { finding, reason: { kind: "below-round-2-bar" } }
+    if (stop === "cleared") return { finding, reason: { kind: "stopped", stop } }
+    if (stop === "round-limit" && !passesRoundTwoBar(finding)) return { finding, reason: { kind: "round-limit", round: sentPerRound.length } }
+    if (!passesRoundTwoBar(finding) && sentPerRound.length > 0) return { finding, reason: { kind: "below-round-2-bar" } }
     const sentIn = sentPerRound.findLastIndex((sent) => sent.some((earlier) => sameFinding(earlier, finding)))
     if (sentIn !== -1) {
       const earlier = sentPerRound[sentIn]?.find((item) => sameFinding(item, finding))

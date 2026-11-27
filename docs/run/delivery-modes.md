@@ -17,7 +17,7 @@ An `orc` run fetches `origin` and rebases its branch onto the default branch rec
 If the rebase fails, the run does not open a PR.
 After the checks pass, the run reviews the branch and fixes findings in up to two rounds by default.
 Set `review.max_fix_rounds` in `.no-mistakes.yaml` to a positive integer to change the limit.
-The first round sends `error` and `warning` findings to the fixer, except findings marked `ask-user`.
+When the first round runs, it sends every finding to the fixer, except findings marked `ask-user`.
 Later rounds send only `error` findings.
 The loop stops when no `error` or `warning` remains, the round limit is reached, a finding repeats, or an `ask-user` error is open.
 It also stops when no finding meets the later rounds' severity bar.
@@ -97,8 +97,12 @@ After a successful review and any fix rounds, an `orc` run opens its PR the same
 Findings that remain after the fix rounds do not stop the PR.
 Under each remaining finding, a nested line says why the fix loop left it.
 An `ask-user` finding stays out of the fixer input and remains in the PR body.
-A `warning` or `info` finding is below the round 2 bar, which fixes only errors.
+If the final review reports the same finding again, the PR uses that review's wording and action.
+When a later round is available, a `warning` or `info` finding is below its severity bar, which fixes only errors.
+If no fix round runs because no `error` or `warning` remains, the reason line names that stop.
+If no fix round is left, the reason line names the round limit.
 A repeat has the same file and topic as a finding the fixer received earlier.
+Only findings eligible for the next fix round can trigger the repeat stop.
 The reviewer supplies a stable topic slug for each finding and keeps it across review rounds.
 If either finding has no topic, orc compares their ids instead.
 The reason line names the match and the round, or the stop that left the finding open.

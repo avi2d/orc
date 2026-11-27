@@ -224,6 +224,66 @@ test("an ask-user warning is not sent to the fixer", async () => {
   expect(result.body).toContain("Left because it asks the user.")
 }, 60_000)
 
+test("round 1 does not drop info findings or send ask-user info to the fixer", async () => {
+  const asked = { ...info, id: "decision", action: "ask-user" }
+  const result = await exercise([[error, info, asked], []])
+  expect(result.evidence.map((value) => JSON.parse(value))).toEqual([[error, info]])
+  expect(result.body).toContain("info `decision`")
+  expect(result.body).toContain("Left because it asks the user.")
+}, 60_000)
+
+test("a re-reported ask-user warning does not block a new error from the second fixer", async () => {
+  const asked = { ...warning, action: "ask-user" }
+  const result = await exercise([[error, asked], [lateError, asked], []])
+  expect(result.evidence.map((value) => JSON.parse(value))).toEqual([[error], [lateError]])
+  expect(result.endReason).toContain("stopped: cleared")
+  expect(result.body).toContain("Left because it asks the user.")
+}, 60_000)
+
+test("a repeated warning below the second round bar does not block a new error", async () => {
+  const result = await exercise([[error, warning], [lateError, warning], []])
+  expect(result.evidence.map((value) => JSON.parse(value))).toEqual([[error, warning], [lateError]])
+  expect(result.endReason).toContain("stopped: cleared")
+}, 60_000)
+
+test("a warning never sent in round 2 does not block a new error in round 3", async () => {
+  const third = { ...error, id: "third", file: "third.txt" }
+  const result = await exercise([[error], [lateError, warning], [third, warning], []], "no diagram", 3)
+  expect(result.evidence.map((value) => JSON.parse(value))).toEqual([[error], [lateError], [third]])
+}, 60_000)
+
+test("an info-only review does not claim a second round severity bar", async () => {
+  const result = await exercise([[info]])
+  expect(result.evidence).toHaveLength(0)
+  expect(result.endReason).toContain("stopped: cleared")
+  expect(result.body).toContain("Left because the review fix loop stopped: cleared.")
+  expect(result.body).not.toContain("round 2 bar")
+}, 60_000)
+
+test("a limit of one does not label a remaining warning as below the round 2 bar", async () => {
+  const result = await exercise([[error], [warning]], "no diagram", 1)
+  expect(result.evidence).toHaveLength(1)
+  expect(result.body).toContain("review after fix round 1")
+  expect(result.body).not.toContain("round 2 bar")
+}, 60_000)
+
+test("a retained ask-user finding does not inflate the recorded final review count", async () => {
+  const result = await exercise([[error, { ...warning, action: "ask-user" }], []])
+  expect(result.reviewEvidence.at(-1)).toMatchObject({ file: "review-2.json", log: "[]\n" })
+  expect(result.endReason).toContain("The review turn recorded 0 findings in ")
+  expect(result.body).toContain("warning `w`")
+}, 60_000)
+
+test("a retained ask-user finding does not overwrite the final review's newer wording or action", async () => {
+  const asked = { ...warning, topic: "result-fragile", action: "ask-user" }
+  const current = { ...error, id: "updated", topic: "result-fragile", description: "The result corrupts saved data." }
+  const result = await exercise([[error, asked], [current]], "no diagram", 1)
+  expect(result.body).toContain("error `updated`")
+  expect(result.body).toContain("The result corrupts saved data.")
+  expect(result.body).not.toContain("The result is fragile.")
+  expect(result.body).not.toContain("Left because it asks the user.")
+}, 60_000)
+
 test("a drawn diagram lands as a mermaid fence rather than prose", async () => {
   const result = await exercise([[]], "```mermaid\nflowchart LR\n  task --> run\n```")
   expect(result.completed).toBe(true)

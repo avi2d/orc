@@ -15,31 +15,22 @@ const ReviewConfig = Schema.Struct({
 })
 const decodeReviewConfig = Schema.decodeUnknownEffect(ReviewConfig)
 
-export const reviewRoundLimit = (yamlText: string): Effect.Effect<number, OrcRunError> =>
-  Effect.gen(function*() {
-    const parsed: unknown = yield* Effect.try({
-      try: () => Bun.YAML.parse(yamlText),
-      catch: () => new OrcRunError({ message: "orc: .no-mistakes.yaml is no YAML orc can read" })
-    })
-    const config = yield* decodeReviewConfig(parsed).pipe(
-      Effect.mapError((error) => new OrcRunError({ message: "orc: .no-mistakes.yaml holds review config orc cannot read: " + error.message }))
-    )
-    return config.review?.max_fix_rounds ?? 2
-  })
-
 const configFile = ".no-mistakes.yaml"
 
-const readPathRules = (yamlText: string, source: string): Effect.Effect<ReadonlyArray<PathRule>, OrcRunError> =>
+const readReviewConfig = (yamlText: string, source: string): Effect.Effect<(typeof ReviewConfig.Type)["review"], OrcRunError> =>
   Effect.gen(function*() {
     const parsed: unknown = yield* Effect.try({
       try: () => Bun.YAML.parse(yamlText),
       catch: () => new OrcRunError({ message: "orc: " + source + " is no YAML orc can read" })
     })
     const config = yield* decodeReviewConfig(parsed).pipe(
-      Effect.mapError((error) => new OrcRunError({ message: "orc: " + source + " holds review.path_instructions orc cannot read: " + error.message }))
+      Effect.mapError((error) => new OrcRunError({ message: "orc: " + source + " holds review config orc cannot read: " + error.message }))
     )
-    return config.review?.path_instructions ?? []
+    return config.review
   })
+
+export const reviewRoundLimit = (yamlText: string): Effect.Effect<number, OrcRunError> =>
+  readReviewConfig(yamlText, configFile).pipe(Effect.map((review) => review?.max_fix_rounds ?? 2))
 
 const rulesForChangedFiles = (rules: ReadonlyArray<PathRule>, changedFiles: ReadonlyArray<string>): ReadonlyArray<PathRule> =>
   rules.filter((rule) => {
@@ -75,6 +66,7 @@ export const projectPathRules = (
     const text = yield* run.fs.readFileString(run.path.join(run.worktreeDir, configFile)).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the review path rules in " + configFile + ": " + readFailure(cause) }))
     )
-    const rules = yield* readPathRules(text, configFile)
+    const review = yield* readReviewConfig(text, configFile)
+    const rules = review?.path_instructions ?? []
     return rules.length === 0 ? [] : rulesForChangedFiles(rules, yield* readChangedFiles(run))
   })

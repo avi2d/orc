@@ -23,7 +23,7 @@ interface ReviewLoop {
 }
 
 const findingsForRound = (findings: ReadonlyArray<ReviewFinding>, round: number): ReadonlyArray<ReviewFinding> =>
-  findings.filter((finding) => finding.action !== "ask-user" && (round === 1 ? finding.severity === "error" || finding.severity === "warning" : passesRoundTwoBar(finding)))
+  findings.filter((finding) => finding.action !== "ask-user" && (round === 1 || passesRoundTwoBar(finding)))
 
 const stopForReview = (review: ReviewOutcome, round: number, limit: number, sent: ReadonlyArray<ReadonlyArray<ReviewFinding>>): ReviewStop | null => {
   if (review.status !== "passed") return null
@@ -31,8 +31,9 @@ const stopForReview = (review: ReviewOutcome, round: number, limit: number, sent
   if (!findings.some((finding) => finding.severity === "error" || finding.severity === "warning")) return "cleared"
   if (findings.some((finding) => finding.severity === "error" && finding.action === "ask-user")) return "ask-user"
   if (round > limit) return "round-limit"
-  if (findings.some((finding) => sent.some((previous) => previous.some((earlier) => sameFinding(earlier, finding))))) return "repeat"
-  if (findingsForRound(findings, round).length === 0) return "severity-bar"
+  const eligible = findingsForRound(findings, round)
+  if (eligible.some((finding) => sent.some((previous) => previous.some((earlier) => sameFinding(earlier, finding))))) return "repeat"
+  if (eligible.length === 0) return "severity-bar"
   return null
 }
 
@@ -101,7 +102,6 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
     const reviewer = run.delivery.reviewer
     let review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, 1)
     const sentPerRound: Array<ReadonlyArray<ReviewFinding>> = []
-    const earlierReviews: Array<ReadonlyArray<ReviewFinding>> = []
     const askUserFindings: Array<ReviewFinding> = []
     let round = 1
     let stop = stopForReview(review, round, limit, sentPerRound)
@@ -109,19 +109,13 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
       for (const finding of review.findings) {
         if (finding.action === "ask-user" && !askUserFindings.some((earlier) => sameFinding(earlier, finding))) askUserFindings.push(finding)
       }
-      earlierReviews.push(review.findings)
       const sent = findingsForRound(review.findings, round)
       sentPerRound.push(sent)
       const failure = yield* runOneRound(loop, sent, round)
       if (failure !== null) return stopReport(loop, failure)
       round += 1
       review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, round)
-      stop = stopForReview(review, round, limit, earlierReviews)
+      stop = stopForReview(review, round, limit, sentPerRound)
     }
-    if (review.status === "passed") {
-      const kept = askUserFindings.filter((finding) => !review.findings.some((remaining) => remaining.action === "ask-user" && sameFinding(remaining, finding)))
-      const current = review.findings.filter((finding) => !kept.some((earlier) => sameFinding(earlier, finding)))
-      review = { ...review, findings: [...current, ...kept] }
-    }
-    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, stop })
+    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, stop, askUserFindings })
   })

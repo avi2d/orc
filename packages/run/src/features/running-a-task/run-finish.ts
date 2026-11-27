@@ -17,6 +17,7 @@ interface OrcLoopEnd {
   readonly review: ReviewOutcome
   readonly sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>
   readonly stop: ReviewStop | null
+  readonly askUserFindings: ReadonlyArray<ReviewFinding>
 }
 
 type ReviewSection =
@@ -39,7 +40,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       if (orcLoop.review.status === "failed") {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound, orcLoop.stop ?? "round-limit") })
+      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound, orcLoop.stop ?? "round-limit", orcLoop.askUserFindings) })
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
