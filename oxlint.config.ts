@@ -1,4 +1,4 @@
-import { defineConfig } from "@avi2dg/checks/oxlint";
+import { defineConfig, sizeBudget, SOURCE_LIMITS } from "@avi2dg/checks/oxlint";
 
 // Each listed file runs at the start of every orc or stand-in call, so loading Effect there slows every call.
 export default defineConfig({
@@ -15,6 +15,9 @@ export default defineConfig({
       "packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts"
     ]
   },
-  // A VitePress theme and a Vue component load a stylesheet only through a bare import.
-  overrides: [{ files: ["docs/.vitepress/theme/index.ts", "docs/map/MapFlow.vue"], rules: { "import/no-unassigned-import": "off" } }]
+  overrides: [
+    sizeBudget(["**/*.vue"], SOURCE_LIMITS),
+    // A VitePress theme and a Vue component load a stylesheet only through a bare import.
+    { files: ["docs/.vitepress/theme/index.ts", "docs/map/MapFlow.vue"], rules: { "import/no-unassigned-import": "off" } },
+  ]
 });
