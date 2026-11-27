@@ -71,9 +71,23 @@ The [nono](https://nono.sh) sandbox carries one provider's credential, so a revi
 ## Open the PR
 After the review turn, a direct-PR run runs `git push --set-upstream origin <branch>` from the run's worktree.
 It reuses the open PR for the branch when `gh pr list --head <branch> --state open` finds one, and otherwise runs `gh pr create`.
-The PR's title is the head commit's subject, and its body lists the branch's commits and the local checks that passed.
-The body then lists each open review finding with its severity, id, `file:line`, description and action.
+The PR's title is the head commit's subject.
+Orc keeps the body as `pr-body.md` in the run folder and records the step as `pr`.
+To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
+
+## The PR body
+The body keeps the same headings in the same order on every run.
+`## Why` holds the task file's first paragraph that is not a heading.
+A task file with no such paragraph gives its `# ` title there, and one with no title gives `The task file states no goal.`
+`## What changed` lists the branch's commits.
+`## How it fits` carries a `mermaid` diagram when the change alters a flow, a structure or a boundary, and the run leaves the heading out otherwise.
+A further Pi turn draws that diagram just before the PR opens, and a run that opens no PR skips it.
+A reply without a `mermaid` fence leaves the heading out.
+`## How it was checked` names the local checks that passed and the review result.
 A review with no findings gives the line `The review found nothing.`, and a failed review turn gives `The review turn failed, so this PR lists no review findings.`
+`## Open review findings` lists each open finding with its severity, id, file and line, description and action, and the run leaves the heading out when no finding is open.
+
+## Findings left open
 After a successful review and any fix rounds, an `orc` run opens its PR the same way, with the remaining findings.
 Findings that remain after the fix rounds do not stop the PR.
 Under each remaining finding, a nested line says why the fix loop left it.
@@ -81,8 +95,6 @@ A `warning` or `info` finding is below the round 2 bar, which fixes only errors.
 For an `error` finding with the same id and file as one the fixer already received, the reason line names that match and the round.
 Any other `error` finding came from the review after fix round 2, so the round limit was reached.
 Orc does not yet mark a finding as left because it needs a person's decision.
-To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
-Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
 
 ## After the PR opens
 A direct-PR run succeeds as soon as the PR opens.

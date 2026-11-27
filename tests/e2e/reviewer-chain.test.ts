@@ -40,7 +40,7 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
             await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: "[]" }], stopReason: "stop", usage: { input: 1, output: 1 } }))
             return { sessionFile, commits: [] }
           }, kinds), lintPasses, pickWith({ acme: { kind: "room" }, beta: { kind: "no-room", reason: "beta-main 2% left, floor 10%" }, gamma: { kind: "room" } }))
-          expect(kinds).toEqual(["implementer", "reviewer"])
+          expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
           expect(outcome.steps).toContainEqual({ name: "review", status: "passed" })
           expect(outcome.stepAgents).toContainEqual({ name: "review", model: "gamma/reviewer", thinking: "high" })
           expect(outcome.ghCalls).toContain("pr create --head orc/test")

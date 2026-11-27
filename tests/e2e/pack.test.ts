@@ -109,6 +109,7 @@ const expectedFiles = [
   "src/features/chat/chat.ts",
   "src/features/chat/chat-tools-bundle.ts",
   "src/features/running-a-task/checks.ts",
+  "src/features/running-a-task/diagram-turn.ts",
   "src/entities/task-copy/checkout.ts",
   "src/features/running-a-task/context-mark.ts",
   "src/shared/config/delivery.ts",
