@@ -91,7 +91,10 @@ To count what each run took, run `orc metrics`.
 It prints one row per run, newest first, with four counts:
 
 - `FAILED STEPS` counts the run's steps that failed, such as a checks round a fix then passed.
-- `GATE STOPS` counts each failed checks round, each answered no-mistakes gate, and one final unanswered no-mistakes gate if the run ended there.
+- `GATE STOPS` counts each review or checks round that stopped the run for findings, the same way in each delivery mode.
+  It counts each failed checks round and, in an orc run, each review turn that returned findings or failed.
+  A no-mistakes run counts each no-mistakes step it parked at once, so a review gate answered with a fix and then approved at its fix review counts one stop.
+  A no-mistakes run recorded before orc kept gate stops counts each answered gate and a final unanswered gate instead.
 - `MINUTES` counts the minutes from the run's start to its end, and prints `-` while it runs.
 - `FIX ROUNDS` counts the run's fix steps.
 

@@ -15,8 +15,12 @@ A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: 
 ## Orc delivery
 An `orc` run fetches `origin` and rebases its branch onto the default branch recorded by `refs/remotes/origin/HEAD` before running the project checks.
 If the rebase fails, the run does not open a PR.
-After the checks pass, the run pushes the branch and opens or reuses a PR.
-The run does not perform a review or wait for a CI verdict.
+After the checks pass, the run reviews the branch as [Review the branch](#review-the-branch) says.
+If the review returns findings, a fixer fixes them, and the checks and the review run again, for up to two fix rounds.
+The second fix round gets only the error findings.
+The run history records each review turn as its own `review` step, numbered by attempt.
+Then the run pushes the branch and opens or reuses a PR, and the PR body lists the findings still open.
+The run does not wait for a CI verdict.
 To select this delivery for a project, set its `mode` to `orc` in `projects.json`.
 For a run or resume you start by hand, pass `--delivery orc`.
 

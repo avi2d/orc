@@ -2,13 +2,13 @@ import { expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { cleanFinish, git, readyToCheck, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+import { cleanFinish, git, readyToCheck, recordedMetrics, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const error = { id: "e", file: "work.txt", line: 1, severity: "error", action: "Fix the error.", description: "The result is wrong." }
 const warning = { id: "w", file: "work.txt", line: 1, severity: "warning", action: "Fix the warning.", description: "The result is fragile." }
 
 const exercise = async (reviews: ReadonlyArray<ReadonlyArray<typeof error>>) => {
-  let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false }
+  let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, steps: [] as unknown, metrics: [] as ReadonlyArray<unknown> }
   await withRepo(async (dir) => {
     await withHome(async (home) => {
       const origin = await mkdtemp(join(tmpdir(), "orc-loop-origin-"))
@@ -46,7 +46,7 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<typeof error>>) => 
           checks += 1
           return { stdout: "ok", stderr: "", exitCode: 0 }
         })
-        result = { kinds, evidence, body: await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8"), checks, completed: outcome.report.completed }
+        result = { kinds, evidence, body: await readFile(join(home, "runs", "step-run-1", "pr-body.md"), "utf8"), checks, completed: outcome.report.completed, steps: outcome.steps, metrics: await recordedMetrics(home) }
       } finally {
         await rm(origin, { recursive: true, force: true })
       }
@@ -67,6 +67,20 @@ test("a cleared first fix does not start a second round", async () => {
   expect(result.evidence[0]).toContain('"id": "e"')
   expect(result.evidence[0]).toContain('"id": "w"')
   expect(result.checks).toBe(2)
+})
+
+test("a review whose findings one fix round clears counts one gate stop rather than none, and records both review turns", async () => {
+  const result = await exercise([[error, warning], []])
+  expect(result.steps).toEqual([
+    { name: "implement", status: "passed" },
+    { name: "checks", status: "passed" },
+    { name: "review", status: "passed" },
+    { name: "fix", status: "passed" },
+    { name: "checks", status: "passed" },
+    { name: "review", status: "passed" },
+    { name: "pr", status: "passed" }
+  ])
+  expect(result.metrics).toMatchObject([{ run: "step-run-1", delivery: "orc", failedSteps: 0, gateStops: 1, fixRounds: 1 }])
 })
 
 test("the second fix receives only errors and a third fix never starts", async () => {

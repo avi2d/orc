@@ -15,7 +15,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + (rounds.at(-1)?.passed === true ? ", and the checks passed. " : ". No local checks ran. ")
     const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
     if (run.delivery.kind === "orc") {
-      const review = orcReview ?? (yield* reviewOrc(run, run.delivery.reviewer, checkpoints, runAgent))
+      const review = orcReview ?? (yield* reviewOrc(run, run.delivery.reviewer, checkpoints, runAgent, 1))
       const reviewed = checked + reviewSentence(review)
       if (review.status === "failed") {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
@@ -25,9 +25,9 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     }
     if (run.delivery.kind === "direct-PR") {
       const reviewStarted = new Date().toISOString()
-      yield* checkpoints.reviewStart(run.delivery.reviewer, reviewStarted)
+      yield* checkpoints.reviewStart(run.delivery.reviewer, 1, reviewStarted)
       const review = yield* reviewAtHead(run, runAgent, run.delivery.reviewer, priorDir)
-      yield* checkpoints.reviewDone(run.delivery.reviewer, review, reviewStarted, new Date().toISOString())
+      yield* checkpoints.reviewDone(run.delivery.reviewer, 1, review, reviewStarted, new Date().toISOString())
       const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
       const reviewed = checked + reviewSentence(review)
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
@@ -42,12 +42,12 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]): Effect.Effect<ReviewOutcome, OrcRunError> =>
+export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number): Effect.Effect<ReviewOutcome, OrcRunError> =>
   Effect.gen(function*() {
     const started = new Date().toISOString()
-    yield* checkpoints.reviewStart(reviewer, started)
+    yield* checkpoints.reviewStart(reviewer, attempt, started)
     const review = yield* runReviewTurn(run, runAgent, reviewer, "orc")
-    yield* checkpoints.reviewDone(reviewer, { ...review, reusedFrom: null }, started, new Date().toISOString())
+    yield* checkpoints.reviewDone(reviewer, attempt, { ...review, reusedFrom: null }, started, new Date().toISOString())
     return review
   })
 

@@ -22,6 +22,7 @@ export interface NoMistakesRecord {
   readonly findings: ReadonlyArray<NoMistakesFinding>
   readonly deferredFindingIds: ReadonlyArray<string>
   readonly gatesAnswered: number
+  readonly gateStops: number
   readonly openQuestions: ReadonlyArray<OpenQuestion>
   readonly prLink: string | null
   readonly reviewer: string | null
@@ -56,7 +57,7 @@ export interface DriveLog {
   readonly noteReviewer: (status: string) => void
   readonly runId: () => string
   readonly gatesAnswered: () => number
-  readonly countGate: () => void
+  readonly countGate: (step: string) => void
   readonly gatesSinceCap: () => number
   readonly liftCap: () => void
   readonly refuse: (gate: ParkedGate | null, reason: string) => Ending
@@ -83,6 +84,7 @@ export const openDriveLog = (started: string): DriveLog => {
   const known = new Set<string>()
   const deferredGates: Array<DeferredGate> = []
   let gatesAnswered = 0
+  const stoppedSteps = new Set<string>()
   let capLifted = 0
   let prLink: string | null = null
   let runId = ""
@@ -121,8 +123,9 @@ export const openDriveLog = (started: string): DriveLog => {
     },
     runId: () => runId,
     gatesAnswered: () => gatesAnswered,
-    countGate: () => {
+    countGate: (step) => {
       gatesAnswered += 1
+      stoppedSteps.add(step)
     },
     gatesSinceCap: () => gatesAnswered - capLifted,
     liftCap: () => {
@@ -150,6 +153,7 @@ export const openDriveLog = (started: string): DriveLog => {
       findings,
       deferredFindingIds: [...new Set(deferredGates.flatMap((gate) => gate.findingIds))],
       gatesAnswered,
+      gateStops: new Set([...stoppedSteps, ...(ending.gate === null ? [] : [ending.gate.step])]).size,
       openQuestions: ending.openQuestions,
       prLink,
       reviewer,

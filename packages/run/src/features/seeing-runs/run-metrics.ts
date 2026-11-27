@@ -7,7 +7,7 @@ import { readShow, type ShowJsonDocument } from "./show"
 const METRICS_JSON_SCHEMA = "orc.metrics.v2" as const
 
 const GateStopsSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
-const decodeGatesAnswered = Schema.decodeUnknownEffect(Schema.fromJsonString(GateStopsSchema))
+const decodeCount = Schema.decodeUnknownEffect(Schema.fromJsonString(GateStopsSchema))
 
 const RunMetricsSchema = Schema.Struct({
   run: Schema.String,
@@ -37,20 +37,44 @@ const minutesOf = (started: string, ended: string | null): number | null => {
   return Number.isFinite(millis) ? Math.round(millis / 6000) / 10 : null
 }
 
+const signalOf = (step: ShowStep, name: string): string | undefined => step.signals.findLast((signal) => signal.name === name)?.value
+
+const reviewStopped = (step: ShowStep): Effect.Effect<boolean, Schema.SchemaError> => {
+  const findings = signalOf(step, "review-findings")
+  return step.status === "failed"
+    ? Effect.succeed(true)
+    : findings === undefined ? Effect.succeed(false) : decodeCount(findings).pipe(Effect.map((count) => count > 0))
+}
+
+// A step recorded before the gate-stops signal holds only its answered gates and its final gate.
+const noMistakesStops = (run: RunRecord, step: ShowStep, isLast: boolean): Effect.Effect<number, Schema.SchemaError> => {
+  const stops = signalOf(step, "gate-stops")
+  if (stops !== undefined) {
+    return decodeCount(stops)
+  }
+  const answered = signalOf(step, "gates-answered")
+  const parkedAtEnd = isLast && run.status !== "running" && step.status === "failed" && (signalOf(step, "gate") ?? "") !== "" ? 1 : 0
+  return answered === undefined ? Effect.succeed(parkedAtEnd) : decodeCount(answered).pipe(Effect.map((count) => count + parkedAtEnd))
+}
+
+const gateStopsOf = (run: RunRecord, own: ReadonlyArray<ShowStep>): Effect.Effect<number, Schema.SchemaError> =>
+  Effect.gen(function*() {
+    let stops = own.filter((step) => step.name === "checks" && step.status === "failed").length
+    for (const [index, step] of own.entries()) {
+      if (step.name === "review" && run.delivery === "orc" && (yield* reviewStopped(step))) {
+        stops += 1
+      }
+      if (step.name === "no-mistakes") {
+        stops += yield* noMistakesStops(run, step, index === own.length - 1)
+      }
+    }
+    return stops
+  })
+
 const metricsOf = (run: RunRecord, steps: ReadonlyArray<ShowStep>): Effect.Effect<RunMetrics, Schema.SchemaError> =>
   Effect.gen(function*() {
     const own = steps.filter((step) => step.from === null)
-    let gateStops = own.filter((step) => step.name === "checks" && step.status === "failed").length
-    for (const step of own.filter((candidate) => candidate.name === "no-mistakes")) {
-      const answered = step.signals.findLast((signal) => signal.name === "gates-answered")
-      if (answered !== undefined) {
-        gateStops += yield* decodeGatesAnswered(answered.value)
-      }
-    }
-    const last = own.at(-1)
-    if (run.status !== "running" && last?.name === "no-mistakes" && last.status === "failed" && last.signals.some((signal) => signal.name === "gate" && signal.value !== "")) {
-      gateStops += 1
-    }
+    const gateStops = yield* gateStopsOf(run, own)
     return {
       run: run.id,
       task: run.task,
