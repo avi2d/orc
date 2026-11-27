@@ -2,7 +2,7 @@ import { type Array as Arr, Console, Effect } from "effect"
 import type { AgentFile } from "../../entities/agent/index"
 import { subprocessPullRequestOpener } from "../../entities/pull-request/index"
 import { subprocessNoMistakesRunner, type SubprocessRunnerOptions } from "../../entities/review-gate/index"
-import type { ProviderRoom, ReviewerEntry } from "../../shared/config/index"
+import type { DefaultCredential, ReviewerEntry, RoomReading } from "../../shared/config/index"
 import type { OrcRunError } from "../../shared/lib/index"
 import { chosenReviewerLine, pickChainEntry } from "./reviewer-chain"
 import type { ReviewerPick, SandboxOps } from "./run-ops"
@@ -10,6 +10,7 @@ import type { RunDeliverer } from "./run-record"
 
 export interface ChainReviewer extends ReviewerEntry {
   readonly reviewer: AgentFile
+  readonly credential: DefaultCredential
 }
 
 export type PreparedReviewer =
@@ -23,7 +24,7 @@ export const fixedReviewer = (reviewer: AgentFile): ReviewerPick => (runAgent) =
 export interface ReviewerChainOptions {
   readonly chain: Arr.NonEmptyReadonlyArray<ChainReviewer>
   readonly implementerProvider: string
-  readonly readRoom: (provider: string) => Effect.Effect<ProviderRoom>
+  readonly readRoom: Effect.Effect<RoomReading>
   readonly openReviewer: (entry: ChainReviewer, position: number) => Effect.Effect<SandboxOps["runAgent"], OrcRunError>
 }
 
@@ -31,7 +32,8 @@ export const chainReviewer = (options: ReviewerChainOptions): ReviewerPick => {
   const opened = new Map<number, SandboxOps["runAgent"]>()
   return () =>
     Effect.gen(function*() {
-      const pick = yield* pickChainEntry(options.chain, options.implementerProvider, options.readRoom)
+      const roomOf = yield* options.readRoom
+      const pick = yield* pickChainEntry(options.chain, options.implementerProvider, roomOf)
       yield* Console.log(chosenReviewerLine(pick))
       const runAgent = opened.get(pick.position) ?? (yield* options.openReviewer(pick.entry, pick.position))
       opened.set(pick.position, runAgent)

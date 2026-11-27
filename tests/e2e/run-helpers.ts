@@ -326,7 +326,7 @@ const reviewer: AgentFile = {
 
 export const chainEntry = (model: string): ChainReviewer => {
   const provider = model.slice(0, model.indexOf("/"))
-  return { provider, model, reviewer: { ...reviewer, model } }
+  return { provider, model, reviewer: { ...reviewer, model }, credential: { kind: "only-account" } }
 }
 
 const sessionFileName = "2026-10-19T10-00-00-000Z_" + sessionId + ".jsonl"

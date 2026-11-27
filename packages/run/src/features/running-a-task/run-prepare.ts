@@ -3,7 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import { homedir } from "node:os"
 import { finishAgentFile, readAgentFile, resolveAgentFile, type AgentFile, type PiThinkingLevel } from "../../entities/agent/index"
 import type { HostTools, SandboxKind } from "../../shared/sandbox/index"
-import { configuredModels, readOrcConfig, routeOfAgents, type OrcConfig, type ReviewerEntry, type RoutedModels, RoutedModelsJson, type RunDelivery } from "../../shared/config/index"
+import { configuredModels, defaultCredentialOf, readOrcConfig, routeOfAgents, type OrcConfig, type ReviewerEntry, type RoutedModels, RoutedModelsJson, type RunDelivery } from "../../shared/config/index"
 import { planSandbox, type SandboxPlan } from "./sandbox-plan"
 import type { Checkout } from "../../entities/task-copy/index"
 import { OrcRunError } from "../../shared/lib/index"
@@ -34,17 +34,22 @@ interface ModelPins {
 const chainReviewers = (
   parsed: Parameters<typeof finishAgentFile>[0],
   chain: Arr.NonEmptyReadonlyArray<ReviewerEntry>,
-  configFile: string
+  config: Pick<OrcConfig, "file" | "providers">
 ) =>
   Effect.all(Arr.map(chain, (entry) =>
-    finishAgentFile({ ...parsed, model: entry.model }, { configModel: { file: configFile, model: entry.model }, thinking: undefined }).pipe(
-      Effect.map((reviewer) => ({ ...entry, reviewer }))
-    )
+    Effect.gen(function*() {
+      const provider = config.providers.find((candidate) => candidate.id === entry.provider)
+      if (provider === undefined) {
+        return yield* new OrcRunError({ message: "orc: " + config.file + " names the reviewer provider " + entry.provider + " among no providers" })
+      }
+      const reviewer = yield* finishAgentFile({ ...parsed, model: entry.model }, { configModel: { file: config.file, model: entry.model }, thinking: undefined })
+      return { ...entry, reviewer, credential: defaultCredentialOf(provider, Bun.env, config.file) }
+    })
   ))
 
 export const prepareRoles = Effect.fnUntraced(function*(
   location: { readonly projectDir: string; readonly orcHome: string; readonly agentsDir: string | undefined },
-  config: Pick<OrcConfig, "file" | "models" | "reviewers">,
+  config: Pick<OrcConfig, "file" | "models" | "reviewers" | "providers">,
   delivery: RunDelivery | undefined,
   pins: Pick<ModelPins, "implementerModel" | "fixerModel" | "implementerThinking" | "fixerThinking">,
   route: RoutedModels | undefined
@@ -60,7 +65,7 @@ export const prepareRoles = Effect.fnUntraced(function*(
   const fixer = yield* finishAgentFile(fixerFile, { configModel: configModel(configured.fixer), thinking: pins.fixerThinking })
   const chain = delivery === "orc" ? config.reviewers : undefined
   const reviewer: PreparedReviewer = chain !== undefined
-    ? { kind: "orc-chain", chain: yield* chainReviewers(yield* readAgentFile("reviewer", location), chain, config.file) }
+    ? { kind: "orc-chain", chain: yield* chainReviewers(yield* readAgentFile("reviewer", location), chain, config) }
     : delivery === "direct-PR" || delivery === "orc"
     ? { kind: delivery, reviewer: yield* resolveAgentFile("reviewer", { ...location, configModel: configModel(route?.reviewer ?? fixer.model) }) }
     : { kind: "no-mistakes" }

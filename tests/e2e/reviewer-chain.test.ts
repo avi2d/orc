@@ -30,7 +30,7 @@ const pickWith = (rooms: Readonly<Record<string, ProviderRoom>>): ReviewerPick =
   chainReviewer({
     chain,
     implementerProvider: "acme",
-    readRoom: (provider) => Effect.succeed(rooms[provider] ?? { kind: "no-room", reason: "no reading" }),
+    readRoom: Effect.succeed(({ provider }) => rooms[provider] ?? { kind: "no-room", reason: "no reading" }),
     openReviewer: () => Effect.succeed(runAgent)
   })(runAgent)
 

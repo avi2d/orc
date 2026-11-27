@@ -26,7 +26,7 @@ import { isRunId, newRunId } from "../../shared/lib/index"
 import { dropEndedPiAgentDir, dropResumedPiAgentDir, reviewerAgentDirOf, runInstructions } from "./run-folders"
 import { prepareAgents } from "./run-prepare"
 import { chainReviewer, subprocessDeliverer } from "./run-deliverer"
-import { type ProviderRoom, providerOfModel, type RunDelivery } from "../../shared/config/index"
+import { providerOfModel, type RoomReading, type RunDelivery } from "../../shared/config/index"
 import { closeTaskCopy, openTaskCopy, writeAgentGitConfig } from "../../entities/task-copy/index"
 import { ensureHeavyQueue, readHeavySettings } from "../../entities/heavy-queue/index"
 import { ciOnlyBashFile, runStepPath, withHeavyPath } from "../../entities/heavy-queue/index"
@@ -55,7 +55,10 @@ export interface OrcRunRequest {
   readonly resumeRun?: string | undefined
   readonly rebase?: HistoryRun["rebase"] | undefined
   readonly agentsDir?: string | undefined
-  readonly readReviewerRoom?: ((orcHome: string, provider: string) => Effect.Effect<ProviderRoom, never, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner>) | undefined
+}
+
+export interface AgentStepRequest extends OrcRunRequest {
+  readonly readReviewerRoom: (orcHome: string) => Effect.Effect<RoomReading, never, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner>
 }
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
@@ -199,7 +202,7 @@ export const runReportStep = (
   }))
 
 export const runAgentStep = (
-  request: OrcRunRequest
+  request: AgentStepRequest
 ): Effect.Effect<OrcRunReport, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.scoped(Effect.gen(function*() {
     const hostPath = Bun.env.PATH
@@ -228,13 +231,10 @@ export const runAgentStep = (
     const asks = askSetupFor(folders.runDir, folders.piSessionDir, answerWaitSeconds, request.answers ?? [], priorOpen)
     const ops = agentOps({ spawner, fs, path, git }, exec, folders, piPacing(idleTimeoutSeconds), asks)
     const services = yield* Effect.context<FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner | Scope.Scope>()
-    const readReviewerRoom = request.readReviewerRoom
     const pickChain = (chain: Parameters<typeof chainReviewer>[0]["chain"]) => chainReviewer({
       chain,
       implementerProvider: providerOfModel(agent.model),
-      readRoom: (provider) => readReviewerRoom === undefined
-        ? Effect.succeed({ kind: "no-room", reason: "this orc run reads no quota" })
-        : readReviewerRoom(home, provider).pipe(Effect.provideContext(services)),
+      readRoom: request.readReviewerRoom(home).pipe(Effect.provideContext(services)),
       openReviewer: (entry, position) => {
         const reviewerFolders = { ...folders, piAgentDir: reviewerAgentDirOf(path, folders.runDir, position) }
         return planReviewer(entry, reviewerFolders.piAgentDir).pipe(

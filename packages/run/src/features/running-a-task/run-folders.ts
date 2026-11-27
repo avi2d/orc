@@ -41,7 +41,6 @@ const piAgentDirOf = (path: Path.Path, runDir: string): string => path.join(runD
 
 const reviewerAgentPrefix = "reviewer-agent-"
 
-// The reviewer folder sits outside the session folder, which the implementer's sandbox reads, because it holds another provider's key.
 export const reviewerAgentDirOf = (path: Path.Path, runDir: string, position: number): string => path.join(runDir, reviewerAgentPrefix + position.toString())
 
 const removeAgentDir = (fs: FileSystem.FileSystem, dir: string): Effect.Effect<void> =>
