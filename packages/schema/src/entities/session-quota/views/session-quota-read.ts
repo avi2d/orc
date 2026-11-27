@@ -3,11 +3,9 @@ import { composedSessionQuota } from "./composed-session-quota";
 import { sessionLogsSince, sessionQuotaFrom, type SessionQuotaView } from "./session-quota";
 import { HarnessProcessSource, HerdrSource, herdrSourceLayer, linuxHarnessProcessSourceLayer, macHarnessProcessSourceLayer } from "../sources/live-sessions";
 import { readBeside } from "../../../shared/config";
-import { quotaSourceLayer } from "../sources/quota";
-import { orcQuotaSourceLayer } from "../sources/orc-quota";
 import type { QuotaReadSources, QuotaReadings } from "../sources/quota-read";
 import { SessionMachines, sessionMachinesLayer } from "./remote-sessions";
-import { harvestLogSourceLayer, SessionLogSource, sessionLogSourceLayer } from "../sources/session-logs";
+import { SessionLogSource, sessionLogSourceLayer } from "../sources/session-logs";
 
 export type SessionSources = HerdrSource | HarnessProcessSource | SessionLogSource | SessionMachines;
 
@@ -16,10 +14,6 @@ export type SessionQuotaSources = QuotaReadSources | SessionSources;
 const harnessProcessSourceLayer = process.platform === "darwin" ? macHarnessProcessSourceLayer : linuxHarnessProcessSourceLayer;
 
 export const sessionSourcesLayer = Layer.mergeAll(herdrSourceLayer, harnessProcessSourceLayer, sessionMachinesLayer, sessionLogSourceLayer);
-
-export const quotaReadSourcesLayer = Layer.mergeAll(quotaSourceLayer, orcQuotaSourceLayer, harvestLogSourceLayer(Effect.succeed([])));
-
-export const sessionQuotaSourcesLayer = Layer.merge(quotaReadSourcesLayer, sessionSourcesLayer);
 
 export const localSessionQuotaOf = <R>(quotas: Effect.Effect<QuotaReadings, never, R>): Effect.Effect<SessionQuotaView, never, Exclude<SessionSources, SessionMachines> | R> =>
   Effect.gen(function* () {

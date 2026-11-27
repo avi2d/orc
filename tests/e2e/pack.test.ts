@@ -245,6 +245,7 @@ const expectedFiles = [
   "src/features/queueing-a-task/send-back.ts",
   "src/entities/backlog/split.ts",
   "src/widgets/beat/stall.ts",
+  "src/widgets/beat/subquo-program.ts",
   "src/widgets/beat/subquo.ts",
   "src/entities/backlog/task-dependency.ts",
   "src/entities/backlog/task-wait.ts",
@@ -419,11 +420,16 @@ const releaseFixture = async (dir: string) => {
     else await writeFile(join(cwd, binary), "not a binary for this host")
     return { manifest, tarball: pack(cwd, dir) }
   }))
+  const subquo = { name: "@avi2dg/subquo", version: runManifest.dependencies["@avi2dg/subquo"] }
+  const subquoDir = join(dir, "subquo")
+  await mkdir(subquoDir)
+  await writeFile(join(subquoDir, "package.json"), JSON.stringify(subquo))
+  const standIn = { manifest: subquo, tarball: pack(subquoDir, dir) }
   spawnPassing(["tar", "-xf", join(dir, pack(packageDir, dir))], dir)
   const main = join(dir, "package")
   const optionalDependencies = Object.fromEntries(tarballs.map(({ manifest }) => [manifest.name, version]))
   await writeFile(join(main, "package.json"), JSON.stringify({ ...runManifest, optionalDependencies }))
-  return { mainTarball: join(main, pack(main, main)), tarballs }
+  return { mainTarball: join(main, pack(main, main)), tarballs: [...tarballs, standIn] }
 }
 
 describe("the npm release", () => {
@@ -445,7 +451,7 @@ describe("the npm release", () => {
         if (asset !== undefined) return new Response(Bun.file(join(dir, asset.tarball)))
         const pkg = tarballs.find(({ manifest }) => manifest.name === path)
         if (pkg === undefined) return new Response("Not Found", { status: 404 })
-        const version = runManifest.version
+        const version = pkg.manifest.version
         return Response.json({
           name: pkg.manifest.name,
           "dist-tags": { latest: version },

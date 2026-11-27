@@ -85,9 +85,9 @@ export const windowSessionJson = (row: SessionShare): typeof WindowSessionJson.T
 });
 
 const sourceJson = (source: WindowSource): typeof WindowSourceJson.Type =>
-  source.kind === "quota-axi"
-    ? { kind: "quota-axi", readAt: instant(source.readAt) }
-    : { ...source, observedAt: instant(source.observedAt) };
+  source.kind === "harvested"
+    ? { ...source, observedAt: instant(source.observedAt) }
+    : { kind: source.kind, readAt: instant(source.readAt) };
 
 export const windowJson = (account: AccountView, window: WindowView): typeof WindowJson.Type => ({
   account: accountRef(account),

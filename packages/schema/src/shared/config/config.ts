@@ -29,6 +29,18 @@ const Accounts = Schema.Record(Schema.String, AccountFolder).check(Schema.makeFi
 export const DashConfig = Schema.Struct({
   appearance: Schema.optionalKey(Schema.Unknown),
   accounts: Schema.optionalKey(Accounts),
+  subquoAccounts: Schema.optionalKey(Schema.Array(Schema.Struct({
+    provider: Schema.Literals(["claude", "codex", "opencode-go"]),
+    accountKey: Schema.NonEmptyString,
+    subquoId: Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9_-]{0,63}$/u)),
+  })).check(
+    Schema.makeFilter((mappings) =>
+      new Set(mappings.map((mapping) => mapping.subquoId)).size === mappings.length &&
+      mappings.every((mapping, index) => mappings.findIndex((other) =>
+        other.provider === mapping.provider && other.accountKey === mapping.accountKey,
+      ) === index),
+    ),
+  )),
   panels: Schema.Record(Schema.String, Schema.Unknown).pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
   layout: Schema.optionalKey(Schema.Unknown),
 });

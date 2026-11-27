@@ -47,7 +47,7 @@ const readQuota = async (
       machines: [],
       quota: {
         provider: "anthropic",
-        command: [source.command, ...args],
+        command: [source.document === undefined ? source.command : join(bin, source.command), ...args],
         accounts: names.map((name) => ({ name, tokenFile: "/unused/" + name })),
         floorPercent
       }
@@ -103,11 +103,19 @@ test("quota reports schema instead of treating an unknown subquo version as a re
   })
 })
 
-test("quota reports command-missing instead of exiting without JSON when subquo is not on PATH", async () => {
-  expect(await readQuota(["main"], { command: "subquo" })).toEqual({
+test("quota reports command-missing instead of exiting without JSON when orc-quota is not on PATH", async () => {
+  expect(await readQuota(["main"], { command: "orc-quota" })).toEqual({
     kind: "unread",
     cause: "command-missing",
-    reason: "the quota command subquo is not installed on PATH"
+    reason: "the quota command orc-quota is not installed on PATH"
+  })
+})
+
+test("quota runs the subquo installed with Orc instead of reporting command-missing when subquo is not on PATH", async () => {
+  expect(await readQuota(["main"], { command: "subquo" })).toEqual({
+    kind: "unread",
+    cause: "exit",
+    reason: "the quota command subquo exited 1"
   })
 })
 
