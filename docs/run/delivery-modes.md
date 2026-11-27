@@ -16,7 +16,7 @@ A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: 
 An `orc` run fetches `origin` and rebases its branch onto the default branch recorded by `refs/remotes/origin/HEAD` before running the project checks.
 If the rebase fails, the run does not open a PR.
 After the checks pass, the run pushes the branch and opens or reuses a PR.
-The run does not perform a review or wait for a CI verdict.
+Between the checks and the push, the run reviews the branch and fixes the findings in at most two rounds, and it does not wait for a CI verdict.
 To select this delivery for a project, set its `mode` to `orc` in `projects.json`.
 For a run or resume you start by hand, pass `--delivery orc`.
 
@@ -40,6 +40,9 @@ A checkpoint write failure does not block the PR, but the next resume runs the r
 After the review turn, a direct-PR run runs `git push --set-upstream origin <branch>` from the run's worktree.
 It reuses the open PR for the branch when `gh pr list --head <branch> --state open` finds one, and otherwise runs `gh pr create`.
 The PR's title is the head commit's subject, and its body lists the branch's commits and the local checks that passed.
+The body then lists each open review finding with its severity, id, `file:line`, description and action.
+A review with no findings gives the line `The review found nothing.`, and a failed review turn gives `The review turn failed, so this PR lists no review findings.`
+An `orc` run opens its PR the same way, with the findings left after its last fix round.
 To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
 Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
 
