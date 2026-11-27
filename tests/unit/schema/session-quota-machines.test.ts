@@ -177,6 +177,18 @@ describe("an account one machine could not read", () => {
     ]);
   });
 
+  test("shows the failure when the other machine read the account but no window, not a read account holding no window", () => {
+    const noClaudeWindow = (report: SessionQuotaReport): SessionQuotaReport => ({
+      ...report,
+      windows: report.windows.filter((window) => window.account.provider !== "claude"),
+    });
+    const view = composedSessionQuota(machineView("north", claudeUnread(unread)), "north", [
+      southReading({ kind: "ok", value: machineView("south", noClaudeWindow) }),
+    ]);
+    expect(view.accounts.find((account) => account.title === "claude work")?.body).toEqual({ kind: "invalid", issue: unread });
+    expect(view.composition?.failedAccounts).toEqual([]);
+  });
+
   test("lists no failed account when every machine read every account", () => {
     expect(composed().composition?.failedAccounts).toEqual([]);
   });

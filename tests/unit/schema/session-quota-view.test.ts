@@ -397,3 +397,28 @@ describe("sessionQuotaView account joins, against the recorded schema-6 replay",
     expect(new Date(since.codex ?? Number.NaN).toISOString()).toBe("2026-10-15T08:24:11.000Z");
   });
 });
+
+describe("sessionQuotaView on a Claude login quota-axi could not read", () => {
+  const view = () => {
+    const now = DateTime.makeUnsafe("2026-11-27T19:40:46.171Z");
+    const quota = decodeQuota(fixture("quota-axi/claude-credential-expired.json"));
+    return sessionQuotaView({
+      quota: quotaAxiRead({ ...quota, capturedAt: now }),
+      orcQuota: noOrcAccounts(now),
+      now,
+      timeZone: DateTime.zoneMakeNamedUnsafe("UTC"),
+      panes: undefined,
+      processes: undefined,
+      ledger: ledgerOf([]),
+      sessions: [],
+      sessionOfFile: new Map(),
+      unmatched: [],
+    });
+  };
+
+  test("carries quota-axi's reason as the account's failure, not a read account holding no window", () => {
+    expect(view().accounts.map((account) => [account.provider, account.body])).toEqual([
+      ["claude", { kind: "unreachable", reason: "quota-axi reads claude as unavailable: Claude credential expired" }],
+    ]);
+  });
+});

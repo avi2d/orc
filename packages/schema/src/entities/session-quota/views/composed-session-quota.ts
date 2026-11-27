@@ -215,7 +215,7 @@ interface MergedAccount {
   readonly failed: ReadonlyArray<FailedAccount>;
 }
 
-// An account shows one machine's failure as its body only when no machine read its windows, and every other failure is kept beside it.
+// An account shows one machine's failure as its body only when no machine read a window of it, and every other failure is kept beside it.
 const mergedAccounts = (machines: ReadonlyArray<Machine>): ReadonlyArray<MergedAccount> => {
   const everyAccount = machines
     .flatMap((machine) => machine.view.accounts.map((account) => ({ machine, account })))
@@ -224,19 +224,18 @@ const mergedAccounts = (machines: ReadonlyArray<Machine>): ReadonlyArray<MergedA
     const head = found.at(0)?.account;
     if (head === undefined) return [];
     const metered = found.flatMap(({ machine, account }) =>
-      account.body.kind === "windows" ? [{ machine, account, windows: account.body.windows }] : [],
+      account.body.kind === "windows" && account.body.windows.length > 0 ? [{ machine, account, windows: account.body.windows }] : [],
     );
+    const shown = metered.length > 0 ? undefined : (found.find(({ account }) => account.body.kind !== "windows") ?? found.at(0))?.account;
     const failed = found.flatMap(({ machine, account }): ReadonlyArray<FailedAccount> =>
-      account.body.kind === "windows" || (metered.length === 0 && account === head)
-        ? []
-        : [{ machine: machine.name, account, failure: account.body }],
+      account.body.kind === "windows" || account === shown ? [] : [{ machine: machine.name, account, failure: account.body }],
     );
     const merged = {
       ...head,
       accountKeys: [...new Set(found.flatMap(({ account }) => account.accountKeys))],
       joins: joinsOf(found.map(({ account }) => account)),
     };
-    if (metered.length === 0) return [{ account: merged, failed }];
+    if (shown !== undefined) return [{ account: { ...merged, body: shown.body }, failed }];
     const windows = groupedWindows(metered).flatMap(windowOfGroup);
     return [{ account: { ...merged, body: { kind: "windows" as const, windows } }, failed }];
   });
