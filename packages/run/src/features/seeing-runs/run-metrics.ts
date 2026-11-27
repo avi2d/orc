@@ -41,7 +41,7 @@ const metricsOf = (run: RunRecord, steps: ReadonlyArray<ShowStep>): Effect.Effec
   Effect.gen(function*() {
     const own = steps.filter((step) => step.from === null)
     let gateStops = own.filter((step) => step.name === "checks" && step.status === "failed").length
-    for (const step of own.filter((step) => step.name === "no-mistakes")) {
+    for (const step of own.filter((candidate) => candidate.name === "no-mistakes")) {
       const answered = step.signals.findLast((signal) => signal.name === "gates-answered")
       if (answered !== undefined) {
         gateStops += yield* decodeGatesAnswered(answered.value)

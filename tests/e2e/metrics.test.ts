@@ -1,30 +1,13 @@
-import { bundlePath, ensureBundle } from "./bundle"
-import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import { BunServices } from "@effect/platform-bun"
+import { runOrc } from "./orc-process"
 import { Effect } from "effect"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
+import { mkdtemp, rm } from "node:fs/promises"
+import { describe, expect, test } from "bun:test"
+import { BunServices } from "@effect/platform-bun"
 import type { Database } from "bun:sqlite"
 import { openDatabase, recordEvidence, recordRun, recordSignal, recordStep, type RunRecord } from "../../packages/run/src/entities/run-history/index"
 import { decodeMetricsJson } from "../../packages/run/src/features/seeing-runs/index"
-
-ensureBundle()
-
-const runOrc = async (args: ReadonlyArray<string>, home: string): Promise<{ readonly exitCode: number; readonly stdout: string; readonly stderr: string }> => {
-  const proc = Bun.spawn([process.execPath, bundlePath, ...args], {
-    stdout: "pipe",
-    stderr: "pipe",
-    env: { ...process.env, HOME: home, ORC_HOME: "" }
-  })
-  const stdout = proc.stdout
-  const stderr = proc.stderr
-  if (!(stdout instanceof ReadableStream) || !(stderr instanceof ReadableStream)) {
-    throw new Error("the orc process has no piped output")
-  }
-  const [out, err, exitCode] = await Promise.all([new Response(stdout).text(), new Response(stderr).text(), proc.exited])
-  return { exitCode, stdout: out, stderr: err }
-}
 
 const withHistory = async (use: (home: string) => Promise<void>, seed = fixtureRuns): Promise<void> => {
   const home = await mkdtemp(join(tmpdir(), "orc-metrics-e2e-"))
@@ -97,7 +80,7 @@ const expectedRows = [
   { run: "resumed", task: "resumed", delivery: "orc", status: "failed", failedSteps: 2, gateStops: 2, minutes: 7, fixRounds: 1 },
   { run: "gate-stopped", task: "gate-stopped", delivery: "no-mistakes", status: "failed", failedSteps: 1, gateStops: 2, minutes: 15.5, fixRounds: 0 },
   { run: "delivered", task: "delivered", delivery: "orc", status: "succeeded", failedSteps: 2, gateStops: 2, minutes: 42, fixRounds: 2 }
-]
+] as const
 
 const fixtureGateRuns = (db: Database) =>
   Effect.gen(function*() {
@@ -123,18 +106,21 @@ const fixtureGateRuns = (db: Database) =>
     ])
   })
 
+const metricsRuns = async (home: string) => {
+  const result = await runOrc(["metrics", "--json"], home)
+  expect(result.stderr).toBe("")
+  expect(result.exitCode).toBe(0)
+  expect(result.stdout.startsWith('{"schema":"orc.metrics.v2"')).toBe(true)
+  return (await Effect.runPromise(decodeMetricsJson(JSON.parse(result.stdout)))).runs
+}
+
 const printedRows = (stdout: string): ReadonlyArray<ReadonlyArray<string>> =>
   stdout.trimEnd().split("\n").map((line) => line.split(/ {2,}/))
 
 describe("orc metrics", () => {
   test("the JSON keeps recovered gate stops without counting carried steps or step time as run minutes", async () => {
     await withHistory(async (home) => {
-      const result = await runOrc(["metrics", "--json"], home)
-      expect(result.stderr).toBe("")
-      expect(result.exitCode).toBe(0)
-      expect(result.stdout.startsWith('{"schema":"orc.metrics.v2"')).toBe(true)
-      const decoded = await Effect.runPromise(decodeMetricsJson(JSON.parse(result.stdout)))
-      expect(decoded.runs).toEqual(expectedRows)
+      expect(await metricsRuns(home)).toEqual(expectedRows)
     })
   }, 30_000)
 
@@ -154,11 +140,7 @@ describe("orc metrics", () => {
 
   test("answered gates and a final unanswered gate count without treating implement, fix or no-gate failures as gates", async () => {
     await withHistory(async (home) => {
-      const result = await runOrc(["metrics", "--json"], home)
-      expect(result.stderr).toBe("")
-      expect(result.exitCode).toBe(0)
-      const decoded = await Effect.runPromise(decodeMetricsJson(JSON.parse(result.stdout)))
-      expect(decoded.runs).toEqual([
+      expect(await metricsRuns(home)).toEqual([
         { run: "no-gate-failed", task: "no-gate-failed", delivery: "no-mistakes", status: "failed", failedSteps: 1, gateStops: 0, minutes: 10, fixRounds: 0 },
         { run: "fix-failed", task: "fix-failed", delivery: "orc", status: "failed", failedSteps: 2, gateStops: 1, minutes: 10, fixRounds: 1 },
         { run: "implement-failed", task: "implement-failed", delivery: "orc", status: "failed", failedSteps: 1, gateStops: 0, minutes: 10, fixRounds: 0 },
