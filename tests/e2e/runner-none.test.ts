@@ -8,6 +8,13 @@ const queueWith = (fixture: Fixture, request: object, env: Record<string, string
 
 const mainToken = "/secrets/main-token"
 
+const beatWith = async (fixture: Fixture, dispatch: object): Promise<void> => {
+  await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify(dispatch))
+  await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
+  await orcOk(fixture, ["beat"])
+}
+
 describe("orc runner queue for a kind none account", () => {
   const bareRunArgs = (fixture: Fixture, task: string, provider: string, claimedMachine: ReadonlyArray<string> = []): Array<string> => [
     "--group", "orc", "--label", fixture.home + " " + task, "--working-directory", fixture.checkout, "--print-task-id", "--escape", "--",
@@ -20,16 +27,13 @@ describe("orc runner queue for a kind none account", () => {
       await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [{ id: "acme", credential: "package", packages: ["npm:example"] }] }))
       const quota = { schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 8 }, { name: "second", remainingPercent: 68 }] }
       await writeFile(join(fixture.dir, "bin", "orc-quota"), "#!/bin/sh\nprintf '%s\\n' '" + JSON.stringify(quota) + "'\n", { mode: 0o755 })
-      await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
+      await beatWith(fixture, {
         machines: [{ name: "linux", slots: 1, start: [process.execPath, binPath, "runner", "start"] }],
         quota: { provider: "acme", command: ["orc-quota"], accounts: [
           { name: "main", kind: "claude-config", configDirs: { linux: "/accounts/main" } },
           { name: "second", kind: "claude-config", configDirs: { linux: "/accounts/second" } }
         ] }
-      }))
-      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
-      await orcOk(fixture, ["beat"])
+      })
       expect(await queuedArgs(fixture)).toEqual(expect.arrayContaining(["ORC_DISPATCH_CLAUDE_CONFIG_DIR=/accounts/second"]))
     })
   }, runnerTimeout)
@@ -39,16 +43,13 @@ describe("orc runner queue for a kind none account", () => {
       await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [{ id: "acme", credential: "package", packages: ["npm:example"] }] }))
       const quota = { schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 8 }, { name: "second", remainingPercent: 68 }] }
       await writeFile(join(fixture.dir, "bin", "orc-quota"), "#!/bin/sh\nprintf '%s\\n' '" + JSON.stringify(quota) + "'\n", { mode: 0o755 })
-      await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
+      await beatWith(fixture, {
         machines: [{ name: "linux", slots: 1, start: [process.execPath, binPath, "runner", "start", "--", ...orcThere(fixture.home)] }],
         quota: { provider: "acme", command: ["orc-quota"], accounts: [
           { name: "main", kind: "claude-config", configDirs: { linux: "/accounts/main", mac: "/accounts/mac-main" } },
           { name: "second", kind: "claude-config", configDirs: { linux: "/accounts/second", mac: "/accounts/mac-second" } }
         ] }
-      }))
-      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
-      await orcOk(fixture, ["beat"])
+      })
       expect(await queuedArgs(fixture)).toEqual(expect.arrayContaining(["ORC_DISPATCH_CLAUDE_CONFIG_DIR=/accounts/second"]))
     })
   }, runnerTimeout)
@@ -101,13 +102,10 @@ describe("orc runner queue for a kind none account", () => {
   test("a beat start for a kind none account queues with no --token-file and renews nothing", async () => {
     await withFixture(async (fixture) => {
       await fakeQuota(fixture)
-      await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
+      await beatWith(fixture, {
         machines: [{ name: "linux", slots: 1, start: [process.execPath, binPath, "runner", "start"] }],
         quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", kind: "none" }], floorPercent: 15 }
-      }))
-      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
-      await orcOk(fixture, ["beat"])
+      })
       expect(await queuedArgs(fixture)).toEqual(bareRunArgs(fixture, "orc-1", "acme", ["env", "ORC_RUN_MACHINE=linux"]))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({
         tasks: {
