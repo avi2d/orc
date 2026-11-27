@@ -93,9 +93,9 @@ const noted = () => ({
 describe("the session quota panel's rows", () => {
   const rows = () => sessionLines(fixtureSessionView(), 84).map(plain);
 
-  test("says an account has no windows reported when quota-axi gave none with a pace, as quota-rows pins it, not a bare heading", () => {
-    const unpaced = JSON.stringify(JSON.parse(fixture("quota-axi/full.json"), (key, value) => (key === "pace" ? undefined : value)));
-    const lines = sessionLines(sessionViewOfQuota(unpaced, recordedNow), 84).map(plain);
+  test("says an account has no windows reported when quota-axi gave none with a reset, as quota-rows pins it, not a bare heading", () => {
+    const unreset = JSON.stringify(JSON.parse(fixture("quota-axi/full.json"), (key, value) => (key === "resetsAt" ? undefined : value)));
+    const lines = sessionLines(sessionViewOfQuota(unreset, recordedNow), 84).map(plain);
     const heading = lines.findIndex((row) => row.startsWith("● claude"));
     expect(lines.slice(heading + 1, heading + 2)).toEqual(["no windows reported"]);
   });

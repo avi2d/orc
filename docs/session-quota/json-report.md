@@ -41,6 +41,13 @@ The window rows detail each tracked window.
 | `windows[].sessions` | Each session's calls, measured `tokens`, `trailingHourTokens`, `raw` and `priced` estimates, `models` and `flagged` |
 | `windows[].sessions[].models` | Each model the session called in the window, most tokens first, with its `model`, `calls`, `tokens`, `trailingHourTokens` and `priced` estimate, whose points add up to the session's |
 | `raw` and `priced` | `share` of the window's local calls, `contributionPoints` as an upper bound, and `pointsPerHour` over the trailing hour |
+
+## Other fields
+
+The report's other rows detail its sessions and its flags.
+
+| Field | What it holds |
+| --- | --- |
 | `sessions` | Each session's `id`, `kind`, `live`, `pane` or `pid`, `harness`, `cwd`, `place`, `label`, log `files` and `modelsSinceMidnight` |
 | `sessions[].modelsSinceMidnight` | Each model the session called since local midnight on the machine that wrote the report, most tokens first, with its `model`, `tokens` and billing `provider`, across every route and quota reset |
 | `unmatchedProcesses` | Each log folder whose headless processes no log could be matched to, with its `harness`, `cwd`, `place` and `pids` |
