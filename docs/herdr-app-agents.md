@@ -81,6 +81,7 @@ In the Agents tab, merge from the **Approve** tab with **Approve and merge**.
 On the Inbox page, select **merge** on the PR's **Awaiting you** card and confirm the dialog.
 Select **hold** on that Inbox card to leave the PR open and clear the request.
 Select the PR address to open it in your browser.
+To send the task back instead, write what to change in the box under **What to change before this PR merges** and select **Send back**.
 
 ![Agents tab on the Approve tab of a run whose PR waits](images/herdr-agents-approve.png)
 
