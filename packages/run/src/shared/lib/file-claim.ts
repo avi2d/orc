@@ -63,33 +63,82 @@ const loadLibc = () => {
 
 let loadedLibc: ReturnType<typeof loadLibc> | undefined
 
+const loadKernel32 = () => dlopen("kernel32.dll", {
+  CreateFileW: { args: [FFIType.ptr, FFIType.u32, FFIType.u32, FFIType.ptr, FFIType.u32, FFIType.u32, FFIType.ptr], returns: FFIType.i64 },
+  LockFileEx: { args: [FFIType.i64, FFIType.u32, FFIType.u32, FFIType.u32, FFIType.u32, FFIType.ptr], returns: FFIType.i32 },
+  UnlockFileEx: { args: [FFIType.i64, FFIType.u32, FFIType.u32, FFIType.u32, FFIType.ptr], returns: FFIType.i32 },
+  CloseHandle: { args: [FFIType.i64], returns: FFIType.i32 },
+  GetLastError: { args: [], returns: FFIType.u32 }
+}).symbols
+
+let loadedKernel32: ReturnType<typeof loadKernel32> | undefined
+
 const processStartedAt = Date.now() - process.uptime() * 1000
 
 const lockFailure = (file: string, method: string, cause: unknown): PlatformError.PlatformError =>
   PlatformError.systemError({ _tag: "Unknown", module: "FileSystem", method, pathOrDescriptor: file, cause })
 
+type Unlock = () => void
+
+// Success holds the lock until the returned unlock runs, and none means another process holds it.
+type TryLock = (file: string) => Effect.Effect<Option.Option<Unlock>, PlatformError.PlatformError>
+
+const tryFlock: TryLock = (file) => Effect.suspend(() => {
+  const { libc, errno } = loadedLibc ??= loadLibc()
+  const fd = libc.symbols.open(Buffer.from(file + "\0"), 2 | (process.platform === "darwin" ? 0x1000200 : 0x80040), 0o600)
+  if (fd < 0) {
+    return Effect.fail(lockFailure(file, "open", "cannot open lock file"))
+  }
+  if (libc.symbols.flock(fd, 2 | 4) === 0) {
+    return Effect.succeedSome(() => { libc.symbols.close(fd) })
+  }
+  const address = errno()
+  const code = address === null ? -1 : read.i32(address)
+  libc.symbols.close(fd)
+  return code === (process.platform === "darwin" ? 35 : 11) ? Effect.succeedNone : Effect.fail(lockFailure(file, "flock", "errno " + code))
+})
+
+const invalidHandle = -1n
+const errorLockViolation = 33
+
+// Windows locks a byte range per handle, so a lock over the holder record would refuse the holder's own write of it.
+const lockedRange = (): Buffer => {
+  const overlapped = Buffer.alloc(32)
+  overlapped.writeUInt32LE(0x4000_0000, 20)
+  return overlapped
+}
+
+const tryLockFileEx: TryLock = (file) => Effect.suspend(() => {
+  const kernel32 = loadedKernel32 ??= loadKernel32()
+  const handle = kernel32.CreateFileW(Buffer.from(file + "\0", "utf16le"), 0xC000_0000, 7, null, 4, 0x80, null)
+  if (handle === invalidHandle) {
+    return Effect.fail(lockFailure(file, "CreateFileW", "error " + kernel32.GetLastError()))
+  }
+  const range = lockedRange()
+  if (kernel32.LockFileEx(handle, 2 | 1, 0, 1, 0, range) !== 0) {
+    return Effect.succeedSome(() => {
+      kernel32.UnlockFileEx(handle, 0, 1, 0, range)
+      kernel32.CloseHandle(handle)
+    })
+  }
+  const code = kernel32.GetLastError()
+  kernel32.CloseHandle(handle)
+  return code === errorLockViolation ? Effect.succeedNone : Effect.fail(lockFailure(file, "LockFileEx", "error " + code))
+})
+
 const withKernelLock = <A, E, R>(file: string, use: Effect.Effect<A, E, R>): Effect.Effect<Option.Option<A>, E | PlatformError.PlatformError, R | FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    if (process.platform === "win32") {
-      return yield* Effect.fail(PlatformError.systemError({ _tag: "Unknown", module: "FileSystem", method: "flock", pathOrDescriptor: file, description: "file claims are not supported on Windows yet" }))
-    }
     const fs = yield* FileSystem.FileSystem
-    const { libc, errno } = loadedLibc ??= loadLibc()
+    const tryLock = process.platform === "win32" ? tryLockFileEx : tryFlock
     return yield* Effect.acquireUseRelease(
-      Effect.flatMap(Effect.sync(() => libc.symbols.open(Buffer.from(file + "\0"), 2 | (process.platform === "darwin" ? 0x1000200 : 0x80040), 0o600)), (fd) =>
-        fd < 0 ? Effect.fail(lockFailure(file, "open", "cannot open lock file")) : Effect.succeed(fd)),
-      (fd) => Effect.gen(function*() {
-        const code = yield* Effect.sync(() => {
-          if (libc.symbols.flock(fd, 2 | 4) === 0) return 0
-          const address = errno()
-          return address === null ? -1 : read.i32(address)
-        })
-        if (code === (process.platform === "darwin" ? 35 : 11)) return Option.none<A>()
-        if (code !== 0) return yield* Effect.fail(lockFailure(file, "flock", "errno " + code))
-        yield* fs.writeFileString(file, JSON.stringify({ pid: process.pid, host: hostname(), startedAt: processStartedAt }))
-        return yield* Effect.asSome(use)
+      tryLock(file),
+      Option.match({
+        onNone: () => Effect.succeedNone,
+        onSome: () => fs.writeFileString(file, JSON.stringify({ pid: process.pid, host: hostname(), startedAt: processStartedAt })).pipe(
+          Effect.andThen(Effect.asSome(use))
+        )
       }),
-      (fd) => Effect.sync(() => { libc.symbols.close(fd) })
+      (held) => Effect.sync(() => { if (Option.isSome(held)) held.value() })
     )
   })
 
