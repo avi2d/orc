@@ -139,14 +139,14 @@ describe("a version-1 north.json report from before window sources and credentia
 });
 
 describe("a window with no cycle in a single-machine report", () => {
-  const withoutCycle = (report: SessionQuotaReport): SessionQuotaReport => ({
-    ...report,
-    windows: report.windows.map((window, index) => (index === 0 ? { ...window, startsAt: null, elapsedFraction: null } : window)),
+  const withoutCycle = (machine: SessionQuotaReport): SessionQuotaReport => ({
+    ...machine,
+    windows: machine.windows.map((window, index) => (index === 0 ? { ...window, startsAt: null, elapsedFraction: null } : window)),
   });
 
   test("reads it at version 3 instead of refusing the null startsAt", () => {
-    const report = { ...withoutCycle(machineReport("north")), schemaVersion: 3 as const };
-    const decoded = Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(JSON.stringify(report)));
+    const versionThree = { ...withoutCycle(machineReport("north")), schemaVersion: 3 as const };
+    const decoded = Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(JSON.stringify(versionThree)));
     expect([decoded.windows[0]?.startsAt, decoded.windows[0]?.elapsedFraction]).toEqual([null, null]);
   });
 });

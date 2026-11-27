@@ -14,7 +14,7 @@ import { accountTitle } from "./quotas";
 import { localMidnight, type SessionModels, sessionModelsSinceMidnight } from "./session-models";
 import type { SourcedEntry, SourcedProvider, SourcedWindow, WindowSource } from "../sources/window-sources";
 import { presenceFieldsOf, presenceOf, type PresenceFields } from "./session-pane-presence";
-import { uncycledWindow, type WindowHead } from "./uncycled-window";
+import { uncycledFields } from "./uncycled-window";
 
 interface ModelShare {
   readonly model: string | undefined;
@@ -213,7 +213,7 @@ const windowView = (
   availability: ReadonlyArray<QuotaAvailability>,
 ): WindowView => {
   const usedPoints = 100 - metered.percentRemaining;
-  const head: WindowHead = {
+  const head = {
     id: metered.window.id,
     label: metered.window.label,
     kind: metered.window.kind,
@@ -224,7 +224,7 @@ const windowView = (
     otherCycle: [],
   };
   const cycleSeconds = metered.window.pace?.cycleSeconds;
-  if (cycleSeconds === undefined) return uncycledWindow(head);
+  if (cycleSeconds === undefined) return { ...head, ...uncycledFields(usedPoints) };
   const now = DateTime.toEpochMillis(inputs.now);
   const start = startOf(metered, cycleSeconds);
   const resetsAt = DateTime.toEpochMillis(metered.resetsAt);

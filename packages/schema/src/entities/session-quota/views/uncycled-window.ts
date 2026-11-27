@@ -1,11 +1,25 @@
-import { noTokens } from "../contract/tokens";
-import type { WindowView } from "./session-quota";
+import { noTokens, type Tokens } from "../contract/tokens";
 
-export type WindowHead = Pick<WindowView, "id" | "label" | "kind" | "source" | "resetsAt" | "usedPoints" | "leftPoints" | "otherCycle">;
+interface UncycledFields {
+  readonly cycleSeconds: undefined;
+  readonly startsAt: null;
+  readonly elapsedFraction: null;
+  readonly pace: "unknown";
+  readonly aheadOfPace: false;
+  readonly pastFirstTenth: false;
+  readonly exhaustsBeforeReset: false;
+  readonly verdict: null;
+  readonly sustainablePointsPerHour: null;
+  readonly activeSessions: 0;
+  readonly fairPointsPerHour: null;
+  readonly observedCalls: 0;
+  readonly observedTokens: Tokens;
+  readonly unattributedPoints: number;
+  readonly sessions: readonly [];
+}
 
 // With no cycle the window has no start to place a call in, so no session shares it and every used point stays unattributed.
-export const uncycledWindow = (head: WindowHead): WindowView => ({
-  ...head,
+export const uncycledFields = (usedPoints: number): UncycledFields => ({
   cycleSeconds: undefined,
   startsAt: null,
   elapsedFraction: null,
@@ -19,6 +33,6 @@ export const uncycledWindow = (head: WindowHead): WindowView => ({
   fairPointsPerHour: null,
   observedCalls: 0,
   observedTokens: noTokens,
-  unattributedPoints: head.usedPoints,
+  unattributedPoints: usedPoints,
   sessions: [],
 });
