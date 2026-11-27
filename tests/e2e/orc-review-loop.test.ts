@@ -205,12 +205,10 @@ for (const reply of [
 const privateTask = "Keep this internal. The violet otter carries seven sealed crates across the quiet harbor before sunrise.\nDo the thing.\n"
 
 for (const reason of [
-  "Do the thing.",
   "This matters because the violet otter carries seven sealed crates across the quiet harbor before sunrise.",
-  "Avoid this because VIOLET, otter carries seven sealed crates across the quiet harbor.",
-  "A new path helps. Keep this internal."
+  "Avoid this because VIOLET, otter carries seven sealed crates across the quiet harbor."
 ]) {
-  test("a copied task sentence or word run cannot enter Why: " + reason, async () => {
+  test("eight copied task words cannot enter Why: " + reason, async () => {
     const result = await exercise([[]], "Why: " + reason + "\nno diagram", privateTask)
     expect(result.completed).toBe(true)
     expect(result.body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
@@ -219,17 +217,24 @@ for (const reason of [
 }
 
 test("copied task text in a diagram cannot bypass the public body comparison", async () => {
-  const result = await exercise([[]], "Why: Cached reads avoid repeated disk access.\n```mermaid\nflowchart LR\n  a[Keep this internal.] --> b[Cache]\n```", privateTask)
+  const result = await exercise([[]], "Why: Cached reads avoid repeated disk access.\n```mermaid\nflowchart LR\n  a[the violet otter carries seven sealed crates across the quiet harbor before sunrise] --> b[Cache]\n```", privateTask)
   expect(result.completed).toBe(true)
   expect(result.body).toContain("## Why\n\nCached reads avoid repeated disk access.\n\n## What changed")
-  expect(result.body).not.toContain("Keep this internal.")
+  expect(result.body).not.toContain("the violet otter carries seven sealed crates")
   expect(result.body).not.toContain("## How it fits")
 }, 60_000)
 
-test("an unreadable task cannot bypass the reason comparison", async () => {
-  const result = await exercise([[]], "Why: Cached reads avoid repeated disk access.\nno diagram", null)
+test("an unreadable task does not discard the reason or diagram", async () => {
+  const result = await exercise([[]], "Why: Cached reads avoid repeated disk access.\n```mermaid\nflowchart LR\n  read --> cache\n```", null)
   expect(result.completed).toBe(true)
-  expect(result.body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
+  expect(result.body).toContain("## Why\n\nCached reads avoid repeated disk access.\n\n## What changed")
+  expect(result.body).toContain("flowchart LR\n  read --> cache")
+}, 60_000)
+
+test("a short shared task label does not discard the reason or diagram", async () => {
+  const result = await exercise([[]], "Why: This fixes a problem with repeated reads.\n```mermaid\nflowchart LR\n  read --> review\n```", "## Problem\n## Review\n")
+  expect(result.body).toContain("This fixes a problem with repeated reads.")
+  expect(result.body).toContain("flowchart LR\n  read --> review")
 }, 60_000)
 
 for (const reply of ["Why:\nno diagram", "Why:\n```mermaid\nflowchart LR\n  a --> b\n```"]) {

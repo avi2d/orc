@@ -78,12 +78,14 @@ To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and
 ## The PR body
 The body keeps the same headings in the same order on every run.
 `## Why` holds the one sentence that the diagram turn writes from the branch diff, never text from the task file.
-When the turn returns no such sentence, when the sentence repeats text from the task file, or when the task file cannot be read, it holds `No reason was recorded for this change; see What changed.`
+When the turn returns no such sentence, or the sentence repeats eight consecutive words from the task file, it holds `No reason was recorded for this change; see What changed.`
+When the task file cannot be read, the reason is kept.
 `## What changed` lists the branch's commits.
 `## How it fits` carries a `mermaid` diagram when the change alters a flow, a structure or a boundary, and the run leaves the heading out otherwise.
 A further Pi turn writes the `## Why` sentence and draws that diagram after the push, and only when `gh pr create` is about to run.
 A run that opens no PR, and a run that reuses an open PR, skip it.
-A reply without a `mermaid` fence leaves the heading out, and so does a diagram that repeats text from the task file.
+A reply without a `mermaid` fence leaves the heading out, and so does a diagram that repeats eight consecutive words from the task file.
+When the task file cannot be read, the diagram is kept.
 `## How it was checked` names the local checks that passed and the review result.
 A review with no findings gives the line `The review found nothing.`, and a failed review turn gives `The review turn failed, so this PR lists no review findings.`
 `## Open review findings` lists each open finding with its severity, id, file and line, description and action, and the run leaves the heading out when no finding is open.

@@ -119,22 +119,17 @@ const normalizedWords = (text: string): Array<string> =>
 
 const repeatsTaskText = (text: string, taskText: string): boolean => {
   const words = normalizedWords(text)
-  const normalizedText = " " + words.join(" ") + " "
-  const copiedSentence = taskText.split(/(?<=[.!?])\s+|\r?\n/u).some((sentence) => {
-    const normalizedSentence = normalizedWords(sentence).join(" ")
-    return normalizedSentence !== "" && normalizedText.includes(" " + normalizedSentence + " ")
-  })
   const normalizedTask = " " + normalizedWords(taskText).join(" ") + " "
   const copiedRun = words.some((_, index) =>
     index + 8 <= words.length && normalizedTask.includes(" " + words.slice(index, index + 8).join(" ") + " ")
   )
-  return copiedSentence || copiedRun
+  return copiedRun
 }
 
 export const prBody = (input: PrBodyInput): string => {
   const reason = input.why?.trim() ?? ""
-  const why = reason === "" || input.taskText === null || repeatsTaskText(reason, input.taskText) ? reasonFallback : reason
-  const chart = input.taskText === null || (input.diagram !== null && repeatsTaskText(input.diagram, input.taskText)) ? null : input.diagram
+  const why = reason === "" || (input.taskText !== null && repeatsTaskText(reason, input.taskText)) ? reasonFallback : reason
+  const chart = input.taskText !== null && input.diagram !== null && repeatsTaskText(input.diagram, input.taskText) ? null : input.diagram
   const changed = input.subjects.length === 0
     ? "No commits landed on the branch."
     : input.subjects.map((subject) => "- " + subject).join("\n")
