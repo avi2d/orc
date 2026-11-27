@@ -306,9 +306,9 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     const { own, forwarded, handover } = yield* forwardHandover(run, priorDir)
     const fresh = !progress.implementPassed && (own !== null || (forwarded !== null && progress.implementSessionId === null))
     const carriedImplement = fresh ? null : yield* carrySession(run, progress.implementSource, progress.implementSessionId)
-    const sentBack = sentBackAnswersOf(answers).length > 0
-    const fixCarry = yield* fixCarryOf(run, progress, sentBack || isNewHoldRelease(answers))
-    const skipImplement = progress.implementPassed && !sentBack
+    const replaysSendBack = sentBackAnswersOf(answers).length > 0 && reviewWait === null
+    const fixCarry = yield* fixCarryOf(run, progress, replaysSendBack || isNewHoldRelease(answers))
+    const skipImplement = progress.implementPassed && !replaysSendBack
     const skipChecks = skipImplement && progress.checksComplete
     const inherited = skipImplement
       ? yield* inheritedCompletion(db, run, progress.priorId, fixCarry.storedFixes)

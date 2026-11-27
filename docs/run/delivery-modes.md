@@ -70,7 +70,9 @@ The [nono](https://nono.sh) sandbox carries one provider's credential, so a revi
 When no entry qualifies, Orc records `NoReviewerRoom` and does not open a PR.
 The run history records the `review` step as failed with no model, and the `review-failure` signal holds the reason.
 The beat parks the task with that reason and checks reviewer quota on the machine where the run stopped.
-When a reviewer qualifies, the beat resumes the same branch at the pending review turn.
+When a reviewer qualifies, the beat resumes the same branch.
+The resumed run keeps the implementation, runs the checks again and then runs the pending review turn.
+It does not apply again a send-back that the parked run already applied.
 The resumed run excludes the providers saved when it parked.
 An account that dispatch assigns to the resumed run can still review until its provider commits a change.
 If the run parks again, it saves the updated list of excluded providers for the beat.

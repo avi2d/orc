@@ -62,6 +62,7 @@ export interface AgentOutcome {
   readonly sessionId: string | null
   readonly sessionFile: string | null
   readonly commits: Array<OrcRunCommit>
+  readonly wroteCommits: boolean
   readonly tokens: PiTokenUse | null
   readonly sessionSize: LongSessionCounts | null
   readonly completed: boolean

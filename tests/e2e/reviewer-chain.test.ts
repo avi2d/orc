@@ -116,4 +116,28 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
       expect(wait).toMatchObject({ implementerProviders: ["acme", "beta"] })
     })
   })
+
+  test("reruns the checks and lets the recovered provider review instead of applying a parked send-back again", async () => {
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktreeDir }) => {
+      const checksThenPass = async () => {
+        kinds.push("checks")
+        return lintPasses()
+      }
+      const opened = await runOrcDeliveryStep(dir, home, cleanReviewer(sha, "beta/reviewer", kinds), checksThenPass,
+        pickWith({ acme: room, beta: room, gamma: room }, sameProviderFirst), { worktreeDir })
+      const sentBack = [{ question: "send-back", answer: "rename the flag", decider: "owner" as const }]
+      const parked = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), checksThenPass,
+        pickWith({ acme: room, beta: exhausted, gamma: exhausted }, sameProviderFirst),
+        { worktreeDir, resumeRun: opened.report.runId, answers: sentBack })
+      expect(parked.report.endReason).toContain("no reviewer in the chain has quota room")
+      kinds.length = 0
+
+      const resumed = await runOrcDeliveryStep(dir, home, cleanReviewer(sha, "beta/reviewer", kinds), checksThenPass,
+        pickWith({ acme: room, beta: room, gamma: exhausted }, sameProviderFirst),
+        { worktreeDir, resumeRun: parked.report.runId, runId: "step-run-3", answers: sentBack, implementerModel: "beta/coder", fixerModel: "beta/coder" })
+      expect(kinds).toEqual(["checks", "reviewer", "reviewer"])
+      expect(resumed.stepAgents).toContainEqual({ name: "review", model: "beta/reviewer", thinking: "high" })
+      expect(resumed.steps).toContainEqual({ name: "review", status: "passed" })
+    })
+  })
 })

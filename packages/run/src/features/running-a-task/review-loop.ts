@@ -6,7 +6,7 @@ import { finishAfterChecks, reviewOrc } from "./run-finish"
 import type { ReviewFinding, ReviewOutcome } from "./review-outcome"
 import { lastFixRound, passesRoundTwoBar } from "./left-findings"
 import type { RunStopped } from "./loop-pause"
-import { reviewHead, writeReviewWait } from "./review-wait"
+import { writeReviewWait } from "./review-wait"
 import type { ResumePlan, ReviewEligibility, RunCheckpoints, SandboxOps } from "./run-ops"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
 
@@ -117,11 +117,9 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, eligibility: reviewEligibility(loop) })
     }).pipe(
       Effect.catchTag("NoReviewerRoom", ({ implementerProviders, message }) =>
-        Effect.gen(function*() {
-          const head = yield* reviewHead(run)
-          yield* writeReviewWait(run, { implementerProviders, reason: message, head, sentPerRound })
-          return { ...stopReport(loop, message), waitingForReviewer: true as const }
-        })
+        writeReviewWait(run, { implementerProviders, reason: message, sentPerRound }).pipe(
+          Effect.as({ ...stopReport(loop, message), waitingForReviewer: true as const })
+        )
       )
     )
   })
