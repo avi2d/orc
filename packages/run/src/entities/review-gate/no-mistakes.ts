@@ -184,7 +184,7 @@ const stepCurrent = (input: NoMistakesInput, log: DriveLog, sent: Sent, current:
     const parsed = log.read(current.stdout)
     const refused = rejected(current, parsed)
     if ((sent.kind === "respond" || sent.kind === "answer") && !refused) {
-      log.countGate()
+      log.countGate(sent.gate.step)
     }
     if (parsed.terminal) {
       return { kind: "stop", ending: log.finish(parsed) }

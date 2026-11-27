@@ -3,7 +3,7 @@ import { driveNoMistakes, waitForAnswers, type AllowWord, type QuestionAnswer } 
 import { type DirectPrRecord, openDirectPr, type PullRequestOpener } from "../../entities/pull-request/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
-import type { AgentFile, LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
+import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 import type { ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
@@ -41,9 +41,9 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     }
     if (run.delivery.kind === "direct-PR") {
       const reviewStarted = new Date().toISOString()
-      yield* checkpoints.reviewStart(run.delivery.reviewer, reviewStarted)
+      yield* checkpoints.reviewStart(run.delivery.reviewer, 1, reviewStarted)
       const review = yield* reviewAtHead(run, runAgent, run.delivery.reviewer, priorDir)
-      yield* checkpoints.reviewDone(run.delivery.reviewer, review, reviewStarted, new Date().toISOString())
+      yield* checkpoints.reviewDone(run.delivery.reviewer, 1, review, reviewStarted, new Date().toISOString())
       const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, unfixedSection(review))
       const reviewed = checked + reviewSentence(review)
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
@@ -58,29 +58,23 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-export const pickedReviewTurn = (
-  pick: ReviewerPick,
-  runAgent: SandboxOps["runAgent"],
-  turn: (reviewer: AgentFile, runAgent: SandboxOps["runAgent"]) => Effect.Effect<ReviewOutcome, OrcRunError>,
-  noRoom: (failed: ReviewOutcome & { readonly status: "failed" }) => Effect.Effect<ReviewOutcome, OrcRunError> = Effect.succeed
-): Effect.Effect<ReviewOutcome, OrcRunError> =>
+export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number): Effect.Effect<ReviewOutcome, OrcRunError> =>
   pick(runAgent).pipe(
-    Effect.flatMap((picked) => turn(picked.reviewer, picked.runAgent)),
-    Effect.catchTag("NoReviewerRoom", (error) => noRoom({ status: "failed", reason: error.message }))
+    Effect.flatMap((picked) =>
+      Effect.gen(function*() {
+        const started = new Date().toISOString()
+        yield* checkpoints.reviewStart(picked.reviewer, attempt, started)
+        const review = yield* runReviewTurn(run, picked.runAgent, picked.reviewer, "orc", attempt)
+        yield* checkpoints.reviewDone(picked.reviewer, attempt, { ...review, reusedFrom: null }, started, new Date().toISOString())
+        return review
+      })
+    ),
+    Effect.catchTag("NoReviewerRoom", (error) => {
+      const failed: ReviewOutcome = { status: "failed", reason: error.message }
+      const at = new Date().toISOString()
+      return checkpoints.reviewDone(null, attempt, { ...failed, reusedFrom: null }, at, at).pipe(Effect.as(failed))
+    })
   )
-
-export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]): Effect.Effect<ReviewOutcome, OrcRunError> =>
-  pickedReviewTurn(pick, runAgent, (reviewer, reviewerRunAgent) =>
-    Effect.gen(function*() {
-      const started = new Date().toISOString()
-      yield* checkpoints.reviewStart(reviewer, started)
-      const review = yield* runReviewTurn(run, reviewerRunAgent, reviewer, "orc")
-      yield* checkpoints.reviewDone(reviewer, { ...review, reusedFrom: null }, started, new Date().toISOString())
-      return review
-    }), (failed) => {
-    const at = new Date().toISOString()
-    return checkpoints.reviewDone(null, { ...failed, reusedFrom: null }, at, at).pipe(Effect.as(failed))
-  })
 
 const findingLine = (finding: ReviewFinding): string =>
   "- " + finding.severity + " `" + finding.id + "` at `" + finding.file + (finding.line === null ? "" : ":" + finding.line.toString()) + "`: " + finding.description + " Action: " + finding.action

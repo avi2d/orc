@@ -64,10 +64,11 @@ const readReply = (run: Pick<HistoryRun, "fs">, sessionFile: string | null): Eff
 
 const recordReview = (
   run: Pick<HistoryRun, "fs" | "path" | "runDir">,
-  findings: ReadonlyArray<ReviewFinding>
+  findings: ReadonlyArray<ReviewFinding>,
+  attempt: number
 ): Effect.Effect<ReviewOutcome> =>
   Effect.gen(function*() {
-    const file = run.path.join(run.runDir, reviewFileName)
+    const file = run.path.join(run.runDir, attempt === 1 ? reviewFileName : "review-" + attempt.toString() + ".json")
     const written = yield* run.fs.writeFileString(file, JSON.stringify(findings, null, 2) + "\n").pipe(Effect.result)
     return Result.isSuccess(written)
       ? { status: "passed", findings, file }
@@ -78,7 +79,8 @@ export const runReviewTurn = (
   run: Pick<HistoryRun, "fs" | "path" | "runDir" | "piSessionDir" | "spawner" | "git" | "projectDir" | "worktreeDir" | "branch">,
   runAgent: SandboxOps["runAgent"],
   reviewer: AgentFile,
-  mode: "direct-PR" | "orc" = "direct-PR"
+  mode: "direct-PR" | "orc" = "direct-PR",
+  attempt = 1
 ): Effect.Effect<ReviewOutcome> =>
   Effect.gen(function*() {
     const diffed = yield* readDiff(run).pipe(Effect.result)
@@ -100,7 +102,7 @@ export const runReviewTurn = (
       }
       const findings = readFindings(yield* readReply(run, result.success.sessionFile), mode)
       if (Result.isSuccess(findings)) {
-        return yield* recordReview(run, findings.success)
+        return yield* recordReview(run, findings.success, attempt)
       }
       problem = findings.failure
       resumeSession = result.success.sessionFile ?? resumeSession
@@ -125,7 +127,7 @@ export const reviewAtHead = (
     const reusable = head !== "" && Option.isSome(decoded) && decoded.value.head === head ? decoded.value : null
     const reusedFrom = reusable !== null && priorDir !== null ? run.path.basename(priorDir) : null
     const outcome = reusable !== null
-      ? yield* recordReview(run, reusable.outcome.findings)
+      ? yield* recordReview(run, reusable.outcome.findings, 1)
       : yield* runReviewTurn(run, runAgent, reviewer)
     if (outcome.status === "passed" && head !== "") {
       const file = run.path.join(run.runDir, checkpointFileName)

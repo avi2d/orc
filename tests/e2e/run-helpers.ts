@@ -15,6 +15,7 @@ import { type ChainReviewer, fixedReviewer } from "../../packages/run/src/featur
 import type { ReviewerPick } from "../../packages/run/src/features/running-a-task/run-ops"
 import type { OrcRunReport, RunDeliverer } from "../../packages/run/src/features/running-a-task/run-record"
 import { listRuns, openDatabase, openQuestionsForRun, type RunRecord } from "../../packages/run/src/entities/run-history/index"
+import { readRunMetrics } from "../../packages/run/src/features/seeing-runs/index"
 import { type FakeAgent, type FakeCheck, fakeOps } from "../lib/fake-ops"
 
 export const git = (dir: string, args: ReadonlyArray<string>): string => {
@@ -43,6 +44,9 @@ export const withRepo = async (use: (dir: string) => Promise<void>): Promise<voi
     await rm(dir, { recursive: true, force: true })
   }
 }
+
+export const recordedMetrics = (home: string): Promise<Effect.Success<ReturnType<typeof readRunMetrics>>> =>
+  Effect.runPromise(Effect.acquireUseRelease(openDatabase(home), readRunMetrics, (db) => Effect.sync(() => db.close())).pipe(Effect.provide(BunServices.layer)))
 
 export const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
   const home = await mkdtemp(join(tmpdir(), "orc-run-home-"))

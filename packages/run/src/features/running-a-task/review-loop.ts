@@ -1,8 +1,7 @@
 import { Effect } from "effect"
 import { OrcRunError } from "../../shared/lib/index"
 import { runChecksRound, summarizeChecksRound, type ChecksCommand } from "./checks"
-import { finishAfterChecks, pickedReviewTurn, reviewOrc } from "./run-finish"
-import { runReviewTurn } from "./review-turn"
+import { finishAfterChecks, reviewOrc } from "./run-finish"
 import type { ReviewFinding, ReviewOutcome } from "./review-outcome"
 import { lastFixRound, passesRoundTwoBar } from "./left-findings"
 import type { RunStopped } from "./loop-pause"
@@ -87,7 +86,7 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
     }
     const reviewer = run.delivery.reviewer
-    let review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent)
+    let review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, 1)
     const sentPerRound: Array<ReadonlyArray<ReviewFinding>> = []
     for (let round = 1; mayStartRound(round, review); round += 1) {
       if (review.status !== "passed") break
@@ -95,7 +94,7 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
       sentPerRound.push(sent)
       const failure = yield* runOneRound(loop, sent, round)
       if (failure !== null) return stopReport(loop, failure)
-      review = yield* pickedReviewTurn(reviewer, ops.runAgent, (picked, runAgent) => runReviewTurn(run, runAgent, picked, "orc"))
+      review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent, round + 1)
     }
     return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound })
   })

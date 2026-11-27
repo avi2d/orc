@@ -17,6 +17,7 @@ An `orc` run fetches `origin` and rebases its branch onto the default branch rec
 If the rebase fails, the run does not open a PR.
 After the checks pass, the run reviews the branch and fixes the findings in at most two rounds.
 The first round fixes every finding, and the second round fixes only the `error` findings the next review still reports.
+The run history records each review turn as its own `review` step, numbered by attempt.
 If a review turn fails, a fix does not finish, or a check fails after a fix, the run stops without opening a PR.
 Otherwise, the run pushes the branch and opens or reuses a PR.
 The run does not wait for a CI verdict.
@@ -29,18 +30,17 @@ In `orc` delivery, orc also reads `review.path_instructions` from `.no-mistakes.
 Each entry holds a `path` glob and its `instructions`.
 Orc adds each entry whose glob matches a changed file to the review prompt, and the reviewer names that glob in each finding the entry raises.
 An entry missing either string fails the review turn.
-Orc decodes the findings JSON array from the reviewer's last reply and writes it to `review.json` in the run folder.
+Orc decodes the findings JSON array from the reviewer's last reply and writes it to the run folder as `review.json`, then `review-2.json` and `review-3.json` in later orc turns.
 An unreadable reply gets one rerun on the same session, and a second one fails the review turn.
 The run's end reason names the finding count or the review failure.
 The run history records the turn as the `review` step with its times and the reviewer's model.
-A passed `review` step names `review.json` as evidence and gives the finding count as the `review-findings` signal.
+A passed `review` step names its findings file as evidence and gives the finding count as the `review-findings` signal.
 A failed `review` step gives the failure as the `review-failure` signal.
 In `direct-PR` delivery, the review turn fixes nothing, and a review failure does not block opening the PR.
 After a successful `direct-PR` review, if orc can read the branch head, it writes `review-checkpoint.json` in the run folder with the head and findings.
 A resumed direct-PR run reads the previous run's checkpoint and reuses the completed review when the branch head is unchanged.
 It writes `review.json` and a new checkpoint in the current run folder.
 If the head changed or no completed review was recorded, orc runs the review turn.
-A resume retries a failed review turn.
 A checkpoint write failure does not block the PR, but the next resume reviews again.
 
 ## Reviewer chain

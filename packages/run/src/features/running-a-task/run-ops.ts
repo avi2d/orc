@@ -73,8 +73,8 @@ export interface RunCheckpoints {
   readonly fixDone: (fix: RecordedFixAttempt) => Effect.Effect<void, OrcRunError>
   readonly noMistakesStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly noMistakesDone: (record: NoMistakesRecord) => Effect.Effect<void, OrcRunError>
-  readonly reviewStart: (reviewer: AgentFile, started: string) => Effect.Effect<void, OrcRunError>
-  readonly reviewDone: (reviewer: AgentFile | null, outcome: ReviewAtHeadOutcome, started: string, ended: string) => Effect.Effect<void, OrcRunError>
+  readonly reviewStart: (reviewer: AgentFile, attempt: number, started: string) => Effect.Effect<void, OrcRunError>
+  readonly reviewDone: (reviewer: AgentFile | null, attempt: number, outcome: ReviewAtHeadOutcome, started: string, ended: string) => Effect.Effect<void, OrcRunError>
   readonly pullRequestStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly pullRequestDone: (record: DirectPrRecord) => Effect.Effect<void, OrcRunError>
   readonly questionAsked: (step: AgentStep, question: OpenQuestion) => Effect.Effect<void, OrcRunError>
