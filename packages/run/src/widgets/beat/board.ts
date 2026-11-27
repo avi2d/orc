@@ -70,7 +70,7 @@ type TaskJson = {
 interface ParkedJson {
   readonly origin?: Parked["origin"]
   readonly branch: string
-  readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string; readonly blocks: boolean; readonly deciderOwns: boolean; readonly answer: typeof DecisionAnswer.Type | null; readonly overturned?: typeof DecisionAnswer.Type }>
+  readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string; readonly blocks: boolean; readonly deciderOwns: boolean; readonly options?: Parked["questions"][number]["options"]; readonly recommendation?: string; readonly answer: typeof DecisionAnswer.Type | null; readonly overturned?: typeof DecisionAnswer.Type }>
 }
 
 const parkedAnswers = (answer: Parked["questions"][number]["answer"]) => {
@@ -92,6 +92,8 @@ const parkedJson = (task: string, parked: Parked, deciderOwns: DeciderOwns): Par
     asked: question.asked,
     blocks: question.blocks,
     deciderOwns: deciderOwns(task, question),
+    ...(question.options === undefined ? {} : { options: question.options }),
+    ...(question.recommendation === undefined ? {} : { recommendation: question.recommendation }),
     ...parkedAnswers(question.answer)
   }))
 })
