@@ -6,7 +6,7 @@ Each project in `projects.json` can name a `mode` that decides how its ship task
 
 - `no-mistakes`, the default, runs the checks and then [no-mistakes](https://github.com/kunchenguid/no-mistakes), which opens the pull request.
 - `direct-PR` runs the checks, then a [review turn that records findings without blocking](run/delivery-modes.md), then pushes the branch and opens the pull request itself.
-- `orc` rebases onto the default branch, runs the checks, [reviews the branch and fixes the findings](run/delivery-modes.md#orc-delivery) in at most two rounds, and opens the pull request without a CI verdict.
+- `orc` rebases onto the default branch, runs the checks, [reviews the branch and fixes the findings](run/delivery-modes.md#orc-delivery) in up to two rounds by default, and opens the pull request without a CI verdict.
   A failed review, a fix that does not finish, or a check that fails after a fix stops the run before a pull request opens.
 - `no-mistakes-prod-only` runs no-mistakes unless a task is marked internal, and then works as `direct-PR`.
 
