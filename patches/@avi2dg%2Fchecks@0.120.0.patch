@@ -1,0 +1,13 @@
+diff --git a/src/delivery/full-set/mutation.ts b/src/delivery/full-set/mutation.ts
+index d9db0b1b58f4b7e0e41ede5a1b4a191fbddd24a4..2cb43b67d4ad91f0e81a48df56c9b681c0ade96d 100644
+--- a/src/delivery/full-set/mutation.ts
++++ b/src/delivery/full-set/mutation.ts
+@@ -1,7 +1,7 @@
+ import { BY_HAND } from "./ci.ts";
+ import { checkout, DOWNLOAD, expression, HOSTED, SETUP, TOKEN, UPLOAD, workflowText, type Step, type Workflow } from "./steps.ts";
+ 
+-const SHARDS = 4;
++const SHARDS = 8;
+ 
+ const prune: Step = { name: "prune superseded baselines", env: [TOKEN], run: "bunx checks-mutation-baseline --prune" };
+ 

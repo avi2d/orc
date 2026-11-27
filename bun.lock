@@ -229,6 +229,7 @@
     "@swc/core",
   ],
   "patchedDependencies": {
+    "@avi2dg/checks@0.120.0": "patches/@avi2dg%2Fchecks@0.120.0.patch",
     "@hughescr/stryker-bun-runner@1.6.0": "patches/@hughescr%2Fstryker-bun-runner@1.6.0.patch",
   },
   "overrides": {
