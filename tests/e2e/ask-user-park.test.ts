@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, rm, writeFile } from "node:fs/promises"
+import { rm } from "node:fs/promises"
 import { join } from "node:path"
 import { backlogTaskOne, refuseOnQuestions, startOnLinux } from "./parked-helpers"
 import { orcOk, queuedArgs, runnerTimeout, withFixture, type Fixture } from "./runner-helpers"
@@ -52,15 +52,9 @@ describe("a worker question about a low image allowance parks as a question", ()
         "Recommended: B) Wait for the reset"
       ].join("\n")
       const question = { id: "ask-1", text, options, recommendation }
+      const timedOut = { ...question, subject: "Make the images with the Codex weekly allowance at 12 percent?", asked: "2026-11-02T10:20:00.000Z", blocks: true }
       await startOnLinux(fixture)
-      await refuseOnQuestions(fixture, [{ id: "ask-1", text }], "implement")
-      const runDir = join(fixture.home, "runs", "run-1")
-      await mkdir(runDir, { recursive: true })
-      await writeFile(join(runDir, "asking.json"), JSON.stringify({
-        asked: "2026-11-02T10:20:00.000Z",
-        until: "2026-11-02T10:30:00.000Z",
-        questions: [question]
-      }))
+      await refuseOnQuestions(fixture, [timedOut], "implement")
       await parksWith(fixture, await orcOk(fixture, ["beat"]), question)
     })
   }, runnerTimeout)
