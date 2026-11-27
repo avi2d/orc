@@ -227,6 +227,9 @@
   "trustedDependencies": [
     "@swc/core",
   ],
+  "patchedDependencies": {
+    "@hughescr/stryker-bun-runner@1.6.0": "patches/@hughescr%2Fstryker-bun-runner@1.6.0.patch",
+  },
   "overrides": {
     "@effect/platform-node-shared": "4.1.4",
     "minimatch": "11.0.3",

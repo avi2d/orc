@@ -8,7 +8,7 @@ import { decodeOrcReviewFindings, RecordedReview, ReviewFindings, type ReviewFin
 
 const ReviewCheckpoint = Schema.Struct({ head: Schema.String, outcome: RecordedReview })
 const decodeCheckpoint = Schema.decodeUnknownOption(Schema.fromJsonString(ReviewCheckpoint))
-const checkpointFileName = "review-checkpoint.json"
+export const checkpointFileName = "review-checkpoint.json"
 
 const reviewFileName = "review.json"
 

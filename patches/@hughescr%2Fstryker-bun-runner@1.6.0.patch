@@ -1,0 +1,127 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index bbc37e0e37e3898b24baa8f11a830894064462cd..c70e1c0bcf034adad08736020d314abedfe8d953 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -57,6 +57,7 @@ export declare class BunTestRunner implements TestRunner {
+ 	private readonly sourceBunfig?;
+ 	private readonly testFilesOverride?;
+ 	private readonly mutateGlobs;
++	private readonly eagerExclude;
+ 	private readonly smol;
+ 	private readonly maxChildRss?;
+ 	private readonly rssCheckIntervalMs?;
+@@ -934,6 +935,7 @@ export interface BunTestRunnerOptions {
+    * @example ['--only', '--verbose']
+    */
+ 	bunArgs?: string[];
++	eagerExclude?: string[];
+ 	/**
+    * Explicit list of test file paths (must be non-empty when provided).
+    * When provided, BunTestRunner skips auto-discovery (which walks the project
+@@ -1056,6 +1058,13 @@ export declare const strykerValidationSchema: {
+ 						type: string;
+ 					};
+ 				};
++				eagerExclude: {
++					type: string;
++					description: string;
++					items: {
++						type: string;
++					};
++				};
+ 				testFiles: {
+ 					type: string;
+ 					description: string;
+diff --git a/dist/index.js b/dist/index.js
+index acdebffdbc7508da6cd6cefbf4056b5b296842db..d210c2711bb6e3598b2aab5b2ea543adb122e586 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -2718,7 +2718,7 @@ var FORCED_FALSE_TEST_KEY_REASONS = new Map([
+ ]);
+ var COVERAGE_DROP_REASON = "dropped: coverage is disabled for mutation runs (the runner collects its own per-test coverage)";
+ var GENERIC_DROP_REASON = "dropped: not on the runner's allowlist of [test] settings that are safe for mutation runs";
+-var PATH_VALUED_TEST_KEYS = new Set(["preload", "root"]);
++var PATH_VALUED_TEST_KEYS = new Set(["root"]);
+ var RANDOM_ORDER_TEST_KEYS = ["randomize", "seed"];
+ var RANDOM_ORDER_REASON = "kept for the dry run, but mutant runs use a copy of the sanitized bunfig with randomize = false and no seed, " + "so they run test files in the runner's cheapest-first order and tests in source order";
+ function mutantRunBunfigPath(sanitizedPath) {
+@@ -2739,6 +2739,15 @@ function absolutizePathValue(value, projectCwd) {
+   }
+   return absolutizePath(value, projectCwd);
+ }
++function resolvePreload(value, projectCwd) {
++  if (typeof value !== "string" || path6.isAbsolute(value) || value.startsWith(".")) {
++    return absolutizePath(value, projectCwd);
++  }
++  return createRequire(path6.join(projectCwd, "package.json")).resolve(value);
++}
++function resolvePreloadValue(value, projectCwd) {
++  return Array.isArray(value) ? value.map((item) => resolvePreload(item, projectCwd)) : resolvePreload(value, projectCwd);
++}
+ async function readSourceBunfig(projectCwd, sourceBunfig) {
+   const bunfigPath = sourceBunfig === undefined ? path6.join(projectCwd, "bunfig.toml") : path6.resolve(projectCwd, sourceBunfig);
+   try {
+@@ -2760,13 +2769,13 @@ async function readBunfigTestRoot(projectCwd, sourceBunfig) {
+ async function readBunfigTestPreloads(projectCwd, sourceBunfig) {
+   const rawConfig = await readSourceBunfig(projectCwd, sourceBunfig);
+   const preload = rawConfig.test?.preload;
+-  return [preload].flat().filter((entry) => typeof entry === "string").map((entry) => path6.resolve(projectCwd, entry));
++  return [preload].flat().filter((entry) => typeof entry === "string").map((entry) => resolvePreload(entry, projectCwd));
+ }
+ function sanitizeTestSection(sourceTest, projectCwd, dropped) {
+   const sanitizedTest = {};
+   for (const [key, value] of Object.entries(sourceTest)) {
+     if (SAFE_TEST_KEYS.has(key)) {
+-      sanitizedTest[key] = PATH_VALUED_TEST_KEYS.has(key) ? absolutizePathValue(value, projectCwd) : value;
++      sanitizedTest[key] = key === "preload" ? resolvePreloadValue(value, projectCwd) : PATH_VALUED_TEST_KEYS.has(key) ? absolutizePathValue(value, projectCwd) : value;
+     } else if (IGNORED_TEST_KEY_REASONS.has(key)) {
+       dropped.push({ key: `test.${key}`, reason: IGNORED_TEST_KEY_REASONS.get(key), warn: true });
+     } else if (FORCED_FALSE_TEST_KEY_REASONS.has(key)) {
+@@ -2785,7 +2794,7 @@ async function generateSanitizedBunfig(projectCwd, tmpDir, sourceBunfig, onDropp
+   await ensurePrivateDir(tmpDir);
+   const rawConfig = await readSourceBunfig(projectCwd, sourceBunfig);
+   const dropped = [];
+-  const sanitized = Object.fromEntries(Object.entries(rawConfig).map(([key, value]) => [key, key === "preload" ? absolutizePathValue(value, projectCwd) : value]));
++  const sanitized = Object.fromEntries(Object.entries(rawConfig).map(([key, value]) => [key, key === "preload" ? resolvePreloadValue(value, projectCwd) : value]));
+   if (rawConfig.test !== undefined && !isTable(rawConfig.test)) {
+     dropped.push({ key: "test", reason: "dropped: [test] is not a table", warn: false });
+   }
+@@ -3272,6 +3281,7 @@ class BunTestRunner {
+   sourceBunfig;
+   testFilesOverride;
+   mutateGlobs;
++  eagerExclude;
+   smol;
+   maxChildRss;
+   rssCheckIntervalMs;
+@@ -3318,6 +3328,7 @@ class BunTestRunner {
+     this.bunArgs = split?.args;
+     this.mutantBunArgs = mutantRunBunArgs(this.bunArgs);
+     this.sourceBunfig = split?.configPath;
++    this.eagerExclude = bunOptions.eagerExclude ?? [];
+     this.smol = bunOptions.smol ?? false;
+     this.maxChildRss = bunOptions.maxChildRss;
+     this.rssCheckIntervalMs = bunOptions.rssCheckIntervalMs;
+@@ -3627,7 +3638,7 @@ class BunTestRunner {
+       return;
+     });
+     if (this.cachedEagerModules === undefined || this.cachedEagerModulesCwd !== eagerCwd) {
+-      this.cachedEagerModules = await resolveEagerModulesFromGlobs(this.mutateGlobs);
++      this.cachedEagerModules = await resolveEagerModulesFromGlobs([...this.mutateGlobs, ...this.eagerExclude.map((pattern) => `!${pattern}`)]);
+       this.cachedEagerModulesCwd = eagerCwd;
+       this.logger.debug("Resolved %d eager modules from mutate globs", this.cachedEagerModules.length);
+     }
+@@ -4854,6 +4865,13 @@ var strykerValidationSchema = {
+             type: "string"
+           }
+         },
++        eagerExclude: {
++          type: "array",
++          description: "Globs excluded from coverage preload eager imports, not from mutation or test selection.",
++          items: {
++            type: "string"
++          }
++        },
+         testFiles: {
+           type: "array",
+           description: "Explicit list of test file paths (relative paths preferred in Stryker context — absolute paths bypass the sandbox copy and will NOT be mutated). When provided, skips auto-discovery and uses this list verbatim. Relative paths resolve against the bun subprocess's cwd. An empty array is invalid (use undefined/omit to enable auto-discovery).",
