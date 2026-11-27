@@ -4,6 +4,7 @@ import { runGit } from "../../shared/process/index"
 import type { HistoryRun } from "./run-record"
 import { OrcRunError } from "../../shared/lib/index"
 import type { AgentRunResult, SandboxOps } from "./run-ops"
+import { pathRulesSection, projectPathRules } from "./review-path-rules"
 import { decodeOrcReviewFindings, RecordedReview, ReviewFindings, type ReviewFinding, type ReviewOutcome, type ReviewAtHeadOutcome } from "./review-outcome"
 
 const ReviewCheckpoint = Schema.Struct({ head: Schema.String, outcome: RecordedReview })
@@ -74,7 +75,7 @@ const recordReview = (
   })
 
 export const runReviewTurn = (
-  run: Pick<HistoryRun, "fs" | "path" | "runDir" | "piSessionDir" | "spawner" | "git" | "projectDir" | "branch">,
+  run: Pick<HistoryRun, "fs" | "path" | "runDir" | "piSessionDir" | "spawner" | "git" | "projectDir" | "worktreeDir" | "branch">,
   runAgent: SandboxOps["runAgent"],
   reviewer: AgentFile,
   mode: "direct-PR" | "orc" = "direct-PR"
@@ -84,7 +85,11 @@ export const runReviewTurn = (
     if (Result.isFailure(diffed)) {
       return { status: "failed", reason: diffed.failure.message }
     }
-    const first = reviewPrompt(reviewer, run.path.join(run.piSessionDir, "task.md"), diffed.success) + (mode === "orc" ? "\nFor this review, severity must be error, warning or info, instead of any other severity names." : "")
+    const rules = mode === "orc" ? yield* projectPathRules(run).pipe(Effect.result) : Result.succeed([])
+    if (Result.isFailure(rules)) {
+      return { status: "failed", reason: rules.failure.message }
+    }
+    const first = reviewPrompt(reviewer, run.path.join(run.piSessionDir, "task.md"), diffed.success) + (mode === "orc" ? "\nFor this review, severity must be error, warning or info, instead of any other severity names." : "") + pathRulesSection(rules.success)
     let prompt = first
     let resumeSession: string | null = null
     let problem = ""
