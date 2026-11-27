@@ -52,7 +52,7 @@ const dropClaim = (fs: FileSystem.FileSystem, file: string, held: string): Effec
 const loadLibc = () => {
   const libcPath = process.platform === "darwin" ? "/usr/lib/libSystem.B.dylib" : "libc.so.6"
   const libc = dlopen(libcPath, {
-    open: { args: [FFIType.ptr, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
+    open: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
     close: { args: [FFIType.i32], returns: FFIType.i32 },
     flock: { args: [FFIType.i32, FFIType.i32], returns: FFIType.i32 }
   })
@@ -60,6 +60,9 @@ const loadLibc = () => {
   const errno = dlopen(libcPath, { [errnoName]: { args: [], returns: FFIType.ptr } }).symbols[errnoName]
   return { libc, errno }
 }
+
+// O_RDWR | O_CLOEXEC. Without O_CREAT, open reads no mode argument, which FFI cannot pass to a variadic function.
+const openFlags = 2 | (process.platform === "darwin" ? 0x1000000 : 0x80000)
 
 let loadedLibc: ReturnType<typeof loadLibc> | undefined
 
@@ -83,19 +86,21 @@ type Unlock = () => void
 // Success holds the lock until the returned unlock runs, and none means another process holds it.
 type TryLock = (file: string) => Effect.Effect<Option.Option<Unlock>, PlatformError.PlatformError>
 
-const tryFlock: TryLock = (file) => Effect.suspend(() => {
+const tryFlock = (fs: FileSystem.FileSystem): TryLock => (file) => Effect.gen(function*() {
   const { libc, errno } = loadedLibc ??= loadLibc()
-  const fd = libc.symbols.open(Buffer.from(file + "\0"), 2 | (process.platform === "darwin" ? 0x1000200 : 0x80040), 0o600)
+  yield* fs.chmod(file, 0o600).pipe(Effect.catchReason("PlatformError", "NotFound", () => Effect.void))
+  yield* fs.writeFileString(file, "", { flag: "a", mode: 0o600 })
+  const fd = libc.symbols.open(Buffer.from(file + "\0"), openFlags)
   if (fd < 0) {
-    return Effect.fail(lockFailure(file, "open", "cannot open lock file"))
+    return yield* Effect.fail(lockFailure(file, "open", "cannot open lock file"))
   }
   if (libc.symbols.flock(fd, 2 | 4) === 0) {
-    return Effect.succeedSome(() => { libc.symbols.close(fd) })
+    return Option.some<Unlock>(() => { libc.symbols.close(fd) })
   }
   const address = errno()
   const code = address === null ? -1 : read.i32(address)
   libc.symbols.close(fd)
-  return code === (process.platform === "darwin" ? 35 : 11) ? Effect.succeedNone : Effect.fail(lockFailure(file, "flock", "errno " + code))
+  return code === (process.platform === "darwin" ? 35 : 11) ? Option.none<Unlock>() : yield* Effect.fail(lockFailure(file, "flock", "errno " + code))
 })
 
 const invalidHandle = -1n
@@ -129,7 +134,7 @@ const tryLockFileEx: TryLock = (file) => Effect.suspend(() => {
 const withKernelLock = <A, E, R>(file: string, use: Effect.Effect<A, E, R>): Effect.Effect<Option.Option<A>, E | PlatformError.PlatformError, R | FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    const tryLock = process.platform === "win32" ? tryLockFileEx : tryFlock
+    const tryLock = process.platform === "win32" ? tryLockFileEx : tryFlock(fs)
     return yield* Effect.acquireUseRelease(
       tryLock(file),
       Option.match({
