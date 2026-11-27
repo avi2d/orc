@@ -63,7 +63,7 @@ const tabRow = (t: Palette, card: Card, reading: Reading<Show> | null, target: C
   const last = lastTab(card)
   const thread: Chosen = { kind: "thread" }
   const approve: Chosen = { kind: "approve" }
-  return h_flex().id("tabs").px(16).pb(8).gap(4).flex_shrink_0().overflow_x_scrollbar().border_b(1).border_color(t.border)
+  return h_flex().id("tabs").px(16).pb(8).gap(4).flex_shrink_0().overflow_x_scroll().border_b(1).border_color(t.border)
     .child(tab(t, "tab-thread", "Thread", sameTarget(thread, target), (cx) => act.choose(cx, thread)))
     .children(shownSteps.map((step, index) => stepTabView(t, step, index, target, models, act)))
     .children(last === null ? [] : [tab(t, "tab-approve", last, sameTarget(approve, target), (cx) => act.choose(cx, approve))])
@@ -125,7 +125,7 @@ const logBody = (t: Palette, reading: Reading<string>, scroll: ScrollHandle): El
 const askedLine = (t: Palette, card: Card, act: AgentsActions): ReadonlyArray<Element> =>
   card.standing.status === "Awaiting you" && card.standing.waiting.on === "answer"
     ? [h_flex().px(20).pt(12).gap(8).items_center().text_color(t.muted)
-      .child(div().child(`Asked: ${card.where}`))
+      .child(div().child(card.where))
       .child(button(t, "open-thread", "Open in Thread", "ghost", 24, (cx) => act.choose(cx, { kind: "thread" })))]
     : []
 

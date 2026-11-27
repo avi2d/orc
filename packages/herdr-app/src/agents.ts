@@ -1,6 +1,7 @@
 import type { Backlog, Run, Runs, ShownStep, Step, Task } from "./guard"
 import { type InboxAnswer, type InboxApproval, type InboxItem, waitsOnLabel } from "./inbox"
 import { sentBackLabel } from "./approval-stage"
+import { whoLabel } from "./thread"
 
 export const cardStatuses = ["Awaiting you", "Running", "Queued", "Failed", "Done"] as const
 export type CardStatus = typeof cardStatuses[number]
@@ -58,10 +59,10 @@ export const prNumber = (link: string): string => {
 
 const answerLabel = (item: InboxAnswer): string => {
   switch (item.kind) {
-    case "hold": return "Hold"
-    case "decision": return "Decision"
-    case "question": return "Question 1"
-    case "event": return "Event"
+    case "hold": return "A hold waits on you"
+    case "decision": return "A decision waits on you"
+    case "question": return `${whoLabel(item)} asks a question`
+    case "event": return "An event waits on you"
   }
 }
 
@@ -95,7 +96,7 @@ const awaitingAnswer = (items: ReadonlyArray<InboxAnswer>): Place | null => {
   const first = items.at(0)
   return first === undefined ? null : {
     standing: { status: "Awaiting you", waiting: { on: "answer", items } },
-    where: items.length === 1 ? answerLabel(first) : `${items.length} open items`
+    where: items.length === 1 ? answerLabel(first) : `${items.length} items wait on you`
   }
 }
 

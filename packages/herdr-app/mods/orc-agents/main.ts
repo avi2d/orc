@@ -9,12 +9,12 @@ import { type RunFacts, runFacts } from "../../src/run-agent"
 import { type LocalAgents, agentsDocuments, readAgentQuestions, readLocalAgents } from "../../src/agents-read"
 import type { AttentionQueue } from "../../src/guard-attention"
 import { type AgentsActions, type Chosen, type DetailShown, type Keyed, askMerge, detailView, submitSendBack } from "../../src/agents-view"
-import { type ListReading, runsColumn } from "../../src/runs-view"
+import { type ListReading, type Reread, runsColumn } from "../../src/runs-view"
 import { type Merge, mergeCommand, mergedNote, runMerge, watchMerges } from "../../src/agents-merge"
 import { type RunChanges, changesKey } from "../../src/changes"
 import { readChanges } from "../../src/changes-read"
 import { show, type Show, type ShownStep } from "../../src/guard"
-import { InboxAnswers } from "../../src/inbox-view"
+import { InboxAnswers, threadBoxes } from "../../src/inbox-view"
 import { alert } from "../../src/kit"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
@@ -76,9 +76,10 @@ export default class OrcAgents extends View {
   questionsBusy = false
   questions: AttentionQueue = { items: [], decided: [] }
   local: LocalAgents | null = null
+  listed = new Date().toISOString()
   review = InputState.new({ placeholder: "What to change before this PR merges" })
   sent: Keyed<string> | null = null
-  answers = new InboxAnswers((cx) => this.refresh(cx))
+  answers = new InboxAnswers((cx) => this.refresh(cx), threadBoxes)
   agent: AgentAttention = { pending: [], decided: [] }
   agentAttention = new AgentAttentionSection()
 
@@ -125,16 +126,16 @@ export default class OrcAgents extends View {
       this.questionsBusy = false
       if (reading.kind === "ok") {
         this.questions = reading.value
-        this.showCards(task)
+        this.showCards(task, this.list.kind === "ok" ? this.list.reread : null)
       }
       task.notify()
     }))
   }
 
-  showCards(cx: Context): void {
+  showCards(cx: Context, reread: Reread | null): void {
     if (this.local === null) return
     const documents = agentsDocuments(this.local, this.questions)
-    this.list = { kind: "ok", cards: documents.cards, reread: null }
+    this.list = { kind: "ok", cards: documents.cards, reread }
     this.agent = documents.agent
     this.answers.sync(cx, documents.cards.flatMap(cardAttention))
   }
@@ -143,9 +144,10 @@ export default class OrcAgents extends View {
     return readLocalAgents().then((reading) => {
       if (reading.kind === "ok") {
         this.local = reading.value
-        this.showCards(cx)
+        this.listed = new Date().toISOString()
+        this.showCards(cx, null)
       } else if (this.list.kind === "ok") {
-        this.list = { ...this.list, reread: reading.kind === "failed" ? reading.reason : null }
+        this.list = { ...this.list, reread: reading.kind === "failed" ? { reason: reading.reason, listed: this.listed } : null }
       } else {
         this.local = null
         this.list = reading
@@ -392,21 +394,23 @@ export default class OrcAgents extends View {
 
   threadShown(t: Palette, card: Card | null, act: AgentsActions): ReadonlyArray<Element> {
     if (card === null) return []
-    const asked = cardAnswers(card).map((item) => this.answers.item(t, item, (approval) => act.askMerge(card, approval), "unnamed"))
+    const asked = cardAnswers(card).map((item) => this.answers.askCard(t, item, (approval) => act.askMerge(card, approval)))
     const task = this.local?.details.find((detail) => detail.id === card.id)
     if (task === undefined) {
-      return [...asked, alert(t, "thread-none", { tone: "neutral", title: "This run has no task in the backlog", body: "A thread belongs to a backlog task, so this run has none." })]
+      return [alert(t, "thread-none", { tone: "neutral", title: "This run has no task in the backlog", body: "A thread belongs to a backlog task, so this run has none." }), ...asked]
     }
     const told = this.told?.of === task.id ? this.told.reading : { kind: "reading" } as const
-    if (told.kind === "reading") return [...asked, alert(t, "thread-reading", { tone: "info", title: "Reading the thread", body: `orc backlog thread ${task.id} --json` })]
-    if (told.kind === "failed") return [...asked, alert(t, "thread-failed", { tone: "error", title: "Could not read the thread", body: told.reason })]
+    if (told.kind === "reading") return [alert(t, "thread-reading", { tone: "info", title: "Reading the thread", body: `orc backlog thread ${task.id} --json` }), ...asked]
+    if (told.kind === "failed") {
+      return [alert(t, "thread-failed", { tone: "error", title: "Could not read the thread", body: told.reason, actions: [{ id: "thread-retry", label: "Retry", press: act.retry }] }), ...asked]
+    }
     const waitsOn = holdsOnTasks(this.local?.details ?? []).get(task.id)
     const history = threadCards(told.value, task, waitsOn).filter((entry) => entry.reply === null)
     const decided = threadDecided(t, told.value)
     if (asked.length === 0 && history.length === 0 && decided.length === 0) {
       return [alert(t, "thread-empty", { tone: "neutral", title: "No thread yet", body: "Questions, answers and notes on this task show here." })]
     }
-    return [...asked, ...history.map((entry) => threadEntry(t, entry, readOnlyThread)), ...decided]
+    return [...history.map((entry) => threadEntry(t, entry, readOnlyThread)), ...decided, ...asked]
   }
 
   shownDetail(t: Palette, card: Card | null, act: AgentsActions): DetailShown {

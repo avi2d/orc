@@ -98,10 +98,41 @@ const click = (element: Node | null): void => {
   if (typeof handler === "function") handler({}, cx)
 }
 
-const everyRow = (_id: unknown, count: number, _key: unknown, row: (index: number, cx: Context) => object): object => {
+const listIds = new WeakMap<Node, unknown>()
+
+const typeInto = new WeakMap<object, (text: string) => void>()
+
+const typeIn = (box: object | undefined, text: string): void => {
+  const type = box === undefined ? undefined : typeInto.get(box)
+  if (type === undefined) throw new Error("No answer box")
+  type(text)
+}
+
+const checkedRadio = (element: object, id: string): boolean => {
+  const row = find(element, id)
+  return row !== null && paths(element).some((path) => path.includes(row) && path.at(-1)?.calls.some((call) => call.name === "id" && call.args[0] === "radio-checked") === true)
+}
+
+const everyRow = (id: unknown, count: number, _key: unknown, row: (index: number, cx: Context) => object): object => {
   const element = node()
-  nodes.get(element)?.kids.push(...Array.from({ length: count }, (_, index) => row(index, cx)))
+  const made = nodes.get(element)
+  made?.kids.push(...Array.from({ length: count }, (_, index) => row(index, cx)))
+  if (made !== undefined) listIds.set(made, id)
   return element
+}
+
+const handlersInRows = (element: object): ReadonlyArray<string> =>
+  paths(element).flatMap((path) => {
+    const list = path.findIndex((made) => listIds.has(made))
+    const made = path.at(-1)
+    return list === -1 || list === path.length - 1 || made === undefined ? [] : made.calls.filter((call) => call.name.startsWith("on_")).map((call) => call.name)
+  })
+
+const pressRow = (element: object, listId: string, key: string): void => {
+  const list = paths(element).map((path) => path.at(-1)).find((made) => made !== undefined && listIds.get(made) === listId)
+  const handler = list?.calls.find((call) => call.name === "on_item_click")?.args[0]
+  if (typeof handler !== "function") throw new Error(`No on_item_click on ${listId}`)
+  handler(key, cx)
 }
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow, image: node, svg: node }))
@@ -110,7 +141,16 @@ void mock.module("gpui-base", () => ({
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
   InputState: { new: () => {
     let typed = ""
-    return { value: () => typed, set_value: (text: string) => { typed = text }, on: () => undefined, focus: () => undefined, release: () => undefined }
+    const changed: Array<(event: object, cx: Context) => void> = []
+    const on = (event: string, handler: (event: object, cx: Context) => void) => {
+      if (event === "change") changed.push(handler)
+    }
+    const state = { value: () => typed, set_value: (text: string) => { typed = text }, on, focus: () => undefined, release: () => undefined }
+    typeInto.set(state, (text) => {
+      typed = text
+      for (const handler of changed) handler({}, cx)
+    })
+    return state
   } }
 }))
 void mock.module("herdr", () => ({
@@ -232,6 +272,60 @@ test("a selected Awaiting you run shows its question, options and recommendation
   expect(other).toContain("No options recorded")
 })
 
+test("pressing an option in a run's Thread puts its text in the answer box and marks it instead of sending at once", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const data = await loadAttention()
+  const agents = new OrcAgents()
+  agents.list = { kind: "ok", cards: data.agents.cards, reread: null }
+  agents.selectedKey = "garden-8"
+  agents.answers.sync(cx, data.inbox.items)
+  const key = "garden-8/garden-8.ask-1.2026-11-25T07_48_00_000Z"
+  executed.length = 0
+  click(find(agents.render(cx), `option-${key}-B`))
+  expect(executed).toEqual([])
+  expect(agents.answers.boxes.get(key)?.value()).toBe("Narrow")
+  const marked = agents.render(cx)
+  expect(checkedRadio(marked, `option-${key}-B`)).toBe(true)
+  expect(checkedRadio(marked, `option-${key}-A`)).toBe(false)
+})
+
+test("typing an option's number into an empty answer box picks that option instead of sending the digit", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const data = await loadAttention()
+  const agents = new OrcAgents()
+  agents.list = { kind: "ok", cards: data.agents.cards, reread: null }
+  agents.selectedKey = "garden-8"
+  agents.answers.sync(cx, data.inbox.items)
+  const key = "garden-8/garden-8.ask-1.2026-11-25T07_48_00_000Z"
+  const box = agents.answers.boxes.get(key)
+  typeIn(box, "2")
+  expect(box?.value()).toBe("Narrow")
+  typeIn(box, "Narrow, then 1")
+  expect(box?.value()).toBe("Narrow, then 1")
+  expect(checkedRadio(agents.render(cx), `option-${key}-B`)).toBe(false)
+})
+
+test("a failed reread keeps its Could not reread card when the agents' questions arrive after it, instead of the questions clearing it", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const agents = new OrcAgents()
+  documents.set("orc backlog --json", { schema: "orc.backlog.v1", tasks: fixture.items.map((item) => openTask(item.task)) })
+  documents.set("orc attention --json", fixture)
+  documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [] })
+  try {
+    await agents.readAll(cx)
+    documents.delete("orc runs --json --local")
+    await agents.readAll(cx)
+    spawned.length = 0
+    agents.refreshQuestions(cx)
+    await Promise.all(spawned)
+    const words = wordsOf(agents.render(cx))
+    expect(words).toContain("Could not reread the runs")
+    expect(words.some((said) => said.includes("The list below is from"))).toBe(true)
+  } finally {
+    documents.clear()
+  }
+})
+
 test("an agent's question stays in the folded Agent attention section until it is opened, not in the run list", async () => {
   const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
   const data = await loadAttention()
@@ -244,6 +338,31 @@ test("an agent's question stays in the folded Agent attention section until it i
   expect(wordsOf(element)).not.toContain("Two retries")
   click(find(element, "toggle-agent-attention"))
   expect(wordsOf(agents.render(cx))).toContain("Which file format should the export use?")
+})
+
+test("a run row in the Runs list registers no press handler of its own, which the App refuses inside a virtual list row", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const data = await loadAttention()
+  const agents = new OrcAgents()
+  agents.list = { kind: "ok", cards: [...data.agents.cards, queued], reread: null }
+  agents.agent = data.agents.agent
+  click(find(agents.render(cx), "toggle-agent-attention"))
+  expect(handlersInRows(agents.render(cx))).toEqual([])
+  agents.folded = true
+  expect(handlersInRows(agents.render(cx))).toEqual([])
+})
+
+test("pressing a run row through the list selects that run, not the run selected before", async () => {
+  const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
+  const data = await loadAttention()
+  const agents = new OrcAgents()
+  agents.list = { kind: "ok", cards: [...data.agents.cards, queued], reread: null }
+  agents.selectedKey = "garden-8"
+  pressRow(agents.render(cx), "cards", `card-${queued.key}`)
+  expect(agents.selectedKey).toBe(queued.key)
+  agents.folded = true
+  pressRow(agents.render(cx), "rail-ids", "garden-8")
+  expect(agents.selectedKey).toBe("garden-8")
 })
 
 test("an Inbox choice sends the option text to the right question once instead of sending the outcome or both options", async () => {

@@ -147,6 +147,9 @@ type Choice =
   | { readonly kind: "merge" }
   | { readonly kind: "unavailable" }
 
+export const optionByNumber = (item: InboxItem, before: string, after: string): AskOption | null =>
+  before === "" && /^[1-9]$/.test(after) ? item.ask.options[Number(after) - 1] ?? null : null
+
 export const choice = (item: InboxItem, option: AskOption): Choice => {
   if (item.action.kind === "merge" && option.text === "merge") return { kind: "merge" }
   if (item.action.kind === "unavailable" || option.action === "wait") return { kind: "unavailable" }

@@ -121,7 +121,7 @@ describe("the runs list", () => {
   })
 
   test("says where each run is now rather than its raw status", () => {
-    expect(board.map((card) => card.where)).toEqual(["Approve PR #48", "Question 1", "Fix", "Waiting to start", "orc exited 1", "PR #12"])
+    expect(board.map((card) => card.where)).toEqual(["Approve PR #48", "Worker asks a question", "Fix", "Waiting to start", "orc exited 1", "PR #12"])
   })
 
   test("a run started outside the backlog carries no kind rather than a made-up one", () => {
@@ -149,7 +149,7 @@ describe("the runs list", () => {
       [answer("orc-7")]
     )
     expect(cards.map((card) => [card.id, card.runId, card.standing.status])).toEqual([["orc-7", null, "Awaiting you"], ["orc-7", "20261113-090000-aaaaaa", "Failed"]])
-    expect(cards.filter((card) => card.standing.status === "Awaiting you").map((card) => card.where)).toEqual(["Question 1"])
+    expect(cards.filter((card) => card.standing.status === "Awaiting you").map((card) => card.where)).toEqual(["Worker asks a question"])
   })
 
   test("a stale run count does not leave an answered question's card Awaiting you", () => {
@@ -228,7 +228,7 @@ describe("the runs list", () => {
   })
 
   test("the Project filter keeps one project's runs, not every project's", () => {
-    expect(filterCards(board, { project: "herdr", allRuns: false }).map((card) => card.where)).toEqual(["Question 1"])
+    expect(filterCards(board, { project: "herdr", allRuns: false }).map((card) => card.where)).toEqual(["Worker asks a question"])
   })
 
   test("the find and the Project filter together keep runs that match both, not either", () => {

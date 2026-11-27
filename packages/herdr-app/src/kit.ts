@@ -97,6 +97,11 @@ export const kbd = (t: Palette, key: string): Element =>
   div().h(20).min_w(20).px(4).flex_none().flex().items_center().justify_center().rounded(4).bg(zinc.s3)
     .text_size(12).font_weight(500).text_color(t.foreground).child(key)
 
+export const radio = (checked: boolean): Element =>
+  checked
+    ? div().id("radio-checked").size(16).flex_none().rounded(8).bg(zinc.accent).flex().items_center().justify_center().child(div().size(6).rounded(3).bg(zinc.accentFg))
+    : div().id("radio").size(16).flex_none().rounded(8).border(1).border_color(zinc.s3).bg(zinc.s2)
+
 export const tab = (t: Palette, id: string, label: string, on: boolean, press: Press | null): Element => {
   const made = h_flex().id(id).h(28).px(12).flex_none().items_center().rounded(14).text_size(13).font_weight(500)
     .text_color(press === null ? t.dim : on ? t.foreground : zinc.muted)
