@@ -13,4 +13,6 @@ export default {
   // The coverage preload imports each mutated file before its test file mocks gpui-kit, gpui-base and herdr, which only the Herdr App provides, and bun keeps a failed import failed for that test file.
   bun: { ...preset.bun, bunArgs: ["--isolate"], eagerExclude: ["packages/herdr-app/src/**"] },
   mutate: ["packages/*/src/**/*.{ts,tsx}", "!packages/*/src/**/*.test.{ts,tsx}", ...binEntries.map((file) => `!${file}`)],
+  // The preset sets ignoreStatic only in refresh mode, and the mutation shard job does not set that mode.
+  ignoreStatic: true,
 };
