@@ -87,7 +87,6 @@ export {
   parseTaskFile,
 } from "./task-record"
 export { fullPrUrl, isCalendarDate } from "./task-record-text"
-export { splitFrontmatter } from "./task-record-parts"
 export type {
   SplitMark,
   Claim,

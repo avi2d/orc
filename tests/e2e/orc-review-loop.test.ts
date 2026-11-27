@@ -15,7 +15,7 @@ const lateError = { id: "late", file: "other.txt", line: 3, severity: "error", a
 
 type Finding = Omit<typeof error, "line"> & { line: number | null; topic?: string }
 
-const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramReply = "no diagram", limit?: number) => {
+const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramReply = "no diagram", taskText = "Do the thing.\n", limit?: number) => {
   let result = { kinds: [] as Array<string>, evidence: [] as Array<string>, body: "", checks: 0, completed: false, endReason: "", prLink: null as string | null, prCreated: false, steps: [] as unknown, metrics: [] as ReadonlyArray<unknown>, reviewEvidence: [] as ReadonlyArray<{ readonly file: string | undefined; readonly log: string }> }
   await withRepo(async (dir) => {
     await withHome(async (home) => {
@@ -37,6 +37,8 @@ const exercise = async (reviews: ReadonlyArray<ReadonlyArray<Finding>>, diagramR
           kinds.push(run.agent.kind)
           if (run.agent.kind === "reviewer") {
             if (run.prompt.includes("no diagram")) {
+              const taskFile = join(home, "runs", "step-run-1", "task.md")
+              await writeFile(taskFile, taskText)
               const sessionFile = join(sessionsDir, "diagram.jsonl")
               await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: diagramReply }], stopReason: "stop", usage: { input: 1, output: 1 } }))
               return { sessionFile, commits: [] }
@@ -193,13 +195,13 @@ test("the default round limit does not start a third fix round", async () => {
 }, 60_000)
 
 test("a limit of one does not start a second fix round", async () => {
-  const result = await exercise([[error], [lateError]], "no diagram", 1)
+  const result = await exercise([[error], [lateError]], "no diagram", undefined, 1)
   expect(result.evidence).toHaveLength(1)
   expect(result.body).toContain("review after fix round 1")
 }, 60_000)
 
 test("a configured limit above two does not stop a third fix round", async () => {
-  const result = await exercise([[error], [lateError], [{ ...error, id: "third", file: "third.txt" }], []], "no diagram", 3)
+  const result = await exercise([[error], [lateError], [{ ...error, id: "third", file: "third.txt" }], []], "no diagram", undefined, 3)
   expect(result.evidence).toHaveLength(3)
 }, 60_000)
 
@@ -248,7 +250,7 @@ test("a repeated warning below the second round bar does not block a new error",
 
 test("a warning never sent in round 2 does not block a new error in round 3", async () => {
   const third = { ...error, id: "third", file: "third.txt" }
-  const result = await exercise([[error], [lateError, warning], [third, warning], []], "no diagram", 3)
+  const result = await exercise([[error], [lateError, warning], [third, warning], []], "no diagram", undefined, 3)
   expect(result.evidence.map((value) => JSON.parse(value))).toEqual([[error], [lateError], [third]])
 }, 60_000)
 
@@ -261,7 +263,7 @@ test("an info-only review does not claim a second round severity bar", async () 
 }, 60_000)
 
 test("a limit of one does not label a remaining warning as below the round 2 bar", async () => {
-  const result = await exercise([[error], [warning]], "no diagram", 1)
+  const result = await exercise([[error], [warning]], "no diagram", undefined, 1)
   expect(result.evidence).toHaveLength(1)
   expect(result.body).toContain("review after fix round 1")
   expect(result.body).not.toContain("round 2 bar")
@@ -277,7 +279,7 @@ test("a retained ask-user finding does not inflate the recorded final review cou
 test("a retained ask-user finding does not overwrite the final review's newer wording or action", async () => {
   const asked = { ...warning, topic: "result-fragile", action: "ask-user" }
   const current = { ...error, id: "updated", topic: "result-fragile", description: "The result corrupts saved data." }
-  const result = await exercise([[error, asked], [current]], "no diagram", 1)
+  const result = await exercise([[error, asked], [current]], "no diagram", undefined, 1)
   expect(result.body).toContain("error `updated`")
   expect(result.body).toContain("The result corrupts saved data.")
   expect(result.body).not.toContain("The result is fragile.")
@@ -285,16 +287,67 @@ test("a retained ask-user finding does not overwrite the final review's newer wo
 }, 60_000)
 
 test("a drawn diagram lands as a mermaid fence rather than prose", async () => {
-  const result = await exercise([[]], "```mermaid\nflowchart LR\n  task --> run\n```")
+  const result = await exercise([[]], "Why: The change connects the two steps.\n```mermaid\nflowchart LR\n  task --> run\n```")
   expect(result.completed).toBe(true)
   expect(result.prCreated).toBe(true)
   expect(result.body).toContain("## How it fits\n\n```mermaid\nflowchart LR\n  task --> run\n```")
-  expect(result.body).toContain("## Why\n\nDo the thing.")
+  expect(result.body).not.toContain("Do the thing.")
+  expect(result.body).toContain("## Why\n\nThe change connects the two steps.\n\n## What changed")
 }, 60_000)
 
 test("a declined diagram leaves How it fits out rather than an empty section", async () => {
   const result = await exercise([[]])
   expect(result.completed).toBe(true)
   expect(result.body).not.toContain("## How it fits")
-  expect(result.body).toContain("## Why\n\nDo the thing.")
+  expect(result.body).not.toContain("Do the thing.")
+  expect(result.body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
 }, 60_000)
+
+for (const reply of [
+  "**Why:** Cached reads avoid repeated disk access.\nno diagram",
+  "**Why**: Cached reads avoid repeated disk access.\nno diagram",
+  "Why:\nCached reads avoid repeated disk access.\nno diagram",
+  "**Why:**\n\nCached reads avoid repeated disk access.\r\nno diagram"
+]) {
+  test("a formatted reason is not lost or prefixed with the title: " + JSON.stringify(reply), async () => {
+    const result = await exercise([[]], reply)
+    expect(result.completed).toBe(true)
+    expect(result.body).toContain("## Why\n\nCached reads avoid repeated disk access.\n\n## What changed")
+  }, 60_000)
+}
+
+const privateTask = "Keep this internal. The violet otter carries seven sealed crates across the quiet harbor before sunrise.\nDo the thing.\n"
+
+for (const reason of [
+  "This matters because the violet otter carries seven sealed crates across the quiet harbor before sunrise.",
+  "Avoid this because VIOLET, otter carries seven sealed crates across the quiet harbor."
+]) {
+  test("eight copied task words cannot enter Why: " + reason, async () => {
+    const result = await exercise([[]], "Why: " + reason + "\nno diagram", privateTask)
+    expect(result.completed).toBe(true)
+    expect(result.body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
+    expect(result.body).not.toContain(reason)
+  }, 60_000)
+}
+
+test("copied task text in a diagram cannot bypass the public body comparison", async () => {
+  const result = await exercise([[]], "Why: Cached reads avoid repeated disk access.\n```mermaid\nflowchart LR\n  a[the violet otter carries seven sealed crates across the quiet harbor before sunrise] --> b[Cache]\n```", privateTask)
+  expect(result.completed).toBe(true)
+  expect(result.body).toContain("## Why\n\nCached reads avoid repeated disk access.\n\n## What changed")
+  expect(result.body).not.toContain("the violet otter carries seven sealed crates")
+  expect(result.body).not.toContain("## How it fits")
+}, 60_000)
+
+test("a short shared task label does not discard the reason or diagram", async () => {
+  const result = await exercise([[]], "Why: This fixes a problem with repeated reads.\n```mermaid\nflowchart LR\n  read --> review\n```", "## Problem\n## Review\n")
+  expect(result.body).toContain("This fixes a problem with repeated reads.")
+  expect(result.body).toContain("flowchart LR\n  read --> review")
+}, 60_000)
+
+for (const reply of ["Why:\nno diagram", "Why:\n```mermaid\nflowchart LR\n  a --> b\n```"]) {
+  test("an empty Why cannot turn diagram output into a reason: " + JSON.stringify(reply), async () => {
+    const result = await exercise([[]], reply)
+    expect(result.completed).toBe(true)
+    expect(result.body).toContain("## Why\n\nNo reason was recorded for this change; see What changed.\n\n## What changed")
+  }, 60_000)
+}
