@@ -77,9 +77,9 @@ When the step that asked is running, its tab names the question with **Open in T
 
 ### Approve a run's PR
 
-When Orc asks you to merge a PR, select **merge** on its **Awaiting you** card and confirm the dialog.
-Select **hold** to leave the PR open and clear that request.
-You can also merge from the **Approve** tab.
+In the Agents tab, merge from the **Approve** tab with **Approve and merge**.
+On the Inbox page, select **merge** on the PR's **Awaiting you** card and confirm the dialog.
+Select **hold** on that Inbox card to leave the PR open and clear the request.
 Select the PR address to open it in your browser.
 
 ![Agents tab on the Approve tab of a run whose PR waits](images/herdr-agents-approve.png)

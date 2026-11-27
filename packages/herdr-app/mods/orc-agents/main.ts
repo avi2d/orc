@@ -77,7 +77,7 @@ export default class OrcAgents extends View {
       this.selectedKey = this.selectedCard()?.key ?? null
       changed.notify()
     })
-    this.find.on("change", (_event, changed) => changed.notify())
+    this.find.on("change", (_event, changed) => this.moveSelection(changed, () => undefined, this.selectedKey))
     this.refresh(cx)
     cx.spawn((task) => watchMerges(task, (spot, id) => this.startMerge(spot, id)))
     cx.timer.every(everyMs, (tick) => {
@@ -294,12 +294,12 @@ export default class OrcAgents extends View {
     return this.recordedSteps(card).find((step) => step.id === target.id) ?? null
   }
 
-  moveSelection(cx: Context, change: () => void): void {
-    const before = this.selectedCard()?.key ?? null
+  moveSelection(cx: Context, change: () => void, before: string | null = this.selectedCard()?.key ?? null): void {
     this.chosen = null
     this.menuOpen = false
     change()
-    if ((this.selectedCard()?.key ?? null) !== before) {
+    this.selectedKey = this.selectedCard()?.key ?? null
+    if (before === null || this.selectedKey !== before) {
       this.changesProblem = null
       this.told = null
       this.shareChanges(null)
@@ -338,10 +338,12 @@ export default class OrcAgents extends View {
     const asked = openAsk(shared(agentsOpenKey))
     if (asked === null || asked.at === this.opened || this.list.kind !== "ok") return
     this.opened = asked.at
-    this.filter = openedFilter(this.list.cards, asked.run)
-    this.find.set_value("")
-    this.foldedGroups.clear()
-    this.select(cx, asked.run)
+    this.moveSelection(cx, () => {
+      this.filter = openedFilter(this.allCards(), asked.run)
+      this.find.set_value("")
+      this.foldedGroups.clear()
+      this.selectedKey = asked.run
+    })
     setShared(agentsOpenKey, null)
   }
 

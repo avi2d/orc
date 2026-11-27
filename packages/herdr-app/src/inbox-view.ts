@@ -155,7 +155,7 @@ export class InboxAnswers {
     const before = this.typed.get(key) ?? ""
     const after = box.value()
     this.typed.set(key, after)
-    const option = optionByNumber(item, before, after)
+    const option = this.writing.has(key) ? null : optionByNumber(item, before, after)
     if (option !== null && !this.busy(key)) this.fill(item, option)
     cx.notify()
   }
