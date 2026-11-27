@@ -2,7 +2,6 @@ import { Effect } from "effect"
 import { OrcRunError } from "../../shared/lib/index"
 import { runChecksRound, summarizeChecksRound, type ChecksCommand } from "./checks"
 import { finishAfterChecks, reviewOrc } from "./run-finish"
-import { runDiagramTurn } from "./diagram-turn"
 import { runReviewTurn } from "./review-turn"
 import type { ReviewFinding, ReviewOutcome } from "./review-outcome"
 import { lastFixRound, passesRoundTwoBar } from "./left-findings"
@@ -98,6 +97,5 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
       if (failure !== null) return stopReport(loop, failure)
       review = yield* runReviewTurn(run, ops.runAgent, reviewer, "orc")
     }
-    const diagram = yield* runDiagramTurn(run, ops.runAgent, reviewer)
-    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, diagram: diagram.kind === "mermaid" ? diagram.chart : null })
+    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound })
   })

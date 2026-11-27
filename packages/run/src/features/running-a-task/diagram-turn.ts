@@ -1,22 +1,15 @@
 import { Effect, Result } from "effect"
-import { finalReplyText, type AgentFile } from "../../entities/agent/index"
+import type { AgentFile } from "../../entities/agent/index"
 import type { HistoryRun } from "./run-record"
-import { readDiff, readOnlyTools } from "./review-turn"
-import type { AgentRunResult, SandboxOps } from "./run-ops"
+import { readDiff, readOnlyTools, readReply } from "./review-turn"
+import type { SandboxOps } from "./run-ops"
 
 export type DiagramResult
   = { readonly kind: "mermaid"; readonly chart: string }
   | { readonly kind: "none" }
 
 export const parseDiagramReply = (reply: string | null): DiagramResult => {
-  if (reply === null) {
-    return { kind: "none" }
-  }
-  const trimmed = reply.trim()
-  if (trimmed.toLowerCase() === "no diagram") {
-    return { kind: "none" }
-  }
-  const chart = /```mermaid[ \t]*\r?\n([\s\S]*?)```/.exec(trimmed)?.[1]?.trim() ?? ""
+  const chart = reply === null ? "" : /```mermaid[ \t]*\r?\n([\s\S]*?)```/.exec(reply)?.[1]?.trim() ?? ""
   return chart === "" ? { kind: "none" } : { kind: "mermaid", chart }
 }
 
@@ -30,20 +23,6 @@ const diagramPrompt = (taskFile: string, diffFile: string): string =>
     "When the change alters a flow, a structure or a boundary, print one ```mermaid flowchart block that explains it, with nothing before or after the fence.",
     "When no picture explains the change better than words, print only: no diagram"
   ].join("\n")
-
-const readReply = (
-  run: Pick<HistoryRun, "fs">,
-  result: Result.Result<AgentRunResult, unknown>
-): Effect.Effect<string | null> => {
-  if (Result.isFailure(result) || result.success.sessionFile === null) {
-    return Effect.succeed(null)
-  }
-  const sessionFile = result.success.sessionFile
-  return run.fs.readFileString(sessionFile).pipe(
-    Effect.map((jsonl) => finalReplyText(jsonl)),
-    Effect.catchTag("PlatformError", () => Effect.succeed<string | null>(null))
-  )
-}
 
 export const runDiagramTurn = (
   run: Pick<HistoryRun, "fs" | "path" | "runDir" | "piSessionDir" | "spawner" | "git" | "projectDir" | "branch">,
@@ -64,5 +43,8 @@ export const runDiagramTurn = (
       withoutAsks: true,
       onSession: () => Effect.void
     }).pipe(Effect.result)
-    return parseDiagramReply(yield* readReply(run, result))
+    if (Result.isFailure(result)) {
+      return { kind: "none" } as const
+    }
+    return parseDiagramReply(yield* readReply(run, result.success.sessionFile))
   })

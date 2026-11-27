@@ -16,7 +16,6 @@ import { leftFindings, leftReasonLine, type LeftFinding } from "./left-findings"
 interface OrcLoopEnd {
   readonly review: ReviewOutcome
   readonly sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>
-  readonly diagram: string | null
 }
 
 type ReviewSection =
@@ -39,7 +38,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       if (orcLoop.review.status === "failed") {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound) }, orcLoop.diagram)
+      const pr = yield* openPullRequest(run, run.delivery, runAgent, rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound) })
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
@@ -47,8 +46,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       yield* checkpoints.reviewStart(run.delivery.reviewer, reviewStarted)
       const review = yield* reviewAtHead(run, runAgent, run.delivery.reviewer, priorDir)
       yield* checkpoints.reviewDone(run.delivery.reviewer, review, reviewStarted, new Date().toISOString())
-      const diagram = yield* runDiagramTurn(run, runAgent, run.delivery.reviewer)
-      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, unfixedSection(review), diagram.kind === "mermaid" ? diagram.chart : null)
+      const pr = yield* openPullRequest(run, run.delivery, runAgent, rounds, checkpoints, unfixedSection(review))
       const reviewed = checked + reviewSentence(review)
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
@@ -85,23 +83,18 @@ export interface PrBodyInput {
   readonly review: ReviewSection
 }
 
+const isHeading = (line: string): boolean => /^#{1,6}(\s|$)/.test(line)
+
 export const taskGoal = (taskText: string): string => {
   const body = splitFrontmatter(taskText)?.body ?? taskText
-  const lines = body.split("\n")
-  let index = 0
-  while (index < lines.length && lines[index].trim() === "") {
-    index += 1
+  const lines = body.split("\n").map((line) => line.trim())
+  const start = lines.findIndex((line) => line !== "" && !isHeading(line))
+  if (start === -1) {
+    const title = lines.find((line) => line.startsWith("# "))?.slice(2).trim() ?? ""
+    return title === "" ? "The task file states no goal." : title
   }
-  let title = ""
-  if (index < lines.length && lines[index].trim().startsWith("# ")) {
-    title = lines[index].trim().slice(2).trim()
-    index += 1
-  }
-  const paragraph = lines.slice(index).join("\n").split(/\n[ \t]*\n/)[0]?.trim() ?? ""
-  if (paragraph !== "") {
-    return paragraph
-  }
-  return title === "" ? "The task file states no goal." : title
+  const end = lines.findIndex((line, index) => index > start && (line === "" || isHeading(line)))
+  return lines.slice(start, end === -1 ? undefined : end).join("\n")
 }
 
 const checkedSentence = (passed: ReadonlyArray<string>): string =>
@@ -140,13 +133,15 @@ const readTaskGoal = (run: Pick<HistoryRun, "fs" | "taskPath">): Effect.Effect<s
 
 const openPullRequest = (
   run: HistoryRun,
-  opener: PullRequestOpener,
+  delivery: { readonly opener: PullRequestOpener; readonly reviewer: AgentFile },
+  runAgent: SandboxOps["runAgent"],
   rounds: ReadonlyArray<ChecksRoundSummary>,
   checkpoints: RunCheckpoints,
-  review: ReviewSection,
-  diagram: string | null
+  review: ReviewSection
 ): Effect.Effect<DirectPrRecord, OrcRunError> =>
   Effect.gen(function*() {
+    const drawn = yield* runDiagramTurn(run, runAgent, delivery.reviewer)
+    const diagram = drawn.kind === "mermaid" ? drawn.chart : null
     yield* checkpoints.pullRequestStart(new Date().toISOString())
     const head = yield* runGit(run.spawner, run.git, ["log", "-1", "--format=%s", run.branch], run.worktreeDir).pipe(
       Effect.map((logged) => logged.stdout.trim()),
@@ -160,7 +155,7 @@ const openPullRequest = (
     yield* run.fs.writeFileString(bodyFile, prBody({ goal, subjects: bodySubjects, diagram, passed: rounds.at(-1)?.checks.map((check) => check.name) ?? [], review })).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
     )
-    const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, bodyFile)
+    const pr = yield* openDirectPr(delivery.opener, run.branch, head !== "" ? head : run.branch, bodyFile)
     yield* checkpoints.pullRequestDone(pr)
     return pr
   })

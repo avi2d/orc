@@ -47,10 +47,12 @@ A checkpoint write failure does not block the PR, but the next resume reviews ag
 After the review turn, a direct-PR run runs `git push --set-upstream origin <branch>` from the run's worktree.
 It reuses the open PR for the branch when `gh pr list --head <branch> --state open` finds one, and otherwise runs `gh pr create`.
 The PR's title is the head commit's subject, and its body keeps the same headings in the same order on every run.
-`## Why` states the task's goal in one or two plain sentences.
+`## Why` holds the task file's first paragraph that is not a heading.
+A task file with no such paragraph gives its `# ` title there, and one with no title gives `The task file states no goal.`
 `## What changed` lists the branch's commits.
 `## How it fits` carries a `mermaid` diagram when the change alters a flow, a structure or a boundary, and the run leaves the heading out otherwise.
-A further Pi turn draws that diagram after the review, and answers `no diagram` when no picture explains the change better than words.
+A further Pi turn draws that diagram just before the PR opens, and a run that opens no PR skips it.
+A reply without a `mermaid` fence leaves the heading out.
 `## How it was checked` names the local checks that passed and the review result.
 A review with no findings gives the line `The review found nothing.`, and a failed review turn gives `The review turn failed, so this PR lists no review findings.`
 `## Open review findings` lists each open finding with its severity, id, `file:line`, description and action, and the run leaves the heading out when no finding is open.

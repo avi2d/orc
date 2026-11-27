@@ -76,7 +76,7 @@ describe("orc delivery", () => {
             return lintPasses()
           })
           expect(checkedBase).toBe(base)
-          expect(kinds).toEqual(["implementer", "reviewer"])
+          expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
           expect(outcome.steps).toContainEqual({ name: "review", status: "passed" })
           expect(outcome.signals).toContainEqual({ name: "review-findings", value: "0" })
           expect(JSON.parse(await readFile(join(home, "runs", "step-run-1", "review.json"), "utf8"))).toEqual([])

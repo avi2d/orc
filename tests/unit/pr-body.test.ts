@@ -101,6 +101,11 @@ test("the goal is the first paragraph after the title rather than the whole task
   expect(taskGoal("# Add the cache\n\nServe reads from a cache.\n\n## Done when\n\nA check passes.\n")).toBe("Serve reads from a cache.")
 })
 
+test("a section heading under the title is skipped rather than given as the goal", () => {
+  expect(taskGoal("# Add the cache\n\n## Goal\n\nServe reads from a cache.\n")).toBe("Serve reads from a cache.")
+  expect(taskGoal("# Add the cache\n## Goal\nServe reads from a cache.\n## Done when\nA check passes.\n")).toBe("Serve reads from a cache.")
+})
+
 test("a task file without a title still gives its first paragraph as the goal", () => {
   expect(taskGoal("Do the thing.\n")).toBe("Do the thing.")
 })

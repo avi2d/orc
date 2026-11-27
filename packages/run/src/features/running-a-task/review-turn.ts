@@ -57,7 +57,7 @@ const rerunPrompt = (problem: string): string =>
     "Print only the findings JSON array again, with nothing before or after it and no code fence."
   ].join("\n")
 
-const readReply = (run: Pick<HistoryRun, "fs">, sessionFile: string | null): Effect.Effect<string | null> =>
+export const readReply = (run: Pick<HistoryRun, "fs">, sessionFile: string | null): Effect.Effect<string | null> =>
   sessionFile === null
     ? Effect.succeed(null)
     : run.fs.readFileString(sessionFile).pipe(Effect.map(finalReplyText), Effect.catchTag("PlatformError", () => Effect.succeed(null)))
