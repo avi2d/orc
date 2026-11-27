@@ -16,7 +16,7 @@ const accountKey = (account: Account): string => `${account.provider} ${account.
 
 const windowKey = (window: ComposedWindow): string => `${accountKey(window.account)} ${window.id}`;
 
-const eventOf = (report: ComposedSessionQuotaReport, window: ComposedWindow, at: DateTime.Utc): QuotaPaceEvent => ({
+const eventOf = (report: ComposedSessionQuotaReport, window: ComposedWindow, at: DateTime.Utc, elapsedFraction: number): QuotaPaceEvent => ({
   schemaVersion: 1,
   rule: "quota-pace",
   at: DateTime.formatIso(at),
@@ -24,7 +24,7 @@ const eventOf = (report: ComposedSessionQuotaReport, window: ComposedWindow, at:
   window: window.id,
   windowLabel: window.label,
   leftPoints: window.leftPoints,
-  elapsedFraction: window.elapsedFraction,
+  elapsedFraction,
   resetsAt: window.resetsAt,
   flags: report.flags.filter((flag) => flag.window === window.id && accountKey(flag.account) === accountKey(window.account)),
 });
@@ -49,7 +49,7 @@ export const quotaPaceStep = (
     const step = episodeStep(next.get(key), threatens(sample.value, window) ? "over" : "under", DateTime.toEpochMillis(now), 0);
     if (step.episode === undefined) next.delete(key);
     else next.set(key, step.episode);
-    if (step.fire) events.push(eventOf(sample.value, window, now));
+    if (step.fire && window.elapsedFraction !== null) events.push(eventOf(sample.value, window, now, window.elapsedFraction));
   }
   return { state: next, events };
 };

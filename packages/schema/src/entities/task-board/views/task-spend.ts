@@ -31,10 +31,11 @@ const fairShares = (view: SessionQuotaView, owned: (session: Session) => boolean
       ? []
       : account.body.windows.flatMap((window) => {
           const fair = window.fairPointsPerHour;
-          if (fair === null || fair <= 0 || !window.aheadOfPace || !window.pastFirstTenth) return [];
+          const cycleSeconds = window.cycleSeconds;
+          if (cycleSeconds === undefined || fair === null || fair <= 0 || !window.aheadOfPace || !window.pastFirstTenth) return [];
           return window.sessions
             .filter((row) => owned(row.session) && row.priced.pointsPerHour > 0)
-            .map((row) => ({ account: account.title, cycleSeconds: window.cycleSeconds, ratio: row.priced.pointsPerHour / fair, flagged: row.flagged }));
+            .map((row) => ({ account: account.title, cycleSeconds, ratio: row.priced.pointsPerHour / fair, flagged: row.flagged }));
         }),
   );
 
