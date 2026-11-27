@@ -114,8 +114,12 @@ const openFindingLines = (section: ReviewSection): string => {
   if (section.kind === "failed" || section.findings.length === 0) {
     return ""
   }
-  const lines = section.kind === "unfixed" ? section.findings.map(findingLine) : section.findings.map(leftFindingLines)
-  return "\n## Open review findings\n\n" + lines.join("\n") + "\n"
+  if (section.kind === "unfixed") return "\n## Open review findings\n\n" + section.findings.map(findingLine).join("\n") + "\n"
+  const open = section.findings.filter((left) => left.finding.action !== "ask-user")
+  const needsPerson = section.findings.filter((left) => left.finding.action === "ask-user")
+  const openSection = open.length === 0 ? "" : "\n## Open review findings\n\n" + open.map(leftFindingLines).join("\n") + "\n"
+  const personSection = needsPerson.length === 0 ? "" : "\n## Findings that need a person\n\n" + needsPerson.map(leftFindingLines).join("\n") + "\n"
+  return openSection + personSection
 }
 
 const reasonFallback = "No reason was recorded for this change; see What changed."

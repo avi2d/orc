@@ -28,14 +28,23 @@ const findingsForRound = (findings: ReadonlyArray<ReviewFinding>, round: number)
   findings.filter((finding) => finding.action !== "ask-user" && (round === 1 || passesRoundTwoBar(finding)))
 
 const stopForReview = (findings: ReadonlyArray<ReviewFinding>, round: number, limit: number, sent: ReadonlyArray<ReadonlyArray<ReviewFinding>>): ReviewStop | null => {
-  const unresolved = findings.filter((finding) => finding.severity === "error" || finding.severity === "warning")
+  const unresolved = findings.filter((finding) => finding.action !== "ask-user" && (finding.severity === "error" || finding.severity === "warning"))
   if (unresolved.length === 0) return "cleared"
-  if (findings.some((finding) => finding.severity === "error" && finding.action === "ask-user")) return "ask-user"
   if (round > limit) return "round-limit"
   const eligible = findingsForRound(findings, round)
   if (eligible.some((finding) => sent.some((previous) => previous.some((earlier) => sameFinding(earlier, finding))))) return "repeat"
-  if (eligible.length === 0) return unresolved.every((finding) => finding.action === "ask-user") ? "ask-user" : "severity-bar"
+  if (eligible.length === 0) return "severity-bar"
   return null
+}
+
+const collectAskUser = (kept: Array<ReviewFinding>, findings: ReadonlyArray<ReviewFinding>): void => {
+  for (const finding of findings) {
+    const earlier = kept.findIndex((held) => sameFinding(held, finding))
+    if (finding.action !== "ask-user") {
+      if (earlier !== -1) kept.splice(earlier, 1)
+    } else if (earlier === -1) kept.push(finding)
+    else kept[earlier] = finding
+  }
 }
 
 const stopReport = (loop: ReviewLoop, endReason: string): OrcRunReport => ({
@@ -117,12 +126,10 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
       let review = yield* reviewNext()
       while (review.status === "passed") {
         const round = sentPerRound.length + 1
+        collectAskUser(askUserFindings, review.findings)
         const stop = stopForReview(review.findings, round, limit, sentPerRound)
         if (stop !== null) {
           return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, stop, askUserFindings, eligibility: yield* eligibility })
-        }
-        for (const finding of review.findings) {
-          if (finding.action === "ask-user" && !askUserFindings.some((earlier) => sameFinding(earlier, finding))) askUserFindings.push(finding)
         }
         const sent = findingsForRound(review.findings, round)
         sentPerRound.push(sent)

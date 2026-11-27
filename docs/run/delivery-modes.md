@@ -19,9 +19,9 @@ After the checks pass, the run reviews the branch and fixes findings in up to tw
 Set `review.maxFixRounds` in `$ORC_HOME/config.json` to a positive integer to change the limit.
 When the first round runs, it sends every finding to the fixer, except findings marked `ask-user`.
 Later rounds send only `error` findings.
-The loop stops when no `error` or `warning` remains, the round limit is reached, a finding repeats, or an `ask-user` error is open.
-It also stops when no finding can go to the fixer.
-That stop names the later rounds' severity bar or the need for the user's decision.
+The loop stops when no fixable `error` or `warning` remains, the round limit is reached, a finding repeats, or no finding meets the later rounds' severity bar.
+Findings marked `ask-user` do not stop the loop.
+The PR body lists them under findings that need a person.
 The run's end reason records why the loop stopped.
 The run history records each review turn as its own `review` step, numbered by attempt.
 If a review turn fails, a fix does not finish, or a check fails after a fix, the run stops without opening a PR.
@@ -107,15 +107,16 @@ When the task file cannot be read, the diagram is kept.
 `## How it was checked` names the local checks that passed and the review result.
 A review with no findings gives the line `The review found nothing.`, and a failed review turn gives `The review turn failed, so this PR lists no review findings.`
 `## Open review findings` lists each open finding with its severity, id, file and line, description and action, and the run leaves the heading out when no finding is open.
+`## Findings that need a person` follows it and lists each open `ask-user` finding the same way, and the run leaves the heading out when none is open.
 
 ## Findings left open
 After a successful review and any fix rounds, an `orc` run opens its PR the same way, with the remaining findings.
 Findings that remain after the fix rounds do not stop the PR.
 Under each remaining finding, a nested line says why the fix loop left it.
 An `ask-user` finding stays out of the fixer input and remains in the PR body.
-If the final review reports the same finding again, the PR uses that review's wording and action.
+If a later review reports the same finding again, its wording and action replace the earlier report.
 When a later round is available, a `warning` or `info` finding is below its severity bar, which fixes only errors.
-If no fix round runs because no `error` or `warning` remains, the reason line names that stop.
+If no fix round runs because no fixable `error` or `warning` remains, the reason line names that stop.
 If no fix round is left, the reason line names the round limit.
 A repeat has the same file and topic as a finding the fixer received earlier.
 Only findings eligible for the next fix round can trigger the repeat stop.
