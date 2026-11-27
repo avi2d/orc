@@ -15,13 +15,13 @@ const dotColour: Readonly<Record<CardStatus, Color>> = {
   "Awaiting you": "#db932e", Running: "#5caaf6", Queued: "#71717a", Failed: "#f7796d", Done: "#35c264"
 }
 
-export const markWidth = 14
+const markWidth = 14
 
 export const statusDot = (status: CardStatus): Element =>
   div().w(markWidth).h(markWidth).flex_none().flex().items_center().justify_center()
     .child(div().size(6).rounded(3).bg(dotColour[status]))
 
-export type IconName = "circle-check" | "circle-x" | "circle-alert" | "circle-dashed" | "spinner"
+type IconName = "circle-check" | "circle-x" | "circle-alert" | "circle-dashed" | "spinner"
 
 // Herdr App ships the spinner and circle-check with its workspace-chrome mod, and the Lucide icons it lacks ship with this mod.
 const iconPaths: Readonly<Record<IconName, string>> = {
@@ -32,7 +32,7 @@ const iconPaths: Readonly<Record<IconName, string>> = {
   "circle-dashed": "mods/orc-agents/icons/circle-dashed.svg"
 }
 
-export const icon = (name: IconName, size: number, colour: Color): Element => {
+const icon = (name: IconName, size: number, colour: Color): Element => {
   const drawn = svg(iconPaths[name]).size(size).flex_none().text_color(colour)
   return name === "spinner" ? drawn.spin(900) : drawn
 }
@@ -110,7 +110,7 @@ export const tab = (t: Palette, id: string, label: string, on: boolean, press: P
   return press === null ? made : made.cursor_pointer().hover((style) => style.text_color(t.foreground)).on_click((_event, cx) => press(cx))
 }
 
-export type AlertTone = "neutral" | "info" | "warning" | "error" | "success"
+type AlertTone = "neutral" | "info" | "warning" | "error" | "success"
 
 const alertLook: Readonly<Record<AlertTone, { readonly bg: Color; readonly icon: IconName; readonly colour: Color }>> = {
   neutral: { bg: "#ffffff0f", icon: "circle-dashed", colour: zinc.muted },

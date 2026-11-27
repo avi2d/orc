@@ -1,10 +1,9 @@
 import { type AsyncContext, type Context, type Element, View } from "gpui-kit"
-import { InputState, h_flex, v_flex } from "gpui-base"
+import { InputState, h_flex } from "gpui-base"
 import { layout, run, setShared, shared } from "herdr"
 import { AgentAttentionSection } from "../../src/agent-attention-view"
-import { type InboxItem, holdsOnTasks } from "../../src/inbox"
 import type { AgentAttention } from "../../src/inbox-read"
-import { type Card, type CardStatus, type Filter, approvalOf, cardAnswers, filterCards, goesOn, lastTab, openedFilter, recordedStatus, unfoldedCards } from "../../src/agents"
+import { type Card, type CardStatus, type Filter, approvalOf, cardAttention, filterCards, goesOn, openedFilter, recordedStatus, unfoldedCards } from "../../src/agents"
 import { type RunFacts, runFacts } from "../../src/run-agent"
 import { type LocalAgents, agentsDocuments, readAgentQuestions, readLocalAgents } from "../../src/agents-read"
 import type { AttentionQueue } from "../../src/guard-attention"
@@ -15,13 +14,13 @@ import { type RunChanges, changesKey } from "../../src/changes"
 import { readChanges } from "../../src/changes-read"
 import { show, type Show, type ShownStep } from "../../src/guard"
 import { InboxAnswers, threadBoxes } from "../../src/inbox-view"
-import { alert } from "../../src/kit"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { StepOutput } from "../../src/step-output"
 import { thread } from "../../src/task-guard"
-import { type Thread, threadCards } from "../../src/thread"
-import { readOnlyThread, threadDecided, threadEntry } from "../../src/thread-view"
+import type { Thread } from "../../src/thread"
+import { targetOf } from "../../src/agents-target"
+import { threadShown } from "../../src/agents-thread"
 import { activeChild, agentsOpenKey, openAsk, viewsStack } from "../../src/views"
 
 type Palette = ReturnType<typeof palette>
@@ -35,19 +34,8 @@ const shown = (): boolean => {
   return active === null || active === thisView
 }
 
-const cardAttention = (card: Card): ReadonlyArray<InboxItem> => {
-  const approval = approvalOf(card)
-  return approval === null ? cardAnswers(card) : [approval]
-}
-
 const readingOf = <A>(keyed: Keyed<A> | null, of: string | null): Reading<A> =>
   of !== null && keyed?.of === of ? keyed.reading : { kind: "reading" }
-
-const openingStep = (card: Card, steps: ReadonlyArray<ShownStep>): Chosen | null => {
-  const failed = card.standing.status === "Failed" ? steps.filter((step) => recordedStatus(step.status, card.standing.status) === "failed").at(-1) : undefined
-  const step = failed ?? steps.at(-1)
-  return step === undefined ? null : { kind: "step", id: step.id }
-}
 
 export default class OrcAgents extends View {
   list: ListReading = { kind: "reading" }
@@ -294,18 +282,7 @@ export default class OrcAgents extends View {
 
   target(): Chosen | null {
     const card = this.selectedCard()
-    if (card === null) {
-      return null
-    }
-    const steps = this.recordedSteps(card)
-    const chosen = this.chosen
-    if (chosen?.kind === "thread") return chosen
-    if (chosen?.kind === "approve" && lastTab(card) !== null) return chosen
-    if (chosen?.kind === "step" && steps.some((step) => step.id === chosen.id)) return chosen
-    if (card.standing.status === "Awaiting you") return card.standing.waiting.on === "approval" ? { kind: "approve" } : { kind: "thread" }
-    if (card.runId === null) return { kind: "thread" }
-    if (card.standing.status === "Done" && lastTab(card) !== null) return { kind: "approve" }
-    return openingStep(card, steps)
+    return card === null ? null : targetOf(card, this.chosen, this.recordedSteps(card))
   }
 
   stepShown(): ShownStep | null {
@@ -392,27 +369,6 @@ export default class OrcAgents extends View {
       .child(detailView(t, card, act, this.shownDetail(t, card, act)))
   }
 
-  threadShown(t: Palette, card: Card | null, act: AgentsActions): ReadonlyArray<Element> {
-    if (card === null) return []
-    const asked = cardAnswers(card).map((item) => this.answers.askCard(t, item, (approval) => act.askMerge(card, approval)))
-    const task = this.local?.details.find((detail) => detail.id === card.id)
-    if (task === undefined) {
-      return [alert(t, "thread-none", { tone: "neutral", title: "This run has no task in the backlog", body: "A thread belongs to a backlog task, so this run has none." }), ...asked]
-    }
-    const told = this.told?.of === task.id ? this.told.reading : { kind: "reading" } as const
-    if (told.kind === "reading") return [alert(t, "thread-reading", { tone: "info", title: "Reading the thread", body: `orc backlog thread ${task.id} --json` }), ...asked]
-    if (told.kind === "failed") {
-      return [alert(t, "thread-failed", { tone: "error", title: "Could not read the thread", body: told.reason, actions: [{ id: "thread-retry", label: "Retry", press: act.retry }] }), ...asked]
-    }
-    const waitsOn = holdsOnTasks(this.local?.details ?? []).get(task.id)
-    const history = threadCards(told.value, task, waitsOn).filter((entry) => entry.reply === null)
-    const decided = threadDecided(t, told.value)
-    if (asked.length === 0 && history.length === 0 && decided.length === 0) {
-      return [alert(t, "thread-empty", { tone: "neutral", title: "No thread yet", body: "Questions, answers and notes on this task show here." })]
-    }
-    return [...history.map((entry) => threadEntry(t, entry, readOnlyThread)), ...decided, ...asked]
-  }
-
   shownDetail(t: Palette, card: Card | null, act: AgentsActions): DetailShown {
     const step = card === null ? null : this.stepShown()
     const runId = card?.runId ?? null
@@ -422,7 +378,7 @@ export default class OrcAgents extends View {
       target: this.target(),
       merge: card === null ? null : this.merge?.task === card.id ? this.merge.outcome : null,
       step,
-      thread: this.threadShown(t, card, act),
+      thread: threadShown(t, card, act, this),
       back: { review: this.review, sent: card !== null && this.sent?.of === card.key ? this.sent.reading : null, send: (cx) => this.sendBack(cx) },
       changesProblem: this.changesProblem,
       turns: readingOf(this.output.turns, of),

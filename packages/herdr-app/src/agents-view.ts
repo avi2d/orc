@@ -84,7 +84,7 @@ const approveBody = (t: Palette, card: Card, approval: InboxApproval, merge: Mer
     .children(shown.notice === null ? [] : [alert(t, "merge-notice", { tone: "error", title: "The merge stopped", body: shown.notice })])
 }
 
-export interface SendBackShown {
+interface SendBackShown {
   readonly review: InputState
   readonly sent: Reading<string> | null
   readonly send: (cx: Context) => void

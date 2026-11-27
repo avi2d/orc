@@ -1,193 +1,8 @@
-import { expect, mock, test } from "bun:test"
-import type { AsyncContext, Context } from "gpui-kit"
+import { expect, test } from "bun:test"
 import fixture from "../../fixtures/attention/herdr-app.json"
 import type { Card } from "../../../packages/herdr-app/src/agents"
 import type { BoardTask } from "../../../packages/herdr-app/src/board"
-
-interface Node {
-  readonly calls: Array<{ readonly name: string; readonly args: ReadonlyArray<unknown> }>
-  readonly kids: Array<object | string>
-}
-
-const nodes = new WeakMap<object, Node>()
-
-const isKid = (value: unknown): value is object | string => typeof value === "string" || (typeof value === "object" && value !== null)
-
-const node = (): object => {
-  const made: Node = { calls: [], kids: [] }
-  const element: object = new Proxy({}, {
-    get: (_target, name) => (...args: ReadonlyArray<unknown>) => {
-      const kids: ReadonlyArray<unknown> = name === "child" ? [args[0]] : name === "children" && Array.isArray(args[0]) ? args[0] : []
-      if (name === "child" || name === "children") made.kids.push(...kids.filter(isKid))
-      else made.calls.push({ name: String(name), args })
-      return element
-    }
-  })
-  nodes.set(element, made)
-  return element
-}
-
-const find = (element: object | string, id: string): Node | null => {
-  const made = typeof element === "string" ? undefined : nodes.get(element)
-  if (made === undefined) return null
-  if (made.calls.some((call) => call.name === "id" && call.args[0] === id)) return made
-  for (const kid of made.kids) {
-    const found = find(kid, id)
-    if (found !== null) return found
-  }
-  return null
-}
-
-const paths = (element: object | string, parents: ReadonlyArray<Node> = []): ReadonlyArray<ReadonlyArray<Node>> => {
-  const made = typeof element === "string" ? undefined : nodes.get(element)
-  if (made === undefined) return []
-  const path = [...parents, made]
-  return [path, ...made.kids.flatMap((kid) => paths(kid, path))]
-}
-
-const press = (view: { render(cx: Context): object }, target: string): void => {
-  const rendered = paths(view.render(cx))
-  const under = rendered.find((path) => path.at(-1)?.calls.some((call) => call.name === "id" && call.args[0] === target))
-  if (under === undefined) throw new Error(`No element ${target}`)
-  for (const path of rendered) {
-    const made = path.at(-1)
-    if (made !== undefined && !under.includes(made)) mouseDownOut(made)
-  }
-  for (const made of [...under].reverse()) mouseDown(made)
-  click(find(view.render(cx), target))
-}
-
-const mouseDownOut = (made: Node): void => {
-  for (const call of made.calls) {
-    const handler = call.args[0]
-    if (call.name === "on_mouse_down_out" && typeof handler === "function") handler({}, cx)
-  }
-}
-
-const mouseDown = (made: Node): void => {
-  for (const call of made.calls) {
-    const handler = call.args[1]
-    if (call.name === "on_mouse_down" && call.args[0] === "left" && typeof handler === "function") handler({}, cx)
-  }
-}
-
-const documents = new Map<string, unknown>()
-const sessionFiles = new Map<string, string>()
-let attentionPending: Promise<{ code: number; stdout: string; stderr: string }> | null = null
-const executed: Array<string> = []
-const spawned: Array<Promise<unknown>> = []
-const ran: Array<{ readonly name: string; readonly args: unknown }> = []
-const stopped: Array<true> = []
-const unused = (): never => { throw new Error("Unexpected App context call") }
-const idleTask = () => ({ cancel: () => undefined, is_done: () => true })
-class IdleEntity {
-  set_props = unused
-  release = unused
-}
-const cx: Context = Object.assign(IdleEntity, {
-  stop_propagation: () => { stopped.push(true) }, notify: () => undefined, spawn: (body: (task: AsyncContext) => unknown) => {
-    spawned.push(Promise.resolve(body(cx)))
-    return idleTask()
-  },
-  bind_keys: unused, propagate: unused, phase: unused, theme: unused, open_url: unused,
-  read_from_clipboard: unused, write_to_clipboard: unused, focus_handle: unused, sleep: unused,
-  timer: { after: unused, every: unused }
-}) satisfies Context
-
-const click = (element: Node | null): void => {
-  const handler = element?.calls.find((call) => call.name === "on_click")?.args[0]
-  if (typeof handler === "function") handler({}, cx)
-}
-
-const listIds = new WeakMap<Node, unknown>()
-
-const typeInto = new WeakMap<object, (text: string) => void>()
-
-const typeIn = (box: object | undefined, text: string): void => {
-  const type = box === undefined ? undefined : typeInto.get(box)
-  if (type === undefined) throw new Error("No answer box")
-  type(text)
-}
-
-const checkedRadio = (element: object, id: string): boolean => {
-  const row = find(element, id)
-  return row !== null && paths(element).some((path) => path.includes(row) && path.at(-1)?.calls.some((call) => call.name === "id" && call.args[0] === "radio-checked") === true)
-}
-
-const everyRow = (id: unknown, count: number, _key: unknown, row: (index: number, cx: Context) => object): object => {
-  const element = node()
-  const made = nodes.get(element)
-  made?.kids.push(...Array.from({ length: count }, (_, index) => row(index, cx)))
-  if (made !== undefined) listIds.set(made, id)
-  return element
-}
-
-const handlersInRows = (element: object): ReadonlyArray<string> =>
-  paths(element).flatMap((path) => {
-    const list = path.findIndex((made) => listIds.has(made))
-    const made = path.at(-1)
-    return list === -1 || list === path.length - 1 || made === undefined ? [] : made.calls.filter((call) => call.name.startsWith("on_")).map((call) => call.name)
-  })
-
-const pressRow = (element: object, listId: string, key: string): void => {
-  const list = paths(element).map((path) => path.at(-1)).find((made) => made !== undefined && listIds.get(made) === listId)
-  const handler = list?.calls.find((call) => call.name === "on_item_click")?.args[0]
-  if (typeof handler !== "function") throw new Error(`No on_item_click on ${listId}`)
-  handler(key, cx)
-}
-
-void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow, image: node, svg: node }))
-void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Scrollbar: { vertical: node }, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
-  ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
-  InputState: { new: () => {
-    let typed = ""
-    const changed: Array<(event: object, cx: Context) => void> = []
-    const on = (event: string, handler: (event: object, cx: Context) => void) => {
-      if (event === "change") changed.push(handler)
-    }
-    const state = { value: () => typed, set_value: (text: string) => { typed = text }, on, focus: () => undefined, release: () => undefined }
-    typeInto.set(state, (text) => {
-      typed = text
-      for (const handler of changed) handler({}, cx)
-    })
-    return state
-  } }
-}))
-void mock.module("herdr", () => ({
-  shared: () => null, setShared: () => undefined, layout: () => null, theme: () => ({}),
-  exec: (command: string, args: ReadonlyArray<string>) => {
-    const line = [command, ...args].join(" ")
-    executed.push(line)
-    if (line === "orc attention --json" && attentionPending !== null) return attentionPending
-    const document = documents.get(line)
-    return Promise.resolve(document === undefined
-      ? { code: 1, stdout: "", stderr: `Unexpected command: ${line}` }
-      : { code: 0, stdout: JSON.stringify(document), stderr: "" })
-  },
-  settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined, readTextFile: (file: string) => Promise.resolve(sessionFiles.get(file) ?? null),
-  run: (name: string, args: unknown) => ran.push({ name, args })
-}))
-
-const openTask = (id: string) => ({
-  id, title: "Update the report", project: "garden", kind: "ship", body: "", created: "2026-11-24T08:00:00Z",
-  priority: null, parent: null, dependsOn: [], prState: null, status: "new", hold: null, parked: null
-})
-
-const loadAttention = async () => {
-  const { readAgents } = await import("../../../packages/herdr-app/src/agents-read")
-  const { readInbox } = await import("../../../packages/herdr-app/src/inbox-read")
-  documents.set("orc backlog --json", {
-    schema: "orc.backlog.v1", tasks: fixture.items.map((item) => openTask(item.task))
-  })
-  documents.set("orc attention --json", fixture)
-  documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [] })
-  const [agents, inbox] = await Promise.all([readAgents(), readInbox()])
-  documents.clear()
-  if (agents.kind !== "ok") throw new Error(agents.kind === "failed" ? agents.reason : agents.kind)
-  if (inbox.kind !== "ok") throw new Error(inbox.kind === "failed" ? inbox.reason : inbox.kind)
-  return { agents: agents.value, inbox: inbox.value }
-}
+import { type Node, checkedRadio, click, cx, documents, executed, find, handlersInRows, loadAttention, nodes, openTask, press, pressRow, ran, sessionFiles, setAttentionDocuments, spawned, stalledAttention, stopped, typeIn } from "./gpui-fakes"
 
 test("a stalled remote question request does not hold back local steps and log refresh", async () => {
   const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
@@ -198,7 +13,7 @@ test("a stalled remote question request does not hold back local steps and log r
   documents.set(`orc show ${runId} --json`, { schema: "orc.show.v1", run: { taskFile: "/work/garden/task.md" }, steps: [step] })
   documents.set(`orc log ${runId} 1`, "local output")
   let release = (): void => undefined
-  attentionPending = new Promise((resolve) => { release = () => resolve({ code: 0, stdout: JSON.stringify(fixture), stderr: "" }) })
+  stalledAttention.pending = new Promise((resolve) => { release = () => resolve({ code: 0, stdout: JSON.stringify(fixture), stderr: "" }) })
   const agents = new OrcAgents()
   try {
     agents.refresh(cx)
@@ -207,7 +22,7 @@ test("a stalled remote question request does not hold back local steps and log r
     expect(agents.output.log?.reading).toEqual({ kind: "ok", value: JSON.stringify("local output") })
   } finally {
     release()
-    attentionPending = null
+    stalledAttention.pending = null
     documents.clear()
   }
 })
@@ -309,9 +124,7 @@ test("typing an option's number into an empty answer box picks that option inste
 test("a failed reread keeps its Could not reread card when the agents' questions arrive after it, instead of the questions clearing it", async () => {
   const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
   const agents = new OrcAgents()
-  documents.set("orc backlog --json", { schema: "orc.backlog.v1", tasks: fixture.items.map((item) => openTask(item.task)) })
-  documents.set("orc attention --json", fixture)
-  documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [] })
+  setAttentionDocuments()
   try {
     await agents.readAll(cx)
     documents.delete("orc runs --json --local")

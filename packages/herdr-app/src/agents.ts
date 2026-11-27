@@ -293,6 +293,11 @@ export const cardAnswers = (card: Pick<Card, "standing"> | null): ReadonlyArray<
 export const approvalOf = (card: Pick<Card, "standing"> | null): InboxApproval | null =>
   card?.standing.status === "Awaiting you" && card.standing.waiting.on === "approval" ? card.standing.waiting.item : null
 
+export const cardAttention = (card: Pick<Card, "standing">): ReadonlyArray<InboxItem> => {
+  const approval = approvalOf(card)
+  return approval === null ? cardAnswers(card) : [approval]
+}
+
 export type LastTab = "Approve" | "Send back"
 
 export const lastTab = (card: Pick<Card, "standing" | "openPr" | "sendBack">): LastTab | null => {

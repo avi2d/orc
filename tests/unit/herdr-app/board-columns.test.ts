@@ -1,40 +1,8 @@
 import { expect, mock, test } from "bun:test"
 import { type BoardTask, cardBox, laneJump, wheelOffset } from "../../../packages/herdr-app/src/board"
-
-interface Node {
-  readonly calls: Array<{ readonly name: string; readonly args: ReadonlyArray<unknown> }>
-  readonly kids: Array<object | string>
-}
-
-const nodes = new WeakMap<object, Node>()
-
-const isKid = (value: unknown): value is object | string => typeof value === "string" || (typeof value === "object" && value !== null)
-
-const node = (): object => {
-  const made: Node = { calls: [], kids: [] }
-  const element: object = new Proxy({}, {
-    get: (_target, name) => (...args: ReadonlyArray<unknown>) => {
-      const kids: ReadonlyArray<unknown> = name === "child" ? [args[0]] : name === "children" && Array.isArray(args[0]) ? args[0] : []
-      if (name === "child" || name === "children") made.kids.push(...kids.filter(isKid))
-      else made.calls.push({ name: String(name), args })
-      return element
-    }
-  })
-  nodes.set(element, made)
-  return element
-}
+import { type Node, find, node } from "./gpui-fakes"
 
 const called = (element: Node, name: string): boolean => element.calls.some((call) => call.name === name)
-const find = (element: object | string, id: string): Node | null => {
-  const made = typeof element === "string" ? undefined : nodes.get(element)
-  if (made === undefined) return null
-  if (made.calls.some((call) => call.name === "id" && call.args[0] === id)) return made
-  for (const kid of made.kids) {
-    const found = find(kid, id)
-    if (found !== null) return found
-  }
-  return null
-}
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node }))
 void mock.module("gpui-base", () => ({

@@ -63,11 +63,17 @@ export class InboxAnswers {
 
   sync(cx: Context, items: ReadonlyArray<InboxItem>): void {
     const wanted = new Set(items.map((item) => item.key))
-    let changed = false
     for (const key of this.recorded) if (!wanted.has(key)) this.recorded.delete(key)
     for (const key of this.sent.keys()) if (!wanted.has(key)) this.sent.delete(key)
     for (const key of this.items.keys()) if (!wanted.has(key)) this.items.delete(key)
     for (const item of items) this.items.set(item.key, item)
+    const dropped = this.dropBoxes(wanted)
+    const added = this.addBoxes(items)
+    if (dropped || added) cx.notify()
+  }
+
+  dropBoxes(wanted: ReadonlySet<string>): boolean {
+    let dropped = false
     for (const [key, box] of this.boxes) {
       if (wanted.has(key)) continue
       box.release()
@@ -75,17 +81,22 @@ export class InboxAnswers {
       this.writing.delete(key)
       this.picked.delete(key)
       this.typed.delete(key)
-      changed = true
+      dropped = true
     }
+    return dropped
+  }
+
+  addBoxes(items: ReadonlyArray<InboxItem>): boolean {
+    let added = false
     for (const item of items) {
       if (this.boxes.has(item.key) || !needsAnswerBox(item)) continue
       const box = InputState.new({ placeholder: this.look.placeholder })
       box.on("submit", (_event, submitCx) => this.answerFromBox(submitCx, item))
       if (this.look.pick === "fill") box.on("change", (_event, changeCx) => this.typedIn(changeCx, item.key))
       this.boxes.set(item.key, box)
-      changed = true
+      added = true
     }
-    if (changed) cx.notify()
+    return added
   }
 
   busy(key: string): boolean {
@@ -223,11 +234,11 @@ export class InboxAnswers {
 
   option(t: Palette, item: InboxItem, option: AskOption, askMerge: AskMerge): Element {
     const display = optionView(t, `option-${item.key}-${option.letter}`, option).max_w_full().whitespace_normal()
-    const button = option.text === item.recommendation ? display.border_color(t.accent) : display
+    const shown = option.text === item.recommendation ? display.border_color(t.accent) : display
     const enabled = !this.busy(item.key) && choice(item, option).kind !== "unavailable"
     return v_flex().gap(3).min_w_0().items_start()
-      .child(enabled ? button.cursor_pointer().hover((style) => style.bg(t.hover))
-        .on_click((_event, cx) => this.choose(cx, item, option, askMerge)) : button.text_color(t.dim))
+      .child(enabled ? shown.cursor_pointer().hover((style) => style.bg(t.hover))
+        .on_click((_event, cx) => this.choose(cx, item, option, askMerge)) : shown.text_color(t.dim))
       .child(div().text_color(t.muted).whitespace_normal().child(option.outcome ?? "No outcome recorded"))
   }
 

@@ -35,7 +35,7 @@ const failureView = (t: Palette, failure: CheckFailure): Element => {
     .children(tally === "" ? [] : [div().text_size(12).text_color(t.muted).child(tally)])
 }
 
-export const checkState = (check: CheckSummary): CheckState => {
+const checkState = (check: CheckSummary): CheckState => {
   switch (check.outcome.kind) {
     case "passed": return "passed"
     case "running": return "running"
@@ -63,9 +63,6 @@ const checkView = (t: Palette, check: CheckSummary, shown: ChecksShown): Element
     .child(div().w(12).flex_shrink_0().text_color(t.muted).child(open ? "▾" : "▸"))
   return open ? v_flex().child(toggle).child(failureView(t, outcome.failure)) : toggle
 }
-
-export const failedChecks = (reading: Reading<ChecksSummary>): ReadonlyArray<string> =>
-  reading.kind === "ok" && reading.value !== null ? reading.value.flatMap((check) => checkState(check) === "failed" ? [check.name] : []) : []
 
 export const checksView = (t: Palette, reading: Reading<ChecksSummary>, shown: ChecksShown, scroll: ScrollHandle, unbounded: () => Element): Element => {
   const note = (id: string, shownAlert: Parameters<typeof alert>[2]): Element => v_flex().p(20).child(alert(t, id, shownAlert))
