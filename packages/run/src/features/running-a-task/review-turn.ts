@@ -79,7 +79,7 @@ export const runReviewTurn = (
   runAgent: SandboxOps["runAgent"],
   reviewer: AgentFile,
   mode: "direct-PR" | "orc" = "direct-PR",
-  attempt: number = 1
+  attempt = 1
 ): Effect.Effect<ReviewOutcome> =>
   Effect.gen(function*() {
     const diffed = yield* readDiff(run).pipe(Effect.result)

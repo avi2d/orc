@@ -406,7 +406,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     })
   }, 60_000)
 
-  test("the fix review after a requested fix is accepted with approve", async () => {
+  test("the fix review after a requested fix is accepted with approve and counts one gate stop rather than two", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
@@ -418,16 +418,6 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
           statusLookup
         ])
         expect(outcome.report.completed).toBe(true)
-        expect(outcome.report.noMistakes?.gatesAnswered).toBe(2)
-      })
-    })
-  }, 60_000)
-
-  test("a review gate answered fix and then approved at fix_review counts one gate stop rather than two", async () => {
-    await withRepo(async (dir) => {
-      await withHome(async (home) => {
-        const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [fixableGate, fixReviewGate, checksPassedWhileMonitoring, recordedNothing])
         expect(outcome.report.noMistakes?.gatesAnswered).toBe(2)
         expect(outcome.runSignals).toContainEqual({ name: "gate-stops", value: "1" })
         expect(await recordedMetrics(home)).toMatchObject([{ run: "step-run-1", delivery: "no-mistakes", failedSteps: 0, gateStops: 1, fixRounds: 0 }])
