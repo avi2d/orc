@@ -75,8 +75,9 @@ Options:
   --delivery <no-mistakes|direct-PR|orc>
                             How a ship task reaches its PR. Defaults to
                             no-mistakes. direct-PR records a review before
-                            opening the PR, and orc rebases and records a review
-                            before opening the PR without a CI verdict.
+                            opening the PR, and orc rebases, reviews the branch
+                            and fixes the findings in at most two rounds, and
+                            opens the PR without a CI verdict.
   --branch <name>           The branch to commit to, or to resume. Defaults to
                             orc/<run-id>.
   --sandbox <nono|none>     Where the agent runs. Runs you start by hand default
