@@ -24,6 +24,7 @@ import {
   widthOf,
   withinRows,
   wrapParts,
+  windowName as quotaWindowName,
 } from "@avi2dg/orc-ui";
 import { labelWithin, machinesOf } from "./labels";
 import { combinedNames, listed, panelFailure, sourceNotes } from "./notes";
@@ -114,7 +115,9 @@ const gateWords = (window: WindowView): { readonly text: string; readonly tone: 
   return { text: window.pace === "on_pace" ? "on pace" : `${window.pace.replace("_", " ")} pace`, tone: "muted" };
 };
 
-const windowName = (window: Pick<WindowView, "cycleSeconds">): string => `${cycleName(window)} window`;
+const cycleLabel = (window: WindowView): string => window.cycleSeconds === undefined ? quotaWindowName(window, undefined) : cycleName(window);
+
+const windowName = (window: WindowView): string => `${cycleLabel(window)} window`;
 
 interface HeadContext {
   readonly now: DateTime.Utc;
@@ -273,7 +276,7 @@ const flagSummary = (view: SessionQuotaView, width: number, form: FlagForm, now:
   return flags.flatMap(({ account, window, row }) => {
     const fair = window.fairPointsPerHour === null ? "" : `, fair ${rateText(window.fairPointsPerHour)}`;
     const rate = `${rateText(row.priced.pointsPerHour)}pp/h${fair}`;
-    const tag = `${cycleName(window)} ${account.title}`;
+    const tag = `${cycleLabel(window)} ${account.title}`;
     const texts =
       form === "wrapped"
         ? wrapParts([labelWithin(row, room, machines), `${account.title} ${windowName(window)}`, rate], room)

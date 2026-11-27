@@ -111,9 +111,11 @@ const weightOf = (tokens: Tokens, weighting: Weighting): number => weightings[we
 
 // The first machine's quota reading stands for the account, and every machine's calls are a share of the calls both observed.
 const combinedWindow = (anchor: WindowView, members: ReadonlyArray<Member>): WindowView => {
+  if (anchor.startsAt === null) return anchor;
   const observedTokens = sumTokens(members.map(({ window }) => window.observedTokens));
   const all = { raw: weightOf(observedTokens, "raw"), priced: weightOf(observedTokens, "priced") };
   const rows = members.flatMap(({ machine, window }) => {
+    if (window.startsAt === null) return [];
     const span = rateSpanHours(
       DateTime.toEpochMillis(window.startsAt),
       DateTime.toEpochMillis(window.resetsAt),

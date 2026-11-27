@@ -126,9 +126,9 @@ const standaloneSubquo = (
       : id === "rolling" && window.id === "five-hour"
         ? { label: "rolling", kind: "unknown" as const, windowSeconds: 18_000 }
       : id === "seven_day" || id === "weekly"
-        ? { label: "week", kind: "weekly" as const, windowSeconds: 604_800 }
+        ? { label: id === "seven_day" ? "week" : id, kind: "weekly" as const, windowSeconds: 604_800 }
         : id === "monthly"
-          ? { label: "month", kind: "monthly" as const }
+          ? { label: id, kind: "monthly" as const }
           : { label: "rolling", kind: "unknown" as const };
     return [{
       id,

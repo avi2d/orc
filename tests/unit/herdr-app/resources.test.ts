@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { DateTime, Schema } from "effect"
-import { composedSessionQuotaReport, decodeQuota, overlaySubquo, type QuotaReport, type SnapshotFields, SnapshotReport, sessionQuotaView } from "@avi2dg/orc-schema"
+import { composedSessionQuota, composedSessionQuotaReport, decodeQuota, overlaySubquo, type QuotaReport, SessionQuotaReport, sessionQuotaReport, sessionQuotaViewOf, SessionsCodec, type SnapshotFields, SnapshotReport, sessionQuotaView } from "@avi2dg/orc-schema"
 import { fixture as fixtureText } from "../../lib/fixtures"
 import { noOrcAccounts } from "../../lib/orc-quota"
 import { ledgerOf } from "../../lib/quota-view-fixture"
@@ -154,9 +154,9 @@ describe("the subscriptions table over a subquo reading", () => {
   const readAt = DateTime.makeUnsafe("2026-11-27T09:35:00.000Z")
   const claudeMain = { provider: "claude", accountKey: "default", subquoId: "main" } as const
 
-  const rowsOver = (quotaAxi: QuotaReport): ReadonlyArray<readonly [string, ReadonlyArray<readonly [string, number]> | string]> => {
-    const view = sessionQuotaView({
-      quota: quotaAxiRead({ kind: "ok", capturedAt: readAt, value: overlaySubquo(quotaAxi, subquoRead, [claudeMain], readAt) }),
+  const viewOver = (quotaAxi: QuotaReport, mappings: Parameters<typeof overlaySubquo>[2] = [claudeMain]) =>
+    sessionQuotaView({
+      quota: quotaAxiRead({ kind: "ok", capturedAt: readAt, value: overlaySubquo(quotaAxi, subquoRead, mappings, readAt) }),
       orcQuota: noOrcAccounts(readAt),
       panes: undefined,
       processes: undefined,
@@ -167,12 +167,16 @@ describe("the subscriptions table over a subquo reading", () => {
       now: readAt,
       timeZone: DateTime.zoneMakeNamedUnsafe("UTC")
     })
+
+  const rowsFrom = (view: ReturnType<typeof viewOver>) => {
     const quota = { status: "ok", report: composedSessionQuotaReport(view, "mac") }
     const text = JSON.stringify({ schemaVersion: 1, generatedAt: DateTime.formatIso(readAt), machine: "mac", sources: { quota } })
     expect(() => Schema.decodeUnknownSync(SnapshotReport)(JSON.parse(text))).not.toThrow()
-    return subscriptionRows(subscriptionsOf(text), DateTime.toEpochMillis(readAt)).map((group) =>
-      [group.account, group.kind === "unread" ? group.reason : group.windows.map((row) => [row.label, row.usedPercent] as const)])
+    return subscriptionRows(subscriptionsOf(text), DateTime.toEpochMillis(readAt))
   }
+
+  const rowsOver = (quotaAxi: QuotaReport) => rowsFrom(viewOver(quotaAxi)).map((group) =>
+    [group.account, group.kind === "unread" ? group.reason : group.windows.map((row) => [row.label, row.usedPercent] as const)])
 
   const claudeWeekOnly = (): QuotaReport => {
     const decoded = decodeQuota(quotaAxiJsonFor(["--provider", "claude"], fixtureText("quota-axi/full.json")))
@@ -181,6 +185,36 @@ describe("the subscriptions table over a subquo reading", () => {
       "kind" in entry ? entry : { ...entry, windows: entry.windows.filter((window) => window.id !== "five_hour") })
     return { ...decoded.value, providers }
   }
+
+  test("keeps a subquo window with no cycle instead of dropping it from the table", () => {
+    const view = viewOver({ generatedAt: readAt, providers: [], notSetUp: ["opencode-go"] }, [
+      { provider: "opencode-go", accountKey: "default", subquoId: "opencode-go" }
+    ])
+    const expected = [
+      { label: "rolling", usedPercent: 0, resets: "3h 21m", notch: null, red: false, runsOut: null },
+      { label: "weekly", usedPercent: 9, resets: "2d 14h" },
+      { label: "monthly", usedPercent: 71, resets: "11d 1h", notch: null, red: false, runsOut: null }
+    ]
+    const assertRows = (reading: typeof view) => {
+      const groups = rowsFrom(reading)
+      expect(groups.map((group) => group.account)).toEqual(["opencode-go"])
+      expect(windowsOf(groups[0])).toMatchObject(expected)
+    }
+    assertRows(view)
+    const report = Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(JSON.stringify(sessionQuotaReport(view))))
+    expect(report.windows.map((window) => [window.id, window.usedPoints, window.resetsAt])).toEqual([
+      ["rolling", 0, "2026-11-27T12:56:43.000Z"],
+      ["weekly", 9, "2026-11-30T00:00:00.000Z"],
+      ["monthly", 71, "2026-12-08T10:59:08.000Z"]
+    ])
+    const remote = sessionQuotaViewOf(report, "remote")
+    if (remote.kind !== "ok") throw new Error(remote.issue)
+    assertRows(remote.value)
+    const saved = Schema.toCodecJson(SessionsCodec)
+    const cached = Schema.decodeUnknownSync(saved)(JSON.parse(JSON.stringify(Schema.encodeSync(saved)(view))))
+    assertRows(cached)
+    assertRows(composedSessionQuota(view, "mac", [{ name: "remote", reading: { kind: "ok", value: remote.value } }]))
+  })
 
   test("shows the week subquo read for a mapped Claude account, not an account with windows read as holding none", () => {
     expect(rowsOver(claudeWeekOnly())).toEqual([["claude", [["week", 30]]]])
