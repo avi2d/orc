@@ -56,7 +56,8 @@ Without it, the review turn runs the reviewer agent on its usual model.
 With it, orc picks the reviewer before each review turn:
 
 1. Orc runs the quota command in `dispatch.json` once, as [Accounts on other providers](backlog-configuration.md#accounts-on-other-providers) describes.
-2. Orc skips each entry on the implementer's provider, which for a resumed run that keeps an earlier implement is the provider that implement ran on.
+2. Orc skips each entry on the implementer's provider.
+   A resumed run keeps its earlier implement, so that is the provider the implement ran on.
 3. For each other entry, orc reads the quota account that holds the provider's default credential in `config.json`, because the review turn runs on that credential.
 4. Orc takes the first entry whose account is at or above `floorPercent`, and the review turn runs the reviewer agent on that entry's model.
 
@@ -73,7 +74,8 @@ The run log names the chosen model, its place and each entry passed over, with t
 ### No reviewer with room
 When no entry qualifies, the review turn records its `review` step as failed with no model, and the `review-failure` signal holds the reason.
 The run opens no PR and ends with `The review turn waits for a reviewer in the chain to have room, so the run parks and no PR opens: <reason>`.
-It writes `reviewer-wait.json` in its run folder with that reason and each entry off the implementer's provider, and the beat parks its task until one of them has room, as [Parked runs](parked-runs.md#a-run-that-waits-for-a-reviewer) shows.
+It writes `reviewer-wait.json` in its run folder with that reason and each entry off the implementer's provider.
+The beat parks its task until one of them has room, as [Parked runs](parked-runs.md#a-run-that-waits-for-a-reviewer) shows.
 A chain whose every entry runs on the implementer's provider has nothing to wait for, so its review turn fails with `NoReviewerRoom` and the run stops.
 
 ### The reviewer's credential

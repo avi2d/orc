@@ -89,7 +89,7 @@ const runOneRound = (loop: ReviewLoop, findings: ReadonlyArray<ReviewFinding>, r
     return yield* checkAfterFix(loop)
   })
 
-export const waitsForReviewerLine = (wait: ReviewerWait): string =>
+const waitsForReviewerLine = (wait: ReviewerWait): string =>
   "The review turn waits for a reviewer in the chain to have room, so the run parks and no PR opens: " + wait.reason
 
 // The beat reads the wait from the run folder to know which entries to re-read, and the run's end reason carries only words.
