@@ -233,13 +233,22 @@ test("a configured limit above two does not stop a third fix round", async () =>
   expect(result.evidence).toHaveLength(3)
 }, 60_000)
 
-test("an ask-user error is not sent to the fixer and remains in the PR", async () => {
-  const result = await exercise([[{ ...error, action: "ask-user" }, lateError]])
-  expect(result.evidence).toHaveLength(0)
-  expect(result.body).toContain("Left because it asks the user.")
-  expect(result.body).toContain("The handle leaks.")
-  expect(result.body).toContain("Left because a finding needs the user's decision.")
-  expect(result.endReason).toContain("stopped because a finding needs the user's decision.")
+test("a fixer receiving an ask-user finding or missing a fixable error", async () => {
+  const askedError = { ...error, action: "ask-user" }
+  const askedWarning = { ...warning, action: "ask-user" }
+  const result = await exercise([[askedError, askedWarning, lateError], []])
+  expect(result.evidence.map((value) => JSON.parse(value))).toEqual([[lateError]])
+  expect(result.completed).toBe(true)
+}, 60_000)
+
+test("the PR body does not omit findings that need a person from any review round", async () => {
+  const askedError = { ...error, action: "ask-user" }
+  const askedWarning = { ...warning, action: "ask-user" }
+  const result = await exercise([[askedError, lateError], [askedWarning]])
+  expect(result.completed).toBe(true)
+  expect(result.body).toContain("## Findings that need a person")
+  expect(result.body).toContain("The result is wrong.")
+  expect(result.body).toContain("The result is fragile.")
 }, 60_000)
 
 test("an ask-user warning is not sent to the fixer", async () => {
