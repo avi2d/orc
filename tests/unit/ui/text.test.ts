@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import fc from "fast-check";
+import * as fc from "fast-check";
 import { ellipsize, fit, plain, span, truncate, widthOf } from "@avi2dg/orc-ui";
 
 const family = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}";
@@ -79,7 +79,7 @@ const referenceEllipsize = (text: string, width: number): string => {
   return `${referenceCut(flat, width - 1).trimEnd()}\u2026`;
 };
 
-const drawnCharacters = [..."abcXYZ019 -_./:%()[]·–…›←↑→↓≥⏎─━│┃┏┓┗┛╭╮╯╰╸▶○●⚑✓✗"];
+const drawnCharacters = Array.from(new Intl.Segmenter().segment("abcXYZ019 -_./:%()[]·–…›←↑→↓≥⏎─━│┃┏┓┗┛╭╮╯╰╸▶○●⚑✓✗"), ({ segment }) => segment);
 
 const joiningCharacters = ["e\u0301", "\u0301", "\u200D", "\uFE0F", "\u20E3", "\u{1F44D}", "\u{1F3FB}", "\u4E2D", "\u1100", "\u1161", "\u{1F1FA}", "\u{1F1F8}", "\t", "\r", "\n", "\u2063", "\u00AD", "\u200C", family];
 
