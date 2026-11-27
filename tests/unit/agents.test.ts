@@ -161,10 +161,10 @@ describe("resolveAgentFile", () => {
     }
   })
 
-  test("the bundled implementer prompt asks through orc_ask when a skill says to stop and allows a skill's scratch folder, instead of ending the step or refusing the skill", async () => {
+  test("the bundled implementer prompt asks through a blocking orc_ask when a skill says to stop and allows a skill's scratch folder, instead of ending the step or refusing the skill", async () => {
     const found = await resolved("implementer", { projectDir: tmpdir(), orcHome: tmpdir(), configModel: { file: "/orc-home/config.json", model: "acme/configured" } })
     const body = typeof found === "string" ? found : found.body
-    expect(body).toContain("When a skill tells you to stop and ask or tell the person, ask through orc_ask instead of ending the step.")
+    expect(body).toContain("When a skill tells you to stop and ask or tell the person, ask through orc_ask with blocks set to true instead of ending the step.")
     expect(body).toContain("Run no command that writes outside this repository, except in a scratch folder a skill tells you to make on another machine.")
   })
 
