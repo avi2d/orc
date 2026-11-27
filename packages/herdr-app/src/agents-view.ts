@@ -76,7 +76,7 @@ const approveBody = (t: Palette, card: Card, approval: InboxApproval, merge: Mer
   const merging = merge?.kind === "merging"
   const shown = approvalShown(merge, card.merge)
   return kitCard().p(12).gap(8)
-    .child(div().text_size(12).text_color(t.muted).child(`Merging runs orc ${approval.action.argv.join(" ")}`))
+    .child(div().text_size(12).text_color(t.muted).child(`Approve and merge runs orc ${approval.action.argv.join(" ")}.`))
     .child(linkedText(`approve-${card.key}`, approval.link))
     .child(h_flex().pt(4).gap(8).justify_end()
       .child(openOnGitHub(t, approval.link))
