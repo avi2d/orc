@@ -150,10 +150,14 @@ describe("orc help", () => {
     expect(pages).toEqual(invocations.map((invocation) => ({ path: invocation.path.join(" "), usageNamesOnlyIt: true, overview: false })))
   })
 
-  test("run help distinguishes runs you start by hand from queued tasks instead of calling them direct runs", () => {
+  test("run help never names nono as the default sandbox", () => {
     const text = helpText(["run"]).replace(/\s+/g, " ")
-    expect(text).toContain("Runs you start by hand default to nono.")
-    expect(text).toContain("Queued tasks pass none without a per-agent sandbox.")
+    expect(text).not.toContain("default to nono")
+    expect(text).not.toContain("nono sandbox by default")
+    expect(text).toContain("The default is no per-agent sandbox")
+    expect(text).toContain("machine space")
+    expect(text).toContain("Queued tasks always run that way")
+    expect(text).toContain("Pass nono to sandbox a run you start by hand")
   })
 
   test("a wrong subcommand prints only its own command's usage instead of every command", () => {

@@ -3,7 +3,8 @@ kind: reference
 ---
 # Running without a sandbox
 Queued tasks always pass `--sandbox none`, so [Pi](https://pi.dev) and the checks run directly on the host without a per-agent sandbox.
-A run you start by hand with `orc run task.md` uses the [nono](https://nono.sh) sandbox by default unless you pass `--sandbox none`.
+That is the default: orc runs without a per-agent sandbox.
+For a run you start by hand, `--sandbox nono` runs it inside the [nono](https://nono.sh) sandbox instead.
 
 The safety boundary is the isolated space that runs the whole agent system.
 Use a separate Linux system without admin rights or host drives, with narrow, revocable logins and a memory and CPU cap per task.
@@ -18,4 +19,4 @@ So Pi's [git](https://git-scm.com) reads none of your other settings and writes 
 Pi gets the variables a short list names instead of your whole environment, and no `ORC_` variable.
 Pi writes its session straight into the run's `sessions` folder.
 Resume takes the sandbox from the earlier run, so `orc run --branch <name>` retains that run's sandbox choice.
-With no recorded sandbox choice, a run uses `nono` unless you pass `--sandbox none`.
+With no recorded sandbox choice, a run uses no per-agent sandbox unless you pass `--sandbox nono`.
