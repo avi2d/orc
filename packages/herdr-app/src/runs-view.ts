@@ -124,7 +124,7 @@ const cardView = (t: Palette, card: Card, selected: boolean, shown: RunsShown): 
     .child(statusDot(card.standing.status).tooltip(card.standing.status))
     .child(vendorLogo(facts.vendor))
     .child(div().flex_1().min_w_0().truncate().text_color(t.foreground).child(facts.title))
-    .child(div().flex_none().text_size(12).text_color(t.muted).child(facts.model ?? ""))
+    .child(div().flex_none().text_size(12).text_color(t.muted).child(facts.waits ?? facts.model ?? ""))
     .child(div().w(30).flex_none().flex().justify_end().text_size(12).text_color(t.muted).child(facts.duration ?? ""))
 }
 
