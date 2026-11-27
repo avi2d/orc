@@ -1,4 +1,5 @@
 import { dlopen, FFIType, read } from "bun:ffi"
+import { chmodSync, closeSync, constants, fchmodSync, openSync } from "node:fs"
 import { hostname } from "node:os"
 import { Clock, Console, Effect, FileSystem, Option, PlatformError, Predicate, Schema } from "effect"
 
@@ -52,7 +53,6 @@ const dropClaim = (fs: FileSystem.FileSystem, file: string, held: string): Effec
 const loadLibc = () => {
   const libcPath = process.platform === "darwin" ? "/usr/lib/libSystem.B.dylib" : "libc.so.6"
   const libc = dlopen(libcPath, {
-    open: { args: [FFIType.ptr, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
     close: { args: [FFIType.i32], returns: FFIType.i32 },
     flock: { args: [FFIType.i32, FFIType.i32], returns: FFIType.i32 }
   })
@@ -85,17 +85,33 @@ type TryLock = (file: string) => Effect.Effect<Option.Option<Unlock>, PlatformEr
 
 const tryFlock: TryLock = (file) => Effect.suspend(() => {
   const { libc, errno } = loadedLibc ??= loadLibc()
-  const fd = libc.symbols.open(Buffer.from(file + "\0"), 2 | (process.platform === "darwin" ? 0x1000200 : 0x80040), 0o600)
-  if (fd < 0) {
-    return Effect.fail(lockFailure(file, "open", "cannot open lock file"))
-  }
-  if (libc.symbols.flock(fd, 2 | 4) === 0) {
-    return Effect.succeedSome(() => { libc.symbols.close(fd) })
-  }
-  const address = errno()
-  const code = address === null ? -1 : read.i32(address)
-  libc.symbols.close(fd)
-  return code === (process.platform === "darwin" ? 35 : 11) ? Effect.succeedNone : Effect.fail(lockFailure(file, "flock", "errno " + code))
+  const opened = Effect.try({
+    try: () => {
+      try {
+        chmodSync(file, 0o600)
+      } catch (error) {
+        if (!Predicate.hasProperty(error, "code") || error.code !== "ENOENT") throw error
+      }
+      const fd = openSync(file, constants.O_RDWR | constants.O_CREAT, 0o600)
+      try {
+        fchmodSync(fd, 0o600)
+      } catch (error) {
+        closeSync(fd)
+        throw error
+      }
+      return fd
+    },
+    catch: (error) => lockFailure(file, "open", error)
+  })
+  return Effect.flatMap(opened, (fd) => {
+    if (libc.symbols.flock(fd, 2 | 4) === 0) {
+      return Effect.succeedSome(() => { libc.symbols.close(fd) })
+    }
+    const address = errno()
+    const code = address === null ? -1 : read.i32(address)
+    libc.symbols.close(fd)
+    return code === (process.platform === "darwin" ? 35 : 11) ? Effect.succeedNone : Effect.fail(lockFailure(file, "flock", "errno " + code))
+  })
 })
 
 const invalidHandle = -1n

@@ -1,10 +1,36 @@
 import { expect, test } from "bun:test"
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { access, chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Option } from "effect"
 import { withFileClaim } from "../../packages/run/src/shared/lib/file-claim"
+
+test.skipIf(process.platform === "win32")("a new guard is not created with unpredictable permissions", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "orc-claim-"))
+  try {
+    const file = join(dir, "claim")
+    const result = await Effect.runPromise(withFileClaim(file, Effect.succeed("acquired")).pipe(Effect.provide(BunServices.layer)))
+    expect(Option.getOrNull(result)).toBe("acquired")
+    expect((await stat(file + ".guard")).mode & 0o777).toBe(0o600)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test.skipIf(process.platform === "win32")("a guard with bad permissions does not block a claim", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "orc-claim-"))
+  try {
+    const file = join(dir, "claim")
+    await writeFile(file + ".guard", "")
+    await chmod(file + ".guard", 0o050)
+    const result = await Effect.runPromise(withFileClaim(file, Effect.succeed("acquired")).pipe(Effect.provide(BunServices.layer)))
+    expect(Option.getOrNull(result)).toBe("acquired")
+    expect((await stat(file + ".guard")).mode & 0o777).toBe(0o600)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
 
 test("an old empty breaker cannot block a claimant or cause it to remove a replacement claim", async () => {
   const dir = await mkdtemp(join(tmpdir(), "orc-claim-"))
