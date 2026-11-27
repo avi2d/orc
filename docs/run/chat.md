@@ -29,7 +29,7 @@ The chat gives Pi these tools:
 | `orc_backlog` | Read projects, machines, tasks, and their states. |
 | `orc_backlog_hold` | Hold a new task other than a decision, with a reason, date, or questions. |
 | `orc_backlog_priority` | Set or clear a new task's priority from 0 to 4. |
-| `orc_machines` | Read the orc version each dispatch machine runs, through `orc machines --json`. |
+| `orc_machines` | Read the orc version, slots and `pinnedOnly` setting of each dispatch machine, through `orc machines --json`. |
 | `orc_backlog_stop` | Kill a started task's run and close the task stopped. |
 | `orc_backlog_retry` | Run a failed or stopped task again, on the machine it ran on, reusing its kept branch when one exists. |
 | `orc_backlog_drop` | Close a new task as dropped, with a reason. |

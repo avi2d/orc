@@ -23,13 +23,14 @@ const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Use
 const newTask = (machine: string | null): TaskRecord => ({ spec: { ...spec, id: "task-1", machine }, hold: null, parked: null, state: { kind: "new" } })
 
 describe("placeTask", () => {
+  const macFull = { machine: "mac", kind: "rejected", code: "capacity", reason: "mac has no room" }
   const room = [{ machine: "mac", slots: 1, busy: 1 }, { machine: "linux", slots: 4, busy: 0 }]
   test("a task marked for a full machine waits instead of going to a machine with room", () => {
     expect(placeTask(newTask("mac"), config, projects, room)).toMatchObject({
       kind: "waits",
       reason: "mac has no room",
       machines: [
-        { machine: "mac", kind: "rejected", code: "capacity", reason: "mac has no room" },
+        macFull,
         { machine: "linux", kind: "rejected", code: "pin", reason: "the task is pinned to mac" }
       ]
     })
@@ -70,7 +71,7 @@ describe("placeTask", () => {
       kind: "waits",
       reason: "mac has no room",
       machines: [
-        { machine: "mac", kind: "rejected", code: "capacity", reason: "mac has no room" },
+        macFull,
         { machine: "linux", kind: "rejected", code: "pin", reason: "the task is pinned to mac" }
       ]
     })
@@ -90,6 +91,37 @@ describe("placeTask", () => {
       reason: "linux has no room",
       machines: [
         { machine: "mac", kind: "rejected", code: "parked-origin", reason: "the task is parked on linux" },
+        { machine: "linux", kind: "rejected", code: "capacity", reason: "linux has no room" }
+      ]
+    })
+  })
+  const macPinnedOnly: DispatchConfig = { ...config, machines: [{ name: "mac", slots: 1, pinnedOnly: true, start: ["true"] }, { name: "linux", slots: 4, start: ["true"] }] }
+  const parkedOnMac: TaskRecord = { ...newTask(null), parked: { origin: { machine: "mac", run: "run-1" }, branch: "orc/task-1", questions: [{ id: "ask-1", text: "Which one?", asked: "2026-10-27T10:05:00.000Z", blocks: true, answer: { decider: "owner" as const, words: "Keep it", at: "2026-10-27T10:06:00.000Z", relayedTo: null } }] } }
+  test("an unpinned task parked on a pin-only mac resumes there instead of waiting forever for a pin", () => {
+    expect(placeTask(parkedOnMac, macPinnedOnly, projects, linuxFull)).toMatchObject({
+      kind: "place",
+      machine: { name: "mac" },
+      machines: [
+        { machine: "mac", kind: "eligible" },
+        { machine: "linux", kind: "rejected", code: "parked-origin", reason: "the task is parked on mac" }
+      ]
+    })
+  })
+  test("an unpinned task parked on a full pin-only mac waits for room there instead of skipping the slot limit", () => {
+    expect(placeTask(parkedOnMac, macPinnedOnly, projects, room)).toMatchObject({
+      kind: "waits",
+      reason: "mac has no room",
+      machines: [
+        macFull,
+        { machine: "linux", kind: "rejected", code: "parked-origin", reason: "the task is parked on mac" }
+      ]
+    })
+  })
+  test("an unpinned, unparked task still skips a pin-only mac instead of taking its idle slot", () => {
+    expect(placeTask(newTask(null), macPinnedOnly, projects, linuxFull)).toMatchObject({
+      kind: "waits",
+      machines: [
+        { machine: "mac", kind: "rejected", code: "pin-required", reason: "mac only runs tasks pinned to it" },
         { machine: "linux", kind: "rejected", code: "capacity", reason: "linux has no room" }
       ]
     })

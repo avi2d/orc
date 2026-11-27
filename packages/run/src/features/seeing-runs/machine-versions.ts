@@ -8,11 +8,17 @@ const VersionJsonSchema = Schema.Struct({
   version: Schema.String
 })
 
+const machineConfigFields = {
+  machine: Schema.String,
+  slots: Schema.Int,
+  pinnedOnly: Schema.Boolean
+}
+
 const MachinesJsonSchema = Schema.Struct({
   schema: Schema.Literal("orc.machines.v1"),
   machines: Schema.Array(Schema.Union([
-    Schema.Struct({ machine: Schema.String, version: Schema.String }),
-    Schema.Struct({ machine: Schema.String, error: Schema.String })
+    Schema.Struct({ ...machineConfigFields, version: Schema.String }),
+    Schema.Struct({ ...machineConfigFields, error: Schema.String })
   ]))
 })
 
@@ -30,13 +36,14 @@ export const encodeMachinesJson = (document: MachinesJsonDocument): Effect.Effec
 const localVersionOf = (through: Command): Command => [...through, "version", "--json", "--local"]
 
 const versionOf = (machine: Machine, localVersion: string): Effect.Effect<ReadonlyArray<MachineVersion>, never, ChildProcessSpawner.ChildProcessSpawner> => {
+  const configured = { machine: machine.name, slots: machine.slots, pinnedOnly: machine.pinnedOnly === true }
   const through = throughFor(machine)
   if (through === null) {
-    return Effect.succeed(ownedBySweep(machine) ? [{ machine: machine.name, version: localVersion }] : [])
+    return Effect.succeed(ownedBySweep(machine) ? [{ ...configured, version: localVersion }] : [])
   }
   return askMachine(localVersionOf(through), decodeVersionJson).pipe(
-    Effect.map((document): ReadonlyArray<MachineVersion> => [{ machine: machine.name, version: document.version }]),
-    Effect.catch((error) => Effect.succeed([{ machine: machine.name, error: error.detail }]))
+    Effect.map((document): ReadonlyArray<MachineVersion> => [{ ...configured, version: document.version }]),
+    Effect.catch((error) => Effect.succeed([{ ...configured, error: error.detail }]))
   )
 }
 

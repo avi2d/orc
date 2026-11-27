@@ -43,6 +43,13 @@ For example:
 }
 ```
 
+### Machine slots and load
+
+Set a machine's `pinnedOnly` to `true` to reserve all its slots for tasks pinned to that machine and for parked runs that started there.
+For example, `{ "name": "mac", "slots": 1, "pinnedOnly": true, "start": ["orc", "runner", "start"] }` gives ordinary tasks no Mac slots.
+Use `orc backlog add <project> <task-file> --machine mac` to pin a task.
+Set `slots` to `0` to stop all new starts on a machine, including pinned tasks.
+
 Set a machine's `loadLimit` above zero to pause starts while its five-minute load is above the limit or unread.
 The start command must run `orc runner start`.
 

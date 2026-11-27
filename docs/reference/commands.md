@@ -37,7 +37,7 @@ The runner:
   runner     Queue, renew, read and stop task runs through pueue
   heavy      Check and watch the queue of heavy tool calls
   version    Print the orc version this machine runs
-  machines   List the orc version each dispatch machine runs
+  machines   List dispatch machine versions and slots
 
 Chat and the app:
   chat       Talk to the orchestrator, which adds, holds and answers tasks
@@ -859,10 +859,11 @@ Examples:
 ```text
 Usage: orc machines --json
 
-Reads the machines in dispatch.json. A machine that starts orc runner start here
-shows this orc's version. A machine reached through orc runner start --
-<command> is asked through that command with orc version --json --local, and
-shows its error when it does not answer within 10 seconds.
+Reads each runner machine's slots and pinnedOnly setting from dispatch.json. A
+machine that starts orc runner start here shows this orc's version. A machine
+reached through orc runner start -- <command> is asked through that command with
+orc version --json --local, and shows its error when it does not answer within
+10 seconds.
 
 Options:
   --json  Print the machines as an orc.machines.v1 JSON document.

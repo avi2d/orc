@@ -25,20 +25,20 @@ describe("orc version and orc machines", () => {
     expect(Exit.isFailure(Effect.runSyncExit(decodeVersionJson({ schema: "orc.runs.v1", version: "1.2.3" })))).toBe(true)
   })
 
-  test("a machine whose through command fails is listed with its error beside the local machine's version", async () => {
+  test("a failed version probe reports the error without dropping the machine's slot settings", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-machines-"))
     try {
       const dispatchFile = join(dir, "dispatch.json")
       await writeFile(dispatchFile, JSON.stringify({
         machines: [
-          { name: "mac", slots: 1, start: ["orc", "runner", "start"] },
-          { name: "box", slots: 1, start: ["orc", "runner", "start", "--", "sh", "-c", "echo 'orc: not installed' >&2; exit 3"] }
+          { name: "mac", slots: 1, pinnedOnly: true, start: ["orc", "runner", "start"] },
+          { name: "box", slots: 0, start: ["orc", "runner", "start", "--", "sh", "-c", "echo 'orc: not installed' >&2; exit 3"] }
         ],
         quota
       }))
       const document = await Effect.runPromise(readMachineVersions(dispatchFile, "1.0.0").pipe(Effect.provide(BunServices.layer)))
-      expect(document.machines[0]).toEqual({ machine: "mac", version: "1.0.0" })
-      expect(document.machines[1]).toEqual({ machine: "box", error: expect.stringContaining("exited 3: orc: not installed") })
+      expect(document.machines[0]).toEqual({ machine: "mac", slots: 1, pinnedOnly: true, version: "1.0.0" })
+      expect(document.machines[1]).toEqual({ machine: "box", slots: 0, pinnedOnly: false, error: expect.stringContaining("exited 3: orc: not installed") })
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
