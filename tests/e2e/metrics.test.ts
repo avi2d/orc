@@ -26,12 +26,12 @@ const runOrc = async (args: ReadonlyArray<string>, home: string): Promise<{ read
   return { exitCode, stdout: out, stderr: err }
 }
 
-const withHistory = async (use: (home: string) => Promise<void>): Promise<void> => {
+const withHistory = async (use: (home: string) => Promise<void>, seed = fixtureRuns): Promise<void> => {
   const home = await mkdtemp(join(tmpdir(), "orc-metrics-e2e-"))
   try {
     const db = await Effect.runPromise(openDatabase(join(home, ".orc")).pipe(Effect.provide(BunServices.layer)))
     try {
-      await Effect.runPromise(fixtureRuns(db))
+      await Effect.runPromise(seed(db))
     } finally {
       db.close()
     }
@@ -52,9 +52,9 @@ interface FixtureStep {
   readonly out?: { readonly kind: string; readonly path: string }
 }
 
-const fixtureRun = (db: Database, run: { readonly id: string; readonly status: RunRecord["status"]; readonly started: string; readonly ended: string }, steps: ReadonlyArray<FixtureStep>) =>
+const fixtureRun = (db: Database, run: { readonly id: string; readonly status: RunRecord["status"]; readonly started: string; readonly ended: string; readonly delivery?: RunRecord["delivery"] }, steps: ReadonlyArray<FixtureStep>) =>
   Effect.gen(function*() {
-    yield* recordRun(db, { id: run.id, project: "orc", branch: "orc/" + run.id, taskFile: runsDir + run.id + "/task.md", status: run.status, started: run.started, ended: run.ended, prLink: null, endReason: null, task: run.id, delivery: "orc" })
+    yield* recordRun(db, { id: run.id, project: "orc", branch: "orc/" + run.id, taskFile: runsDir + run.id + "/task.md", status: run.status, started: run.started, ended: run.ended, prLink: null, endReason: null, task: run.id, delivery: run.delivery ?? "orc" })
     for (const step of steps) {
       const stepId = yield* recordStep(db, { runId: run.id, name: step.name, attempt: step.attempt, status: step.status, started: step.at, ended: step.at, agentFile: null, piSessionFile: null })
       for (const [name, value] of step.signals ?? []) {
@@ -78,7 +78,7 @@ const fixtureRuns = (db: Database) =>
       { name: "review", attempt: 1, status: "passed", at: "2026-11-20T10:35:00.000Z" },
       { name: "pr", attempt: 1, status: "passed", at: "2026-11-20T10:40:00.000Z" }
     ])
-    yield* fixtureRun(db, { id: "gate-stopped", status: "failed", started: "2026-11-21T11:00:00.000Z", ended: "2026-11-21T11:15:30.000Z" }, [
+    yield* fixtureRun(db, { id: "gate-stopped", status: "failed", delivery: "no-mistakes", started: "2026-11-21T11:00:00.000Z", ended: "2026-11-21T11:15:30.000Z" }, [
       { name: "implement", attempt: 1, status: "passed", at: "2026-11-21T11:01:00.000Z" },
       { name: "checks", attempt: 1, status: "passed", at: "2026-11-21T11:05:00.000Z", signals: [["check test", "passed"]] },
       { name: "no-mistakes", attempt: 1, status: "failed", at: "2026-11-21T11:15:00.000Z", signals: [["gates-answered", "1"], ["gate", "review"]] }
@@ -94,21 +94,45 @@ const fixtureRuns = (db: Database) =>
   })
 
 const expectedRows = [
-  { run: "resumed", task: "resumed", delivery: "orc", status: "failed", failedSteps: 2, gateStop: "checks: typecheck", minutes: 7, fixRounds: 1 },
-  { run: "gate-stopped", task: "gate-stopped", delivery: "orc", status: "failed", failedSteps: 1, gateStop: "no-mistakes: review", minutes: 15.5, fixRounds: 0 },
-  { run: "delivered", task: "delivered", delivery: "orc", status: "succeeded", failedSteps: 2, gateStop: null, minutes: 42, fixRounds: 2 }
+  { run: "resumed", task: "resumed", delivery: "orc", status: "failed", failedSteps: 2, gateStops: 2, minutes: 7, fixRounds: 1 },
+  { run: "gate-stopped", task: "gate-stopped", delivery: "no-mistakes", status: "failed", failedSteps: 1, gateStops: 2, minutes: 15.5, fixRounds: 0 },
+  { run: "delivered", task: "delivered", delivery: "orc", status: "succeeded", failedSteps: 2, gateStops: 2, minutes: 42, fixRounds: 2 }
 ]
+
+const fixtureGateRuns = (db: Database) =>
+  Effect.gen(function*() {
+    yield* fixtureRun(db, { id: "answered-two", delivery: "no-mistakes", status: "succeeded", started: "2026-11-23T10:00:00.000Z", ended: "2026-11-23T10:10:00.000Z" }, [
+      { name: "implement", attempt: 1, status: "passed", at: "2026-11-23T10:01:00.000Z" },
+      { name: "no-mistakes", attempt: 1, status: "passed", at: "2026-11-23T10:09:00.000Z", signals: [["gates-answered", "2"]] }
+    ])
+    yield* fixtureRun(db, { id: "stopped-unanswered", delivery: "no-mistakes", status: "failed", started: "2026-11-24T10:00:00.000Z", ended: "2026-11-24T10:10:00.000Z" }, [
+      { name: "implement", attempt: 1, status: "passed", at: "2026-11-24T10:01:00.000Z" },
+      { name: "no-mistakes", attempt: 1, status: "failed", at: "2026-11-24T10:09:00.000Z", signals: [["gates-answered", "0"], ["gate", "review"]] }
+    ])
+    yield* fixtureRun(db, { id: "implement-failed", status: "failed", started: "2026-11-25T10:00:00.000Z", ended: "2026-11-25T10:10:00.000Z" }, [
+      { name: "implement", attempt: 1, status: "failed", at: "2026-11-25T10:09:00.000Z" }
+    ])
+    yield* fixtureRun(db, { id: "fix-failed", status: "failed", started: "2026-11-26T10:00:00.000Z", ended: "2026-11-26T10:10:00.000Z" }, [
+      { name: "implement", attempt: 1, status: "passed", at: "2026-11-26T10:01:00.000Z" },
+      { name: "checks", attempt: 1, status: "failed", at: "2026-11-26T10:05:00.000Z", signals: [["check lint", "failed"], ["check test", "failed"]] },
+      { name: "fix", attempt: 1, status: "failed", at: "2026-11-26T10:09:00.000Z" }
+    ])
+    yield* fixtureRun(db, { id: "no-gate-failed", delivery: "no-mistakes", status: "failed", started: "2026-11-27T10:00:00.000Z", ended: "2026-11-27T10:10:00.000Z" }, [
+      { name: "implement", attempt: 1, status: "passed", at: "2026-11-27T10:01:00.000Z" },
+      { name: "no-mistakes", attempt: 1, status: "failed", at: "2026-11-27T10:09:00.000Z", signals: [["gates-answered", "0"]] }
+    ])
+  })
 
 const printedRows = (stdout: string): ReadonlyArray<ReadonlyArray<string>> =>
   stdout.trimEnd().split("\n").map((line) => line.split(/ {2,}/))
 
 describe("orc metrics", () => {
-  test("the JSON counts of three known runs match their hand counts instead of counting carried steps, passed-over failed rounds as a gate stop, or step time as run minutes", async () => {
+  test("the JSON keeps recovered gate stops without counting carried steps or step time as run minutes", async () => {
     await withHistory(async (home) => {
       const result = await runOrc(["metrics", "--json"], home)
       expect(result.stderr).toBe("")
       expect(result.exitCode).toBe(0)
-      expect(result.stdout.startsWith('{"schema":"orc.metrics.v1"')).toBe(true)
+      expect(result.stdout.startsWith('{"schema":"orc.metrics.v2"')).toBe(true)
       const decoded = await Effect.runPromise(decodeMetricsJson(JSON.parse(result.stdout)))
       expect(decoded.runs).toEqual(expectedRows)
     })
@@ -120,12 +144,28 @@ describe("orc metrics", () => {
       expect(result.stderr).toBe("")
       expect(result.exitCode).toBe(0)
       expect(printedRows(result.stdout)).toEqual([
-        ["RUN", "TASK", "DELIVERY", "STATUS", "FAILED STEPS", "GATE STOP", "MINUTES", "FIX ROUNDS"],
-        ["resumed", "resumed", "orc", "failed", "2", "checks: typecheck", "7.0", "1"],
-        ["gate-stopped", "gate-stopped", "orc", "failed", "1", "no-mistakes: review", "15.5", "0"],
-        ["delivered", "delivered", "orc", "succeeded", "2", "-", "42.0", "2"]
+        ["RUN", "TASK", "DELIVERY", "STATUS", "FAILED STEPS", "GATE STOPS", "MINUTES", "FIX ROUNDS"],
+        ["resumed", "resumed", "orc", "failed", "2", "2", "7.0", "1"],
+        ["gate-stopped", "gate-stopped", "no-mistakes", "failed", "1", "2", "15.5", "0"],
+        ["delivered", "delivered", "orc", "succeeded", "2", "2", "42.0", "2"]
       ])
     })
+  }, 30_000)
+
+  test("answered gates and a final unanswered gate count without treating implement, fix or no-gate failures as gates", async () => {
+    await withHistory(async (home) => {
+      const result = await runOrc(["metrics", "--json"], home)
+      expect(result.stderr).toBe("")
+      expect(result.exitCode).toBe(0)
+      const decoded = await Effect.runPromise(decodeMetricsJson(JSON.parse(result.stdout)))
+      expect(decoded.runs).toEqual([
+        { run: "no-gate-failed", task: "no-gate-failed", delivery: "no-mistakes", status: "failed", failedSteps: 1, gateStops: 0, minutes: 10, fixRounds: 0 },
+        { run: "fix-failed", task: "fix-failed", delivery: "orc", status: "failed", failedSteps: 2, gateStops: 1, minutes: 10, fixRounds: 1 },
+        { run: "implement-failed", task: "implement-failed", delivery: "orc", status: "failed", failedSteps: 1, gateStops: 0, minutes: 10, fixRounds: 0 },
+        { run: "stopped-unanswered", task: "stopped-unanswered", delivery: "no-mistakes", status: "failed", failedSteps: 1, gateStops: 1, minutes: 10, fixRounds: 0 },
+        { run: "answered-two", task: "answered-two", delivery: "no-mistakes", status: "succeeded", failedSteps: 0, gateStops: 2, minutes: 10, fixRounds: 0 }
+      ])
+    }, fixtureGateRuns)
   }, 30_000)
 
   test("an empty history prints that no runs are recorded instead of a bare header", async () => {

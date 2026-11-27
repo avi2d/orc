@@ -4,7 +4,10 @@ import { listAllRuns, RunStatusSchema, type RunRecord, type SqliteFailure } from
 import { formatTable } from "../../shared/lib/index"
 import { readShow, type ShowJsonDocument } from "./show"
 
-const METRICS_JSON_SCHEMA = "orc.metrics.v1" as const
+const METRICS_JSON_SCHEMA = "orc.metrics.v2" as const
+
+const GateStopsSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
+const decodeGatesAnswered = Schema.decodeUnknownEffect(Schema.fromJsonString(GateStopsSchema))
 
 const RunMetricsSchema = Schema.Struct({
   run: Schema.String,
@@ -12,7 +15,7 @@ const RunMetricsSchema = Schema.Struct({
   delivery: Schema.NullOr(Schema.String),
   status: RunStatusSchema,
   failedSteps: Schema.Int,
-  gateStop: Schema.NullOr(Schema.String),
+  gateStops: GateStopsSchema,
   minutes: Schema.NullOr(Schema.Finite),
   fixRounds: Schema.Int
 })
@@ -26,29 +29,6 @@ const MetricsJsonSchema = Schema.Struct({
 
 type ShowStep = ShowJsonDocument["steps"][number]
 
-const failedCheckNames = (step: ShowStep): ReadonlyArray<string> =>
-  step.signals.filter((signal) => signal.name.startsWith("check ") && signal.value === "failed").map((signal) => signal.name.slice("check ".length))
-
-const gateDetail = (step: ShowStep): ReadonlyArray<string> => {
-  if (step.name === "checks") {
-    return failedCheckNames(step)
-  }
-  if (step.name === "no-mistakes") {
-    return step.signals.filter((signal) => signal.name === "gate").map((signal) => signal.value).slice(-1)
-  }
-  return []
-}
-
-// A failed step a later step follows was passed by a fix or a retry, so only the last step can be where the run stopped.
-const gateStopOf = (status: RunRecord["status"], own: ReadonlyArray<ShowStep>): string | null => {
-  const last = own.at(-1)
-  if (status === "running" || last?.status !== "failed") {
-    return null
-  }
-  const detail = gateDetail(last)
-  return detail.length === 0 ? last.name : last.name + ": " + detail.join(", ")
-}
-
 const minutesOf = (started: string, ended: string | null): number | null => {
   if (ended === null) {
     return null
@@ -57,25 +37,36 @@ const minutesOf = (started: string, ended: string | null): number | null => {
   return Number.isFinite(millis) ? Math.round(millis / 6000) / 10 : null
 }
 
-// A resumed run carries its earlier run's steps, and counting them here would count them again for every resume.
-const metricsOf = (run: RunRecord, steps: ReadonlyArray<ShowStep>): RunMetrics => {
-  const own = steps.filter((step) => step.from === null)
-  return {
-    run: run.id,
-    task: run.task,
-    delivery: run.delivery,
-    status: run.status,
-    failedSteps: own.filter((step) => step.status === "failed").length,
-    gateStop: gateStopOf(run.status, own),
-    minutes: minutesOf(run.started, run.ended),
-    fixRounds: own.filter((step) => step.name === "fix").length
-  }
-}
+const metricsOf = (run: RunRecord, steps: ReadonlyArray<ShowStep>): Effect.Effect<RunMetrics, Schema.SchemaError> =>
+  Effect.gen(function*() {
+    const own = steps.filter((step) => step.from === null)
+    let gateStops = own.filter((step) => step.name === "checks" && step.status === "failed").length
+    for (const step of own.filter((step) => step.name === "no-mistakes")) {
+      const answered = step.signals.findLast((signal) => signal.name === "gates-answered")
+      if (answered !== undefined) {
+        gateStops += yield* decodeGatesAnswered(answered.value)
+      }
+    }
+    const last = own.at(-1)
+    if (run.status !== "running" && last?.name === "no-mistakes" && last.status === "failed" && last.signals.some((signal) => signal.name === "gate" && signal.value !== "")) {
+      gateStops += 1
+    }
+    return {
+      run: run.id,
+      task: run.task,
+      delivery: run.delivery,
+      status: run.status,
+      failedSteps: own.filter((step) => step.status === "failed").length,
+      gateStops,
+      minutes: minutesOf(run.started, run.ended),
+      fixRounds: own.filter((step) => step.name === "fix").length
+    }
+  })
 
 export const readRunMetrics = (db: Database): Effect.Effect<ReadonlyArray<RunMetrics>, Schema.SchemaError | SqliteFailure> =>
   listAllRuns(db).pipe(
     Effect.flatMap((runs) =>
-      Effect.forEach(runs, (run) => readShow(db, run.id).pipe(Effect.map((document) => metricsOf(run, document?.steps ?? []))))
+      Effect.forEach(runs, (run) => readShow(db, run.id).pipe(Effect.flatMap((document) => metricsOf(run, document?.steps ?? []))))
     )
   )
 
@@ -87,14 +78,14 @@ export const decodeMetricsJson = (value: unknown): Effect.Effect<typeof MetricsJ
 
 export const formatMetricsTable = (runs: ReadonlyArray<RunMetrics>): string =>
   formatTable(
-    ["RUN", "TASK", "DELIVERY", "STATUS", "FAILED STEPS", "GATE STOP", "MINUTES", "FIX ROUNDS"],
+    ["RUN", "TASK", "DELIVERY", "STATUS", "FAILED STEPS", "GATE STOPS", "MINUTES", "FIX ROUNDS"],
     runs.map((metrics): ReadonlyArray<string> => [
       metrics.run,
       metrics.task ?? "-",
       metrics.delivery ?? "-",
       metrics.status,
       metrics.failedSteps.toString(),
-      metrics.gateStop ?? "-",
+      metrics.gateStops.toString(),
       metrics.minutes === null ? "-" : metrics.minutes.toFixed(1),
       metrics.fixRounds.toString()
     ]),

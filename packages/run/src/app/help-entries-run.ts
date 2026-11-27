@@ -77,9 +77,9 @@ export const refusalsHelp: HelpEntry = {
 
 export const metricsHelp: HelpEntry = {
   usage: ["orc metrics [--json]"],
-  summary: "Count each run's failed steps, gate stop, minutes and fix rounds",
-  about: "Prints one row per run, newest first: its failed steps, the gate it stopped at, its minutes from start to end and its fix rounds. A resumed run counts only the steps it ran itself.",
-  options: [{ flag: "--json", meaning: "Print the counts as an orc.metrics.v1 JSON document." }],
+  summary: "Count each run's failed steps, gate stops, minutes and fix rounds",
+  about: "Prints one row per run, newest first: its failed steps, gate stops, minutes from start to end and fix rounds. Gate stops count failed checks rounds, answered no-mistakes gates and a final unanswered gate. A resumed run counts only the steps it ran itself.",
+  options: [{ flag: "--json", meaning: "Print the counts as an orc.metrics.v2 JSON document." }],
   examples: ["orc metrics"]
 }
 
