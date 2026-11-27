@@ -14,10 +14,12 @@ export const taskStateFields = {
 const TaskStateFront = Schema.Struct(taskStateFields);
 type TaskStateFront = typeof TaskStateFront.Type;
 
-export const claimOf = (front: TaskStateFront) =>
+export const claimOf = (
+  front: TaskStateFront
+): { beat: string; machine: string; account: string; takenAt: string } | null =>
   front.beat === undefined || front.taken_for === undefined || front.account === undefined || front.taken_at === undefined
     ? null
     : { beat: front.beat, machine: front.taken_for, account: front.account, takenAt: front.taken_at };
 
-export const startedOf = (front: TaskStateFront) =>
+export const startedOf = (front: TaskStateFront): { at: string; log: string } | null =>
   front.started_at === undefined ? null : { at: front.started_at, log: front.start_log ?? "" };
