@@ -5,7 +5,7 @@ import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
 import type { AgentFile, LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
-import type { RunCheckpoints, SandboxOps } from "./run-ops"
+import type { ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
 import { beatReadsChecks } from "./checks"
@@ -58,14 +58,23 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number): Effect.Effect<ReviewOutcome, OrcRunError> =>
-  Effect.gen(function*() {
-    const started = new Date().toISOString()
-    yield* checkpoints.reviewStart(reviewer, attempt, started)
-    const review = yield* runReviewTurn(run, runAgent, reviewer, "orc", attempt)
-    yield* checkpoints.reviewDone(reviewer, attempt, { ...review, reusedFrom: null }, started, new Date().toISOString())
-    return review
-  })
+export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number): Effect.Effect<ReviewOutcome, OrcRunError> =>
+  pick(runAgent).pipe(
+    Effect.flatMap((picked) =>
+      Effect.gen(function*() {
+        const started = new Date().toISOString()
+        yield* checkpoints.reviewStart(picked.reviewer, attempt, started)
+        const review = yield* runReviewTurn(run, picked.runAgent, picked.reviewer, "orc", attempt)
+        yield* checkpoints.reviewDone(picked.reviewer, attempt, { ...review, reusedFrom: null }, started, new Date().toISOString())
+        return review
+      })
+    ),
+    Effect.catchTag("NoReviewerRoom", (error) => {
+      const failed: ReviewOutcome = { status: "failed", reason: error.message }
+      const at = new Date().toISOString()
+      return checkpoints.reviewDone(null, attempt, { ...failed, reusedFrom: null }, at, at).pipe(Effect.as(failed))
+    })
+  )
 
 const findingLine = (finding: ReviewFinding): string =>
   "- " + finding.severity + " `" + finding.id + "` at `" + finding.file + (finding.line === null ? "" : ":" + finding.line.toString()) + "`: " + finding.description + " Action: " + finding.action
