@@ -6,11 +6,12 @@ import { OrcRunError } from "../../shared/lib/index"
 import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 import { type DiagramTurnResult, runDiagramTurn } from "./diagram-turn"
-import type { ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
+import type { ReviewEligibility, ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
 import { beatReadsChecks } from "./checks"
 import { leftFindings, leftReasonLine, reviewStopReason, type LeftFinding, type ReviewStop } from "./left-findings"
+import type { NoReviewerRoom } from "./reviewer-chain"
 
 type OrcLoopEnd =
   | { readonly review: Extract<ReviewOutcome, { readonly status: "failed" }> }
@@ -19,6 +20,7 @@ type OrcLoopEnd =
     readonly sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>
     readonly stop: ReviewStop
     readonly askUserFindings: ReadonlyArray<ReviewFinding>
+    readonly eligibility: ReviewEligibility
   }
 
 type ReviewSection =
@@ -41,7 +43,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       if (!("stop" in orcLoop)) {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound, orcLoop.stop, orcLoop.askUserFindings) })
+      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent, orcLoop.eligibility), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound, orcLoop.stop, orcLoop.askUserFindings) })
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + "The review fix loop stopped because " + reviewStopReason(orcLoop.stop) + ". " + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
@@ -63,8 +65,8 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number): Effect.Effect<ReviewOutcome, OrcRunError> =>
-  pick(runAgent).pipe(
+export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number, eligibility: ReviewEligibility): Effect.Effect<ReviewOutcome, OrcRunError | NoReviewerRoom> =>
+  pick(runAgent, eligibility).pipe(
     Effect.flatMap((picked) =>
       Effect.gen(function*() {
         const started = new Date().toISOString()
@@ -77,7 +79,7 @@ export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunC
     Effect.catchTag("NoReviewerRoom", (error) => {
       const failed: ReviewOutcome = { status: "failed", reason: error.message }
       const at = new Date().toISOString()
-      return checkpoints.reviewDone(null, attempt, { ...failed, reusedFrom: null }, at, at).pipe(Effect.as(failed))
+      return checkpoints.reviewDone(null, attempt, { ...failed, reusedFrom: null }, at, at).pipe(Effect.andThen(Effect.fail(error)))
     })
   )
 
@@ -112,8 +114,12 @@ const openFindingLines = (section: ReviewSection): string => {
   if (section.kind === "failed" || section.findings.length === 0) {
     return ""
   }
-  const lines = section.kind === "unfixed" ? section.findings.map(findingLine) : section.findings.map(leftFindingLines)
-  return "\n## Open review findings\n\n" + lines.join("\n") + "\n"
+  if (section.kind === "unfixed") return "\n## Open review findings\n\n" + section.findings.map(findingLine).join("\n") + "\n"
+  const open = section.findings.filter((left) => left.finding.action !== "ask-user")
+  const needsPerson = section.findings.filter((left) => left.finding.action === "ask-user")
+  const openSection = open.length === 0 ? "" : "\n## Open review findings\n\n" + open.map(leftFindingLines).join("\n") + "\n"
+  const personSection = needsPerson.length === 0 ? "" : "\n## Findings that need a person\n\n" + needsPerson.map(leftFindingLines).join("\n") + "\n"
+  return openSection + personSection
 }
 
 const reasonFallback = "No reason was recorded for this change; see What changed."
@@ -141,8 +147,8 @@ export const prBody = (input: PrBodyInput): string => {
   return "## Why\n\n" + why + "\n\n## What changed\n\n" + changed + "\n" + diagram + "\n## How it was checked\n\n" + checkedSentence(input.passed) + "\n" + reviewStatusLine(input.review) + "\n" + openFindingLines(input.review)
 }
 
-const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps["runAgent"]): Effect.Effect<DiagramTurnResult> =>
-  pick(runAgent).pipe(
+const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps["runAgent"], eligibility: ReviewEligibility): Effect.Effect<DiagramTurnResult> =>
+  pick(runAgent, eligibility).pipe(
     Effect.flatMap((picked) => runDiagramTurn(run, picked.runAgent, picked.reviewer)),
     Effect.catchTags({
       NoReviewerRoom: () => Effect.succeed({ diagram: { kind: "none" }, why: null } as const),

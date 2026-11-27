@@ -23,7 +23,7 @@ const noRoom: ProviderRoom = { kind: "no-room", reason: "openai-main 0% left, fl
 describe("the reviewer chain", () => {
   test("picks the second entry when the first has no room, instead of the first", async () => {
     const asked: Array<string> = []
-    const pick = await Effect.runPromise(pickChainEntry([openai, opencode], "anthropic", roomFrom({ openai: noRoom, "opencode-go": { kind: "room" } }, asked)))
+    const pick = await Effect.runPromise(pickChainEntry([openai, opencode], ["anthropic"], roomFrom({ openai: noRoom, "opencode-go": { kind: "room" } }, asked)))
     expect(pick.entry).toEqual(opencode)
     expect(pick.position).toBe(2)
     expect(pick.passed).toEqual([{ entry: openai, reason: "openai-main 0% left, floor 10%" }])
@@ -32,14 +32,14 @@ describe("the reviewer chain", () => {
 
   test("rejects the implementer's provider while another entry has room, instead of reviewing on it", async () => {
     const asked: Array<string> = []
-    const pick = await Effect.runPromise(pickChainEntry([anthropic, openai], "anthropic", roomFrom({ anthropic: { kind: "room" }, openai: { kind: "room" } }, asked)))
+    const pick = await Effect.runPromise(pickChainEntry([anthropic, openai], ["anthropic"], roomFrom({ anthropic: { kind: "room" }, openai: { kind: "room" } }, asked)))
     expect(pick.entry).toEqual(openai)
     expect(pick.passed.map(({ entry }) => entry)).toEqual([anthropic])
     expect(asked).toEqual(["openai"])
   })
 
   test("fails with NoReviewerRoom when no entry has room, instead of picking one", async () => {
-    const error = await Effect.runPromise(Effect.flip(pickChainEntry([anthropic, openai], "anthropic", roomFrom({ anthropic: { kind: "room" }, openai: noRoom }, []))))
+    const error = await Effect.runPromise(Effect.flip(pickChainEntry([anthropic, openai], ["anthropic"], roomFrom({ anthropic: { kind: "room" }, openai: noRoom }, []))))
     expect(error).toBeInstanceOf(NoReviewerRoom)
     expect(error.message).toContain("openai/gpt-5.5 (openai-main 0% left, floor 10%)")
   })
@@ -70,7 +70,7 @@ describe("room on the reviewer's default credential", () => {
 
   test("rejects picking a provider whose default credential has no room while another of its accounts has room, instead of counting that account", async () => {
     const chain = [{ ...anthropic, ...claudeA }, { ...openai, ...openaiMain }] as const
-    const pick = await Effect.runPromise(pickChainEntry(chain, "opencode-go", (entry) => roomOnCredential(reading({ "claude-a": 3, "claude-b": 80 }), quota, entry)))
+    const pick = await Effect.runPromise(pickChainEntry(chain, ["opencode-go"], (entry) => roomOnCredential(reading({ "claude-a": 3, "claude-b": 80 }), quota, entry)))
     expect(pick.entry.provider).toBe("openai")
     expect(pick.passed).toEqual([{ entry: chain[0], reason: "claude-a 3% left, floor 10%" }])
   })

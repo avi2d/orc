@@ -37,7 +37,7 @@ test("an answered parked question does not reappear when attention has not caugh
     parked: { branch: "orc/garden-8", questions: [{
       id: "ask-1", text: "Which layout should the report use?", asked: "2026-11-25T07:48:00.000Z",
       answer: { words: "Narrow", at: "2026-11-25T07:50:00.000Z" }
-    }] }
+    }], waitsForReviewer: null }
   }
   expect(inboxItems([parked], items).find((item) => item.task === parked.id)).toBeUndefined()
 })

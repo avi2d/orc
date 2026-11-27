@@ -19,9 +19,9 @@ After the checks pass, the run reviews the branch and fixes findings in up to tw
 Set `review.maxFixRounds` in `$ORC_HOME/config.json` to a positive integer to change the limit.
 When the first round runs, it sends every finding to the fixer, except findings marked `ask-user`.
 Later rounds send only `error` findings.
-The loop stops when no `error` or `warning` remains, the round limit is reached, a finding repeats, or an `ask-user` error is open.
-It also stops when no finding can go to the fixer.
-That stop names the later rounds' severity bar or the need for the user's decision.
+The loop stops when no fixable `error` or `warning` remains, the round limit is reached, a finding repeats, or no finding meets the later rounds' severity bar.
+Findings marked `ask-user` do not stop the loop.
+The PR body lists them under findings that need a person.
 The run's end reason records why the loop stopped.
 The run history records each review turn as its own `review` step, numbered by attempt.
 If a review turn fails, a fix does not finish, or a check fails after a fix, the run stops without opening a PR.
@@ -56,7 +56,7 @@ Without it, the review turn runs the reviewer agent on its usual model.
 With it, orc picks the reviewer before each review turn:
 
 1. Orc runs the quota command in `dispatch.json` once, as [Accounts on other providers](backlog-configuration.md#accounts-on-other-providers) describes.
-2. Orc skips each entry on the implementer's provider.
+2. Orc skips every provider that ran an implementation or fix step on this branch, in any run, even when the step was interrupted or made no commit.
 3. For each other entry, orc reads the quota account that holds the provider's default credential in `config.json`, because the review turn runs on that credential.
 4. Orc takes the first entry whose account is at or above `floorPercent`, and the review turn runs the reviewer agent on that entry's model.
 
@@ -69,11 +69,22 @@ The account that holds the default credential is one of these:
 Another account on the same provider does not count, even with room.
 An unreadable quota, or no account that holds the default credential, counts as no room.
 The run log names the chosen model, its place and each entry passed over, with the reason.
-When no entry qualifies, the review turn fails with `NoReviewerRoom` and the run stops without opening a PR.
-For the first review turn, the run history records that `review` step as failed with no model, and the `review-failure` signal holds the reason.
 A chain reviewer runs Pi with its own provider's credential.
 For a `token-file` or `package` provider, it runs from its own Pi folder `reviewer-agent-<position>` in the run folder.
 The [nono](https://nono.sh) sandbox carries one provider's credential, so a reviewer chain needs `--sandbox none`.
+
+## No reviewer room
+When no entry qualifies, Orc records `NoReviewerRoom` and does not open a PR.
+The run history records the `review` step as failed with no model, and the `review-failure` signal holds the reason.
+The beat parks the task with that reason and checks reviewer quota on the machine where the run stopped.
+When a reviewer qualifies, the beat resumes the same branch.
+The resumed run keeps the implementation, runs the checks again and then runs the pending review turn.
+It keeps the fix rounds the parked run spent and its ask-user findings for the PR body, so the two-round cap holds across the wait.
+It does not apply again a send-back that the parked run already applied.
+A new send-back runs the implementer again and starts a fresh review cycle with up to two fix rounds.
+The resumed run excludes the providers saved when it parked.
+An account that dispatch assigns to the resumed run can still review until its provider runs an implementation or fix step.
+If the run parks again, it saves the updated list of excluded providers for the beat.
 
 ## Open the PR
 After the review turn, a direct-PR run runs `git push --set-upstream origin <branch>` from the run's worktree.
@@ -96,15 +107,16 @@ When the task file cannot be read, the diagram is kept.
 `## How it was checked` names the local checks that passed and the review result.
 A review with no findings gives the line `The review found nothing.`, and a failed review turn gives `The review turn failed, so this PR lists no review findings.`
 `## Open review findings` lists each open finding with its severity, id, file and line, description and action, and the run leaves the heading out when no finding is open.
+`## Findings that need a person` follows it and lists each open `ask-user` finding the same way, and the run leaves the heading out when none is open.
 
 ## Findings left open
 After a successful review and any fix rounds, an `orc` run opens its PR the same way, with the remaining findings.
 Findings that remain after the fix rounds do not stop the PR.
 Under each remaining finding, a nested line says why the fix loop left it.
 An `ask-user` finding stays out of the fixer input and remains in the PR body.
-If the final review reports the same finding again, the PR uses that review's wording and action.
+If a later review reports the same finding again, its wording and action replace the earlier report.
 When a later round is available, a `warning` or `info` finding is below its severity bar, which fixes only errors.
-If no fix round runs because no `error` or `warning` remains, the reason line names that stop.
+If no fix round runs because no fixable `error` or `warning` remains, the reason line names that stop.
 If no fix round is left, the reason line names the round limit.
 A repeat has the same file and topic as a finding the fixer received earlier.
 Only findings eligible for the next fix round can trigger the repeat stop.

@@ -45,7 +45,7 @@ A new task does not start until the beat finds nothing in its way.
 | --- | --- |
 | `no-priority` | It has no priority, and a task with no priority never starts |
 | `held` | You held it with `orc backlog hold` until you answer |
-| `parked` | Its run stopped on a question that has no answer yet |
+| `parked` | Its run stopped on a question that has no answer yet, or on no reviewer with quota room |
 | `depends` | A task it depends on is not done, or a parent's children are not done |
 | `decision` | It is a decision, which only your answer closes |
 | `room` | No machine has a free slot, or no account has room |

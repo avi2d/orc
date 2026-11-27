@@ -8,7 +8,7 @@ import type { ChecksRoundSummary, OrcRunReport, RecordedFixAttempt } from "../..
 import { OrcRunError } from "../../shared/lib/index"
 import { historyFailure, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, sqlite, stepIdFor, updateRun, updateStep } from "../../entities/run-history/index"
 import type { EvidenceInput, SignalInput, StepInput } from "../../entities/run-history/index"
-import { measuredSignals, noMistakesSignals, openQuestionSignal } from "../../entities/run-history/index"
+import { measuredSignals, noMistakesSignals, openQuestionSignal, writerModelsForBranch } from "../../entities/run-history/index"
 import type { AgentStep, ResumePlan, RunCheckpoints } from "./run-ops"
 import type { AgentFile } from "../../entities/agent/index"
 import { liveAskQuestions, type AskSetup } from "../../entities/agent/index"
@@ -372,7 +372,8 @@ const recordPullRequestDone = (db: Database, run: HistoryRun, record: DirectPrRe
     }
   })
 
-export const deliveryCheckpoints = (db: Database, run: HistoryRun): Pick<RunCheckpoints, "noMistakesStart" | "noMistakesDone" | "reviewStart" | "reviewDone" | "pullRequestStart" | "pullRequestDone"> => ({
+export const deliveryCheckpoints = (db: Database, run: HistoryRun): Pick<RunCheckpoints, "branchWriterModels" | "noMistakesStart" | "noMistakesDone" | "reviewStart" | "reviewDone" | "pullRequestStart" | "pullRequestDone"> => ({
+  branchWriterModels: writerModelsForBranch(db, run.projectDir, run.branch).pipe(Effect.mapError((cause) => historyFailure("read branch writers in", cause))),
   noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
   noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
   reviewStart: (reviewer, attempt, started) => recordReviewStart(db, run.runId, reviewer, attempt, started),

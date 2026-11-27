@@ -20,8 +20,33 @@ const fresh: TaskDetail = {
 
 test("lists the info rows in the fixed order with a dash for each empty one instead of dropping them", () => {
   const rows = infoRows(fresh, [])
-  expect(rows.map((row) => row.label)).toEqual(["Account", "Run", "Branch", "PR", "Depends on", "Created", "Started", "Closed", "Priority", "Assets"])
-  expect(rows.filter((row) => row.label !== "Created").map((row) => row.value)).toEqual(Array.from({ length: 9 }, () => "—"))
+  expect(rows.map((row) => row.label)).toEqual(["Account", "Run", "Branch", "Waits for reviewer", "PR", "Depends on", "Created", "Started", "Closed", "Priority", "Assets"])
+  expect(rows.filter((row) => row.label !== "Created").map((row) => row.value)).toEqual(Array.from({ length: 10 }, () => "—"))
+})
+
+const parkedForReviewer = (status: string) => JSON.stringify({
+  schema: "orc.backlog.v1",
+  tasks: [{
+    id: "orc-34", title: "t", kind: "ship", body: "", created: "2026-11-13T10:00:00.000Z", priority: null, parent: null, dependsOn: [], prState: null, hold: null,
+    status, claim: { account: "acme-main" }, started: null,
+    parked: { branch: "orc/orc-34", questions: [], origin: { machine: "mac", run: "run-1", reviewerQuota: "no reviewer in the chain has room" } }
+  }]
+})
+
+const waitsForReviewerOf = (text: string): string | undefined => {
+  const parsed = guardJson(text, taskDetails)
+  if (parsed.kind === "refused") throw new Error(parsed.reason)
+  const task = parsed.value.at(0)
+  if (task === undefined) throw new Error("the backlog has no task")
+  return infoRows(task, []).find((row) => row.label === "Waits for reviewer")?.value
+}
+
+test("shows a parked task's reviewer room reason from its origin in Waits for reviewer instead of a dash", () => {
+  expect(waitsForReviewerOf(parkedForReviewer("new"))).toBe("no reviewer in the chain has room")
+})
+
+test("shows a dash in Waits for reviewer once the beat has taken the parked task again instead of the old reason", () => {
+  expect(waitsForReviewerOf(parkedForReviewer("taken"))).toBe("—")
 })
 
 test("shows a closed task's report file as its asset instead of a dash", () => {

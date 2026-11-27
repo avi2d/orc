@@ -2,13 +2,12 @@ import type { ReviewFinding } from "./review-outcome"
 
 export const passesRoundTwoBar = (finding: ReviewFinding): boolean => finding.severity === "error"
 
-export type ReviewStop = "cleared" | "round-limit" | "repeat" | "ask-user" | "severity-bar"
+export type ReviewStop = "cleared" | "round-limit" | "repeat" | "severity-bar"
 
 const stopReasons = {
-  cleared: "no error or warning remained",
+  cleared: "no fixable error or warning remained",
   "round-limit": "the configured fix round limit was reached",
   repeat: "a finding repeated one sent to the fixer",
-  "ask-user": "a finding needs the user's decision",
   "severity-bar": "no finding met the later rounds' severity bar"
 } satisfies Record<ReviewStop, string>
 
