@@ -253,7 +253,7 @@ const namesNoPark = (front: Frontmatter): boolean =>
   front.parked_branch === undefined && front.parked_questions === undefined && front.parked_origin === undefined && front.parked_reviewer_wait === undefined
 
 const hasParkReason = (front: Frontmatter, questions: ReadonlyArray<unknown>): boolean =>
-  questions.length > 0 || front.parked_reviewer_wait !== undefined || ((front.retry !== undefined || front.rebase !== undefined) && front.parked_origin !== undefined)
+  questions.length > 0 || front.parked_reviewer_wait !== undefined || front.parked_origin !== undefined
 
 const parkedFrom = (front: Frontmatter, branch: string, questions: Parked["questions"]): Parked => ({
   branch,

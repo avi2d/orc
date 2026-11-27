@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Layer } from "effect"
-import { listTasks, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
+import { ensureBacklog, listTasks, parseTaskFile, renderTaskFile, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 import { readRequest } from "../../../packages/run/src/features/queueing-a-task/runner-request"
 import { insertRun, openDatabase } from "../../../packages/run/src/entities/run-history/index"
 import { closeFinished } from "../../../packages/run/src/widgets/beat/beat-close"
@@ -11,7 +11,7 @@ import { backlogJson } from "../../../packages/run/src/widgets/beat/board"
 import { guardJson } from "../../../packages/herdr-app/src/guard"
 import { infoRows } from "../../../packages/herdr-app/src/task"
 import { taskDetails } from "../../../packages/herdr-app/src/task-guard"
-import { beatWith, config, macProjects, pueueDone, run, startTaskOne, withBacklog } from "../../lib/dispatch-beat"
+import { beatWith, claim, config, macProjects, pueueDone, run, spec, startTaskOne, withBacklog } from "../../lib/dispatch-beat"
 
 const wait = {
   reason: "no reviewer in the chain has quota room: beta/reviewer: beta-main 2% left, floor 15%",
@@ -51,6 +51,23 @@ const parkedForReviewer = async (root: string): Promise<void> => {
 }
 
 describe("a run that waits for a reviewer with room", () => {
+  test('a resumed task does not fail parsing or backlog listing with "a parked task names no question"', async () => {
+    await withBacklog(async (root) => {
+      await run(ensureBacklog(root))
+      const resumed: TaskRecord = {
+        spec: { ...spec, id: "orc-1" },
+        hold: null,
+        parked: { branch: "orc/orc-1", questions: [], origin: { machine: "mac", run: "run-1" }, at: "2026-10-27T10:05:00.000Z" },
+        state: { kind: "started", claim, started: { at: "2026-10-27T10:06:00.000Z", log: join(root, "logs", "orc-1.log") } }
+      }
+      const file = join(root, "taken", "orc-1.md")
+      const text = renderTaskFile(resumed)
+      expect(await run(parseTaskFile(file, "taken", text))).toEqual(resumed)
+      await writeFile(file, text)
+      expect(await run(listTasks(root))).toEqual([resumed])
+    })
+  })
+
   test("parks its task with the wait and its run instead of closing it failed or spending its retry", async () => {
     await withBacklog(async (root) => {
       await parkedForReviewer(root)

@@ -17,11 +17,10 @@ export const retryStartedTask = (
       }
       const branch = record.parked?.branch ?? (record.spec.kind === "parent" ? parentBranch(id) : taskBranch(id))
       const sentPr = record.parked?.origin?.pr
-      const { reviewerWait: _waited, ...kept } = record.parked ?? {}
       const retried: TaskRecord = {
         ...record,
         retry: { run, at },
-        parked: { ...kept, branch, questions: record.parked?.questions ?? [], origin: { machine, run, ...(sentPr === undefined ? {} : { pr: sentPr }) }, at },
+        parked: { ...record.parked, branch, questions: record.parked?.questions ?? [], origin: { machine, run, ...(sentPr === undefined ? {} : { pr: sentPr }) }, at },
         state: { kind: "new" }
       }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(retried)))) {
