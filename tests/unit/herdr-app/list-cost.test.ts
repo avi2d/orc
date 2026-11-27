@@ -1,6 +1,7 @@
 import { expect, mock, test } from "bun:test"
-import type { AsyncContext, Context } from "gpui-kit"
+import type { Context } from "gpui-kit"
 import fixture from "../../fixtures/attention/herdr-app.json"
+import { cx } from "./gpui-fakes"
 
 let built = 0
 
@@ -22,21 +23,6 @@ const list = (id: unknown, count: number, _key: unknown, row: Shown["row"]): obj
   lists.push({ id, count, row })
   return node()
 }
-
-const unused = (): never => { throw new Error("Unexpected App context call") }
-class IdleEntity {
-  set_props = unused
-  release = unused
-}
-const cx: Context = Object.assign(IdleEntity, {
-  stop_propagation: unused, notify: () => undefined, spawn: (body: (task: AsyncContext) => unknown) => {
-    void body(cx)
-    return { cancel: () => undefined, is_done: () => true }
-  },
-  bind_keys: unused, propagate: unused, phase: unused, theme: unused, open_url: unused,
-  read_from_clipboard: unused, write_to_clipboard: unused, focus_handle: unused, sleep: unused,
-  timer: { after: unused, every: unused }
-}) satisfies Context
 
 const documents = new Map<string, unknown>()
 

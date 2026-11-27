@@ -1,72 +1,19 @@
-import { expect, mock, test } from "bun:test"
+import { expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import type { AsyncContext, Context } from "gpui-kit"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { retryStartedTask, sendBackClosedTask } from "../../../packages/run/src/entities/parked-runs/index"
 import { backlogJson } from "../../../packages/run/src/widgets/beat/board"
+import { cx, documents, nodes, spawned } from "./gpui-fakes"
 
-const kids = new WeakMap<object, Array<unknown>>()
-
-const node = (): object => {
-  const made: Array<unknown> = []
-  const element: object = new Proxy({}, {
-    get: (_target, name) => (...args: ReadonlyArray<unknown>) => {
-      if (name === "child") made.push(args[0])
-      if (name === "children" && Array.isArray(args[0])) made.push(...args[0])
-      return element
-    }
-  })
-  kids.set(element, made)
-  return element
+const wordsOf = (element: unknown): ReadonlyArray<string> => {
+  if (typeof element === "string") return [element]
+  const made = typeof element === "object" && element !== null ? nodes.get(element) : undefined
+  return made === undefined ? [] : made.kids.flatMap(wordsOf)
 }
-
-const wordsOf = (element: unknown): ReadonlyArray<string> =>
-  typeof element === "string" ? [element] : typeof element === "object" && element !== null ? (kids.get(element) ?? []).flatMap(wordsOf) : []
-
-const documents = new Map<string, unknown>()
-const spawned: Array<Promise<unknown>> = []
-const unused = (): never => { throw new Error("Unexpected App context call") }
-class IdleEntity {
-  set_props = unused
-  release = unused
-}
-const cx: Context = Object.assign(IdleEntity, {
-  stop_propagation: () => undefined, notify: () => undefined, spawn: (body: (task: AsyncContext) => unknown) => {
-    spawned.push(Promise.resolve(body(cx)))
-    return { cancel: () => undefined, is_done: () => true }
-  },
-  bind_keys: unused, propagate: unused, phase: unused, theme: unused, open_url: unused,
-  read_from_clipboard: unused, write_to_clipboard: unused, focus_handle: unused, sleep: unused,
-  timer: { after: unused, every: unused }
-}) satisfies Context
-
-const everyRow = (_id: unknown, count: number, _key: unknown, row: (index: number, cx: Context) => object): object => {
-  const element = node()
-  kids.get(element)?.push(...Array.from({ length: count }, (_, index) => row(index, cx)))
-  return element
-}
-
-void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow, image: node, svg: node }))
-void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Scrollbar: { vertical: node }, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
-  ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
-  InputState: { new: () => ({ value: () => "", set_value: () => undefined, on: () => undefined, focus: () => undefined, release: () => undefined }) }
-}))
-void mock.module("herdr", () => ({
-  shared: () => null, setShared: () => undefined, layout: () => null, theme: () => ({}),
-  exec: (command: string, args: ReadonlyArray<string>) => {
-    const document = documents.get([command, ...args].join(" "))
-    return Promise.resolve(document === undefined
-      ? { code: 1, stdout: "", stderr: "no such document" }
-      : { code: 0, stdout: JSON.stringify(document), stderr: "" })
-  },
-  settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined, readTextFile: () => undefined,
-  run: () => undefined
-}))
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
