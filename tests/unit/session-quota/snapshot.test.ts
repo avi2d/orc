@@ -397,7 +397,7 @@ describe("the live session quota panel inside the terminal's rows where flags de
       accounts: view.accounts.flatMap((account) => {
         if (account.provider !== "claude" || account.body.kind !== "windows") return [];
         const found = account.body.windows.find((window) => window.id === "seven_day");
-        if (found === undefined) return [];
+        if (found === undefined || found.startsAt === null) return [];
         const week = { ...found, sessions: found.sessions.map((row) => ({ ...row, flagged: row.session.id === "pane:w1A:p2" })) };
         const windows = [1, 2, 3, 4, 5, 6, 7].map((hours) => ({ ...week, id: `w${hours}`, cycleSeconds: hours * 3600 }));
         return [{ ...account, body: { kind: "windows" as const, windows } }];
