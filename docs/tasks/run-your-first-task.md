@@ -21,7 +21,7 @@ To put the `orc` command on your PATH:
 
 Orc prints `orc` and its version.
 The npm package runs without Bun on Apple silicon macOS and Linux x64 with glibc.
-If the compiled binary is missing, install [Bun](https://bun.com) to run orc from source.
+If the compiled binary is missing, install [Bun](https://bun.com) to run the bundled `dist/bin.js`.
 To upgrade orc later, run the same install command again.
 
 ## Name a provider and its models

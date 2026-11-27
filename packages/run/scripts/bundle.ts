@@ -1,6 +1,6 @@
 const run = Bun.fileURLToPath(new URL("..", import.meta.url))
 const outdir = run + "dist"
-const placement = { outdir }
+const placement = { outdir, naming: { asset: "[name].[ext]" } }
 const results = await Promise.all([
   Bun.build({ entrypoints: [run + "src/bin.ts"], ...placement, target: "bun" }),
   Bun.build({ entrypoints: [run + "src/entities/heavy-queue/heavy-standin-main.ts"], ...placement, target: "bun", naming: "[name].ts" }),

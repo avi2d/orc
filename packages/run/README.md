@@ -22,7 +22,7 @@ To install orc:
 
 Orc prints its version.
 The npm package runs without Bun on Apple silicon macOS and Linux x64 with glibc.
-If the compiled binary is missing, install Bun to run orc from source.
+If the compiled binary is missing, install Bun to run the bundled `dist/bin.js`.
 To upgrade orc, run the same install command again or follow [Updating orc](https://github.com/avi2d/orc/blob/main/docs/run/updating-orc.md).
 To run orc from a checkout of the repository instead, follow [Contribute](https://github.com/avi2d/orc/blob/main/docs/contribute.md#run-orc-from-a-checkout).
 

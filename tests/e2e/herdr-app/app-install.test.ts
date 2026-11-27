@@ -48,7 +48,7 @@ test("does not install a build whose sources fail to compile", async () => {
     await mkdir(join(source, "scripts"), { recursive: true })
     await mkdir(join(source, "mods", "orc-board"), { recursive: true })
     await mkdir(join(source, "layouts"), { recursive: true })
-    await copyFile(join(herdrAppSourceDir(), "scripts", "build.ts"), join(source, "scripts", "build.ts"))
+    await copyFile(join(import.meta.dir, "../../../packages/herdr-app/scripts/build.ts"), join(source, "scripts", "build.ts"))
     await writeFile(join(source, "mods", "orc-board", "main.ts"), "export const = ;")
     await writeFile(join(source, "mods", "orc-board", "mod.json"), "{}")
     await writeFile(join(source, "layouts", "orc.json"), "{}")

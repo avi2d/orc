@@ -16,7 +16,16 @@
     "CHANGELOG.md",
     "README.md",
     "agents/",
+    "dist/bin.js",
+    "dist/chat-tools.ts",
+    "dist/decider-policy.md",
+    "dist/fixer.md",
+    "dist/heavy-standin-main.ts",
     "dist/herdr-app/",
+    "dist/implementer.md",
+    "dist/orc-ask-extension.ts",
+    "dist/reviewer.md",
+    "dist/support-check-policy.md",
     "dist/launch",
     "dist/launch.js",
     "scripts/patch-knip-jiti.ts",
@@ -31,6 +40,7 @@
     "effect": "4.1.4"
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.120.0"
+    "@avi2dg/checks": "0.120.0",
+    "@avi2dg/orc-schema": "workspace:*"
   }
 }
