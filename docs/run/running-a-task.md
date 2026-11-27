@@ -133,7 +133,7 @@ The bundled reviewer prints only its findings JSON array, with nothing before or
 Each finding has `id`, `file`, `line`, `severity`, `action`, and `description`.
 An implementer or fixer model comes from its file, its role's model flag, or `config.json`, in that order.
 The implementer and the fixer must use a configured provider, and both must use the same provider.
-The reviewer runs only in direct-PR delivery, on the fixer model unless its file names a model, and it must use the same provider.
+The reviewer runs only in direct-PR and orc delivery, on the fixer model unless its file names a model, and it must use the same provider.
 Orc runs the reviewer with read, grep, find, and ls, regardless of the tools named in its agent file.
 Orc refuses models absent from Pi or with a context window of 150,000 tokens or less.
 Pi compacts context at 150,000 tokens in the nono sandbox.
