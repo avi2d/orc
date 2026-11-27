@@ -17,6 +17,7 @@ export type Command = typeof Command.Type
 const RawMachine = Schema.Struct({
   name: Name,
   slots: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  pinnedOnly: Schema.optionalKey(Schema.Boolean),
   start: Command,
   renew: Schema.optionalKey(Command),
   loadLimit: Schema.optionalKey(Schema.Unknown)

@@ -95,6 +95,16 @@ describe("orc beat", () => {
     })
   }, beatTimeout)
 
+  test("ordinary tasks cannot fill spare pin-only slots, and pinned tasks cannot exceed those slots", async () => {
+    await withFixture({ mac: 2, macPinnedOnly: true, linux: 1, floorPercent: 15 }, async (fixture) => {
+      await addTasks(fixture, 5, (index) => index < 2 ? null : "mac")
+      const beat = await orcOk(fixture, ["beat"])
+      expect(beat).toContain("waits orc-2: no machine with a checkout of orc has room")
+      expect(beat).toContain("waits orc-5: mac has no room")
+      expect(await settledStarts(fixture, 3)).toEqual(["orc-1 linux", "orc-3 mac", "orc-4 mac"])
+    })
+  }, beatTimeout)
+
   test("a task with no priority waits while a P1 task takes the slot, and once set to 0 starts before a newer P0 task", async () => {
     await withFixture({ mac: 1, linux: 0, floorPercent: 15 }, async (fixture) => {
       await orcOk(fixture, ["backlog", "add", "orc", "task.md"])

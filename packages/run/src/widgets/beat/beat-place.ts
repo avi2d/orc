@@ -113,7 +113,7 @@ export interface Placed {
   readonly instructions: string | null
 }
 
-type MachineRejection = "unknown-project" | "priority-floor" | "missing-origin" | "parked-origin" | "pin" | "no-checkout" | "capacity" | "load"
+type MachineRejection = "unknown-project" | "priority-floor" | "missing-origin" | "parked-origin" | "pin" | "pin-required" | "no-checkout" | "capacity" | "load"
 
 interface RejectedMachine {
   readonly kind: "rejected"
@@ -167,6 +167,7 @@ const noRoom = (machine: string): string => machine + " has no room"
 const assessMachine = (
   machine: Machine,
   project: Project,
+  pin: TaskRecord["spec"]["machine"],
   restriction: MachineRestriction | null,
   room: ReadonlyArray<MachineRoom>,
   overloaded: ReadonlyMap<string, string>
@@ -178,6 +179,9 @@ const assessMachine = (
   const checkout = checkoutOn(project, machine.name)
   if (checkout === null) {
     return rejectMachine(machine.name, "no-checkout", checkoutMissing(project.name, machine.name))
+  }
+  if (machine.pinnedOnly === true && pin !== machine.name) {
+    return rejectMachine(machine.name, "pin-required", machine.name + " only runs tasks pinned to it")
   }
   const slot = room.find((entry) => entry.machine === machine.name)
   const free = slot === undefined ? 0 : freeRoom(slot)
@@ -212,7 +216,8 @@ const placementWait = (project: string, pinned: string | undefined, machines: Re
   if (machines.some((machine) => machine.kind === "rejected" && machine.code === "capacity")) {
     return pinned === undefined ? "no machine with a checkout of " + project + " has room" : noRoom(pinned)
   }
-  return checkoutMissing(project, pinned ?? "any machine")
+  const pinRequired = machines.flatMap((machine) => machine.kind === "rejected" && machine.code === "pin-required" ? [machine.reason] : [])
+  return pinRequired.length > 0 ? pinRequired.join("; ") : checkoutMissing(project, pinned ?? "any machine")
 }
 
 export const placeTask = (
@@ -237,7 +242,7 @@ export const placeTask = (
   if (restriction !== null && !config.machines.some((machine) => machine.name === restriction.machine)) {
     return rejectPlacement(config.machines, restriction.code, "the machine " + restriction.machine + " is not in dispatch.json")
   }
-  const assessments = config.machines.map((machine) => assessMachine(machine, project, restriction, room, overloaded))
+  const assessments = config.machines.map((machine) => assessMachine(machine, project, task.spec.machine, restriction, room, overloaded))
   const machines = assessments.map(machinePlacement)
   const best = roomiest(assessments)
   if (best === null) {

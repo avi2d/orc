@@ -859,7 +859,8 @@ Examples:
 ```text
 Usage: orc machines --json
 
-Reads the machines in dispatch.json. A machine that starts orc runner start here
+Reads each runner machine's slots and pinnedOnly setting from dispatch.json.
+A machine that starts orc runner start here
 shows this orc's version. A machine reached through orc runner start --
 <command> is asked through that command with orc version --json --local, and
 shows its error when it does not answer within 10 seconds.

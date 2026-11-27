@@ -106,8 +106,8 @@ export const versionHelp: HelpEntry = {
 
 export const machinesHelp: HelpEntry = {
   usage: ["orc machines --json"],
-  summary: "List the orc version each dispatch machine runs",
-  about: "Reads the machines in dispatch.json. A machine that starts orc runner start here shows this orc's version. A machine reached through orc runner start -- <command> is asked through that command with orc version --json --local, and shows its error when it does not answer within 10 seconds.",
+  summary: "List dispatch machine versions and slots",
+  about: "Reads each runner machine's slots and pinnedOnly setting from dispatch.json. A machine that starts orc runner start here shows this orc's version. A machine reached through orc runner start -- <command> is asked through that command with orc version --json --local, and shows its error when it does not answer within 10 seconds.",
   options: [{ flag: "--json", meaning: "Print the machines as an orc.machines.v1 JSON document." }],
   examples: ["orc machines --json"]
 }
