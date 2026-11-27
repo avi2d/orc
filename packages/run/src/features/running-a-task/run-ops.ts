@@ -4,8 +4,9 @@ import type { CommandResult } from "../../shared/sandbox/index"
 import type { OrcRunError } from "../../shared/lib/index"
 import type { AllowWord, NoMistakesRecord, OpenQuestion, QuestionAnswer } from "../../entities/review-gate/index"
 import type { DirectPrRecord } from "../../entities/pull-request/index"
-import type { ChecksRoundSummary, OrcRunCommit, RecordedFixAttempt } from "./run-record"
+import type { ChecksRoundSummary, OrcRunCommit, RecordedFixAttempt } from "../../entities/run-history/index"
 import type { ReviewAtHeadOutcome } from "./review-outcome"
+import type { NoReviewerRoom } from "./reviewer-chain"
 
 export interface AgentRun {
   readonly agent: AgentFile
@@ -24,6 +25,13 @@ export interface SandboxOps {
   readonly runAgent: (run: AgentRun) => Effect.Effect<AgentRunResult, OrcRunError>
   readonly execCheck: <E>(command: string, onOutput: (text: string) => Effect.Effect<void, E>) => Effect.Effect<CommandResult, OrcRunError | E>
 }
+
+export interface PickedReviewer {
+  readonly reviewer: AgentFile
+  readonly runAgent: SandboxOps["runAgent"]
+}
+
+export type ReviewerPick = (runAgent: SandboxOps["runAgent"]) => Effect.Effect<PickedReviewer, NoReviewerRoom | OrcRunError>
 
 export interface ResumePlan {
   readonly implementSessionId: string | null
@@ -66,7 +74,7 @@ export interface RunCheckpoints {
   readonly noMistakesStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly noMistakesDone: (record: NoMistakesRecord) => Effect.Effect<void, OrcRunError>
   readonly reviewStart: (reviewer: AgentFile, started: string) => Effect.Effect<void, OrcRunError>
-  readonly reviewDone: (reviewer: AgentFile, outcome: ReviewAtHeadOutcome, started: string, ended: string) => Effect.Effect<void, OrcRunError>
+  readonly reviewDone: (reviewer: AgentFile | null, outcome: ReviewAtHeadOutcome, started: string, ended: string) => Effect.Effect<void, OrcRunError>
   readonly pullRequestStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly pullRequestDone: (record: DirectPrRecord) => Effect.Effect<void, OrcRunError>
   readonly questionAsked: (step: AgentStep, question: OpenQuestion) => Effect.Effect<void, OrcRunError>

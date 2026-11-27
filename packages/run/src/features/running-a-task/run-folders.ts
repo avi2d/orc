@@ -39,12 +39,22 @@ const copyInstructions = (
 
 const piAgentDirOf = (path: Path.Path, runDir: string): string => path.join(runDir, "session", "agent")
 
-export const dropPiAgentDir = (fs: FileSystem.FileSystem, path: Path.Path, runDir: string): Effect.Effect<void> => {
-  const dir = piAgentDirOf(path, runDir)
-  return fs.remove(dir, { recursive: true, force: true }).pipe(
+const reviewerAgentPrefix = "reviewer-agent-"
+
+// The reviewer folder sits outside the session folder, which the implementer's sandbox reads, because it holds another provider's key.
+export const reviewerAgentDirOf = (path: Path.Path, runDir: string, position: number): string => path.join(runDir, reviewerAgentPrefix + position.toString())
+
+const removeAgentDir = (fs: FileSystem.FileSystem, dir: string): Effect.Effect<void> =>
+  fs.remove(dir, { recursive: true, force: true }).pipe(
     Effect.catch((cause) => Console.log("orc: cannot remove the Pi agent folder " + dir + " after the run ended: " + String(cause)))
   )
-}
+
+export const dropPiAgentDir = (fs: FileSystem.FileSystem, path: Path.Path, runDir: string): Effect.Effect<void> =>
+  Effect.gen(function*() {
+    yield* removeAgentDir(fs, piAgentDirOf(path, runDir))
+    const entries = yield* fs.readDirectory(runDir).pipe(Effect.catchTag("PlatformError", () => Effect.succeed<ReadonlyArray<string>>([])))
+    yield* Effect.forEach(entries.filter((entry) => entry.startsWith(reviewerAgentPrefix)), (entry) => removeAgentDir(fs, path.join(runDir, entry)), { discard: true })
+  })
 
 const endsParked = (db: Database, runId: string, report: OrcRunReport): Effect.Effect<boolean> =>
   report.completed

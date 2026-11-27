@@ -32,6 +32,21 @@ This example names opencode-go through a [Pi](https://pi.dev) login, anthropic t
 
 [Dispatch rules](dispatch-rules.md) can pick different agent models for each backlog task.
 
+## Reviewer chain
+The optional `reviewers` list names the reviewers an [`orc` delivery](delivery-modes.md#reviewer-chain) run tries, in order.
+Each entry names a `provider` from `providers` and a `model` from that provider:
+
+```json
+{
+  "reviewers": [
+    { "provider": "opencode-go", "model": "opencode-go/kimi-k2" },
+    { "provider": "anthropic", "model": "anthropic/claude-opus-5-5" }
+  ]
+}
+```
+
+Orc refuses an empty list, a model that does not start with its provider and a slash, and a provider that `providers` does not name.
+
 ## Provider credentials
 
 Each provider names its Pi provider `id`, the part of a model name before the `/`, and its `credential`:

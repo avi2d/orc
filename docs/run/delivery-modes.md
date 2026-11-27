@@ -39,6 +39,22 @@ If the head changed or no completed review was recorded, orc runs the review tur
 Failed review turns are not recorded for reuse, so a resume retries them.
 A checkpoint write failure does not block the PR, but the next resume runs the review again.
 
+## Reviewer chain
+The optional `reviewers` list in `config.json` gives an `orc` run an ordered chain of reviewers, as [Configuring providers](configuring-providers.md#reviewer-chain) shows.
+Without it, the review turn runs the reviewer agent on its usual model.
+With it, orc picks the reviewer before each review turn:
+
+1. Orc skips each entry on the implementer's provider.
+2. For each other entry, orc reads the quota of that provider's accounts in `dispatch.json`, as [Accounts on other providers](backlog-configuration.md#accounts-on-other-providers) describes.
+3. Orc takes the first entry with an account at or above `floorPercent`, and the review turn runs the reviewer agent on that entry's model.
+
+An unreadable quota or a provider with no account in the quota counts as no room.
+The run log names the chosen model, its place in the chain and each entry orc passed over with the reason.
+When no entry qualifies, the review turn fails with `NoReviewerRoom` and the run stops without opening a PR.
+The run history records that `review` step as failed with no model, and the `review-failure` signal holds the reason.
+A chain reviewer runs Pi with its own provider's credential, from its own Pi folder `reviewer-agent-<position>` in the run folder.
+The [nono](https://nono.sh) sandbox carries one provider's credential, so orc refuses a reviewer chain with `--sandbox nono` and needs `--sandbox none`.
+
 ## Open the PR
 After the review turn, a direct-PR run runs `git push --set-upstream origin <branch>` from the run's worktree.
 It reuses the open PR for the branch when `gh pr list --head <branch> --state open` finds one, and otherwise runs `gh pr create`.

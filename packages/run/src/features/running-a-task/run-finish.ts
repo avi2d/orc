@@ -5,7 +5,7 @@ import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
 import type { AgentFile, LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
-import type { RunCheckpoints, SandboxOps } from "./run-ops"
+import type { ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
 import { beatReadsChecks } from "./checks"
@@ -42,13 +42,28 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]): Effect.Effect<ReviewOutcome, OrcRunError> =>
-  Effect.gen(function*() {
-    const started = new Date().toISOString()
-    yield* checkpoints.reviewStart(reviewer, started)
-    const review = yield* runReviewTurn(run, runAgent, reviewer, "orc")
-    yield* checkpoints.reviewDone(reviewer, { ...review, reusedFrom: null }, started, new Date().toISOString())
-    return review
+export const pickedReviewTurn = (
+  pick: ReviewerPick,
+  runAgent: SandboxOps["runAgent"],
+  turn: (reviewer: AgentFile, runAgent: SandboxOps["runAgent"]) => Effect.Effect<ReviewOutcome, OrcRunError>,
+  noRoom: (failed: ReviewOutcome & { readonly status: "failed" }) => Effect.Effect<ReviewOutcome, OrcRunError> = Effect.succeed
+): Effect.Effect<ReviewOutcome, OrcRunError> =>
+  pick(runAgent).pipe(
+    Effect.flatMap((picked) => turn(picked.reviewer, picked.runAgent)),
+    Effect.catchTag("NoReviewerRoom", (error) => noRoom({ status: "failed", reason: error.message }))
+  )
+
+export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]): Effect.Effect<ReviewOutcome, OrcRunError> =>
+  pickedReviewTurn(pick, runAgent, (reviewer, reviewerRunAgent) =>
+    Effect.gen(function*() {
+      const started = new Date().toISOString()
+      yield* checkpoints.reviewStart(reviewer, started)
+      const review = yield* runReviewTurn(run, reviewerRunAgent, reviewer, "orc")
+      yield* checkpoints.reviewDone(reviewer, { ...review, reusedFrom: null }, started, new Date().toISOString())
+      return review
+    }), (failed) => {
+    const at = new Date().toISOString()
+    return checkpoints.reviewDone(null, { ...failed, reusedFrom: null }, at, at).pipe(Effect.as(failed))
   })
 
 const findingLine = (finding: ReviewFinding): string =>

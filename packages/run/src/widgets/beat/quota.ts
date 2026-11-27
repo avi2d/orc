@@ -1,6 +1,6 @@
 import { Clock, DateTime, Effect, type Path, Result, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { duplicateOf, roomAtFloor } from "../../shared/config/index"
+import { duplicateOf, type ProviderRoom, providerOf, roomAtFloor } from "../../shared/config/index"
 import { type AccountReading, type CommandFailureCause, runQuotaCommand } from "./quota-command"
 import { decodeSubquo, isSubquoDocument, type SubquoFailureCause } from "./subquo"
 
@@ -157,15 +157,34 @@ export const readQuota = (
       : assessQuota(run.document, settings)
   })
 
+const describeAccount = (account: AccountReading): string =>
+  account.kind === "usable"
+    ? account.account + " " + account.remainingPercent + "% left" + (account.resetsAt === undefined ? "" : " until " + account.resetsAt)
+    : account.account + " unusable, " + account.reason
+
+export const roomOnProvider = (
+  reading: QuotaReading,
+  quota: { readonly provider: string; readonly accounts: ReadonlyArray<{ readonly name: string; readonly provider?: string }> },
+  provider: string
+): ProviderRoom => {
+  if (reading.kind === "unread") {
+    return { kind: "no-room", reason: "quota unread: " + reading.reason }
+  }
+  const names = new Set(quota.accounts.filter((account) => providerOf(quota, account) === provider).map((account) => account.name))
+  const accounts = reading.accounts.filter((account) => names.has(account.account))
+  if (accounts.length === 0) {
+    return { kind: "no-room", reason: "the quota names no account on " + provider }
+  }
+  return accounts.some((account) => account.kind === "usable" && roomAtFloor(account.remainingPercent, reading.floorPercent))
+    ? { kind: "room" }
+    : { kind: "no-room", reason: accounts.map(describeAccount).join(", ") + ", floor " + reading.floorPercent + "%" }
+}
+
 export const describeQuota = (reading: QuotaReading, perTaskRouting = false): string => {
   if (reading.kind === "unread") {
     return "quota unread: " + reading.reason
   }
-  const accounts = reading.accounts.map((account) =>
-    account.kind === "usable"
-      ? account.account + " " + account.remainingPercent + "% left" + (account.resetsAt === undefined ? "" : " until " + account.resetsAt)
-      : account.account + " unusable, " + account.reason
-  )
+  const accounts = reading.accounts.map(describeAccount)
   const verdict = perTaskRouting && reading.accounts.some((account) => account.kind === "usable" && roomAtFloor(account.remainingPercent, reading.floorPercent))
     ? "dispatch rules pick an account for each task"
     : reading.pick === null ? "no account has room at or above the floor" : "runs use " + reading.pick

@@ -328,11 +328,11 @@ export const recordReviewStart = (db: Database, runId: string, reviewer: Pick<Ag
     Effect.mapError((cause) => historyFailure("record the review step in", cause))
   )
 
-export const recordReviewDone = (db: Database, runId: string, reviewer: Pick<AgentFile, "path" | "model" | "thinking">, outcome: ReviewAtHeadOutcome, started: string, ended: string): Effect.Effect<void, OrcRunError> =>
+export const recordReviewDone = (db: Database, runId: string, reviewer: Pick<AgentFile, "path" | "model" | "thinking"> | null, outcome: ReviewAtHeadOutcome, started: string, ended: string): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const failed = (action: string) => (cause: unknown) => historyFailure(action, cause)
     const known = yield* stepIdFor(db, runId, "review", 1).pipe(Effect.mapError(failed("read the review step in")))
-    const agent = outcome.reusedFrom === null
+    const agent = outcome.reusedFrom === null && reviewer !== null
       ? { agentFile: reviewer.path, model: reviewer.model, thinking: reviewer.thinking }
       : { agentFile: null, model: null, thinking: null }
     const stepId = known ?? (yield* recordStep(db, { runId, name: "review", attempt: 1, status: outcome.status, started, ended, piSessionFile: null, ...agent }).pipe(Effect.mapError(failed("record the review step in"))))
