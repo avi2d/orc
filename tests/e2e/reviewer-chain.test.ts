@@ -39,14 +39,27 @@ const pickWith = (rooms: Readonly<Record<string, ProviderRoom>>, entries: typeof
       openReviewer: () => Effect.succeed(runAgent)
     })(runAgent, eligibility)
 
+const passReview = async (sessionsDir: string) => {
+  const sessionFile = join(sessionsDir, "review.jsonl")
+  await writeFile(sessionFile, sessionEnding({ ...cleanFinish, content: [{ type: "text", text: "[]" }] }))
+  return { sessionFile, commits: [] }
+}
+
 const cleanReviewer = (sha: string, model: string, kinds: Array<string>) =>
   recordingKinds(async (run, sessionsDir) => {
     if (run.agent.kind !== "reviewer") return sandboxResult(sha)(run, sessionsDir)
     expect(run.agent.model).toBe(model)
-    const sessionFile = join(sessionsDir, "review.jsonl")
-    await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: "[]" }], stopReason: "stop", usage: { input: 1, output: 1 } }))
-    return { sessionFile, commits: [] }
+    return passReview(sessionsDir)
   }, kinds)
+
+const commitSendBack = async (worktreeDir: string, sessionsDir: string) => {
+  await writeFile(join(worktreeDir, "send-back.txt"), "applied")
+  git(worktreeDir, ["add", "send-back.txt"])
+  git(worktreeDir, ["commit", "-qm", "Apply the send-back"])
+  const sessionFile = join(sessionsDir, "implement.jsonl")
+  await writeFile(sessionFile, sessionEnding(cleanFinish))
+  return { sessionFile, commits: [{ sha: git(worktreeDir, ["rev-parse", "HEAD"]) }] }
+}
 
 describe("an orc run's review turn takes the first chain reviewer with room on another provider", () => {
   test("uses the second reviewer instead of stopping when the first has no quota room", async () => {
@@ -158,21 +171,40 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
       const applyNew = recordingKinds(async (run, sessionsDir) => {
         if (run.agent.kind === "reviewer") {
           expect(run.agent.model).toBe("gamma/reviewer")
-          const sessionFile = join(sessionsDir, "review.jsonl")
-          await writeFile(sessionFile, sessionEnding({ ...cleanFinish, content: [{ type: "text", text: "[]" }] }))
-          return { sessionFile, commits: [] }
+          return passReview(sessionsDir)
         }
         expect(run.prompt).not.toContain(applied.answer)
         expect(run.prompt).toContain(added.answer)
-        const sessionFile = join(sessionsDir, "implement.jsonl")
-        await writeFile(sessionFile, sessionEnding(cleanFinish))
-        git(worktreeDir, ["commit", "--allow-empty", "-qm", "Apply the second send-back"])
-        return { sessionFile, commits: [{ sha: git(worktreeDir, ["rev-parse", "HEAD"]) }] }
+        return commitSendBack(worktreeDir, sessionsDir)
       }, kinds)
       const resumed = await runOrcDeliveryStep(dir, home, applyNew, lintPasses,
         pickWith({ acme: room, beta: room, gamma: room }, sameProviderFirst),
         { worktreeDir, resumeRun: parked.report.runId, runId: "step-run-3", answers: [applied, added], implementerModel: "beta/coder" })
       expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
+      expect(resumed.ghCalls).toContain("pr create --head orc/test")
+    })
+  })
+
+  test("an ordinary send-back excludes earlier writers instead of asking acme to review its own work", async () => {
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktreeDir }) => {
+      const pick = pickWith({ acme: room, beta: room, gamma: room }, sameProviderFirst)
+      const opened = await runOrcDeliveryStep(dir, home, cleanReviewer(sha, "beta/reviewer", kinds), lintPasses, pick, { worktreeDir })
+      const sendBack = { question: "send-back", answer: "remove the old example", decider: "owner" as const }
+      kinds.length = 0
+
+      const applySendBack = recordingKinds(async (run, sessionsDir) => {
+        if (run.agent.kind === "reviewer") {
+          expect(run.agent.model).toBe("gamma/reviewer")
+          return passReview(sessionsDir)
+        }
+        expect(run.agent.model).toBe("beta/coder")
+        expect(run.prompt).toContain(sendBack.answer)
+        return commitSendBack(worktreeDir, sessionsDir)
+      }, kinds)
+      const resumed = await runOrcDeliveryStep(dir, home, applySendBack, lintPasses, pick,
+        { worktreeDir, resumeRun: opened.report.runId, answers: [sendBack], implementerModel: "beta/coder" })
+      expect(kinds).toEqual(["implementer", "reviewer", "reviewer"])
+      expect(resumed.stepAgents).toContainEqual({ name: "review", model: "gamma/reviewer", thinking: "high" })
       expect(resumed.ghCalls).toContain("pr create --head orc/test")
     })
   })

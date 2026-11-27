@@ -19,7 +19,6 @@ interface ReviewLoop {
   readonly fixes: Array<RecordedFixAttempt>
   readonly commits: Array<OrcRunCommit>
   readonly plan: ResumePlan
-  readonly implementedHere: boolean
   readonly checkpoints: RunCheckpoints
   readonly fixReview: (evidence: string, attempt: number) => Effect.Effect<{ readonly fix: RecordedFixAttempt; readonly commits: ReadonlyArray<OrcRunCommit>; readonly paused: string | null }, OrcRunError | RunStopped>
   readonly readChecks: (round: number) => Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError>
@@ -83,17 +82,11 @@ const runOneRound = (loop: ReviewLoop, findings: ReadonlyArray<ReviewFinding>, r
     return yield* checkAfterFix(loop)
   })
 
-const reviewEligibility = ({ run, plan, fixes, implementedHere }: ReviewLoop): ReviewEligibility => {
-  const originalImplementer = providerOfModel(plan.inheritedImplement?.model ?? run.agent.model)
-  const parkedProviders = plan.reviewWait?.implementerProviders
-  const implementerProviders = parkedProviders ?? Arr.of(originalImplementer)
-  const recentImplementer = implementedHere ? [providerOfModel(run.agent.model)] : []
-  const fixerProviders = fixes.flatMap(({ commits, model }) => commits > 0 && model !== null ? [providerOfModel(model)] : [])
-  return {
-    implementerProviders: Arr.dedupe(Arr.appendAll(implementerProviders, [...recentImplementer, ...fixerProviders])),
-    resumedForQuota: parkedProviders !== undefined
-  }
-}
+const reviewEligibility = ({ checkpoints, plan }: Pick<ReviewLoop, "checkpoints" | "plan">): Effect.Effect<ReviewEligibility, OrcRunError> =>
+  checkpoints.branchWriterModels.pipe(Effect.map((models) => ({
+    implementerProviders: Arr.dedupe([...plan.reviewWait?.implementerProviders ?? [], ...models.map(providerOfModel)]),
+    resumedForQuota: plan.reviewWait !== undefined
+  })))
 
 const appliedSendBackIds = (plan: ResumePlan): ReadonlyArray<string> =>
   Arr.dedupe([...plan.reviewWait?.appliedSendBackIds ?? [], ...sentBackAnswersOf(plan.answers).map(({ question }) => question)])
@@ -106,7 +99,10 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
     }
     const reviewer = run.delivery.reviewer
     const sentPerRound = [...plan.reviewWait?.sentPerRound ?? []]
-    const reviewNext = () => reviewOrc(run, reviewer, checkpoints, ops.runAgent, sentPerRound.length + 1, reviewEligibility(loop))
+    const eligibility = reviewEligibility(loop)
+    const reviewNext = () => eligibility.pipe(Effect.flatMap((writers) =>
+      reviewOrc(run, reviewer, checkpoints, ops.runAgent, sentPerRound.length + 1, writers)
+    ))
     return yield* Effect.gen(function*() {
       let review = yield* reviewNext()
       while (mayStartRound(sentPerRound.length + 1, review)) {
@@ -118,7 +114,7 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
         if (failure !== null) return stopReport(loop, failure)
         review = yield* reviewNext()
       }
-      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, eligibility: reviewEligibility(loop) })
+      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, eligibility: yield* eligibility })
     }).pipe(
       Effect.catchTag("NoReviewerRoom", ({ implementerProviders, message }) =>
         writeReviewWait(run, { implementerProviders, reason: message, sentPerRound, appliedSendBackIds: appliedSendBackIds(plan) }).pipe(

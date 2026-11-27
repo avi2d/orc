@@ -123,7 +123,7 @@ export const runLoopCheckpoints = (db: Database, run: HistoryRun): RunCheckpoint
       agentPath: run.agent.path,
       sessionFile: outcome.sessionFile,
       tokens: outcome.tokens,
-      commits: outcome.commits,
+      commits: outcome.writtenCommits,
       sessionSize: outcome.sessionSize,
       implementPassed: outcome.completed
     }, started, ended),

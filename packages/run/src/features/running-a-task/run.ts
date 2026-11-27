@@ -281,7 +281,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       },
       implementSession: (file) => recordStepSession(db, run.runId, "implement", 1, file),
       implementDone: (outcome, started, ended) => Effect.gen(function*() {
-        yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: outcome.sessionFile, tokens: outcome.tokens, commits: outcome.commits, sessionSize: outcome.sessionSize, implementPassed: outcome.completed }, started, ended)
+        yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: outcome.sessionFile, tokens: outcome.tokens, commits: outcome.writtenCommits, sessionSize: outcome.sessionSize, implementPassed: outcome.completed }, started, ended)
         if (outcome.sessionSize !== null && longSessionWarning(outcome.sessionSize) !== null) {
           implementLong = { counts: outcome.sessionSize, commits: [...outcome.commits], sessionFile: outcome.sessionFile }
           const provisional: OrcRunReport = {

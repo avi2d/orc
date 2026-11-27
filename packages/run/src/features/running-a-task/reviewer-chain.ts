@@ -1,9 +1,10 @@
 import { type Array as Arr, Effect, Schema } from "effect"
+import { ReviewerWait } from "../../entities/run-history/index"
 import type { ProviderRoom, ReviewerEntry } from "../../shared/config/index"
 
 export class NoReviewerRoom extends Schema.TaggedError<NoReviewerRoom>()("NoReviewerRoom", {
   message: Schema.String,
-  implementerProviders: Schema.NonEmptyArray(Schema.String)
+  implementerProviders: ReviewerWait.fields.implementerProviders
 }) {}
 
 interface PassedEntry {
@@ -22,7 +23,7 @@ const passedText = (passed: ReadonlyArray<PassedEntry>): string =>
 
 export const pickChainEntry = <T extends ReviewerEntry>(
   chain: Arr.NonEmptyReadonlyArray<T>,
-  implementerProviders: Arr.NonEmptyReadonlyArray<string>,
+  implementerProviders: ReadonlyArray<string>,
   roomOf: (entry: T) => ProviderRoom
 ): Effect.Effect<ChainPick<T>, NoReviewerRoom> => {
   const passed: Array<PassedEntry> = []
@@ -39,7 +40,7 @@ export const pickChainEntry = <T extends ReviewerEntry>(
   }
   return Effect.fail(new NoReviewerRoom({
     implementerProviders,
-    message: "no reviewer in the chain has quota room on a provider that did not write the change; excluded providers: " + implementerProviders.join(", ") + ": " + passedText(passed)
+    message: "no reviewer in the chain has quota room on a provider that did not write the change: " + passedText(passed)
   }))
 }
 

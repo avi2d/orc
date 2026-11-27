@@ -1,4 +1,4 @@
-import type { Array as Arr, Effect } from "effect"
+import type { Effect } from "effect"
 import type { AgentFile, PiRun, PiTokenUse, LongSessionCounts } from "../../entities/agent/index"
 import type { CommandResult } from "../../shared/sandbox/index"
 import type { OrcRunError } from "../../shared/lib/index"
@@ -33,7 +33,7 @@ interface PickedReviewer {
 }
 
 export interface ReviewEligibility {
-  readonly implementerProviders: Arr.NonEmptyReadonlyArray<string>
+  readonly implementerProviders: ReviewWaitCheckpoint["implementerProviders"]
   readonly resumedForQuota: boolean
 }
 
@@ -62,7 +62,7 @@ export interface AgentOutcome {
   readonly sessionId: string | null
   readonly sessionFile: string | null
   readonly commits: Array<OrcRunCommit>
-  readonly wroteCommits: boolean
+  readonly writtenCommits: ReadonlyArray<OrcRunCommit>
   readonly tokens: PiTokenUse | null
   readonly sessionSize: LongSessionCounts | null
   readonly completed: boolean
@@ -71,6 +71,7 @@ export interface AgentOutcome {
 }
 
 export interface RunCheckpoints {
+  readonly branchWriterModels: Effect.Effect<ReadonlyArray<string>, OrcRunError>
   readonly implementStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly implementSession: (file: string) => Effect.Effect<void, OrcRunError>
   readonly implementDone: (outcome: AgentOutcome, started: string, ended: string) => Effect.Effect<void, OrcRunError>

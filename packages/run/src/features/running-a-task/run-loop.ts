@@ -120,7 +120,7 @@ const resumedOutcome = (run: HistoryRun, sessionId: string | null, sessionFile: 
       sessionId,
       sessionFile,
       commits,
-      wroteCommits: false,
+      writtenCommits: [],
       tokens: null,
       sessionSize: null,
       completed: done,
@@ -188,7 +188,7 @@ const implement = (
       sessionId: session.sessionId,
       sessionFile: session.sessionFile,
       commits,
-      wroteCommits: session.commits.length > 0,
+      writtenCommits: session.commits,
       tokens: session.tokens,
       sessionSize,
       completed,
@@ -277,8 +277,7 @@ const runChecksFixLoop = (
   fixes: Array<RecordedFixAttempt>,
   commits: Array<OrcRunCommit>,
   plan: ResumePlan,
-  checkpoints: RunCheckpoints,
-  implementedHere: boolean
+  checkpoints: RunCheckpoints
 ): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const resumed = yield* retryParkedFix(run, ops, base, rounds, fixes, commits, plan, checkpoints)
@@ -287,7 +286,7 @@ const runChecksFixLoop = (
     }
     const readChecks = (number: number) => readProjectChecks(run, number)
     const finish = () => finishChecked({
-      run, ops, base, rounds, fixes, commits, plan, checkpoints, readChecks, implementedHere,
+      run, ops, base, rounds, fixes, commits, plan, checkpoints, readChecks,
       fixReview: (evidence, attempt) => fixOnce(run, ops.runAgent, evidence, attempt, null, checkpoints, null, true)
     })
     for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
@@ -367,7 +366,7 @@ const runFullReport = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, tra
     if (plan.skipChecks && run.delivery.kind !== "orc") {
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, tracked, ops.runAgent, plan.priorDir)
     }
-    return yield* runChecksFixLoop(run, ops, base, rounds, fixes, commits, plan, tracked, done.wroteCommits)
+    return yield* runChecksFixLoop(run, ops, base, rounds, fixes, commits, plan, tracked)
   })
 
 

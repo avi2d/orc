@@ -9,7 +9,7 @@ import { agentReportFileName } from "../backlog/index"
 
 export const reportFileName = "report.md"
 export const reviewerWaitFileName = "reviewer-wait.json"
-export const ReviewerWait = Schema.Struct({ implementerProviders: Schema.NonEmptyArray(Schema.String), reason: Schema.String })
+export const ReviewerWait = Schema.Struct({ implementerProviders: Schema.Array(Schema.String), reason: Schema.String })
 
 export type { OrcRunCommit } from "../../shared/process/index"
 

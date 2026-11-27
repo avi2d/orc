@@ -218,7 +218,7 @@ const liveFilesOf = (run: RunRecord, home: string): Effect.Effect<LiveFiles, nev
   return Effect.all({ asking, failing })
 }
 
-export type ReviewerRoomCheck = (home: string, implementerProviders: Arr.NonEmptyReadonlyArray<string>) => Effect.Effect<ProviderRoom, never, RunnerRequirements>
+export type ReviewerRoomCheck = (home: string, implementerProviders: (typeof ReviewerWait.Type)["implementerProviders"]) => Effect.Effect<ProviderRoom, never, RunnerRequirements>
 
 const readReviewerWait = (home: string, run: RunRecord, checkRoom: ReviewerRoomCheck | undefined) =>
   Effect.gen(function*() {
