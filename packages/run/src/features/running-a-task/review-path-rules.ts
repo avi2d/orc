@@ -16,7 +16,7 @@ const decodeReviewConfig = Schema.decodeUnknownEffect(ReviewConfig)
 
 const configFile = ".no-mistakes.yaml"
 
-export const readPathRules = (yamlText: string, source: string): Effect.Effect<ReadonlyArray<PathRule>, OrcRunError> =>
+const readPathRules = (yamlText: string, source: string): Effect.Effect<ReadonlyArray<PathRule>, OrcRunError> =>
   Effect.gen(function*() {
     const parsed: unknown = yield* Effect.try({
       try: () => Bun.YAML.parse(yamlText),
@@ -28,7 +28,7 @@ export const readPathRules = (yamlText: string, source: string): Effect.Effect<R
     return config.review?.path_instructions ?? []
   })
 
-export const rulesForChangedFiles = (rules: ReadonlyArray<PathRule>, changedFiles: ReadonlyArray<string>): ReadonlyArray<PathRule> =>
+const rulesForChangedFiles = (rules: ReadonlyArray<PathRule>, changedFiles: ReadonlyArray<string>): ReadonlyArray<PathRule> =>
   rules.filter((rule) => {
     const glob = new Bun.Glob(rule.path)
     return changedFiles.some((file) => glob.match(file))
@@ -48,11 +48,11 @@ const readChangedFiles = (
   run: Pick<HistoryRun, "spawner" | "git" | "projectDir" | "branch">
 ): Effect.Effect<ReadonlyArray<string>, OrcRunError> =>
   Effect.gen(function*() {
-    const listed = yield* runGit(run.spawner, run.git, ["diff", "--name-only", "--no-renames", "HEAD..." + run.branch, "--"], run.projectDir)
+    const listed = yield* runGit(run.spawner, run.git, ["diff", "--name-only", "-z", "--no-renames", "HEAD..." + run.branch, "--"], run.projectDir)
     if (listed.exitCode !== 0) {
       return yield* new OrcRunError({ message: "orc cannot list the branch's changed files: " + listed.stderr.trim() })
     }
-    return listed.stdout.split("\n").filter((line) => line.trim() !== "")
+    return listed.stdout.split("\0").filter((line) => line !== "")
   })
 
 export const projectPathRules = (

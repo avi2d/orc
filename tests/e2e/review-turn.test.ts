@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
@@ -41,7 +41,7 @@ const repoWithChange = async (changed: string): Promise<{ readonly dir: string; 
   await gitFixture(dir, ["add", "a.txt"])
   await gitFixture(dir, ["commit", "-qm", "base"])
   await gitFixture(dir, ["checkout", "-qb", "orc/test"])
-  await mkdir(join(dir, dirname(changed)), { recursive: true })
+  await mkdir(join(dir, changed, ".."), { recursive: true })
   await writeFile(join(dir, changed), "base\nchange\n")
   await gitFixture(dir, ["add", changed])
   await gitFixture(dir, ["commit", "-qm", "work"])
