@@ -298,7 +298,7 @@ const reviewWaitOf = (
   if (reviewWait === null || reviewWait === undefined) {
     return {}
   }
-  return { reviewWait: replaysSendBack ? { ...reviewWait, sentPerRound: [] } : reviewWait }
+  return { reviewWait: replaysSendBack ? { ...reviewWait, sentPerRound: [], askUserFindings: [] } : reviewWait }
 }
 
 export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePlan, OrcRunError> =>

@@ -69,6 +69,7 @@ const cleanReviewer = (sha: string, model: string, kinds: Array<string>) =>
   }, kinds)
 
 const errorFinding = (topic: string) => [{ topic, id: "missing-file", file: "fix.txt", line: null, severity: "error", action: "Add the file.", description: "The file is missing." }]
+const askUserWarning = { topic: "flag-name", id: "confirm-flag-name", file: "flags.ts", line: null, severity: "warning", action: "ask-user", description: "Confirm the public flag name." }
 
 const replyFindings = async (sessionsDir: string, name: string, findings: ReadonlyArray<unknown>) => {
   const sessionFile = join(sessionsDir, name + ".jsonl")
@@ -296,7 +297,7 @@ describe("a new send-back on a reviewer quota resume starts a fresh review cycle
 
       let fixesInParkedRun = 0
       const spendBothRounds = recordingKinds(async (run, sessionsDir) => {
-        if (run.agent.kind === "reviewer") return replyFindings(sessionsDir, "review-" + kinds.length.toString(), errorFinding("parked-" + kinds.length.toString()))
+        if (run.agent.kind === "reviewer") return replyFindings(sessionsDir, "review-" + kinds.length.toString(), [askUserWarning, ...errorFinding("parked-" + kinds.length.toString())])
         if (run.agent.kind === "implementer") return commitSendBack(worktreeDir, sessionsDir)
         fixesInParkedRun += 1
         if (fixesInParkedRun === 2) rooms.beta = exhausted
@@ -328,6 +329,106 @@ describe("a new send-back on a reviewer quota resume starts a fresh review cycle
         { worktreeDir, resumeRun: parked.report.runId, runId: "step-run-3", answers: [first, second] })
       expect(kinds).toEqual(["implementer", "reviewer", "fixer", "reviewer", "reviewer"])
       expect(resumed.ghCalls).toContain("pr create --head orc/test")
+      const body = await Bun.file(join(home, "runs", resumed.report.runId, "pr-body.md")).text()
+      expect(body).not.toContain(askUserWarning.description)
+    })
+  })
+})
+
+describe("reviewer quota resumes preserve the review cycle and checks budget", () => {
+  test("does not drop an earlier ask-user warning from the PR body after repeated quota resumes", async () => {
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktreeDir }) => {
+      const rooms: Record<string, ProviderRoom> = { beta: room, gamma: exhausted }
+      const pick = pickWith(rooms)
+      const reviewThenPark = recordingKinds(async (run, sessionsDir) => {
+        if (run.agent.kind === "implementer") return sandboxResult(sha)(run, sessionsDir)
+        if (run.agent.kind === "reviewer") return replyFindings(sessionsDir, "review", [askUserWarning, ...errorFinding("missing-file")])
+        rooms.beta = exhausted
+        return commitFix(worktreeDir, sessionsDir, "review-fix")
+      }, kinds)
+      const parked = await runOrcDeliveryStep(dir, home, reviewThenPark, lintPasses, pick, { worktreeDir })
+      expect(parked.report.waitingForReviewer).toBe(true)
+      expect(parked.report.fixAttempts).toBe(1)
+      expect(parked.ghCalls).not.toContain("pr create")
+
+      const stillWaiting = await runOrcDeliveryStep(dir, home, cleanReviewer(sha, "beta/reviewer", kinds), lintPasses, pick,
+        { worktreeDir, resumeRun: parked.report.runId })
+      expect(stillWaiting.report.waitingForReviewer).toBe(true)
+      rooms.beta = room
+      const resumed = await runOrcDeliveryStep(dir, home, cleanReviewer(sha, "beta/reviewer", kinds), lintPasses, pick,
+        { worktreeDir, resumeRun: stillWaiting.report.runId, runId: "step-run-3" })
+      expect(resumed.ghCalls).toContain("pr create --head orc/test")
+      expect(resumed.report.fixAttempts).toBe(1)
+      const body = await Bun.file(join(home, "runs", resumed.report.runId, "pr-body.md")).text()
+      expect(body).toContain(askUserWarning.description)
+      expect(body).toContain("Left because it asks the user.")
+    })
+  })
+
+  test("does not reject an older wait file without saved ask-user findings", async () => {
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktreeDir }) => {
+      const parked = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses,
+        pickWith({ beta: exhausted, gamma: exhausted }), { worktreeDir })
+      expect(parked.report.waitingForReviewer).toBe(true)
+      await writeFile(join(home, "runs", parked.report.runId, "reviewer-wait.json"), JSON.stringify({
+        implementerProviders: ["acme"], reason: parked.report.endReason, appliedSendBackIds: [], sentPerRound: []
+      }))
+      const resumed = await runOrcDeliveryStep(dir, home, cleanReviewer(sha, "beta/reviewer", kinds), lintPasses,
+        pickWith({ beta: room, gamma: exhausted }), { worktreeDir, resumeRun: parked.report.runId })
+      expect(resumed.ghCalls).toContain("pr create --head orc/test")
+      expect(resumed.report.completed).toBe(true)
+    })
+  })
+
+  test.each([true, false])("does not spend the checks-fix budget on inherited review fixes (checks recover: %s)", async (recover) => {
+    await withReadyBranch(async ({ dir, home, sha, kinds, worktreeDir }) => {
+      const rooms: Record<string, ProviderRoom> = { beta: room, gamma: exhausted }
+      const pick = pickWith(rooms)
+      let checks = 0
+      let reviews = 0
+      let fixes = 0
+      const spendCheckAndReviewFixes = recordingKinds(async (run, sessionsDir) => {
+        if (run.agent.kind === "implementer") return sandboxResult(sha)(run, sessionsDir)
+        if (run.agent.kind === "reviewer") {
+          reviews += 1
+          return replyFindings(sessionsDir, "review-" + reviews.toString(), errorFinding("round-" + reviews.toString()))
+        }
+        fixes += 1
+        if (fixes === 3) rooms.beta = exhausted
+        return commitFix(worktreeDir, sessionsDir, "fix-" + fixes.toString())
+      }, kinds)
+      const parked = await runOrcDeliveryStep(dir, home, spendCheckAndReviewFixes, async () => {
+        checks += 1
+        return checks === 1 ? { stdout: "", stderr: "lint failed", exitCode: 1 } : lintPasses()
+      }, pick, { worktreeDir })
+      expect(parked.report.waitingForReviewer).toBe(true)
+      expect(parked.report.fixes.map(({ attempt }) => attempt)).toEqual([1, 2, 3])
+      await writeFile(join(dir, "main-update.txt"), "main advanced while waiting")
+      git(dir, ["add", "main-update.txt"])
+      git(dir, ["commit", "-qm", "Advance main while waiting"])
+      git(dir, ["push"])
+
+      rooms.beta = room
+      checks = 0
+      const fixChecksThenReview = recordingKinds(async (run, sessionsDir) => {
+        if (run.agent.kind === "reviewer") return passReview(sessionsDir)
+        expect(run.agent.kind).toBe("fixer")
+        fixes += 1
+        return commitFix(worktreeDir, sessionsDir, "fix-" + fixes.toString())
+      }, kinds)
+      const resumed = await runOrcDeliveryStep(dir, home, fixChecksThenReview, async () => {
+        checks += 1
+        return recover && checks > 2 ? lintPasses() : { stdout: "", stderr: "lint failed after rebase", exitCode: 1 }
+      }, pick, { worktreeDir, resumeRun: parked.report.runId })
+      expect(await Bun.file(join(worktreeDir, "main-update.txt")).text()).toBe("main advanced while waiting")
+      expect(resumed.report.fixes.map(({ attempt }) => attempt)).toEqual([1, 2, 3, 4, 5])
+      expect(checks).toBe(3)
+      expect(resumed.report.completed).toBe(recover)
+      if (recover) expect(resumed.ghCalls).toContain("pr create --head orc/test")
+      else {
+        expect(resumed.ghCalls).not.toContain("pr create")
+        expect(resumed.report.endReason).toContain("still failed after 3 fix attempts")
+      }
     })
   })
 })

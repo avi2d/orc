@@ -108,7 +108,7 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
     const limit = run.delivery.maxFixRounds
     const reviewer = run.delivery.reviewer
     const sentPerRound = [...plan.reviewWait?.sentPerRound ?? []]
-    const askUserFindings: Array<ReviewFinding> = []
+    const askUserFindings = [...plan.reviewWait?.askUserFindings ?? []]
     const eligibility = reviewEligibility(loop)
     const reviewNext = () => eligibility.pipe(Effect.flatMap((writers) =>
       reviewOrc(run, reviewer, checkpoints, ops.runAgent, sentPerRound.length + 1, writers)
@@ -133,7 +133,7 @@ export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, Orc
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review })
     }).pipe(
       Effect.catchTag("NoReviewerRoom", ({ implementerProviders, message }) =>
-        writeReviewWait(run, { implementerProviders, reason: message, sentPerRound, appliedSendBackIds: appliedSendBackIds(plan) }).pipe(
+        writeReviewWait(run, { implementerProviders, reason: message, sentPerRound, askUserFindings, appliedSendBackIds: appliedSendBackIds(plan) }).pipe(
           Effect.as({ ...stopReport(loop, message), waitingForReviewer: true as const })
         )
       )

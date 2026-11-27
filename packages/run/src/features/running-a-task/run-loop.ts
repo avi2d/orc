@@ -293,7 +293,8 @@ const runChecksFixLoop = (
       if (failed.length === 0) {
         return yield* finish()
       }
-      if (fixes.length >= maxFixAttempts) {
+      const checksFixes = fixes.filter((fix) => rounds.some((checked) => checked.file === fix.evidenceIn))
+      if (checksFixes.length >= maxFixAttempts) {
         return {
           ...base,
           commits,
