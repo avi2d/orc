@@ -15,11 +15,12 @@ import { helpText, overview, usageErrorText } from "./app/help"
 import { runDispatch } from "./app/dispatch-cli"
 import { isStandinInvocation, launcherCommand, runStandinInvocation } from "./entities/heavy-queue/index"
 import { runQuotaCli } from "./app/quota-cli"
+import { readReviewerRoom } from "./widgets/beat/index"
 import { decodeJson, pueue, PueueState, queuedTasks, RunnerError, selfCommand } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
 import { backlogPaths, backlogRoot as backlogRootOf, Rebase, type ReportKind, runDirFor } from "./entities/backlog/index"
 import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listAllRuns, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
-import { encodeMachinesJson, encodeRunsJson, encodeShowJson, encodeVersionJson, formatRunsTable, formatShow, readListedRuns, readMachineVersions, readOtherMachinesFrom, readRunsJsonRuns, readShow, readStepLog, recordStepScore, runsJson, withOtherMachines, withQueued } from "./features/seeing-runs/index"
+import { encodeMachinesJson, encodeMetricsJson, encodeRunsJson, encodeShowJson, encodeVersionJson, formatMetricsTable, formatRunsTable, formatShow, readListedRuns, readMachineVersions, readOtherMachinesFrom, readRunMetrics, readRunsJsonRuns, readShow, readStepLog, recordStepScore, runsJson, withOtherMachines, withQueued } from "./features/seeing-runs/index"
 
 const self = launcherCommand(Bun.env, process.execPath, Bun.main) ?? selfCommand(process.execPath, Bun.main)
 
@@ -107,7 +108,7 @@ const shipStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>) =>
       Effect.catchTag("RunnerError", (error) => Console.error(error.detail).pipe(Effect.andThen(Effect.fail("agent step refused"))))
     )
     const answers = args.answers.map((answer) => ({ ...answer, decider: (Object.hasOwn(deciders, answer.question) ? deciders[answer.question] : undefined) ?? "owner" as const }))
-    const report = yield* runAgentStep({ rebase, cwd: process.cwd(), taskFile: args.taskFile, delivery: args.delivery, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, implementerModel: args.implementerModel, fixerModel: args.fixerModel, implementerThinking: args.implementerThinking, fixerThinking: args.fixerThinking, instructions: args.instructions, allow: args.allow, answers, resumeRun: Bun.env.ORC_DISPATCH_RESUME_RUN, runId: Bun.env.ORC_DISPATCH_RUN_ID }).pipe(
+    const report = yield* runAgentStep({ rebase, cwd: process.cwd(), taskFile: args.taskFile, delivery: args.delivery, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, implementerModel: args.implementerModel, fixerModel: args.fixerModel, implementerThinking: args.implementerThinking, fixerThinking: args.fixerThinking, instructions: args.instructions, allow: args.allow, answers, resumeRun: Bun.env.ORC_DISPATCH_RESUME_RUN, runId: Bun.env.ORC_DISPATCH_RUN_ID, readReviewerRoom }).pipe(
       Effect.provide(BunServices.layer),
       Effect.catchTag("OrcRunError", (error) =>
         Console.error(error.message).pipe(Effect.andThen(Effect.fail("agent step refused")))
@@ -182,6 +183,12 @@ const printRefusals = (args: Extract<OrcArgs, { readonly kind: "ListRefusals" }>
     } else {
       yield* Console.log(formatRefusalsTable(counts))
     }
+  })
+
+const printMetrics = (args: Extract<OrcArgs, { readonly kind: "ListMetrics" }>) =>
+  Effect.gen(function*() {
+    const runs = yield* readHistory((db) => readRunMetrics(db))
+    yield* Console.log(args.json ? yield* encodeMetricsJson(runs) : formatMetricsTable(runs))
   })
 
 const printShow = (args: Extract<OrcArgs, { readonly kind: "ShowRun" }>) =>
@@ -278,6 +285,9 @@ const program = Effect.gen(function*() {
     }
     case "ListRefusals": {
       return yield* printRefusals(args)
+    }
+    case "ListMetrics": {
+      return yield* printMetrics(args)
     }
     case "ShowRun": {
       return yield* printShow(args)

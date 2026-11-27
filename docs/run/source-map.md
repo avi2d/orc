@@ -27,6 +27,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/widgets/beat/quota.ts` | The quota reading from the configured command and the pick of an account |
+| `packages/run/src/widgets/beat/reviewer-room.ts` | The one quota read before a review turn and the room it gives each reviewer chain entry |
 | `packages/run/src/widgets/beat/beat.ts` | The beat: room, placement, take and start |
 | `packages/run/src/widgets/beat/beat-close.ts` | The closing of finished runs and the running output time |
 | `packages/run/src/widgets/beat/beat-close-runner.ts` | The runner record read for a close and the relay of answers and corrections to a running task |
@@ -154,6 +155,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/running-a-task/run-loop.ts` | The implement, check and fix steps of one run |
 | `packages/run/src/features/running-a-task/run-finish.ts` | The finish of a run after its checks pass: the direct PR or the [no-mistakes](https://github.com/kunchenguid/no-mistakes) gate |
 | `packages/run/src/features/running-a-task/review-turn.ts` | The direct-PR review turn: the branch diff, the reviewer run and the findings it records |
+| `packages/run/src/features/running-a-task/reviewer-chain.ts` | The reviewer pick by quota room on another provider, and the `NoReviewerRoom` error |
 | `packages/run/src/features/running-a-task/diagram-turn.ts` | The Pi turn that draws the `mermaid` diagram of a direct-PR or orc PR body |
 | `packages/run/src/features/running-a-task/review-path-rules.ts` | The `review.path_instructions` entries of `.no-mistakes.yaml` whose glob matches a changed file, and the review prompt section they make |
 | `packages/run/src/features/running-a-task/run-resume.ts` | The prior run's session and passed steps a resume starts from |
@@ -174,6 +176,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/seeing-runs/run-history-view.ts` | The `orc runs` table and its `orc.runs.v1` JSON |
 | `packages/run/src/features/seeing-runs/run-facts.ts` | The facts `orc runs --json` reads beside each run: its title, latest step and open questions |
 | `packages/run/src/features/seeing-runs/step-log.ts` | The `orc log` reading of one step's output file |
+| `packages/run/src/features/seeing-runs/run-metrics.ts` | The `orc metrics` counts of each run's failed steps, gate stops, minutes and fix rounds, and its `orc.metrics.v1` JSON |
 | `packages/run/src/features/seeing-runs/run-scores.ts` | The `orc score` step score writes: the 1 to 5 check, the note and the unknown run and step errors |
 | `packages/run/src/features/seeing-runs/other-machines.ts` | The other dispatch machines’ runs `orc runs --json` adds, and the `machines` it names for those that fail |
 | `packages/run/src/features/seeing-runs/machine-versions.ts` | The `orc version --json` and `orc machines --json` version reading of each dispatch machine, and the error for a machine that does not answer |
@@ -319,7 +322,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning, the `orc update` install command and the implementer, fixer, orchestrator, planner and decider models |
+| `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the reviewer chain, the heavy queue tuning, the `orc update` install command and the implementer, fixer, orchestrator, planner and decider models |
+| `packages/run/src/shared/config/provider-room.ts` | The default credential of a provider and the room reading a reviewer chain entry takes |
 | `packages/run/src/shared/config/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `packages/run/src/shared/config/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `packages/run/src/shared/config/dispatch-config.ts` | The reading of `dispatch.json` and `projects.json` |

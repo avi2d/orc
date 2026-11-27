@@ -5,9 +5,9 @@ import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
 import type { AgentFile, LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
-import { runDiagramTurn } from "./diagram-turn"
+import { type DiagramResult, runDiagramTurn } from "./diagram-turn"
 import { splitFrontmatter } from "../../entities/backlog/index"
-import type { RunCheckpoints, SandboxOps } from "./run-ops"
+import type { ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
 import { beatReadsChecks } from "./checks"
@@ -38,15 +38,15 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       if (orcLoop.review.status === "failed") {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery, runAgent, rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound) })
+      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound) })
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
       const reviewStarted = new Date().toISOString()
-      yield* checkpoints.reviewStart(run.delivery.reviewer, reviewStarted)
+      yield* checkpoints.reviewStart(run.delivery.reviewer, 1, reviewStarted)
       const review = yield* reviewAtHead(run, runAgent, run.delivery.reviewer, priorDir)
-      yield* checkpoints.reviewDone(run.delivery.reviewer, review, reviewStarted, new Date().toISOString())
-      const pr = yield* openPullRequest(run, run.delivery, runAgent, rounds, checkpoints, unfixedSection(review))
+      yield* checkpoints.reviewDone(run.delivery.reviewer, 1, review, reviewStarted, new Date().toISOString())
+      const pr = yield* openPullRequest(run, run.delivery.opener, runDiagramTurn(run, runAgent, run.delivery.reviewer), rounds, checkpoints, unfixedSection(review))
       const reviewed = checked + reviewSentence(review)
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
@@ -60,14 +60,23 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]): Effect.Effect<ReviewOutcome, OrcRunError> =>
-  Effect.gen(function*() {
-    const started = new Date().toISOString()
-    yield* checkpoints.reviewStart(reviewer, started)
-    const review = yield* runReviewTurn(run, runAgent, reviewer, "orc")
-    yield* checkpoints.reviewDone(reviewer, { ...review, reusedFrom: null }, started, new Date().toISOString())
-    return review
-  })
+export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number): Effect.Effect<ReviewOutcome, OrcRunError> =>
+  pick(runAgent).pipe(
+    Effect.flatMap((picked) =>
+      Effect.gen(function*() {
+        const started = new Date().toISOString()
+        yield* checkpoints.reviewStart(picked.reviewer, attempt, started)
+        const review = yield* runReviewTurn(run, picked.runAgent, picked.reviewer, "orc", attempt)
+        yield* checkpoints.reviewDone(picked.reviewer, attempt, { ...review, reusedFrom: null }, started, new Date().toISOString())
+        return review
+      })
+    ),
+    Effect.catchTag("NoReviewerRoom", (error) => {
+      const failed: ReviewOutcome = { status: "failed", reason: error.message }
+      const at = new Date().toISOString()
+      return checkpoints.reviewDone(null, attempt, { ...failed, reusedFrom: null }, at, at).pipe(Effect.as(failed))
+    })
+  )
 
 const findingLine = (finding: ReviewFinding): string =>
   "- " + finding.severity + " `" + finding.id + "` at `" + finding.file + (finding.line === null ? "" : ":" + finding.line.toString()) + "`: " + finding.description + " Action: " + finding.action
@@ -131,16 +140,22 @@ const readTaskGoal = (run: Pick<HistoryRun, "fs" | "taskPath">): Effect.Effect<s
     Effect.catchTag("PlatformError", () => Effect.succeed(taskGoal("")))
   )
 
+const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps["runAgent"]): Effect.Effect<DiagramResult> =>
+  pick(runAgent).pipe(
+    Effect.flatMap((picked) => runDiagramTurn(run, picked.runAgent, picked.reviewer)),
+    Effect.catch(() => Effect.succeed({ kind: "none" } as const))
+  )
+
 const openPullRequest = (
   run: HistoryRun,
-  delivery: { readonly opener: PullRequestOpener; readonly reviewer: AgentFile },
-  runAgent: SandboxOps["runAgent"],
+  opener: PullRequestOpener,
+  drawDiagram: Effect.Effect<DiagramResult>,
   rounds: ReadonlyArray<ChecksRoundSummary>,
   checkpoints: RunCheckpoints,
   review: ReviewSection
 ): Effect.Effect<DirectPrRecord, OrcRunError> =>
   Effect.gen(function*() {
-    const drawn = yield* runDiagramTurn(run, runAgent, delivery.reviewer)
+    const drawn = yield* drawDiagram
     const diagram = drawn.kind === "mermaid" ? drawn.chart : null
     yield* checkpoints.pullRequestStart(new Date().toISOString())
     const head = yield* runGit(run.spawner, run.git, ["log", "-1", "--format=%s", run.branch], run.worktreeDir).pipe(
@@ -155,7 +170,7 @@ const openPullRequest = (
     yield* run.fs.writeFileString(bodyFile, prBody({ goal, subjects: bodySubjects, diagram, passed: rounds.at(-1)?.checks.map((check) => check.name) ?? [], review })).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
     )
-    const pr = yield* openDirectPr(delivery.opener, run.branch, head !== "" ? head : run.branch, bodyFile)
+    const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, bodyFile)
     yield* checkpoints.pullRequestDone(pr)
     return pr
   })

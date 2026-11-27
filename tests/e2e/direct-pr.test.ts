@@ -1,20 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { runStatus } from "../../packages/run/src/entities/run-history/index"
-import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, recordingKinds, runDirectPrResume, runDirectPrStep, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
-
-const withOrigin = async (dir: string, use: (origin: string) => Promise<void>): Promise<void> => {
-  const origin = await mkdtemp(join(tmpdir(), "orc-origin-"))
-  try {
-    git(origin, ["init", "-q", "--bare"])
-    git(dir, ["remote", "add", "origin", origin])
-    await use(origin)
-  } finally {
-    await rm(origin, { recursive: true, force: true })
-  }
-}
+import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, recordingKinds, runDirectPrResume, runDirectPrStep, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withOrigin, withPushedBase, withRepo } from "./run-helpers"
 
 const branchOn = (origin: string): string | null => {
   const shown = Bun.spawnSync(["git", "rev-parse", "--verify", "--quiet", "refs/heads/orc/test"], { cwd: origin })
@@ -29,10 +17,7 @@ describe("orc delivery", () => {
   test("malformed reviewer output fails the review step by name instead of opening a PR", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
-        await withOrigin(dir, async () => {
-          const baseBranch = git(dir, ["branch", "--show-current"])
-          git(dir, ["push", "-u", "origin", baseBranch])
-          git(dir, ["remote", "set-head", "origin", baseBranch])
+        await withPushedBase(dir, async () => {
           const sha = await readyToCheck(dir, home)
           git(dir, ["checkout", "-q", "orc/test"])
           const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(async (run, sessionsDir) => {
@@ -52,10 +37,8 @@ describe("orc delivery", () => {
   test("rebases before checks and records the reviewer findings instead of skipping review", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
-        await withOrigin(dir, async () => {
+        await withPushedBase(dir, async () => {
           const baseBranch = git(dir, ["branch", "--show-current"])
-          git(dir, ["push", "-u", "origin", baseBranch])
-          git(dir, ["remote", "set-head", "origin", baseBranch])
           const sha = await readyToCheck(dir, home)
           await writeFile(join(dir, "base.txt"), "new base\n")
           git(dir, ["add", "base.txt"])

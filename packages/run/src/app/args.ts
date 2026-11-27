@@ -10,6 +10,7 @@ export type OrcArgs =
   | { readonly kind: "NoCommand" }
   | { readonly kind: "ListRuns"; readonly json: boolean; readonly local: boolean }
   | { readonly kind: "ListRefusals"; readonly json: boolean }
+  | { readonly kind: "ListMetrics"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
   | { readonly kind: "ShowStepLog"; readonly runId: string; readonly stepId: number }
   | { readonly kind: "ScoreStep"; readonly runId: string; readonly step: string; readonly score: number; readonly note: string }
@@ -64,7 +65,7 @@ const parseScoreArgs = (rest: readonly string[]): OrcArgs => {
   return { kind: "ScoreStep", runId, step, score: Number(scoreText), note }
 }
 
-const parseJsonListArgs = (rest: readonly string[], kind: "ListRefusals" | "Quota" | "Update"): OrcArgs => {
+const parseJsonListArgs = (rest: readonly string[], kind: "ListRefusals" | "ListMetrics" | "Quota" | "Update"): OrcArgs => {
   if (rest.length === 0) {
     return { kind, json: false }
   }
@@ -166,6 +167,7 @@ const topLevelParsers = {
   log: parseLogArgs,
   score: parseScoreArgs,
   refusals: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "ListRefusals"),
+  metrics: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "ListMetrics"),
   chat: parseChatArgs,
   app: parseAppArgs,
   login: parseLoginArgs,

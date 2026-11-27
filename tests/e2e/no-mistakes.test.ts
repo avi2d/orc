@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { access, readFile, realpath, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { isRecord } from "./runner-helpers"
-import { checksPassedWhileMonitoring, git, passedWithPr, readyToCheck, recordedNothing, recordingKinds, runStep, sandboxResult, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
+import { checksPassedWhileMonitoring, git, passedWithPr, readyToCheck, recordedMetrics, recordedNothing, recordingKinds, runStep, sandboxResult, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
 
 const fixableGate: NoMistakesReply = {
   stdout: [
@@ -406,7 +406,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     })
   }, 60_000)
 
-  test("the fix review after a requested fix is accepted with approve", async () => {
+  test("the fix review after a requested fix is accepted with approve and counts one gate stop rather than two", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
@@ -419,6 +419,8 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         ])
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.noMistakes?.gatesAnswered).toBe(2)
+        expect(outcome.runSignals).toContainEqual({ name: "gate-stops", value: "1" })
+        expect(await recordedMetrics(home)).toMatchObject([{ run: "step-run-1", delivery: "no-mistakes", failedSteps: 0, gateStops: 1, fixRounds: 0 }])
       })
     })
   }, 60_000)
