@@ -83,7 +83,7 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
           await parkedForRoom(dir, home, sha, kinds, worktree)
           const resumedKinds: Array<string> = []
           const resumed = await runOrcDeliveryResume(dir, home, reviewsOn("gamma/reviewer", resumedKinds, sha), lintPasses, pickWith({ acme: { kind: "room" }, beta: noRoomBeta, gamma: { kind: "room" } }), worktree)
-          expect(resumedKinds).toEqual(["reviewer"])
+          expect(resumedKinds).toEqual(["reviewer", "reviewer"])
           expect(resumed.stepAgents).toContainEqual({ name: "review", model: "gamma/reviewer", thinking: "high" })
           expect(resumed.ghCalls).toContain("pr create --head orc/test")
     })
@@ -94,7 +94,7 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
           await parkedForRoom(dir, home, sha, kinds, worktree)
           const resumedKinds: Array<string> = []
           const resumed = await runOrcDeliveryResume(dir, home, reviewsOn(null, resumedKinds, sha), lintPasses, pickWith(resumeRooms), worktree, "beta/coder")
-          expect(resumedKinds).toEqual(["reviewer"])
+          expect(resumedKinds).toEqual(["reviewer", "reviewer"])
           expect(resumed.stepAgents).toContainEqual({ name: "review", model: "beta/reviewer", thinking: "high" })
           expect(resumed.ghCalls).toContain("pr create --head orc/test")
     })
