@@ -73,7 +73,7 @@ const HarvestedFields = { kind: Schema.Literal("harvested"), observedAt: Schema.
 
 // A report with no via predates the capture ledger, when every harvested reading came from a log.
 export const WindowSourceJson = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("quota-axi"), readAt: Schema.String }),
+  Schema.Struct({ kind: Schema.Literals(["quota-axi", "subquo"]), readAt: Schema.String }),
   Schema.Struct({ ...HarvestedFields, harness: Schema.Literal("codex"), via: Schema.optionalKey(Schema.Literal("log")) }),
   Schema.Struct({
     ...HarvestedFields,

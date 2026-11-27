@@ -61,7 +61,10 @@ const harvestedVerdict = (window: SourcedWindow): Line => {
 // A window that bounds a scope speaks with that scope's runway, the wording quota-axi prints under its headline.
 const liveVerdict = (window: SourcedWindow, exhaustion: ReadonlyArray<QuotaAvailability>): Line => {
   if (window.source.kind === "harvested") return harvestedVerdict(window);
-  const runway = exhaustion.find((scope) => scope.runway?.limitingWindowId === window.id)?.runway;
+  const runway =
+    window.source.kind === "quota-axi"
+      ? exhaustion.find((scope) => scope.runway?.limitingWindowId === window.id)?.runway
+      : undefined;
   if (runway !== undefined) return runwayVerdict(runway);
   return window.pace === undefined ? [] : paceWords[window.pace.status];
 };
@@ -165,7 +168,6 @@ const liveRow = (
     const text = `read ${countdown(stale)} ago`;
     return staleCell(shortLabel(window), text, shape);
   }
-  // Each countdown runs on the clock its verdict was read at: quota-axi's report, or now for a harvested reading.
   const reset = resetCell(shape, window.source.kind === "harvested" ? now : body.reportedAt, window.resetsAt);
   if (!("percentRemaining" in window)) {
     const parent = body.windows.find((candidate) => candidate.id === window.shareOf);
@@ -214,7 +216,7 @@ const joinOf = (window: SourcedWindow): ReadonlyArray<AccountJoin> => {
 
 const harvestedFirst = (windows: ReadonlyArray<SourcedWindow>): ReadonlyArray<SourcedWindow> => [
   ...windows.filter((window) => window.source.kind === "harvested"),
-  ...windows.filter((window) => window.source.kind === "quota-axi"),
+  ...windows.filter((window) => window.source.kind !== "harvested"),
 ];
 
 const sourceGroups = (windows: ReadonlyArray<SourcedWindow>, now: DateTime.Utc): ReadonlyArray<SourceGroup> => {
@@ -251,7 +253,7 @@ const groupTexts = (group: SourceGroup, room: number): ReadonlyArray<string> => 
   return lines;
 };
 
-// A block read wholly by quota-axi keeps quota-axi's own layout, so only a block holding a harvested window names its sources.
+// A block read wholly by quota-axi keeps quota-axi's own layout, so only a block holding a window not read by quota-axi names its sources.
 const sourceLines = (windows: ReadonlyArray<SourcedWindow>, width: number, now: DateTime.Utc): Block => {
   if (windows.every((window) => window.source.kind === "quota-axi")) return [];
   const room = width - sourceIndent.length;

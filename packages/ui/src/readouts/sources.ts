@@ -13,9 +13,9 @@ const harvestName = (origin: HarvestOrigin): string => {
 export const agoWords = (seconds: number): string => (seconds < minuteSeconds ? "just now" : `${countdown(seconds)} ago`);
 
 export const sourceWords = (source: WindowSource, now: DateTime.Utc): string =>
-  source.kind === "quota-axi"
-    ? `quota-axi ${agoWords(secondsBetween(source.readAt, now))}`
-    : `${harvestName(source)} ${agoWords(secondsBetween(source.observedAt, now))}`;
+  source.kind === "harvested"
+    ? `${harvestName(source)} ${agoWords(secondsBetween(source.observedAt, now))}`
+    : `${source.kind} ${agoWords(secondsBetween(source.readAt, now))}`;
 
 export const joinWords = (joins: ReadonlyArray<AccountJoin>): string | undefined => {
   if (joins.length === 0) return undefined;

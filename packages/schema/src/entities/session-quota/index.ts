@@ -111,6 +111,7 @@ export {
   QuotaSource,
   quotaSourceLayer,
 } from "./sources/quota";
+export { overlaySubquo, quotaSourceLayerWithMappings } from "./sources/subquo";
 export {
   type OrcQuota,
   type OrcQuotaAccount,
@@ -168,8 +169,6 @@ export {
   type SessionSources,
   type SessionQuotaSources,
   sessionSourcesLayer,
-  quotaReadSourcesLayer,
-  sessionQuotaSourcesLayer,
   localSessionQuotaOf,
   composedSessionQuotaOf,
   sessionQuotaOf,
