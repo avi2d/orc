@@ -16,6 +16,7 @@ A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: 
 An `orc` run fetches `origin` and rebases its branch onto the default branch recorded by `refs/remotes/origin/HEAD` before running the project checks.
 If the rebase fails, the run does not open a PR.
 After the checks pass, the run reviews the branch and fixes the findings in at most two rounds.
+The first round fixes every finding, and the second round fixes only the `error` findings the next review still reports.
 If a review turn fails, a fix does not finish, or a check fails after a fix, the run stops without opening a PR.
 Otherwise, the run pushes the branch and opens or reuses a PR.
 The run does not wait for a CI verdict.
