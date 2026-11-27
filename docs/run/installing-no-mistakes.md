@@ -27,9 +27,9 @@ For another origin it pushes the branch and skips the `pr` and `ci` steps, and o
 ## Ask each review question for a recommended option
 
 Orc's decider answers a question with its recommended option only when a line of the question starts with `Recommended:`.
-no-mistakes follows review instructions from `review.path_instructions` in its config, and treats the run's intent as data, so the rule goes in your config.
+no-mistakes follows review instructions from the `path_instructions` list under `review` in its config, and treats the run's intent as data, so the rule goes in your config.
 Orc never writes `~/.no-mistakes/config.yaml`.
-Add this entry under `review.path_instructions` in that file, beside any entries already there:
+Add this entry to the `path_instructions` list under `review` in that file, beside any entries already there:
 
 ```yaml
 review:

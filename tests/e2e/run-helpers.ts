@@ -9,6 +9,7 @@ import { subprocessNoMistakesRunner, type QuestionAnswer } from "../../packages/
 import type { OpenQuestion } from "../../packages/run/src/entities/review-gate/index"
 import { subprocessPullRequestOpener } from "../../packages/run/src/entities/pull-request/direct-pr"
 import { hostGitShim } from "../../packages/run/src/shared/sandbox/host"
+import { readOrcConfig } from "../../packages/run/src/shared/config/index"
 import { askSetupFor, orcCompletionLine } from "../../packages/run/src/entities/agent/index"
 import { runWithHistory } from "../../packages/run/src/features/running-a-task/run"
 import { type ChainReviewer, fixedReviewer } from "../../packages/run/src/features/running-a-task/run-deliverer"
@@ -263,10 +264,11 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
 }
 
 export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerPick = fixedReviewer(reviewer)): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+  const config = await Effect.runPromise(readOrcConfig(home).pipe(Effect.provide(BunServices.layer)))
   const gh = await stubGh()
   try {
     const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
-      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer: reviewerPick }), gh.dir + ":")
+      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer: reviewerPick, maxFixRounds: config.review.maxFixRounds }), gh.dir + ":")
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
     await rm(gh.dir, { recursive: true, force: true })

@@ -10,12 +10,16 @@ import type { ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
 import { beatReadsChecks } from "./checks"
-import { leftFindings, leftReasonLine, type LeftFinding } from "./left-findings"
+import { leftFindings, leftReasonLine, reviewStopReason, type LeftFinding, type ReviewStop } from "./left-findings"
 
-interface OrcLoopEnd {
-  readonly review: ReviewOutcome
-  readonly sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>
-}
+type OrcLoopEnd =
+  | { readonly review: Extract<ReviewOutcome, { readonly status: "failed" }> }
+  | {
+    readonly review: Extract<ReviewOutcome, { readonly status: "passed" }>
+    readonly sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>
+    readonly stop: ReviewStop
+    readonly askUserFindings: ReadonlyArray<ReviewFinding>
+  }
 
 type ReviewSection =
   | { readonly kind: "failed" }
@@ -34,11 +38,11 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
         return yield* new OrcRunError({ message: "orc: an orc delivery run reached its PR without the review fix loop" })
       }
       const reviewed = checked + reviewSentence(orcLoop.review)
-      if (orcLoop.review.status === "failed") {
+      if (!("stop" in orcLoop)) {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound) })
-      return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
+      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound, orcLoop.stop, orcLoop.askUserFindings) })
+      return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + "The review fix loop stopped because " + reviewStopReason(orcLoop.stop) + ". " + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
       const reviewStarted = new Date().toISOString()
