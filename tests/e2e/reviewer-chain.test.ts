@@ -15,6 +15,8 @@ const withReadyBranch = (use: (ready: { readonly dir: string; readonly home: str
         const worktreeDir = join(home, "worktree")
         const baseBranch = git(dir, ["branch", "--show-current"])
         git(dir, ["clone", "-q", "--shared", "-b", "orc/test", dir, worktreeDir])
+        git(worktreeDir, ["config", "user.name", "orc test"])
+        git(worktreeDir, ["config", "user.email", "orc@test.invalid"])
         git(worktreeDir, ["remote", "set-url", "origin", origin])
         git(worktreeDir, ["remote", "set-head", "origin", baseBranch])
         await writeFile(join(worktreeDir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
