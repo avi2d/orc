@@ -4,13 +4,15 @@ kind: reference
 # Read the JSON report
 To print the report once, run `orc-dash report session-quota`.
 The report is one JSON object on one line, and `SessionQuotaReport` in `packages/schema/src/entities/session-quota/contract/session-quota.ts` decodes it.
-A reader checks `schemaVersion` first, and version 1 is the only version.
+A reader checks `schemaVersion` first.
+This report is version 3, and a version 1 report from an older machine still reads.
+The [composed report](compose-two-machines.md) uses version 4.
 
 ## Report fields
 
 | Field | What it holds |
 | --- | --- |
-| `schemaVersion` | `1` |
+| `schemaVersion` | `3`, or `1` from an older machine |
 | `generatedAt` | The ISO instant of the read |
 | `scope` | `local`, since the report covers only the machine it ran on |
 | `estimate` | `basis` `local-logs`, `upperBound` `true`, and the `priceRatios` of input, output, cache read and cache write tokens |
@@ -27,6 +29,8 @@ The window rows detail each tracked window.
 
 | Field | What it holds |
 | --- | --- |
+| `windows[].startsAt` | The ISO instant of the window's start, or `null` when the reading names no cycle |
+| `windows[].elapsedFraction` | The fraction of the cycle elapsed, or `null` when the reading names no cycle |
 | `windows[].gate` | `aheadOfPace`, `pastFirstTenth`, and `open` when both hold |
 | `windows[].exhaustsBeforeReset` | Whether the window runs out before its reset, from the quota-axi verdict or the live sessions' total rate |
 | `windows[].verdict` | The quota-axi verdict for the window, `null` when the live rate decides instead |
@@ -37,6 +41,13 @@ The window rows detail each tracked window.
 | `windows[].sessions` | Each session's calls, measured `tokens`, `trailingHourTokens`, `raw` and `priced` estimates, `models` and `flagged` |
 | `windows[].sessions[].models` | Each model the session called in the window, most tokens first, with its `model`, `calls`, `tokens`, `trailingHourTokens` and `priced` estimate, whose points add up to the session's |
 | `raw` and `priced` | `share` of the window's local calls, `contributionPoints` as an upper bound, and `pointsPerHour` over the trailing hour |
+
+## Other fields
+
+The report's other rows detail its sessions and its flags.
+
+| Field | What it holds |
+| --- | --- |
 | `sessions` | Each session's `id`, `kind`, `live`, `pane` or `pid`, `harness`, `cwd`, `place`, `label`, log `files` and `modelsSinceMidnight` |
 | `sessions[].modelsSinceMidnight` | Each model the session called since local midnight on the machine that wrote the report, most tokens first, with its `model`, `tokens` and billing `provider`, across every route and quota reset |
 | `unmatchedProcesses` | Each log folder whose headless processes no log could be matched to, with its `harness`, `cwd`, `place` and `pids` |
@@ -45,6 +56,7 @@ The window rows detail each tracked window.
 
 ## Older reports
 
+Version 3 differs from version 1 in one way: a window with no known cycle stays in the report, with `startsAt` and `elapsedFraction` both `null`.
 A report written before window sources and credential keys has no `windows[].source`, `accounts[].credentialKey` or `accounts[].accountKeys`, and still reads.
 Its windows count as read by quota-axi at its `generatedAt`.
 A report written before the capture ledger has no `windows[].source.via`, and its harvested windows read as read from a log.
