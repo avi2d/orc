@@ -33,6 +33,8 @@ interface PickedReviewer {
 
 export type ReviewerPick = (runAgent: SandboxOps["runAgent"]) => Effect.Effect<PickedReviewer, NoReviewerRoom | ReviewerRoomWait | OrcRunError>
 
+export type ReviewerChoice = (implementerModel: string) => ReviewerPick
+
 export interface ResumePlan {
   readonly implementSessionId: string | null
   readonly implementSessionFile: string | null

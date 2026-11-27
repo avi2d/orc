@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Effect, Schema } from "effect"
 import { chainReviewer } from "../../packages/run/src/features/running-a-task/run-deliverer"
-import type { ReviewerPick } from "../../packages/run/src/features/running-a-task/run-ops"
+import type { ReviewerChoice } from "../../packages/run/src/features/running-a-task/run-ops"
 import { type ProviderRoom, ReviewerWait } from "../../packages/run/src/shared/config/index"
 import { chainEntry, git, readyToCheck, recordingKinds, runOrcDeliveryResume, runOrcDeliveryStep, sandboxResult, sessionEnding, withHome, withPushedBase, withRepo } from "./run-helpers"
 
@@ -22,13 +22,12 @@ const lintPasses = async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 })
 
 const chain = [chainEntry("acme/coder"), chainEntry("beta/reviewer"), chainEntry("gamma/reviewer")] as const
 
-const pickWith = (rooms: Readonly<Record<string, ProviderRoom>>): ReviewerPick => (runAgent) =>
+const pickWith = (rooms: Readonly<Record<string, ProviderRoom>>): ReviewerChoice => (implementerModel) => (runAgent) =>
   chainReviewer({
     chain,
-    implementerProvider: "acme",
     readRoom: Effect.succeed(({ provider }) => rooms[provider] ?? { kind: "no-room", reason: "no reading" }),
     openReviewer: () => Effect.succeed(runAgent)
-  })(runAgent)
+  })(implementerModel)(runAgent)
 
 describe("an orc run's review turn takes the first chain reviewer with room on another provider", () => {
   test("reviews on the third entry when the second has no room, instead of the implementer's provider", async () => {
@@ -82,10 +81,27 @@ describe("an orc run's review turn takes the first chain reviewer with room on a
     })
   })
 
+  test("a parked run resumed on another provider's account keeps its reviewer off the provider that implemented it, instead of passing over the waiting entry or reviewing on the implementer's provider", async () => {
+    await withReadyBranch(async ({ dir, home, sha, kinds }) => {
+          await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses,
+            pickWith({ acme: { kind: "room" }, beta: { kind: "no-room", reason: "beta-main 2% left, floor 10%" }, gamma: { kind: "no-room", reason: "gamma-main 0% left, floor 10%" } }))
+          const resumedKinds: Array<string> = []
+          const resumed = await runOrcDeliveryResume(dir, home, recordingKinds(async (run, sessionsDir) => {
+            if (run.agent.kind !== "reviewer") return sandboxResult(sha)(run, sessionsDir)
+            const sessionFile = join(sessionsDir, "review.jsonl")
+            await writeFile(sessionFile, sessionEnding({ role: "assistant", content: [{ type: "text", text: "[]" }], stopReason: "stop", usage: { input: 1, output: 1 } }))
+            return { sessionFile, commits: [] }
+          }, resumedKinds), lintPasses, pickWith({ acme: { kind: "room" }, beta: { kind: "room" }, gamma: { kind: "no-room", reason: "gamma-main 0% left, floor 10%" } }), "beta/coder")
+          expect(resumedKinds).toEqual(["reviewer"])
+          expect(resumed.stepAgents).toContainEqual({ name: "review", model: "beta/reviewer", thinking: "high" })
+          expect(resumed.ghCalls).toContain("pr create --head orc/test")
+    })
+  })
+
   test("still fails the review turn when every entry is on the implementer's provider, instead of parking on a wait no quota ends", async () => {
     await withReadyBranch(async ({ dir, home, sha, kinds }) => {
-          const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses, (runAgent) =>
-            chainReviewer({ chain: [chainEntry("acme/coder")], implementerProvider: "acme", readRoom: Effect.succeed(() => ({ kind: "room" })), openReviewer: () => Effect.succeed(runAgent) })(runAgent))
+          const outcome = await runOrcDeliveryStep(dir, home, recordingKinds(sandboxResult(sha), kinds), lintPasses, (implementerModel) => (runAgent) =>
+            chainReviewer({ chain: [chainEntry("acme/coder")], readRoom: Effect.succeed(() => ({ kind: "room" })), openReviewer: () => Effect.succeed(runAgent) })(implementerModel)(runAgent))
           expect(outcome.steps).toContainEqual({ name: "review", status: "failed" })
           expect(outcome.report.endReason).not.toContain("the run parks")
           expect(outcome.ghCalls).not.toContain("pr create")

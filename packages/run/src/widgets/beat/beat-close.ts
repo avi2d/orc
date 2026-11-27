@@ -116,20 +116,15 @@ const endClosed = (
       : Option.some({ kind: "closed", task: task.spec.id, machine, outcome: ending.outcome, reason: ending.reason, pr: ending.pr, report: ending.report } satisfies BeatAction)
   })
 
-// The beat resumes only a run it can name, so a wait read without its run closes the task instead.
 const endReviewerWait = (
   root: string,
   task: TaskRecord,
   machine: string,
-  ending: ReviewerWaitEnding,
-  run: string | undefined
+  ending: ReviewerWaitEnding
 ): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    if (run === undefined) {
-      return yield* endClosed(root, task, machine, { kind: "close", outcome: "failed", reason: ending.reason, pr: null, report: null })
-    }
-    const parked = yield* parkForReviewerRoom(root, task.spec.id, machine, run, ending.wait, yield* nowIso).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
-    return parked === null ? Option.none() : Option.some({ kind: "reviewer-wait", task: task.spec.id, machine, run, reason: ending.reason } satisfies BeatAction)
+    const parked = yield* parkForReviewerRoom(root, task.spec.id, machine, ending.run, ending.wait, yield* nowIso).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
+    return parked === null ? Option.none() : Option.some({ kind: "reviewer-wait", task: task.spec.id, machine, run: ending.run, reason: ending.reason } satisfies BeatAction)
   })
 
 const endTask = (
@@ -145,7 +140,7 @@ const endTask = (
     : ending.kind === "split"
     ? endSplit(root, task, machine, ending)
     : ending.kind === "wait-reviewer"
-    ? endReviewerWait(root, task, machine, ending, run)
+    ? endReviewerWait(root, task, machine, ending)
     : endClosed(root, task, machine, ending)
 
 const readSince = (

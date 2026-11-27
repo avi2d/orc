@@ -56,7 +56,7 @@ Without it, the review turn runs the reviewer agent on its usual model.
 With it, orc picks the reviewer before each review turn:
 
 1. Orc runs the quota command in `dispatch.json` once, as [Accounts on other providers](backlog-configuration.md#accounts-on-other-providers) describes.
-2. Orc skips each entry on the implementer's provider.
+2. Orc skips each entry on the implementer's provider, which for a resumed run that keeps an earlier implement is the provider that implement ran on.
 3. For each other entry, orc reads the quota account that holds the provider's default credential in `config.json`, because the review turn runs on that credential.
 4. Orc takes the first entry whose account is at or above `floorPercent`, and the review turn runs the reviewer agent on that entry's model.
 

@@ -11,14 +11,14 @@ import { handoverFileName, handoverNote, lastAssistantReply, longSessionWarning 
 import { branchCommits } from "../../shared/process/index"
 import { readFailure } from "../../shared/config/index"
 import type { PullRequestOpener } from "../../entities/pull-request/index"
-import type { ReviewerPick } from "./run-ops"
+import type { ReviewerChoice } from "./run-ops"
 
 export type { ChecksRoundSummary, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "../../entities/run-history/index"
 
 export type RunDeliverer =
   | { readonly kind: "no-mistakes"; readonly runner: NoMistakesRunner }
   | { readonly kind: "direct-PR"; readonly opener: PullRequestOpener; readonly reviewer: AgentFile }
-  | { readonly kind: "orc"; readonly opener: PullRequestOpener; readonly reviewer: ReviewerPick; readonly maxFixRounds: number }
+  | { readonly kind: "orc"; readonly opener: PullRequestOpener; readonly reviewer: ReviewerChoice; readonly maxFixRounds: number }
 
 export const prBodyFileName = "pr-body.md"
 

@@ -61,7 +61,7 @@ describe("a run that waits for a reviewer with room", () => {
     })
   })
 
-  test("the task detail's Parked row reads the wait's reason, instead of a dash that hides why the task does not start", async () => {
+  test("the task detail's Waits for reviewer row reads the wait's reason, instead of a dash that hides why the task does not start", async () => {
     await withBacklog(async (root) => {
       await parkedForReviewer(root)
       const view = { tasks: [await current(root)], events: [], projects: { kind: "read", projects: macProjects }, room: { kind: "read", room: [] }, merged: new Set<string>(), prStates: new Map(), beatWaits: null, deciderOwns: () => false } as const
@@ -69,7 +69,7 @@ describe("a run that waits for a reviewer with room", () => {
       if (read.kind !== "ok") throw new Error(read.reason)
       const detail = read.value.at(0)
       if (detail === undefined) throw new Error("the backlog JSON holds no task")
-      expect(infoRows(detail, []).find((row) => row.label === "Parked")?.value).toBe(wait.reason)
+      expect(infoRows(detail, []).find((row) => row.label === "Waits for reviewer")?.value).toBe(wait.reason)
     })
   })
 

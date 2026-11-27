@@ -101,12 +101,14 @@ const parkForReviewer = (loop: ReviewLoop, error: ReviewerRoomWait): Effect.Effe
   )
 }
 
+const writtenByModel = (run: HistoryRun, plan: ResumePlan): string => plan.inheritedImplement?.model ?? run.agent.model
+
 export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> => {
   const { run, ops, base, rounds, fixes, commits, plan, checkpoints } = loop
   if (run.delivery.kind !== "orc") {
     return finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
   }
-  return reviewAndFinish(loop, run.delivery.reviewer, run.delivery.maxFixRounds).pipe(Effect.catchTag("ReviewerRoomWait", (error) => parkForReviewer(loop, error)))
+  return reviewAndFinish(loop, run.delivery.reviewer(writtenByModel(run, plan)), run.delivery.maxFixRounds).pipe(Effect.catchTag("ReviewerRoomWait", (error) => parkForReviewer(loop, error)))
 }
 
 const reviewAndFinish = (loop: ReviewLoop, reviewer: ReviewerPick, limit: number): Effect.Effect<OrcRunReport, OrcRunError | RunStopped | ReviewerRoomWait> =>
@@ -119,7 +121,7 @@ const reviewAndFinish = (loop: ReviewLoop, reviewer: ReviewerPick, limit: number
     while (review.status === "passed") {
       const stop = stopForReview(review.findings, round, limit, sentPerRound)
       if (stop !== null) {
-        return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, stop, askUserFindings })
+        return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, stop, askUserFindings, reviewer })
       }
       for (const finding of review.findings) {
         if (finding.action === "ask-user" && !askUserFindings.some((earlier) => sameFinding(earlier, finding))) askUserFindings.push(finding)

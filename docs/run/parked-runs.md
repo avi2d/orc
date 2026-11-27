@@ -99,9 +99,9 @@ It prints `parked <task-id> from run <run-id> on <machine> until a reviewer has 
 Each later beat re-reads the quota for those entries.
 While none has room, it prints `waits <task-id>: parked until a reviewer in the chain has room: <model>: <reason>` with each entry and why it has no room.
 Once one has room, the beat resumes the task on its original machine and run, the way it resumes a parked task.
-The resumed run keeps the implement it passed, rebases and runs the checks again, picks its reviewer from the chain again, and opens its PR after the review.
+The resumed run keeps the implement it passed, rebases and runs the checks again, picks its reviewer from the chain again off the provider of the implement it kept, and opens its PR after the review.
 `orc backlog` shows the task as `parked (reviewer room)`.
-`orc backlog --json` gives the wait's reason and entries in the task's `parked.reviewerWait`, and the task panel's Info tab shows the reason in its Parked row.
+`orc backlog --json` gives the wait's reason and entries in the task's `parked.reviewerWait`, and the task panel's Info tab shows the reason in its `Waits for reviewer` row.
 
 ## A looping run
 A run whose [Pi](https://pi.dev) fails one command 6 times in a row pauses the run and asks the question `looping`, as [How orc runs Pi](how-orc-runs-pi.md) shows.

@@ -87,7 +87,7 @@ export const descriptionOf = (body: string): string => {
   return lines.slice(title + 1).join("\n").trim()
 }
 
-const infoLabels = ["Parked", "Account", "Run", "Branch", "PR", "Depends on", "Created", "Started", "Closed", "Priority", "Assets"] as const
+const infoLabels = ["Waits for reviewer", "Account", "Run", "Branch", "PR", "Depends on", "Created", "Started", "Closed", "Priority", "Assets"] as const
 type InfoLabel = typeof infoLabels[number]
 
 export interface InfoRow {
@@ -118,7 +118,7 @@ const prValue = (task: TaskDetail): string | null => {
 
 const infoValue = (task: TaskDetail, runs: ReadonlyArray<TaskRun>, label: InfoLabel): string | null => {
   switch (label) {
-    case "Parked": return task.state.status === "new" ? task.parked?.waitsForReviewer ?? null : null
+    case "Waits for reviewer": return task.state.status === "new" ? task.parked?.waitsForReviewer ?? null : null
     case "Account": return accountOf(task.state)
     case "Run": return runValue(runs)
     case "Branch": return runs.at(0)?.branch ?? task.parked?.branch ?? null

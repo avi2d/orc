@@ -20,6 +20,7 @@ type OrcLoopEnd =
     readonly sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>
     readonly stop: ReviewStop
     readonly askUserFindings: ReadonlyArray<ReviewFinding>
+    readonly reviewer: ReviewerPick
   }
 
 type ReviewSection =
@@ -42,7 +43,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       if (!("stop" in orcLoop)) {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound, orcLoop.stop, orcLoop.askUserFindings) })
+      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, orcLoop.reviewer, runAgent), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound, orcLoop.stop, orcLoop.askUserFindings) })
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + "The review fix loop stopped because " + reviewStopReason(orcLoop.stop) + ". " + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {

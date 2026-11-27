@@ -71,7 +71,7 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
 export type RunEnding =
   | { readonly kind: "close"; readonly outcome: "done" | "failed" | "stopped"; readonly reason: string; readonly pr: string | null; readonly report: string | null }
   | { readonly kind: "park"; readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion>; readonly reason: string }
-  | { readonly kind: "wait-reviewer"; readonly wait: ReviewerWait; readonly reason: string }
+  | { readonly kind: "wait-reviewer"; readonly run: string; readonly wait: ReviewerWait; readonly reason: string }
   | { readonly kind: "split"; readonly plan: SplitPlan }
 
 type FinishedResult = Extract<RunnerResult, { readonly status: "succeeded" | "failed" }>
@@ -95,7 +95,7 @@ export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEndin
     return { kind: "close", outcome: "stopped", reason: result.run.endReason ?? stoppedEndReason, pr: result.run.prLink ?? null, report: null }
   }
   if (result.status === "failed" && result.run?.reviewerWait !== undefined && result.run.openQuestions.length === 0) {
-    return { kind: "wait-reviewer", wait: result.run.reviewerWait, reason: result.run.endReason ?? result.reason }
+    return { kind: "wait-reviewer", run: result.run.id, wait: result.run.reviewerWait, reason: result.run.endReason ?? result.reason }
   }
   if (kind === "parent" && result.status === "failed") {
     return { kind: "close", outcome: "failed", reason: result.run?.endReason ?? result.reason, pr: null, report: result.run?.report ?? null }
