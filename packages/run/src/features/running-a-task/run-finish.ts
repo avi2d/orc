@@ -3,7 +3,7 @@ import { driveNoMistakes, waitForAnswers, type AllowWord, type QuestionAnswer } 
 import { type DirectPrRecord, openDirectPr, type PullRequestOpener } from "../../entities/pull-request/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
-import type { AgentFile, LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
+import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 import type { ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
