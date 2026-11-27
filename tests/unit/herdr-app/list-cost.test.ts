@@ -1,6 +1,7 @@
 import { expect, mock, test } from "bun:test"
-import type { AsyncContext, Context } from "gpui-kit"
+import type { Context } from "gpui-kit"
 import fixture from "../../fixtures/attention/herdr-app.json"
+import { cx } from "./gpui-fakes"
 
 let built = 0
 
@@ -23,24 +24,9 @@ const list = (id: unknown, count: number, _key: unknown, row: Shown["row"]): obj
   return node()
 }
 
-const unused = (): never => { throw new Error("Unexpected App context call") }
-class IdleEntity {
-  set_props = unused
-  release = unused
-}
-const cx: Context = Object.assign(IdleEntity, {
-  stop_propagation: unused, notify: () => undefined, spawn: (body: (task: AsyncContext) => unknown) => {
-    void body(cx)
-    return { cancel: () => undefined, is_done: () => true }
-  },
-  bind_keys: unused, propagate: unused, phase: unused, theme: unused, open_url: unused,
-  read_from_clipboard: unused, write_to_clipboard: unused, focus_handle: unused, sleep: unused,
-  timer: { after: unused, every: unused }
-}) satisfies Context
-
 const documents = new Map<string, unknown>()
 
-void mock.module("gpui-kit", () => ({ View: Object, div: node, list }))
+void mock.module("gpui-kit", () => ({ View: Object, div: node, list, image: node, svg: node }))
 void mock.module("gpui-base", () => ({
   h_flex: node, v_flex: node, Input: { new: node }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   Scrollbar: { vertical: node }, ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
@@ -93,7 +79,7 @@ const agentsFrame = async (count: number) => {
   const read = await readAgents().finally(() => documents.clear())
   if (read.kind !== "ok") throw new Error(read.kind === "failed" ? read.reason : read.kind)
   const agents = new OrcAgents()
-  agents.cards = { kind: "ok", value: read.value.cards }
+  agents.list = { kind: "ok", cards: read.value.cards, reread: null }
   agents.agent = read.value.agent
   return frame(() => agents.render(cx))
 }
@@ -111,7 +97,8 @@ const inboxFrame = async (count: number) => {
 test("an Agents frame with 300 cards awaiting you builds as many elements as one with 30 instead of building every card", async () => {
   const few = await agentsFrame(30)
   const many = await agentsFrame(300)
-  expect(many.held).toContain(300)
+  const statusHeader = 1
+  expect(many.held).toContain(300 + statusHeader)
   expect(many.built).toBe(few.built)
 })
 

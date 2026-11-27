@@ -1,15 +1,16 @@
 import { type AsyncContext, type Context, type Element, View, div } from "gpui-kit"
 import { Input, InputState, TextView, h_flex, v_flex } from "gpui-base"
 import { openOverlay, run, setShared, shared } from "herdr"
-import { type Sent, actionButton, failureLine, listenFor, optionView, section, sendOrc } from "../../src/ask-view"
+import { type Sent, actionButton, failureLine, listenFor, sendOrc } from "../../src/ask-view"
 import { type QueuedRun, kindLabel, queueLine } from "../../src/board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
-import { type AnswerTarget, type TaskDetail, type TaskRun, answerArgv, descriptionOf, infoRows, mergeArgv, mergeablePr, runToOpen, runsOfTask, shortTime } from "../../src/task"
+import { type AnswerTarget, type TaskDetail, type TaskRun, answerArgv, descriptionOf, infoRows, mergeArgv, mergeablePr, runToOpen, runsOfTask } from "../../src/task"
 import { taskDetails, taskRuns, taskRunsAndQueue, thread } from "../../src/task-guard"
-import { type AgentDecidedLine, type AskOption, type DecidedLine, type Thread, type ThreadCard, type ThreadLine, lineLabel, threadCards, threadDecisions, whoLabel } from "../../src/thread"
+import { type Thread, type ThreadCard, threadCards } from "../../src/thread"
+import { type ThreadControls, threadDecided, threadEntry } from "../../src/thread-view"
 import { linkedText } from "../../src/links-view"
-import { holdsOnTasks, waitsOnLabel } from "../../src/inbox"
+import { holdsOnTasks } from "../../src/inbox"
 import { agentsOpenKey, selectedTaskKey, viewsStack, refreshWhenShown, reloadNow } from "../../src/views"
 
 type Palette = ReturnType<typeof palette>
@@ -189,7 +190,7 @@ export default class OrcTask extends View {
         if (cards === null || told?.kind !== "ok") return body.child(div().text_color(t.muted).child("Reading the thread"))
         return cards.length === 0
           ? body.child(div().text_color(t.muted).child(`Nothing is said on ${task.id} yet`))
-          : body.children(cards.map((card) => this.card(t, task.id, card))).children(this.decided(t, told.value))
+          : body.children(cards.map((card) => threadEntry(t, card, this.controls(task.id)))).children(threadDecided(t, told.value))
       }
       case "Description": {
         const description = descriptionOf(task.body)
@@ -211,67 +212,17 @@ export default class OrcTask extends View {
     return actionButton(t, "merge", "Merge", this.sent.get("merge")?.kind === "sending", () => this.askMerge(task))
   }
 
-  lineHeader(t: Palette, line: ThreadLine, what: string): Element {
-    return h_flex().gap(6).text_size(12)
-      .child(div().font_semibold().child(whoLabel(line)))
-      .child(div().text_color(t.dim).child("·"))
-      .child(div().text_color(t.muted).child(what))
-      .children(line.at === null ? [] : [div().text_color(t.dim).child("·"), div().text_color(t.dim).child(shortTime(line.at))])
-  }
-
-  option(t: Palette, task: string, card: ThreadCard, option: AskOption): Element {
-    const shown = optionView(t, `option-${card.key}-${option.letter}`, option)
-    const reply = card.reply
-    if (reply === null || reply.kind !== "question" || this.sent.get(card.key)?.kind === "sending") return shown
-    return shown.cursor_pointer().hover((style) => style.bg(t.hover))
-      .on_click((_event, cx) => this.answer(cx, task, card.key, reply, option.text, () => undefined))
-  }
-
-  askBody(t: Palette, task: string, card: ThreadCard): ReadonlyArray<Element> {
-    const ask = card.ask
-    if (ask === null) return [linkedText(`text-${card.key}`, card.line.text)]
-    const pictures = ask.options.flatMap((option) => option.picture === null ? [] : [`${option.letter}) ${option.picture}`])
-    return [
-      ...(ask.context === null ? [] : [section(t, "Context", linkedText(`context-${card.key}`, ask.context))]),
-      section(t, "Question", linkedText(`question-${card.key}`, ask.question)),
-      ...(ask.options.length === 0 ? [] : [section(t, "Options", h_flex().flex_wrap().gap(8).children(ask.options.map((option) => this.option(t, task, card, option))))]),
-      ...(pictures.length === 0 ? [] : [section(t, "Evidence", v_flex().text_color(t.muted).children(pictures.map((picture) => div().child(picture))))])
-    ]
-  }
-
-  answerLine(t: Palette, key: string, line: ThreadLine, delivered: boolean): Element {
-    return v_flex().gap(4).p(8).rounded(6).bg(t.surface)
-      .child(this.lineHeader(t, line, "Answer").children(delivered ? [div().text_color(t.done).child("· Delivered")] : []))
-      .child(linkedText(key, line.text))
-  }
-
-  card(t: Palette, task: string, card: ThreadCard): Element {
-    const answers = card.answers.map((line, index) => this.answerLine(t, `answer-${card.key}-${index}`, line, card.delivered && index === card.answers.length - 1))
-    const shown = v_flex().id(`entry-${card.key}`).gap(6).p(10).rounded(6).bg(t.raised)
-      .child(this.lineHeader(t, card.line, card.what)).children(this.askBody(t, task, card)).children(answers)
-      .children(this.replyBox(t, task, card))
-      .children(card.waitsOn.length === 0 ? [] : [div().text_color(t.muted).child(waitsOnLabel(card.waitsOn))])
-      .children(failureLine(t, this.sent.get(card.key)))
-    const notes = card.notes.map((line, index) => v_flex().ml(24).gap(4).p(8).rounded(6).border_l(2).border_color(t.border).bg(t.surface)
-      .child(this.lineHeader(t, line, lineLabel(line))).child(linkedText(`note-${card.key}-${index}`, line.text)))
-    return v_flex().gap(6).child(shown).children(notes)
-  }
-
-  decided(t: Palette, told: Thread): ReadonlyArray<Element> {
-    const { owner, agent } = threadDecisions(told)
-    return [
-      ...(owner.length === 0 ? [] : [this.decidedGroup(t, "owner", "Decided by the owner", owner)]),
-      ...(agent.length === 0 ? [] : [this.decidedGroup(t, "agent", "Decided by the agent", agent)])
-    ]
-  }
-
-  decidedGroup(t: Palette, key: string, heading: string, lines: ReadonlyArray<DecidedLine | AgentDecidedLine>): Element {
-    return v_flex().id(`decided-by-${key}`).gap(6)
-      .child(div().text_size(12).font_semibold().text_color(t.muted).child(heading))
-      .children(lines.map((line) => v_flex().id(`decided-${key}-${line.key}`).gap(4).p(10).rounded(6).bg(t.raised).min_w_0()
-        .child(div().text_size(12).font_semibold().child(line.what))
-        .child(linkedText(`decided-text-${key}-${line.key}`, line.words))
-        .children("basis" in line && line.basis !== null ? [section(t, "Basis", div().whitespace_normal().child(line.basis))] : [])))
+  controls(task: string): ThreadControls {
+    return {
+      option: (card, option, shown) => {
+        const reply = card.reply
+        if (reply === null || reply.kind !== "question" || this.sent.get(card.key)?.kind === "sending") return shown
+        return shown.cursor_pointer().hover((style) => style.bg(palette().hover))
+          .on_click((_event, cx) => this.answer(cx, task, card.key, reply, option.text, () => undefined))
+      },
+      reply: (card) => this.replyBox(palette(), task, card),
+      failure: (card) => failureLine(palette(), this.sent.get(card.key))
+    }
   }
 
   replyBox(t: Palette, task: string, card: ThreadCard): ReadonlyArray<Element> {

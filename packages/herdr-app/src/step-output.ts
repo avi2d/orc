@@ -5,7 +5,6 @@ import type { Keyed } from "./agents-view"
 import { type ChecksSummary, checkIndexFile, checksSummary, logLines, parseCheckIndex } from "./checks"
 import type { ShownStep } from "./guard"
 import { type Reading, readText } from "./orc-read"
-import type { Pane } from "./step-bar"
 import { type Turn, sessionTurns } from "./turns"
 
 export class StepOutput {
@@ -18,10 +17,15 @@ export class StepOutput {
   private shownLines = 0
   private turnsText: string | null = null
 
-  read(of: string, runId: string, step: ShownStep, pane: Pane, taskFile: string): Promise<void> {
-    if (pane === "parsed") {
-      if (step.name === "checks") return this.readSummary(of, runId, step, taskFile)
-      if (opensTurns(step)) return this.readTurns(of, step.piSessionFile)
+  read(of: string, runId: string, step: ShownStep, taskFile: string): Promise<void> {
+    if (step.name === "checks") return this.readSummary(of, runId, step, taskFile)
+    if (opensTurns(step)) {
+      return this.readTurns(of, step.piSessionFile).then(() => {
+        const turns = this.turns
+        if (turns?.of === of && turns.reading.kind === "ok" && turns.reading.value.length === 0) {
+          return this.readLog(of, runId, step.id).then(() => undefined)
+        }
+      })
     }
     return this.readLog(of, runId, step.id).then(() => undefined)
   }

@@ -52,7 +52,7 @@ An option with a picture shows as a tile, and others as buttons.
 The Inbox outlines the recommended option.
 If Orc did not record options, the card shows the original text and says **No options recorded**.
 An overdue card shows how long it has waited.
-The Agents tab shows the same cards under each run in **Awaiting you**.
+The Agents tab shows the same question in the **Thread** tab of its run.
 
 To answer a question, a decision, a hold or an event:
 
@@ -98,12 +98,11 @@ On the Board tab, click the count in the **Awaiting you** lane header to open th
 <div id="follow-a-run-in-the-agents-tab"><span id="approve-a-run-s-pr"></span><span id="read-a-run-s-changes"></span><span id="chat-with-orc"></span></div>
 
 [Runs and chat](herdr-app-agents.md) covers the Agents tab and chat drawer.
-On the Agents tab, open the **Status** select and click the count beside **Awaiting you** to open the Inbox, as `cmd-4` does.
 The **Project** select shows runs for configured projects by default.
 Choose **All runs** in it to include runs from other projects.
 Opening a run of another project from the Inbox switches the **Project** select to **All runs**.
 A merged PR shows its run as Done, and a closed PR shows its run as Failed.
-The Approve step names each stage of a merge, as [Approve a run's PR](herdr-app-agents.md#approve-a-runs-pr) says.
+The **Approve** tab names each stage of a merge, as [Approve a run's PR](herdr-app-agents.md#approve-a-runs-pr) says.
 
 <div id="start-a-scratch-app"><span id="recapture-the-board-screenshots"></span><span id="change-the-mods"></span></div>
 
@@ -111,22 +110,18 @@ The Approve step names each stage of a merge, as [Approve a run's PR](herdr-app-
 
 ## Read a Checks step
 
-On the **Agents** tab, select a run and then select a **Checks** step.
-By default, **Summary** shows one row per check with its name, result, and time.
-If a log has no recorded check boundaries, **Summary** shows a note instead of check rows.
+On the **Agents** tab, select a run and then select a **Checks** tab.
+It shows one row per check with a status icon, its name and its time.
+If a log has no recorded check boundaries, the tab shows the whole log instead.
 
 Passed checks stay folded.
 A failed check opens below its row.
 Select the row to fold or reopen it.
-For a failed `bun test` check, **Summary** shows the failed test names, their errors, and the pass and fail counts.
+For a failed `bun test` check, the tab shows the failed test names, their errors, and the pass and fail counts.
 For other failed checks, it shows the last 20 lines before the exit.
 If the step ended before a check reported its result, the row says **Interrupted**.
 
-![Agents tab with a Checks step in Summary, showing passed typecheck and unit checks and a failed e2e check](images/herdr-agents-checks.png)
-
-Select **Raw** in the step bar to see the full log.
-The tab keeps **Raw** selected when you move between steps or runs.
-Select **Summary** on a Checks step or **Turns** on an Agent step to switch back.
+![Agents tab on a failed run's Checks tab, showing passed typecheck and unit checks and a failed e2e check](images/herdr-agents-checks.png)
 
 ## Related topics
 

@@ -24,13 +24,14 @@ Selecting a card opens the task panel, with the task's whole conversation and it
 ## The Agents tab
 
 The Agents tab lists the runs and the queued tasks.
-For the selected run it shows each step, the agent's turns, and the changes on the branch.
+For the selected run it shows the task's thread and one tab per step with the agent's turns or the checks.
+It also shows the changes on the branch.
 
-![Agents tab with a running run's Agent step in the Turns view and its Changes column](../images/herdr-agents-turns.png)
+![Agents tab on the Thread of a run whose worker asks a question, with two options and an answer box](../images/herdr-agents-thread.png)
 
-A run whose pull request waits for your word ends in an Approve step, which merges through `orc merge`.
+A run whose pull request waits for your word ends in an Approve tab, which merges through `orc merge`.
 
-![Agents tab on the Approve step of a run whose PR waits](../images/herdr-agents-approve.png)
+![Agents tab on the Approve tab of a run whose PR waits](../images/herdr-agents-approve.png)
 
 ## The Resources tab
 
