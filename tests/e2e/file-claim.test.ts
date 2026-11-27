@@ -6,55 +6,46 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, Option } from "effect"
 import { withFileClaim } from "../../packages/run/src/shared/lib/file-claim"
 
-test.skipIf(process.platform === "win32")("a new guard is not created with unpredictable permissions", async () => {
+const inClaimDir = async (use: (file: string) => Promise<void>) => {
   const dir = await mkdtemp(join(tmpdir(), "orc-claim-"))
   try {
-    const file = join(dir, "claim")
-    const result = await Effect.runPromise(withFileClaim(file, Effect.succeed("acquired")).pipe(Effect.provide(BunServices.layer)))
-    expect(Option.getOrNull(result)).toBe("acquired")
-    expect((await stat(file + ".guard")).mode & 0o777).toBe(0o600)
+    await use(join(dir, "claim"))
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+}
+
+const claimGuardMode = (prepare: (guard: string) => Promise<void>) => inClaimDir(async (file) => {
+  await prepare(file + ".guard")
+  const result = await Effect.runPromise(withFileClaim(file, Effect.succeed("acquired")).pipe(Effect.provide(BunServices.layer)))
+  expect(Option.getOrNull(result)).toBe("acquired")
+  expect((await stat(file + ".guard")).mode & 0o777).toBe(0o600)
 })
 
-test.skipIf(process.platform === "win32")("a guard with bad permissions does not block a claim", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "orc-claim-"))
-  try {
-    const file = join(dir, "claim")
-    await writeFile(file + ".guard", "")
-    await chmod(file + ".guard", 0o050)
-    const result = await Effect.runPromise(withFileClaim(file, Effect.succeed("acquired")).pipe(Effect.provide(BunServices.layer)))
-    expect(Option.getOrNull(result)).toBe("acquired")
-    expect((await stat(file + ".guard")).mode & 0o777).toBe(0o600)
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
-})
+test.skipIf(process.platform === "win32")("a new guard is not created with unpredictable permissions", () => claimGuardMode(async () => {}))
 
-test("an old empty breaker cannot block a claimant or cause it to remove a replacement claim", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "orc-claim-"))
-  try {
-    const file = join(dir, "claim")
-    const dead = Bun.spawn([process.execPath, "-e", ""])
-    await dead.exited
-    const held = JSON.stringify({ pid: dead.pid, at: Date.now(), token: "dead" })
-    const breaker = file + "." + new Bun.CryptoHasher("sha256").update(held).digest("hex").slice(0, 16) + ".break"
-    const replacement = JSON.stringify({ pid: process.pid, at: Date.now(), token: "replacement" })
-    await writeFile(file, held)
-    await writeFile(breaker, "")
+test.skipIf(process.platform === "win32")("a guard with bad permissions does not block a claim", () => claimGuardMode(async (guard) => {
+  await writeFile(guard, "")
+  await chmod(guard, 0o050)
+}))
 
-    const result = await Effect.runPromise(withFileClaim(file, Effect.promise(async () => {
-      await writeFile(file, replacement)
-      return "acquired"
-    })).pipe(Effect.provide(BunServices.layer)))
+test("an old empty breaker cannot block a claimant or cause it to remove a replacement claim", () => inClaimDir(async (file) => {
+  const dead = Bun.spawn([process.execPath, "-e", ""])
+  await dead.exited
+  const held = JSON.stringify({ pid: dead.pid, at: Date.now(), token: "dead" })
+  const breaker = file + "." + new Bun.CryptoHasher("sha256").update(held).digest("hex").slice(0, 16) + ".break"
+  const replacement = JSON.stringify({ pid: process.pid, at: Date.now(), token: "replacement" })
+  await writeFile(file, held)
+  await writeFile(breaker, "")
 
-    expect(Option.getOrNull(result)).toBe("acquired")
-    expect(await readFile(file, "utf8")).toBe(replacement)
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
-})
+  const result = await Effect.runPromise(withFileClaim(file, Effect.promise(async () => {
+    await writeFile(file, replacement)
+    return "acquired"
+  })).pipe(Effect.provide(BunServices.layer)))
+
+  expect(Option.getOrNull(result)).toBe("acquired")
+  expect(await readFile(file, "utf8")).toBe(replacement)
+}))
 
 test("a live holder excludes another claimant but killing it releases the claim", async () => {
   const dir = await mkdtemp(join(tmpdir(), "orc-claim-"))
