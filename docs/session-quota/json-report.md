@@ -27,6 +27,7 @@ The window rows detail each tracked window.
 
 | Field | What it holds |
 | --- | --- |
+| `windows[]` timing | `startsAt` and `elapsedFraction`, both `null` for a window whose reading names no cycle, such as a subquo monthly window, which reads unknown pace and no fair share |
 | `windows[].gate` | `aheadOfPace`, `pastFirstTenth`, and `open` when both hold |
 | `windows[].exhaustsBeforeReset` | Whether the window runs out before its reset, from the quota-axi verdict or the live sessions' total rate |
 | `windows[].verdict` | The quota-axi verdict for the window, `null` when the live rate decides instead |
