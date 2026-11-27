@@ -23,13 +23,14 @@ const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Use
 const newTask = (machine: string | null): TaskRecord => ({ spec: { ...spec, id: "task-1", machine }, hold: null, parked: null, state: { kind: "new" } })
 
 describe("placeTask", () => {
+  const macFull = { machine: "mac", kind: "rejected", code: "capacity", reason: "mac has no room" }
   const room = [{ machine: "mac", slots: 1, busy: 1 }, { machine: "linux", slots: 4, busy: 0 }]
   test("a task marked for a full machine waits instead of going to a machine with room", () => {
     expect(placeTask(newTask("mac"), config, projects, room)).toMatchObject({
       kind: "waits",
       reason: "mac has no room",
       machines: [
-        { machine: "mac", kind: "rejected", code: "capacity", reason: "mac has no room" },
+        macFull,
         { machine: "linux", kind: "rejected", code: "pin", reason: "the task is pinned to mac" }
       ]
     })
@@ -70,7 +71,7 @@ describe("placeTask", () => {
       kind: "waits",
       reason: "mac has no room",
       machines: [
-        { machine: "mac", kind: "rejected", code: "capacity", reason: "mac has no room" },
+        macFull,
         { machine: "linux", kind: "rejected", code: "pin", reason: "the task is pinned to mac" }
       ]
     })
@@ -111,7 +112,7 @@ describe("placeTask", () => {
       kind: "waits",
       reason: "mac has no room",
       machines: [
-        { machine: "mac", kind: "rejected", code: "capacity", reason: "mac has no room" },
+        macFull,
         { machine: "linux", kind: "rejected", code: "parked-origin", reason: "the task is parked on mac" }
       ]
     })
