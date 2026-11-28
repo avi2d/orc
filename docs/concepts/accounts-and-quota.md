@@ -23,6 +23,7 @@ Orc runs the subquo copy installed with its [npm](https://www.npmjs.com) package
 To go back, set the quota command back to the value it held before, the reader that prints an `orc.quota.v1` or [quota-axi](https://github.com/kunchenguid/quota-axi) document.
 An account's room in a subquo snapshot is the smallest `percentLeft` among its windows with scope `all`.
 A window that covers one model only does not limit the account.
+A window subquo marks `not_returned` is skipped, as if the snapshot left it out.
 An account whose reading is stale, unavailable, past its `validUntil` or has an unknown percent or reset cannot run.
 A quota account the snapshot does not name leaves the whole quota unread, since the subquo account list and the quota accounts then differ.
 

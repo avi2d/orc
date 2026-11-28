@@ -110,6 +110,7 @@ The quota command may instead print the `subquo.v1` snapshot `subquo read --json
 A quota command whose program is `subquo` runs the subquo copy installed with Orc's [npm](https://www.npmjs.com) package, and runs `subquo` from PATH when that copy is missing.
 Orc reads the account room as the smallest `percentLeft` among its windows with scope `all`, so a window that covers one model only does not limit the account.
 The reset time is the `resetsAt` of the limiting window, the latest one when several tie.
+A window subquo marks `not_returned` is skipped, as if the snapshot left it out.
 An account with a stale or unavailable reading, a fresh reading past its `validUntil`, or an unknown percent or reset cannot run.
 A snapshot that names no quota account, names one account twice, or breaks the `subquo.v1` shape leaves the whole quota unread.
 
