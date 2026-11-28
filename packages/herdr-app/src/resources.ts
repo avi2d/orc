@@ -176,26 +176,8 @@ const named = <A>(key: string, body: Guard<A>): Guard<Named<A>> => (value, at) =
   return ok({ name: namedRecord.value.name, reading: reading.value })
 }
 
-const group: Guard<string> = (value, at) => {
-  const record = fields(value, at)
-  return record.kind === "refused" ? record : string(record.value, "group", at)
-}
-
-const legacyCount: Guard<number> = (value, at) => {
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  const groups = arrayOf(record.value, "running", at, group)
-  return groups.kind === "refused" ? groups : ok(groups.value.filter((name) => name === "orc").length)
-}
-
-const queueCount: Guard<Named<number>> = (value, at) => {
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  if (!("runs" in record.value)) return named("pueue", legacyCount)(value, at)
-  return named("runs", (count, where) =>
-    typeof count === "number" && Number.isSafeInteger(count) && count >= 0 ? ok(count) : refused(where, "a nonnegative integer", count)
-  )(value, at)
-}
+const queueCount: Guard<Named<number>> = named("runs", (count, where) =>
+  typeof count === "number" && Number.isSafeInteger(count) && count >= 0 ? ok(count) : refused(where, "a nonnegative integer", count))
 
 const subscriptionsOf = (record: Fields, at: string): Guarded<Subscriptions> => {
   const where = child(at, "report")

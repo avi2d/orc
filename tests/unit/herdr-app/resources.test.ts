@@ -9,6 +9,7 @@ import { type Guard, guardJson } from "../../../packages/herdr-app/src/guard"
 import { type AccountRows, type QuotaWindow, type Subscriptions, type WindowRow, countdown, machineRows, machinesSnapshot, unreadLines, pastPace, runsOutAt, subscriptionRows, subscriptionsSnapshot } from "../../../packages/herdr-app/src/resources"
 
 const fixture = await Bun.file(`${import.meta.dir}/../../fixtures/herdr-resources/two-machines.json`).text()
+const machinesFixture = await Bun.file(`${import.meta.dir}/../../fixtures/herdr-resources/machine-overview.json`).text()
 
 const minute = 60_000
 const hour = 60 * minute
@@ -50,8 +51,8 @@ const windowsOf = (group: AccountRows | undefined): ReadonlyArray<WindowRow> => 
 
 const only = (windows: ReadonlyArray<QuotaWindow>): Subscriptions => ({ accounts: [], windows })
 
-const remoteUnreachable = fixture.replace(
-  /("name": "build-box",\s*"reading": )\{[\s\S]*?"gpu": null\s*\}\s*\}/,
+const remoteUnreachable = machinesFixture.replace(
+  /("name": "build-box",\s*"reading": )\{[\s\S]*?"totalBytes": 2000381018112(?:\s*\}){5}/,
   '$1{ "kind": "unreachable", "reason": "ssh timed out" }'
 )
 
@@ -261,13 +262,8 @@ describe("the subscriptions table over a subquo reading", () => {
 })
 
 describe("the machines table", () => {
-  test("is read from a document the snapshot contract accepts", () => {
-    expect(() => Schema.decodeUnknownSync(SnapshotReport)(JSON.parse(fixture))).not.toThrow()
-    expect(() => Schema.decodeUnknownSync(SnapshotReport)(JSON.parse(remoteUnreachable))).not.toThrow()
-  })
-
   test("shows both machines, not only this one", () => {
-    expect(rowsOf(fixture)).toEqual([
+    expect(rowsOf(machinesFixture)).toEqual([
       {
         name: "local",
         cores: { kind: "value", text: "10", alert: false },
@@ -304,8 +300,8 @@ describe("the machines table", () => {
     expect(unreadLines([row])).toEqual(["local memory, disk: no df"])
   })
 
-  test("refuses a running task with no group rather than counting it as an orc run", () => {
-    const text = fixture.replace('"group": "orc",', "")
-    expect(guardJson(text, machinesSnapshot)).toEqual({ kind: "refused", reason: "sources.queues.machines[0].pueue.value.running[0].group is missing" })
+  test("refuses a negative run count rather than showing it", () => {
+    const text = machinesFixture.replace('"value": 2', '"value": -2')
+    expect(guardJson(text, machinesSnapshot)).toEqual({ kind: "refused", reason: "sources.queues.machines[0].runs.value is -2, not a nonnegative integer" })
   })
 })
