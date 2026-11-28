@@ -3,7 +3,7 @@ import { type Backlog, type Guard, type Runs, backlog, ok, runs } from "./guard"
 import { type AttentionQueue, attention } from "./guard-attention"
 import { holdsOnTasks } from "./inbox"
 import { type AgentAttention, inboxDocuments } from "./inbox-read"
-import { type Reading, readJson } from "./orc-read"
+import { type Reading, rememberedJson } from "./orc-read"
 import type { TaskDetail } from "./task"
 import { taskDetails } from "./task-guard"
 
@@ -25,18 +25,20 @@ export interface LocalAgents {
   readonly details: ReadonlyArray<TaskDetail>
 }
 
+const readLocalRuns = rememberedJson("orc", ["runs", "--json", "--local"], runs)
+const readBacklog = rememberedJson("orc", ["backlog", "--json"], agentsBacklog)
+
+export const sameLocalAgents = (left: LocalAgents | null, right: LocalAgents): boolean =>
+  left !== null && left.runs === right.runs && left.backlog === right.backlog && left.details === right.details
+
 export const readLocalAgents = (): Promise<Reading<LocalAgents>> =>
-  Promise.all([
-    readJson("orc", ["runs", "--json", "--local"], runs),
-    readJson("orc", ["backlog", "--json"], agentsBacklog)
-  ]).then(([local, listed]) => {
+  Promise.all([readLocalRuns(), readBacklog()]).then(([local, listed]) => {
     if (local.kind !== "ok") return local
     if (listed.kind !== "ok") return listed
     return { kind: "ok", value: { runs: local.value, ...listed.value } }
   })
 
-export const readAgentQuestions = (): Promise<Reading<AttentionQueue>> =>
-  readJson("orc", ["attention", "--json"], attention)
+export const readAgentQuestions = rememberedJson("orc", ["attention", "--json"], attention)
 
 export const agentsDocuments = (local: LocalAgents, queue: AttentionQueue): AgentsDocuments => {
   const { items, agent } = inboxDocuments(local.details, queue)

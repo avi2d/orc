@@ -60,7 +60,10 @@ const refreshInto = <T>(host: Refreshed<T>, spot: AsyncContext): void => {
 
 export const refreshInBackground = <T>(everyMs: number, cx: AsyncContext, host: Refreshed<T>): void => {
   cx.timer.every(1000, (tick) => {
-    if (Date.now() - host.lastRead >= everyMs) refreshInto(host, tick)
+    if (!host.busy && Date.now() - host.lastRead >= everyMs) {
+      refreshInto(host, tick)
+      tick.notify()
+    }
   })
   refreshInto(host, cx)
 }

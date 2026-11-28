@@ -107,6 +107,7 @@ const quotaAccount: Guard<QuotaAccount> = (value, at) => {
 }
 
 export interface Subscriptions {
+  readonly warnings?: ReadonlyArray<string>
   readonly accounts: ReadonlyArray<QuotaAccount>
   readonly windows: ReadonlyArray<QuotaWindow>
 }
@@ -175,15 +176,8 @@ const named = <A>(key: string, body: Guard<A>): Guard<Named<A>> => (value, at) =
   return ok({ name: namedRecord.value.name, reading: reading.value })
 }
 
-const group: Guard<string> = (value, at) => {
-  const record = fields(value, at)
-  return record.kind === "refused" ? record : string(record.value, "group", at)
-}
-
-const runningGroups: Guard<ReadonlyArray<string>> = (value, at) => {
-  const record = fields(value, at)
-  return record.kind === "refused" ? record : arrayOf(record.value, "running", at, group)
-}
+const queueCount: Guard<Named<number>> = named("runs", (count, where) =>
+  typeof count === "number" && Number.isSafeInteger(count) && count >= 0 ? ok(count) : refused(where, "a nonnegative integer", count))
 
 const subscriptionsOf = (record: Fields, at: string): Guarded<Subscriptions> => {
   const where = child(at, "report")
@@ -193,10 +187,12 @@ const subscriptionsOf = (record: Fields, at: string): Guarded<Subscriptions> => 
   if (accounts.kind === "refused") return accounts
   const windows = arrayOf(report.value, "windows", where, quotaWindow)
   if (windows.kind === "refused") return windows
-  return ok({ accounts: accounts.value, windows: windows.value })
+  const warnings = report.value["warnings"] === undefined ? ok([]) : arrayOf(report.value, "warnings", where,
+    (entry, path) => typeof entry === "string" ? ok(entry) : refused(path, "a string", entry))
+  return warnings.kind === "refused" ? warnings : ok({ accounts: accounts.value, windows: windows.value, warnings: warnings.value })
 }
 
-export type Queues = ReadonlyArray<Named<ReadonlyArray<string>>>
+export type Queues = ReadonlyArray<Named<number>>
 
 const snapshotSources = (value: unknown, at: string): Guarded<{ readonly sources: Fields; readonly at: string }> => {
   const record = fields(value, at)
@@ -225,7 +221,7 @@ export const machinesSnapshot: Guard<MachinesSnapshot> = (value, at) => {
   const { sources, at: where } = snapshot.value
   const machines = answer(sources["resources"], child(where, "resources"), (r, a) => arrayOf(r, "machines", a, named("reading", machine)))
   if (machines.kind === "refused") return machines
-  const queues = answer(sources["queues"], child(where, "queues"), (r, a) => arrayOf(r, "machines", a, named("pueue", runningGroups)))
+  const queues = answer(sources["queues"], child(where, "queues"), (r, a) => arrayOf(r, "machines", a, queueCount))
   if (queues.kind === "refused") return queues
   return ok({ machines: machines.value, queues: queues.value })
 }
@@ -336,13 +332,11 @@ const cellOf = <A>(known: Known<A>, cell: (value: A) => Cell): Cell => known.kin
 const bytesCell = (known: Known<Bytes>): Cell =>
   cellOf(known, ({ usedBytes, totalBytes }) => plain(`${Math.round(usedBytes / gib)} / ${Math.round(totalBytes / gib)} GiB`))
 
-const orcGroup = "orc"
-
 const runsCell = (name: string, queues: Known<Queues>): Cell => {
   if (queues.kind === "failed") return queues
   const queue = queues.value.find((entry) => entry.name === name)
   if (queue === undefined) return failed(`the queues report has no machine named ${name}`)
-  return cellOf(queue.reading, (groups) => plain(String(groups.filter((entry) => entry === orcGroup).length)))
+  return cellOf(queue.reading, (runs) => plain(String(runs)))
 }
 
 export const machineRows = (machines: ReadonlyArray<Named<Machine>>, queues: Known<Queues>): ReadonlyArray<MachineRow> =>

@@ -1,11 +1,12 @@
 import { type AsyncContext, type Context, type Element, View, div } from "gpui-kit"
-import { v_flex } from "gpui-base"
+import { ScrollHandle, v_flex } from "gpui-base"
 import { openOverlay } from "herdr"
 import { AgentAttentionSection } from "../../src/agent-attention-view"
 import { runMerge } from "../../src/agents-merge"
 import { listenFor } from "../../src/ask-view"
 import type { InboxApproval } from "../../src/inbox"
 import { type InboxDocuments, readInbox } from "../../src/inbox-read"
+import { InboxScroll, inboxGap, inboxPadding } from "../../src/inbox-scroll"
 import { InboxAnswers } from "../../src/inbox-view"
 import type { Reading } from "../../src/orc-read"
 import { palette } from "../../src/palette"
@@ -21,14 +22,20 @@ export default class OrcInbox extends View {
   agentAttention = new AgentAttentionSection()
   merging: InboxApproval | null = null
 
+  scroll = ScrollHandle.new()
+  window = new InboxScroll()
   load = readInbox
 
   override init(_props: unknown, cx: AsyncContext): void {
     refreshWhenShown("orc-inbox", 10_000, cx, this)
-    cx.timer.every(150, (tick) => {
-      if (this.reading.kind === "ok") this.answers.sync(tick, this.reading.value.items)
-    })
+    cx.timer.every(150, (tick) => this.tick(tick))
     cx.spawn((task) => listenFor("merge", () => this.merge(task)))
+  }
+
+  tick(cx: Context): void {
+    if (this.reading.kind !== "ok") return
+    this.answers.sync(cx, this.reading.value.items)
+    if (this.visible && this.window.leftDrawnBand(this.scroll)) cx.notify()
   }
 
   askMerge(item: InboxApproval): void {
@@ -66,9 +73,12 @@ export default class OrcInbox extends View {
     if (this.reading.kind === "failed") return root.child(div().p(16).text_color(t.blocked).child(this.reading.reason))
     if (this.reading.kind === "reading") return root.child(div().p(16).text_color(t.muted).child("Reading the inbox"))
     const { items, agent } = this.reading.value
-    // An answer holds an input box and press handlers, which the App refuses inside a virtual list row, and a refused row leaves the whole list blank.
-    return root.child(v_flex().id("items").flex_1().min_h_0().overflow_y_scrollbar().p(16).gap(12)
-      .children(items.length === 0 ? [div().text_color(t.muted).child("No task awaits you")] : items.map((item) => this.answers.item(t, item, (approval) => this.askMerge(approval))))
-      .children(this.agentAttention.render(t, agent)))
+    const row = this.window.rows(this.scroll, items)
+    const history = this.agentAttention.expanded ? "expanded-history" : "collapsed-history"
+    return root.child(v_flex().id("items").flex_1().min_h_0().overflow_y_scrollbar().track_scroll(this.scroll).p(inboxPadding).gap(inboxGap)
+      .children(items.length === 0 ? [div().text_color(t.muted).child("No task awaits you")] : items.map((item) =>
+        row(item.key, () => this.answers.item(t, item, (approval) => this.askMerge(approval)))))
+      .children(items.length === 0 ? this.agentAttention.render(t, agent) : this.agentAttention.shows(agent) ? [row(history, () =>
+        v_flex().id("agent-section").flex_shrink_0().children(this.agentAttention.render(t, agent)))] : []))
   }
 }

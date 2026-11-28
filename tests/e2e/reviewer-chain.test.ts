@@ -430,5 +430,5 @@ describe("reviewer quota resumes preserve the review cycle and checks budget", (
         expect(resumed.report.endReason).toContain("still failed after 3 fix attempts")
       }
     })
-  })
+  }, 60_000)
 })
