@@ -75,7 +75,7 @@ jobs:
       # npm takes a trusted publish only from the Node it set up with its registry.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: "24"
+          node-version: "26"
           registry-url: https://registry.npmjs.org
       # The binaries job skips on a push that is no release commit, so there is nothing to download.
       - if: needs.binaries.result == 'success'
