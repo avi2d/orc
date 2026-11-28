@@ -1,5 +1,5 @@
 import { type Context, type Element, div } from "gpui-kit"
-import { Avatar, AvatarFallback, AvatarImage, h_flex, v_flex } from "gpui-base"
+import { Avatar, AvatarFallback, AvatarImage, v_flex } from "gpui-base"
 import { hasLinks } from "./links"
 import { linkedText } from "./links-view"
 import { exec, nextCommand } from "herdr"

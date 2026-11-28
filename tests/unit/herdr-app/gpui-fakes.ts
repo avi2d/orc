@@ -1,6 +1,5 @@
 import { mock } from "bun:test"
 import type { AsyncContext, Context } from "gpui-kit"
-import type { themes } from "herdr"
 import type { AgentsDocuments } from "../../../packages/herdr-app/src/agents-read"
 import type { InboxDocuments } from "../../../packages/herdr-app/src/inbox-read"
 import fixture from "../../fixtures/attention/herdr-app.json"
@@ -181,10 +180,11 @@ const paper = {
   background: "#ffffff", surface: "#ffffff", chrome: "#f1f1ee", raised: "#f6f6f6",
   working: "#9a6700", blocked: "#c93c2c", done: "#2f6fe4"
 }
-const installedThemes = [
-  { name: "Graphite", light: false, colors: graphite },
-  { name: "Paper", light: true, colors: paper }
-] satisfies ReturnType<typeof themes>
+const dawn = { ...paper, background: "#f4ecd8", surface: "#f4ecd8", chrome: "#e9dfc6", raised: "#faf4e4" }
+const dusk = { ...graphite, background: "#0b1220", surface: "#0b1220", chrome: "#070b14", raised: "#1a2236" }
+const installedColors: Readonly<Record<string, Record<string, string>>> = {
+  Graphite: graphite, Paper: paper, "Auto (light)": dawn, "Auto (dark)": dusk
+}
 
 void mock.module("herdr", () => ({
   run: (name: string, args: unknown) => ran.push({ name, args }),
@@ -194,8 +194,8 @@ void mock.module("herdr", () => ({
     executed.push(line)
     return line === "orc attention --json" && stalledAttention.pending !== null ? stalledAttention.pending : reply(line)
   },
-  shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => installedThemes.find((entry) => entry.name === appSettings["theme"])?.colors ?? graphite,
-  settings: () => appSettings, themes: () => installedThemes, openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined
+  shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => installedColors[String(appSettings["theme"])] ?? {},
+  settings: () => appSettings, openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined
 }))
 
 interface OpenTask {

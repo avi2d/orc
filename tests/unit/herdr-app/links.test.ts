@@ -210,25 +210,37 @@ test("keeps dark cards readable in a light app and never uses the theme's status
   }
 })
 
-const themedLinkColor = async (name: string | null): Promise<string> => {
+const themedLink = async (name: string): Promise<Node> => {
   const { linkedText } = await import("../../../packages/herdr-app/src/links-view")
-  appSettings["theme"] = name ?? undefined
+  appSettings["theme"] = name
   try {
     const link = nativeLinks(linkedText("job", job)).at(0)
     if (link === undefined) throw new Error("Missing themed job link")
-    return colorOf(link, "text_color")
+    return link
   } finally {
     appSettings["theme"] = "Graphite"
   }
 }
 
-test("uses dark link colours when the active theme name is missing or matches no entry instead of a light entry's", async () => {
-  const dark = await themedLinkColor("Graphite")
-  const light = await themedLinkColor("Paper")
-  expect(light).not.toBe(dark)
-  expect(await themedLinkColor("paper")).toBe(dark)
-  expect(await themedLinkColor("Retired Light")).toBe(dark)
-  expect(await themedLinkColor(null)).toBe(dark)
+test("reads 4.5:1 link contrast from the resolved theme background instead of the theme's name", async () => {
+  const { palette } = await import("../../../packages/herdr-app/src/palette")
+  const colors = new Set<string>()
+  for (const name of ["Graphite", "Paper", "Auto (light)", "Auto (dark)"]) {
+    const link = await themedLink(name)
+    appSettings["theme"] = name
+    try {
+      checkLinkContrast(link, [palette().background])
+    } finally {
+      appSettings["theme"] = "Graphite"
+    }
+    colors.add(colorOf(link, "text_color"))
+  }
+  expect(colors.size).toBe(2)
+})
+
+test("keeps the dark link colours when the theme has no valid background instead of the light ones", async () => {
+  const dark = colorOf(await themedLink("Graphite"), "text_color")
+  expect(colorOf(await themedLink("Retired theme"), "text_color")).toBe(dark)
 })
 
 const linksOnSurfaces = (element: object | string, surface: string | null): ReadonlyArray<{ readonly link: Node; readonly surface: string | null }> => {

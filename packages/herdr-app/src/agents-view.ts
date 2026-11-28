@@ -90,12 +90,15 @@ interface SendBackShown {
   readonly send: (cx: Context) => void
 }
 
+const sendBackResult = (t: Palette, card: Card, sent: Reading<string>): Element => {
+  if (sent.kind === "failed") return alert(t, "send-back-failed", { tone: "error", title: "Could not send it back", body: sent.reason })
+  const resultText = card.sendBack === null ? linkedText : linkedCardText
+  return resultText("send-back-result", sent.kind === "reading" ? "Sending it back" : sent.value.trim()).text_size(12).text_color(t.muted).whitespace_normal()
+}
+
 const sendBackBody = (t: Palette, card: Card, back: SendBackShown, withLink: boolean): ReadonlyArray<Element> => {
   const sent = back.sent
-  const resultText = card.sendBack === null ? linkedText : linkedCardText
-  const said = sent === null ? [] : [sent.kind === "failed"
-    ? alert(t, "send-back-failed", { tone: "error", title: "Could not send it back", body: sent.reason })
-    : resultText("send-back-result", sent.kind === "reading" ? "Sending it back" : sent.value.trim()).text_size(12).text_color(t.muted).whitespace_normal()]
+  const said = sent === null ? [] : [sendBackResult(t, card, sent)]
   if (card.sendBack === null) return sent?.kind === "ok" ? said : []
   const ready = sendBackArgs(card, back.review.value()) !== null && sent?.kind !== "reading"
   const label = sent?.kind === "reading" ? "Sending back" : "Send back"
