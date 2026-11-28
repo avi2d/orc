@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { type StepTab, buildCards, cardAnswers, filterCards, lastTab, openedFilter, projectsOf, railLabel, sendBackArgs, stepTabs } from "../../../packages/herdr-app/src/agents"
 import { durationLabel, rowFacts, shortModel, shortTitle, vendorOf } from "../../../packages/herdr-app/src/agent-row"
 import { namedModels, opensTurns, runFacts } from "../../../packages/herdr-app/src/run-agent"
-import { projectMenu } from "../../../packages/herdr-app/src/run-menus"
+import { projectMenu, projectMenuPosition } from "../../../packages/herdr-app/src/run-menus"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 import type { InboxAnswer, InboxApproval } from "../../../packages/herdr-app/src/inbox"
 import { askText } from "../../../packages/herdr-app/src/thread"
@@ -248,9 +248,13 @@ describe("the runs list", () => {
     expect(filterCards(board, { project: "herdr", allRuns: false }, "orc-48")).toEqual([])
   })
 
+  test("the project menu stays below and right-aligned with its selector, not at the panel edge", () => {
+    expect(projectMenuPosition()).toEqual({ left: 108, top: 46 })
+  })
+
   test("each Project choice counts the runs it would show, not the whole list", () => {
     expect(projectMenu(board, { project: null, allRuns: false }).choices.map(({ name, count }) => [name, count])).toEqual([
-      ["All", 6], ["herdr", 1], ["orc", 5], ["All runs", 6]
+      ["Configured projects", 6], ["herdr", 1], ["orc", 5], ["All runs", 6]
     ])
   })
 
@@ -258,7 +262,7 @@ describe("the runs list", () => {
     const filter = { project: "herdr", allRuns: false } as const
     const refreshed = buildCards(runs([run("20261113-100000-ffffff", { status: "running" })]), backlog([task("orc-50", {}), task("orc-51", {})]))
     expect(projectMenu(refreshed, filter).chosen).toEqual({ value: { project: "herdr", allRuns: false }, name: "herdr", count: 0 })
-    expect(projectMenu(refreshed, filter).choices.map(({ name }) => name)).toEqual(["All", "orc", "All runs"])
+    expect(projectMenu(refreshed, filter).choices.map(({ name }) => name)).toEqual(["Configured projects", "orc", "All runs"])
   })
 })
 
