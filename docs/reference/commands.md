@@ -531,7 +531,7 @@ Closes one item with your words. A review question or an overdue wait is
 answered with orc backlog answer instead.
 
 Examples:
-  orc attention answer orc-9.run-died restarted it by hand
+  orc attention answer orc-9.run-died.2026-11-20T12_00_00_000Z restarted it
 ```
 
 ### orc beat

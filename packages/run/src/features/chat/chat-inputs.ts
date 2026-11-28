@@ -50,7 +50,7 @@ export const AnswerInput = Schema.Struct({
 
 export const AttentionAnswerInput = Schema.Struct({
   id: Schema.String.check(Schema.isNonEmpty()).annotate({
-    description: "The id of the open attention item, as orc_attention returns it, such as orc-9.run-died"
+    description: "The id of the open attention item, as orc_attention returns it, such as orc-9.run-died.2026-11-20T12_00_00_000Z"
   }),
   words: Schema.String.check(Schema.isNonEmpty()).annotate({ description: "The captain's answer, word for word" })
 })
