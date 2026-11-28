@@ -65,14 +65,16 @@ export const readReply = (run: Pick<HistoryRun, "fs">, sessionFile: string | nul
 const recordReview = (
   run: Pick<HistoryRun, "fs" | "path" | "runDir">,
   findings: ReadonlyArray<ReviewFinding>,
-  attempt: number
+  attempt: number,
+  sessionFile: string | null
 ): Effect.Effect<ReviewOutcome> =>
   Effect.gen(function*() {
     const file = run.path.join(run.runDir, attempt === 1 ? reviewFileName : "review-" + attempt.toString() + ".json")
     const written = yield* run.fs.writeFileString(file, JSON.stringify(findings, null, 2) + "\n").pipe(Effect.result)
+    const session = sessionFile === null ? {} : { sessionFile }
     return Result.isSuccess(written)
-      ? { status: "passed", findings, file }
-      : { status: "failed", reason: "orc cannot write " + file + ": " + written.failure.message }
+      ? { status: "passed", findings, file, ...session }
+      : { status: "failed", reason: "orc cannot write " + file + ": " + written.failure.message, ...session }
   })
 
 export const runReviewTurn = (
@@ -95,20 +97,23 @@ export const runReviewTurn = (
     let prompt = first
     let resumeSession: string | null = null
     let problem = ""
+    let sessionFile: string | null = null
+    const session = () => sessionFile === null ? {} : { sessionFile }
     for (let answer = 1; answer <= maxReviewAnswers; answer += 1) {
-      const result: Result.Result<AgentRunResult, OrcRunError> = yield* runAgent({ agent: { ...reviewer, tools: readOnlyTools }, prompt, logFile: "review-" + answer.toString() + ".log", resumeSession, withoutAsks: true, onSession: () => Effect.void }).pipe(Effect.result)
+      const result: Result.Result<AgentRunResult, OrcRunError> = yield* runAgent({ agent: { ...reviewer, tools: readOnlyTools }, prompt, logFile: "review-" + answer.toString() + ".log", resumeSession, withoutAsks: true, onSession: (file) => Effect.sync(() => { sessionFile = file }) }).pipe(Effect.result)
       if (Result.isFailure(result)) {
-        return { status: "failed", reason: result.failure.message }
+        return { status: "failed", reason: result.failure.message, ...session() }
       }
+      sessionFile = result.success.sessionFile ?? sessionFile
       const findings = readFindings(yield* readReply(run, result.success.sessionFile), mode)
       if (Result.isSuccess(findings)) {
-        return yield* recordReview(run, findings.success, attempt)
+        return yield* recordReview(run, findings.success, attempt, sessionFile)
       }
       problem = findings.failure
       resumeSession = result.success.sessionFile ?? resumeSession
       prompt = resumeSession === null ? first + "\n" + rerunPrompt(problem) : rerunPrompt(problem)
     }
-    return { status: "failed", reason: "the reviewer gave " + maxReviewAnswers.toString() + " answers orc could not read, the last because " + problem }
+    return { status: "failed", reason: "the reviewer gave " + maxReviewAnswers.toString() + " answers orc could not read, the last because " + problem, ...session() }
   })
 
 export const reviewAtHead = (
@@ -127,7 +132,7 @@ export const reviewAtHead = (
     const reusable = head !== "" && Option.isSome(decoded) && decoded.value.head === head ? decoded.value : null
     const reusedFrom = reusable !== null && priorDir !== null ? run.path.basename(priorDir) : null
     const outcome = reusable !== null
-      ? yield* recordReview(run, reusable.outcome.findings, 1)
+      ? yield* recordReview(run, reusable.outcome.findings, 1, null)
       : yield* runReviewTurn(run, runAgent, reviewer)
     if (outcome.status === "passed" && head !== "") {
       const file = run.path.join(run.runDir, checkpointFileName)

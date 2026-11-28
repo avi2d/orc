@@ -112,7 +112,7 @@ describe("the direct-PR review turn decodes the reviewer's findings", () => {
     expect(runs[0]?.prompt).toContain("The task sits in " + join(sessionDir, "task.md") + ".")
     expect(runs[0]?.prompt).toContain("The branch diff sits in " + join(sessionDir, "diff.md") + ".")
     expect(diff).toContain("+change")
-    expect(outcome).toEqual({ status: "passed", findings: [finding], file: join(runDir, "review.json") })
+    expect(outcome).toEqual({ status: "passed", findings: [finding], file: join(runDir, "review.json"), sessionFile: join(runDir, "review-1.jsonl") })
     expect(JSON.parse(saved ?? "null")).toEqual([finding])
   })
 
@@ -122,6 +122,7 @@ describe("the direct-PR review turn decodes the reviewer's findings", () => {
     expect(runs[1]?.resumeSession).toEndWith("review-1.jsonl")
     expect(runs[1]?.prompt).toContain("orc could not read your findings")
     expect(outcome).toMatchObject({ status: "passed", findings: [] })
+    expect(outcome.sessionFile).toEndWith("review-2.jsonl")
     expect(saved).toBe("[]\n")
   })
 

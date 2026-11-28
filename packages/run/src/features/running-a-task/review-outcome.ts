@@ -31,6 +31,6 @@ export type ReviewFinding = typeof ReviewFinding.Type | typeof OrcReviewFinding.
 
 export const RecordedReview = Schema.Struct({ status: Schema.Literal("passed"), findings: Schema.Array(Schema.Union([ReviewFinding, OrcReviewFinding])), file: Schema.String })
 
-export type ReviewOutcome = typeof RecordedReview.Type | { readonly status: "failed"; readonly reason: string }
+export type ReviewOutcome = (typeof RecordedReview.Type | { readonly status: "failed"; readonly reason: string }) & { readonly sessionFile?: string }
 
 export type ReviewAtHeadOutcome = ReviewOutcome & { readonly reusedFrom: string | null }

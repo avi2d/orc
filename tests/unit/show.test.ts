@@ -418,7 +418,7 @@ describe("formatShow", () => {
         await fixture(db)
         const reviewer = { path: "bundled/reviewer.md", model: "acme/reviewer", thinking: "high" as const }
         await Effect.runPromise(recordReviewStart(db, "show-1", reviewer, 1, "2026-10-18T10:03:00.000Z"))
-        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, 1, { status: "passed", findings: [], file: "/tmp/show-home/runs/show-1/review.json", reusedFrom: null }, "2026-10-18T10:03:00.000Z", "2026-10-18T10:05:30.000Z"))
+        await Effect.runPromise(recordReviewDone(db, "show-1", reviewer, 1, { status: "passed", findings: [], file: "/tmp/show-home/runs/show-1/review.json", sessionFile: "/tmp/show-home/runs/show-1/sessions/review.jsonl", reusedFrom: null }, "2026-10-18T10:03:00.000Z", "2026-10-18T10:05:30.000Z"))
         const document = await Effect.runPromise(readShow(db, "show-1"))
         if (document === null) {
           throw new Error("missing fixture")
@@ -428,6 +428,7 @@ describe("formatShow", () => {
         expect(review).toContain("step review #1: passed")
         expect(review).toContain("  model: acme/reviewer")
         expect(review).toContain("  minutes: 2.5")
+        expect(review).toContain("  session: file:///tmp/show-home/runs/show-1/sessions/review.jsonl")
         expect(review).toContain("  signal review-findings: 0")
         expect(review).toContain("  evidence out review: file:///tmp/show-home/runs/show-1/review.json")
       } finally {
