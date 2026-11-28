@@ -2,7 +2,7 @@ import { type Context, type Element, div } from "gpui-kit"
 import { type InputState, h_flex, v_flex } from "gpui-base"
 import { type Card, type CardStatus, type Filter, cardStatuses, filterCards, railLabel, unfoldedCards } from "./agents"
 import { type RowFacts, rowFacts } from "./agent-row"
-import { type AlertAction, type AlertShown, alert, button, field, statusDot, vendorLogo, zinc } from "./kit"
+import { type AlertAction, type AlertShown, alert, button, field, selectTrigger, statusDot, vendorLogo, zinc } from "./kit"
 import type { palette } from "./palette"
 import type { RunFacts } from "./run-agent"
 import { projectMenu, projectMenuPosition, runsHeader } from "./run-menus"
@@ -168,17 +168,11 @@ const menuList = (t: Palette, all: ReadonlyArray<Card>, filter: Filter, act: Run
 
 const titleRow = 28
 
-const header = (t: Palette, all: ReadonlyArray<Card>, shown: RunsShown, act: RunsActions): Element => {
-  const choice = projectMenu(all, shown.filter).chosen.name
-  const label = shown.filter.project === null && !shown.filter.allRuns ? "Projects" : choice
-  return h_flex().px(headerPadding).pt(headerTop).pb(8).gap(headerGap).items_center().border_b(1).border_color(t.border)
+const header = (t: Palette, all: ReadonlyArray<Card>, shown: RunsShown, act: RunsActions): Element =>
+  h_flex().px(headerPadding).pt(headerTop).pb(8).gap(headerGap).items_center().border_b(1).border_color(t.border)
     .child(field(shown.find, controlHeight))
-    .child(h_flex().id("filter-project").w(selectorWidth).h(controlHeight).px(10).flex_none().items_center().gap(6).rounded(8).bg(zinc.s2).text_size(13).text_color(t.foreground)
-      .cursor_pointer().hover((style) => style.bg(zinc.s3)).tooltip(choice)
-      .on_mouse_down("left", (_event, cx) => act.openMenu(cx, !shown.menuOpen))
-      .child(div().flex_1().min_w_0().truncate().child(label)).child(div().text_color(zinc.muted).child("▾")))
+    .child(selectTrigger(t, "filter-project", projectMenu(all, shown.filter).chosen.name, controlHeight, selectorWidth, (cx) => act.openMenu(cx, !shown.menuOpen)))
     .child(button(t, "fold", "«", "ghost", 24, act.toggleFold).w(foldWidth))
-}
 
 const rail = (t: Palette, shown: RunsShown, act: RunsActions): Element => {
   const cards = shown.list.kind === "ok" ? unfoldedCards(filterCards(shown.list.cards, shown.filter, findWords(shown)), shown.foldedGroups) : []
