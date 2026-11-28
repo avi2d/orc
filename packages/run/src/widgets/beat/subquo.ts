@@ -1,3 +1,4 @@
+import { subquoWindowOf } from "@avi2dg/orc-schema"
 import { Result, Schema } from "effect"
 import { duplicateOf } from "../../shared/config/index"
 import type { AccountReading } from "./quota-command"
@@ -10,16 +11,7 @@ const Timestamp = Schema.String.check(Schema.makeFilter((value) => {
 }))
 const Label = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9_-]{0,63}$/))
 const FailureCode = Schema.Literals(["timeout", "rate_limited", "auth_required", "auth_unverified"])
-const Window = Schema.Union([
-  Schema.Struct({ id: Label, scope: Schema.optionalKey(Label), percentLeft: Schema.Null, resetsAt: Schema.Null, status: Schema.Literal("not_returned") }),
-  Schema.Struct({
-    id: Label,
-    scope: Label,
-    percentLeft: Schema.NullOr(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 }))),
-    resetsAt: Schema.NullOr(Timestamp),
-    status: Schema.optionalKey(Schema.String)
-  })
-])
+const Window = subquoWindowOf(Timestamp)
 type SubquoWindow = typeof Window.Type
 type KnownWindow = SubquoWindow & { readonly percentLeft: number; readonly resetsAt: string }
 const Windows = Schema.NonEmptyArray(Window)
