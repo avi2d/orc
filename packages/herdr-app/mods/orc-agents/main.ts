@@ -138,8 +138,12 @@ export default class OrcAgents extends View {
         if (this.list.kind === "ok" && sameLocalAgents(this.local, reading.value)) {
           this.list = { ...this.list, reread: null }
         } else {
-          this.local = reading.value
-          this.showCards(cx, null)
+          // Parsing a changed backlog fills most of a frame, so the cards are built after the next frame draws.
+          return cx.sleep(0).then(() => {
+            this.local = reading.value
+            this.showCards(cx, null)
+            return this.readSelected(cx)
+          })
         }
       } else if (this.list.kind === "ok") {
         this.list = { ...this.list, reread: reading.kind === "failed" ? { reason: reading.reason, listed: this.listed } : null }
@@ -147,12 +151,16 @@ export default class OrcAgents extends View {
         this.local = null
         this.list = reading
       }
-      cx.notify()
-      if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {
-        this.review.set_value("")
-      }
-      return Promise.all([this.readSelectedRun(), this.readSelectedThread(), this.readSelectedChanges()]).then(() => undefined)
+      return this.readSelected(cx)
     })
+  }
+
+  readSelected(cx: Context): Promise<void> {
+    cx.notify()
+    if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {
+      this.review.set_value("")
+    }
+    return Promise.all([this.readSelectedRun(), this.readSelectedThread(), this.readSelectedChanges()]).then(() => undefined)
   }
 
   readSelectedThread(): Promise<void> {
