@@ -1,4 +1,4 @@
-import { type Guard, type Guarded, absentOrString, arrayOf, child, fields, literal, namedFields, number, ok, oneOf, string } from "./guard"
+import { type Guard, type Guarded, absentOrString, arrayOf, child, fields, literal, namedFields, nullableString, number, ok, oneOf, refused, string } from "./guard"
 
 export type Known<A> =
   | { readonly kind: "ok"; readonly value: A }
@@ -40,15 +40,18 @@ const answer = <A>(value: unknown, at: string, body: (record: Fields, at: string
   return ok({ kind: "ok", value: inner.value })
 }
 
-export interface QuotaWindow {
+interface QuotaReading {
   readonly account: string
   readonly label: string
-  readonly startsAt: string
   readonly resetsAt: string
   readonly usedPoints: number
   readonly leftPoints: number
-  readonly elapsedFraction: number
 }
+
+export type QuotaWindow = QuotaReading & (
+  | { readonly startsAt: string; readonly elapsedFraction: number }
+  | { readonly startsAt: null; readonly elapsedFraction: null }
+)
 
 const quotaWindow: Guard<QuotaWindow> = (value, at) => {
   const record = fields(value, at)
@@ -59,7 +62,7 @@ const quotaWindow: Guard<QuotaWindow> = (value, at) => {
   if (title.kind === "refused") return title
   const label = string(record.value, "label", at)
   if (label.kind === "refused") return label
-  const startsAt = string(record.value, "startsAt", at)
+  const startsAt = nullableString(record.value, "startsAt", at)
   if (startsAt.kind === "refused") return startsAt
   const resetsAt = string(record.value, "resetsAt", at)
   if (resetsAt.kind === "refused") return resetsAt
@@ -67,17 +70,18 @@ const quotaWindow: Guard<QuotaWindow> = (value, at) => {
   if (usedPoints.kind === "refused") return usedPoints
   const leftPoints = number(record.value, "leftPoints", at)
   if (leftPoints.kind === "refused") return leftPoints
-  const elapsedFraction = number(record.value, "elapsedFraction", at)
+  const elapsedFraction = record.value["elapsedFraction"] === null ? ok(null) : number(record.value, "elapsedFraction", at)
   if (elapsedFraction.kind === "refused") return elapsedFraction
-  return ok({
+  const reading = {
     account: title.value,
     label: label.value,
-    startsAt: startsAt.value,
     resetsAt: resetsAt.value,
     usedPoints: usedPoints.value,
-    leftPoints: leftPoints.value,
-    elapsedFraction: elapsedFraction.value
-  })
+    leftPoints: leftPoints.value
+  }
+  if (startsAt.value === null && elapsedFraction.value === null) return ok({ ...reading, startsAt: null, elapsedFraction: null })
+  if (startsAt.value === null || elapsedFraction.value === null) return refused(at, "complete cycle timing", value)
+  return ok({ ...reading, startsAt: startsAt.value, elapsedFraction: elapsedFraction.value })
 }
 
 interface QuotaAccount {
@@ -243,11 +247,11 @@ const usedShare = (window: QuotaWindow): number => {
   return total === 0 ? 0 : window.usedPoints / total
 }
 
-export const pastPace = (window: QuotaWindow): boolean => usedShare(window) > window.elapsedFraction
+export const pastPace = (window: QuotaWindow): boolean => window.elapsedFraction !== null && usedShare(window) > window.elapsedFraction
 
 // At a steady pace the window empties at start + elapsed / usedShare, which is before the reset exactly when pastPace holds.
 export const runsOutAt = (window: QuotaWindow): number | null => {
-  if (!pastPace(window)) return null
+  if (window.startsAt === null || !pastPace(window)) return null
   const start = Date.parse(window.startsAt)
   const elapsed = window.elapsedFraction * (Date.parse(window.resetsAt) - start)
   return start + elapsed / usedShare(window)
@@ -257,7 +261,7 @@ export interface WindowRow {
   readonly label: string
   readonly usedPercent: number
   readonly filled: number
-  readonly notch: number
+  readonly notch: number | null
   readonly red: boolean
   readonly resets: string
   readonly runsOut: string | null
@@ -276,7 +280,7 @@ const windowRow = (window: QuotaWindow, now: number): WindowRow => {
     label: window.label,
     usedPercent: Math.round(usedShare(window) * 100),
     filled: share(usedShare(window)),
-    notch: share(window.elapsedFraction),
+    notch: window.elapsedFraction === null ? null : share(window.elapsedFraction),
     red: pastPace(window),
     resets: countdown(resetsAt - now),
     runsOut: runsOut === null ? null : countdown(runsOut - now)

@@ -15,33 +15,114 @@ A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: 
 ## Orc delivery
 An `orc` run fetches `origin` and rebases its branch onto the default branch recorded by `refs/remotes/origin/HEAD` before running the project checks.
 If the rebase fails, the run does not open a PR.
-After the checks pass, the run pushes the branch and opens or reuses a PR.
-The run does not perform a review or wait for a CI verdict.
+After the checks pass, the run reviews the branch and fixes findings in up to two rounds by default.
+Set `review.maxFixRounds` in `$ORC_HOME/config.json` to a positive integer to change the limit.
+When the first round runs, it sends every finding to the fixer, except findings marked `ask-user`.
+Later rounds send only `error` findings.
+The loop stops when no fixable `error` or `warning` remains, the round limit is reached, a finding repeats, or no finding meets the later rounds' severity bar.
+Findings marked `ask-user` do not stop the loop.
+The PR body lists them under findings that need a person.
+The run's end reason records why the loop stopped.
+The run history records each review turn as its own `review` step, numbered by attempt.
+If a review turn fails, a fix does not finish, or a check fails after a fix, the run stops without opening a PR.
+Otherwise, the run pushes the branch and opens or reuses a PR.
+The run does not wait for a CI verdict.
 To select this delivery for a project, set its `mode` to `orc` in `projects.json`.
 For a run or resume you start by hand, pass `--delivery orc`.
 
 ## Review the branch
-Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one [Pi](https://pi.dev) turn with the reviewer agent over that diff and the task file.
-Orc decodes the findings JSON array from the reviewer's last reply and writes it to `review.json` in the run folder.
-An unreadable reply gets one rerun on the same session, and a second unreadable reply fails the review turn.
+After local checks pass, orc writes the branch diff to `diff.md` in the session folder.
+A [Pi](https://pi.dev) reviewer reads the diff and task file.
+In `orc` delivery, orc also reads the `path_instructions` list under `review` in `.no-mistakes.yaml` in the run's worktree.
+Each entry holds a `path` glob and its `instructions`.
+Orc adds each entry whose glob matches a changed file to the review prompt, and the reviewer names that glob in each finding the entry raises.
+An entry missing either string fails the review turn.
+Orc decodes the findings JSON array from the reviewer's last reply and writes it to the run folder as `review.json`, then `review-2.json`, `review-3.json` and so on in later orc turns.
+An unreadable reply gets one rerun on the same session, and a second one fails the review turn.
 The run's end reason names the finding count or the review failure.
-The run history records the turn as the `review` step with its start and end time and the reviewer's model.
-A passed `review` step names `review.json` as evidence and gives the finding count as the `review-findings` signal.
+The run history records the turn as the `review` step with its times and the reviewer's model.
+A passed `review` step names its findings file as evidence and gives the finding count as the `review-findings` signal.
 A failed `review` step gives the failure as the `review-failure` signal.
-The review turn fixes nothing and blocks nothing, so the PR opens after it either way.
-After a successful review, if orc can read the branch head, it writes `review-checkpoint.json` in the run folder with the head and findings.
+In `direct-PR` delivery, the review turn fixes nothing, and a review failure does not block opening the PR.
+After a successful `direct-PR` review, if orc can read the branch head, it writes `review-checkpoint.json` in the run folder with the head and findings.
 A resumed direct-PR run reads the previous run's checkpoint and reuses the completed review when the branch head is unchanged.
-It writes the findings to `review.json` and a new checkpoint in the current run folder.
+It writes `review.json` and a new checkpoint in the current run folder.
 If the head changed or no completed review was recorded, orc runs the review turn.
-Failed review turns are not recorded for reuse, so a resume retries them.
-A checkpoint write failure does not block the PR, but the next resume runs the review again.
+A checkpoint write failure does not block the PR, but the next resume reviews again.
+
+## Reviewer chain
+The optional `reviewers` list in `config.json` gives an `orc` run an ordered chain of reviewers, as [Configuring providers](configuring-providers.md#reviewer-chain) shows.
+Without it, the review turn runs the reviewer agent on its usual model.
+With it, orc picks the reviewer before each review turn:
+
+1. Orc runs the quota command in `dispatch.json` once, as [Accounts on other providers](backlog-configuration.md#accounts-on-other-providers) describes.
+2. Orc skips every provider that ran an implementation or fix step on this branch, in any run, even when the step was interrupted or made no commit.
+3. For each other entry, orc reads the quota account that holds the provider's default credential in `config.json`, because the review turn runs on that credential.
+4. Orc takes the first entry whose account is at or above `floorPercent`, and the review turn runs the reviewer agent on that entry's model.
+
+The account that holds the default credential is one of these:
+
+- For a `token-file` provider, the `token-file` account whose `tokenFile` is the provider's token file.
+- For a `package` provider whose `env` names `CLAUDE_CONFIG_DIR`, the `claude-config` account with that folder.
+- For any other provider, its one account in the quota.
+
+Another account on the same provider does not count, even with room.
+An unreadable quota, or no account that holds the default credential, counts as no room.
+The run log names the chosen model, its place and each entry passed over, with the reason.
+A chain reviewer runs Pi with its own provider's credential.
+For a `token-file` or `package` provider, it runs from its own Pi folder `reviewer-agent-<position>` in the run folder.
+The [nono](https://nono.sh) sandbox carries one provider's credential, so a reviewer chain needs `--sandbox none`.
+
+## No reviewer room
+When no entry qualifies, Orc records `NoReviewerRoom` and does not open a PR.
+The run history records the `review` step as failed with no model, and the `review-failure` signal holds the reason.
+The beat parks the task with that reason and checks reviewer quota on the machine where the run stopped.
+When a reviewer qualifies, the beat resumes the same branch.
+The resumed run keeps the implementation, runs the checks again and then runs the pending review turn.
+It keeps the fix rounds the parked run spent and its ask-user findings for the PR body, so the two-round cap holds across the wait.
+It does not apply again a send-back that the parked run already applied.
+A new send-back runs the implementer again and starts a fresh review cycle with up to two fix rounds.
+The resumed run excludes the providers saved when it parked.
+An account that dispatch assigns to the resumed run can still review until its provider runs an implementation or fix step.
+If the run parks again, it saves the updated list of excluded providers for the beat.
 
 ## Open the PR
 After the review turn, a direct-PR run runs `git push --set-upstream origin <branch>` from the run's worktree.
 It reuses the open PR for the branch when `gh pr list --head <branch> --state open` finds one, and otherwise runs `gh pr create`.
-The PR's title is the head commit's subject, and its body lists the branch's commits and the local checks that passed.
+The PR's title is the head commit's subject.
+Orc keeps the body as `pr-body.md` in the run folder and records the step as `pr`.
 To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
-Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
+
+## The PR body
+The body keeps the same headings in the same order on every run.
+`## Why` holds the one sentence that the diagram turn writes from the branch diff, never text from the task file.
+When the turn returns no such sentence, or the sentence repeats eight consecutive words from the task file, it holds `No reason was recorded for this change; see What changed.`
+When the task file cannot be read, the reason is kept.
+`## What changed` lists the branch's commits.
+`## How it fits` carries a `mermaid` diagram when the change alters a flow, a structure or a boundary, and the run leaves the heading out otherwise.
+A further Pi turn writes the `## Why` sentence and draws that diagram after the push, and only when `gh pr create` is about to run.
+A run that opens no PR, and a run that reuses an open PR, skip it.
+A reply without a `mermaid` fence leaves the heading out, and so does a diagram that repeats eight consecutive words from the task file.
+When the task file cannot be read, the diagram is kept.
+`## How it was checked` names the local checks that passed and the review result.
+A review with no findings gives the line `The review found nothing.`, and a failed review turn gives `The review turn failed, so this PR lists no review findings.`
+`## Open review findings` lists each open finding with its severity, id, file and line, description and action, and the run leaves the heading out when no finding is open.
+`## Findings that need a person` follows it and lists each open `ask-user` finding the same way, and the run leaves the heading out when none is open.
+
+## Findings left open
+After a successful review and any fix rounds, an `orc` run opens its PR the same way, with the remaining findings.
+Findings that remain after the fix rounds do not stop the PR.
+Under each remaining finding, a nested line says why the fix loop left it.
+An `ask-user` finding stays out of the fixer input and remains in the PR body.
+If a later review reports the same finding again, its wording and action replace the earlier report.
+When a later round is available, a `warning` or `info` finding is below its severity bar, which fixes only errors.
+If no fix round runs because no fixable `error` or `warning` remains, the reason line names that stop.
+If no fix round is left, the reason line names the round limit.
+A repeat has the same file and topic as a finding the fixer received earlier.
+Only findings eligible for the next fix round can trigger the repeat stop.
+The reviewer supplies a stable topic slug for each finding and keeps it across review rounds.
+A finding without a topic fails decoding and follows the unreadable-reply retry rule.
+The reason line names the match and the round, or the stop that left the finding open.
 
 ## After the PR opens
 A direct-PR run succeeds as soon as the PR opens.

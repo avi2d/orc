@@ -4,8 +4,10 @@ import type { CommandResult } from "../../shared/sandbox/index"
 import type { OrcRunError } from "../../shared/lib/index"
 import type { AllowWord, NoMistakesRecord, OpenQuestion, QuestionAnswer } from "../../entities/review-gate/index"
 import type { DirectPrRecord } from "../../entities/pull-request/index"
-import type { ChecksRoundSummary, OrcRunCommit, RecordedFixAttempt } from "./run-record"
+import type { ChecksRoundSummary, OrcRunCommit, RecordedFixAttempt } from "../../entities/run-history/index"
 import type { ReviewAtHeadOutcome } from "./review-outcome"
+import type { NoReviewerRoom } from "./reviewer-chain"
+import type { ReviewWaitCheckpoint } from "./review-wait-checkpoint"
 
 export interface AgentRun {
   readonly agent: AgentFile
@@ -25,6 +27,18 @@ export interface SandboxOps {
   readonly execCheck: <E>(command: string, onOutput: (text: string) => Effect.Effect<void, E>) => Effect.Effect<CommandResult, OrcRunError | E>
 }
 
+interface PickedReviewer {
+  readonly reviewer: AgentFile
+  readonly runAgent: SandboxOps["runAgent"]
+}
+
+export interface ReviewEligibility {
+  readonly implementerProviders: ReviewWaitCheckpoint["implementerProviders"]
+  readonly resumedForQuota: boolean
+}
+
+export type ReviewerPick = (runAgent: SandboxOps["runAgent"], eligibility: ReviewEligibility) => Effect.Effect<PickedReviewer, NoReviewerRoom | OrcRunError>
+
 export interface ResumePlan {
   readonly implementSessionId: string | null
   readonly implementSessionFile: string | null
@@ -41,6 +55,7 @@ export interface ResumePlan {
   readonly handover: string | null
   readonly priorDir: string | null
   readonly cleanupPriorDir: string | null
+  readonly reviewWait?: ReviewWaitCheckpoint
 }
 
 export interface AgentOutcome {
@@ -55,6 +70,7 @@ export interface AgentOutcome {
 }
 
 export interface RunCheckpoints {
+  readonly branchWriterModels: Effect.Effect<ReadonlyArray<string>, OrcRunError>
   readonly implementStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly implementSession: (file: string) => Effect.Effect<void, OrcRunError>
   readonly implementDone: (outcome: AgentOutcome, started: string, ended: string) => Effect.Effect<void, OrcRunError>
@@ -65,8 +81,8 @@ export interface RunCheckpoints {
   readonly fixDone: (fix: RecordedFixAttempt) => Effect.Effect<void, OrcRunError>
   readonly noMistakesStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly noMistakesDone: (record: NoMistakesRecord) => Effect.Effect<void, OrcRunError>
-  readonly reviewStart: (reviewer: AgentFile, started: string) => Effect.Effect<void, OrcRunError>
-  readonly reviewDone: (reviewer: AgentFile, outcome: ReviewAtHeadOutcome, started: string, ended: string) => Effect.Effect<void, OrcRunError>
+  readonly reviewStart: (reviewer: AgentFile, attempt: number, started: string) => Effect.Effect<void, OrcRunError>
+  readonly reviewDone: (reviewer: AgentFile | null, attempt: number, outcome: ReviewAtHeadOutcome, started: string, ended: string) => Effect.Effect<void, OrcRunError>
   readonly pullRequestStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly pullRequestDone: (record: DirectPrRecord) => Effect.Effect<void, OrcRunError>
   readonly questionAsked: (step: AgentStep, question: OpenQuestion) => Effect.Effect<void, OrcRunError>

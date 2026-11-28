@@ -1,6 +1,7 @@
 import { expect, mock, test } from "bun:test"
-import type { AsyncContext, Context } from "gpui-kit"
+import type { Context } from "gpui-kit"
 import fixture from "../../fixtures/attention/herdr-app.json"
+import { cx } from "./gpui-fakes"
 
 let built = 0
 
@@ -10,37 +11,30 @@ const node = (): object => {
   return element
 }
 
-interface Shown {
-  readonly id: unknown
-  readonly count: number
-  readonly row: (index: number, cx: Context) => unknown
+interface Range {
+  readonly start: number
+  readonly end: number
 }
+
+type Shown =
+  | { readonly kind: "list"; readonly id: unknown; readonly count: number; readonly row: (index: number, cx: Context) => unknown }
+  | { readonly kind: "uniform"; readonly id: unknown; readonly count: number; readonly rows: (range: Range, cx: Context) => unknown }
 
 const lists: Array<Shown> = []
 
-const list = (id: unknown, count: number, _key: unknown, row: Shown["row"]): object => {
-  lists.push({ id, count, row })
+const list = (id: unknown, count: number, _key: unknown, row: (index: number, cx: Context) => unknown): object => {
+  lists.push({ kind: "list", id, count, row })
   return node()
 }
 
-const unused = (): never => { throw new Error("Unexpected App context call") }
-class IdleEntity {
-  set_props = unused
-  release = unused
+const uniformList = (id: unknown, count: number, _key: unknown, rows: (range: Range, cx: Context) => unknown): object => {
+  lists.push({ kind: "uniform", id, count, rows })
+  return node()
 }
-const cx: Context = Object.assign(IdleEntity, {
-  stop_propagation: unused, notify: () => undefined, spawn: (body: (task: AsyncContext) => unknown) => {
-    void body(cx)
-    return { cancel: () => undefined, is_done: () => true }
-  },
-  bind_keys: unused, propagate: unused, phase: unused, theme: unused, open_url: unused,
-  read_from_clipboard: unused, write_to_clipboard: unused, focus_handle: unused, sleep: unused,
-  timer: { after: unused, every: unused }
-}) satisfies Context
 
 const documents = new Map<string, unknown>()
 
-void mock.module("gpui-kit", () => ({ View: Object, div: node, list }))
+void mock.module("gpui-kit", () => ({ View: Object, div: node, list, uniform_list: uniformList, image: node, svg: node }))
 void mock.module("gpui-base", () => ({
   h_flex: node, v_flex: node, Input: { new: node }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   Scrollbar: { vertical: node }, ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
@@ -76,48 +70,51 @@ const awaiting = (count: number): void => {
   documents.set("orc runs --json --local", { schema: "orc.runs.v1", runs: [] })
 }
 
-const frame = (render: () => unknown): { readonly built: number; readonly held: ReadonlyArray<number> } => {
+interface Frame {
+  readonly built: number
+  readonly held: ReadonlyArray<number>
+  readonly rangeRows: ReadonlyMap<unknown, number>
+}
+
+const rowsReturned = (rows: unknown): number => Array.isArray(rows) ? rows.length : -1
+
+const frame = (render: () => unknown): Frame => {
   lists.length = 0
   built = 0
   render()
+  const rangeRows = new Map<unknown, number>()
   for (const shown of [...lists]) {
-    for (let index = 0; index < Math.min(shown.count, rowsOnScreen); index += 1) shown.row(index, cx)
+    const onScreen = Math.min(shown.count, rowsOnScreen)
+    if (shown.kind === "uniform") rangeRows.set(shown.id, rowsReturned(shown.rows({ start: 0, end: onScreen }, cx)))
+    else for (let index = 0; index < onScreen; index += 1) shown.row(index, cx)
   }
-  return { built, held: lists.map((shown) => shown.count) }
+  return { built, held: lists.map((shown) => shown.count), rangeRows }
 }
 
-const agentsFrame = async (count: number) => {
+const agentsFrame = async (count: number, folded = false) => {
   const { default: OrcAgents } = await import("../../../packages/herdr-app/mods/orc-agents/main")
   const { readAgents } = await import("../../../packages/herdr-app/src/agents-read")
   awaiting(count)
   const read = await readAgents().finally(() => documents.clear())
   if (read.kind !== "ok") throw new Error(read.kind === "failed" ? read.reason : read.kind)
   const agents = new OrcAgents()
-  agents.cards = { kind: "ok", value: read.value.cards }
+  agents.list = { kind: "ok", cards: read.value.cards, reread: null }
   agents.agent = read.value.agent
-  return frame(() => agents.render(cx))
-}
-
-const inboxFrame = async (count: number) => {
-  const { default: OrcInbox } = await import("../../../packages/herdr-app/mods/orc-inbox/main")
-  const { readInbox } = await import("../../../packages/herdr-app/src/inbox-read")
-  awaiting(count)
-  const view = new OrcInbox()
-  view.reading = await readInbox().finally(() => documents.clear())
-  if (view.reading.kind === "ok") view.answers.sync(cx, view.reading.value.items)
-  return frame(() => view.render())
+  agents.folded = folded
+  return frame(() => agents.render())
 }
 
 test("an Agents frame with 300 cards awaiting you builds as many elements as one with 30 instead of building every card", async () => {
   const few = await agentsFrame(30)
   const many = await agentsFrame(300)
-  expect(many.held).toContain(300)
+  const statusHeader = 1
+  expect(many.held).toContain(300 + statusHeader)
   expect(many.built).toBe(few.built)
 })
 
-test("an Inbox frame with 300 questions builds as many elements as one with 30 instead of building every question", async () => {
-  const few = await inboxFrame(30)
-  const many = await inboxFrame(300)
-  expect(many.held).toContain(300)
-  expect(many.built).toBe(few.built)
+test("an Agents frame hands its card rows to uniform_list, whose one range call returns the rows on screen instead of every row", async () => {
+  const shown = await agentsFrame(300)
+  const rail = await agentsFrame(300, true)
+  expect(shown.rangeRows.get("cards")).toBe(rowsOnScreen)
+  expect(rail.rangeRows.get("rail-ids")).toBe(rowsOnScreen)
 })

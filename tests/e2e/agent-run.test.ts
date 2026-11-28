@@ -6,6 +6,7 @@ import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { runAgentStep } from "../../packages/run/src/features/running-a-task/run"
+import { readReviewerRoom } from "../../packages/run/src/widgets/beat/index"
 import { listRuns, openDatabase } from "../../packages/run/src/entities/run-history/index"
 
 const git = (dir: string, args: ReadonlyArray<string>): void => {
@@ -30,7 +31,7 @@ describe("orc run through the agent step", () => {
       git(repo, ["commit", "-qm", "task"])
       await copyFile(liveConfig, join(home, "config.json"))
       const report = await Effect.runPromise(
-        runAgentStep({ cwd: repo, taskFile: join(repo, "task.md"), branch: "orc/e2e-agent", homeDir: home, runId: "e2e-agent-1" }).pipe(
+        runAgentStep({ cwd: repo, taskFile: join(repo, "task.md"), branch: "orc/e2e-agent", sandbox: "nono", homeDir: home, runId: "e2e-agent-1", readReviewerRoom }).pipe(
           Effect.provide(BunServices.layer)
         )
       )

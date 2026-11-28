@@ -319,7 +319,7 @@ const actionLine = (action: BeatAction): string => {
     }
     case "parked": {
       const waiting = action.questions.length + action.decider.length > 0
-      return "parked " + action.task + " on " + action.branch + (waiting ? " for " + answersAwaited(action.questions, action.decider) : "")
+      return "parked " + action.task + " on " + action.branch + (waiting ? " for " + answersAwaited(action.questions, action.decider) : "") + (action.reason === undefined ? "" : ": " + action.reason)
     }
     case "held": {
       return "held " + action.task + " on " + action.machine + ": " + action.reason

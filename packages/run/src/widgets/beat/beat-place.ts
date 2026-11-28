@@ -113,7 +113,7 @@ export interface Placed {
   readonly instructions: string | null
 }
 
-type MachineRejection = "unknown-project" | "priority-floor" | "missing-origin" | "parked-origin" | "pin" | "no-checkout" | "capacity" | "load"
+type MachineRejection = "unknown-project" | "priority-floor" | "missing-origin" | "parked-origin" | "pin" | "pin-required" | "no-checkout" | "capacity" | "load"
 
 interface RejectedMachine {
   readonly kind: "rejected"
@@ -179,6 +179,9 @@ const assessMachine = (
   if (checkout === null) {
     return rejectMachine(machine.name, "no-checkout", checkoutMissing(project.name, machine.name))
   }
+  if (machine.pinnedOnly === true && restriction === null) {
+    return rejectMachine(machine.name, "pin-required", machine.name + " only runs tasks pinned to it")
+  }
   const slot = room.find((entry) => entry.machine === machine.name)
   const free = slot === undefined ? 0 : freeRoom(slot)
   if (free === 0) {
@@ -212,7 +215,8 @@ const placementWait = (project: string, pinned: string | undefined, machines: Re
   if (machines.some((machine) => machine.kind === "rejected" && machine.code === "capacity")) {
     return pinned === undefined ? "no machine with a checkout of " + project + " has room" : noRoom(pinned)
   }
-  return checkoutMissing(project, pinned ?? "any machine")
+  const pinRequired = machines.flatMap((machine) => machine.kind === "rejected" && machine.code === "pin-required" ? [machine.reason] : [])
+  return pinRequired.length > 0 ? pinRequired.join("; ") : checkoutMissing(project, pinned ?? "any machine")
 }
 
 export const placeTask = (

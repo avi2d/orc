@@ -1,6 +1,7 @@
 import { type Context, type Element, div } from "gpui-kit"
-import { v_flex } from "gpui-base"
-import { actionButton, section } from "./ask-view"
+import { h_flex, v_flex } from "gpui-base"
+import { section } from "./ask-view"
+import { button, card } from "./kit"
 import type { AttentionItem, DecidedAttention } from "./guard-attention"
 import type { AgentAttention } from "./inbox-read"
 import type { palette } from "./palette"
@@ -8,7 +9,7 @@ import type { palette } from "./palette"
 type Palette = ReturnType<typeof palette>
 
 const pendingView = (t: Palette, item: AttentionItem): Element =>
-  v_flex().id(`pending-${item.id}`).gap(4).p(10).rounded(6).bg(t.raised).min_w_0()
+  card().id(`pending-${item.id}`).gap(4).p(12).min_w_0()
     .child(div().font_semibold().child(`${item.task} · With the agent`))
     .child(div().whitespace_normal().child(item.subject ?? item.text))
     .child(section(t, "Basis", div().whitespace_normal().child(item.decision?.basis ?? "The attention record assigns this item to the agent.")))
@@ -32,14 +33,14 @@ const basisOf = (item: DecidedAttention, decider: Decider): ReadonlyArray<string
 }
 
 const decidedView = (t: Palette, item: DecidedAttention, answer: DecidedAttention["answer"], replaced: boolean): Element =>
-  v_flex().id(`${replaced ? "replaced" : "decided"}-${item.id}`).gap(4).p(10).rounded(6).bg(t.raised).min_w_0()
+  card().id(`${replaced ? "replaced" : "decided"}-${item.id}`).gap(4).p(12).min_w_0()
     .child(div().font_semibold().child(`${item.task}${answer.inferred ? " · inferred" : ""}`))
     .child(div().whitespace_normal().child(item.text))
     .child(section(t, replaced ? "Replaced answer" : "Answer", div().whitespace_normal().child(answer.words)))
     .children(basisOf(item, answer.decider).map((basis) => section(t, "Basis", div().whitespace_normal().child(basis))))
 
 const unansweredView = (t: Palette, item: DecidedAttention, decision: Decision): Element =>
-  v_flex().id(`agent-decision-${item.id}`).gap(4).p(10).rounded(6).bg(t.raised).min_w_0()
+  card().id(`agent-decision-${item.id}`).gap(4).p(12).min_w_0()
     .child(div().font_semibold().child(item.task))
     .child(div().whitespace_normal().child(item.text))
     .child(section(t, "Decision", div().whitespace_normal().child(decisionWords[decision.kind])))
@@ -78,7 +79,7 @@ export class AgentAttentionSection {
     if (!this.shows(agent)) return []
     const label = `${this.expanded ? "▾" : "▸"} Agent attention (${attentionCount(agent)})`
     return [v_flex().id("agent-attention").gap(6).items_stretch().flex_shrink_0()
-      .child(actionButton(t, "toggle-agent-attention", label, false, (cx: Context) => { this.expanded = !this.expanded; cx.notify() }))
+      .child(h_flex().child(button(t, "toggle-agent-attention", label, "ghost", 24, (cx: Context) => { this.expanded = !this.expanded; cx.notify() })))
       .children(this.expanded ? [
         ...agent.pending.map((item) => pendingView(t, item)),
         ...decidedGroups(t, agent.decided)

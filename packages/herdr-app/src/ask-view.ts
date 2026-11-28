@@ -1,6 +1,7 @@
 import { type Context, type Element, div } from "gpui-kit"
 import { Avatar, AvatarFallback, AvatarImage, v_flex } from "gpui-base"
 import { exec, nextCommand } from "herdr"
+import { exitReason } from "./orc-read"
 import type { palette } from "./palette"
 import { type AskOption, optionShape } from "./thread"
 
@@ -13,8 +14,6 @@ export interface OrcSender {
   reload(cx: Context): void
 }
 
-const firstLine = (text: string): string => text.trim().split("\n")[0] ?? ""
-
 export const sendOrc = (host: OrcSender, cx: Context, key: string, argv: ReadonlyArray<string>, done: () => void, current: () => boolean = () => true): void => {
   host.sent.set(key, { kind: "sending" })
   cx.spawn((task) => exec("orc", [...argv]).then(
@@ -23,7 +22,7 @@ export const sendOrc = (host: OrcSender, cx: Context, key: string, argv: Readonl
         host.sent.delete(key)
         done()
       } else if (current()) {
-        host.sent.set(key, { kind: "failed", reason: `orc ${argv.join(" ")} exited ${result.code}: ${firstLine(result.stderr) || firstLine(result.stdout)}` })
+        host.sent.set(key, { kind: "failed", reason: exitReason(`orc ${argv.join(" ")}`, result) })
       }
       host.reload(task)
       task.notify()
@@ -44,7 +43,7 @@ export const listenFor = (command: string, act: () => void): Promise<void> =>
   })
 
 export const section = (t: Palette, label: string, content: Element): Element =>
-  v_flex().gap(2).child(div().text_size(11).text_color(t.dim).child(label)).child(content)
+  v_flex().gap(2).child(div().text_size(12).text_color(t.muted).child(label)).child(content)
 
 export const optionView = (t: Palette, id: string, option: AskOption): Element => {
   const label = `${option.letter}) ${option.text}`

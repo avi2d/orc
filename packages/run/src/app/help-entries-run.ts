@@ -13,9 +13,9 @@ export const runHelp: HelpEntry = {
   about: "Runs the task in the clean checkout you are in: Pi writes the change, the checks run, and no-mistakes reviews it and opens the PR. Give --branch with no task file to resume a stopped run on that branch.",
   options: [
     { flag: "--kind " + choice(runKinds), meaning: "What the task ends in. ship ends in a PR, scout and task end in a report, and parent runs a parent's final check. Defaults to ship." },
-    { flag: "--delivery " + choice(runDeliveries), meaning: "How a ship task reaches its PR. Defaults to no-mistakes. direct-PR records a review before opening the PR, and orc rebases and records a review before opening the PR without a CI verdict." },
+    { flag: "--delivery " + choice(runDeliveries), meaning: "How a ship task reaches its PR. Defaults to no-mistakes. direct-PR records a review before opening the PR, and orc rebases, reviews and fixes the findings in up to two rounds by default, set by review.maxFixRounds, before opening the PR without a CI verdict." },
     { flag: "--branch <name>", meaning: "The branch to commit to, or to resume. Defaults to orc/<run-id>." },
-    { flag: "--sandbox " + choice(sandboxKinds), meaning: "Where the agent runs. Runs you start by hand default to nono. none runs on the host as you. Queued tasks pass none without a per-agent sandbox. Their safety boundary is the isolated space around the whole agent system." },
+    { flag: "--sandbox " + choice(sandboxKinds), meaning: "Where the agent runs. The default is no per-agent sandbox: none runs the agent on the host as you, and the safety boundary is the isolated space around the whole agent system. Queued tasks always run that way. Pass nono to sandbox a run you start by hand." },
     { flag: "--token-file <path>", meaning: "A file holding the provider token the run uses." },
     { flag: "--provider <id>", meaning: "The provider id from config.json the run must use." },
     { flag: "--implementer-model <model>", meaning: "The implementer model, used instead of the one config.json names." },
@@ -73,6 +73,14 @@ export const refusalsHelp: HelpEntry = {
   about: "Counts the runs that hit each gate, and each rule where the failure names a stable rule code.",
   options: [{ flag: "--json", meaning: "Print the counts as an orc.refusals.v1 JSON document." }],
   examples: ["orc refusals"]
+}
+
+export const metricsHelp: HelpEntry = {
+  usage: ["orc metrics [--json]"],
+  summary: "Count each run's failed steps, gate stops, minutes and fix rounds",
+  about: "Prints one row per run, newest first: its failed steps, gate stops, minutes from start to end and fix rounds. Gate stops count each failed checks round, each orc review turn that started a fix round or failed, and each no-mistakes step the run parked at, once per step. A resumed run counts only the steps it ran itself.",
+  options: [{ flag: "--json", meaning: "Print the counts as an orc.metrics.v1 JSON document." }],
+  examples: ["orc metrics"]
 }
 
 export const chatHelp: HelpEntry = {

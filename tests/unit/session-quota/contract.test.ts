@@ -18,10 +18,10 @@ import { fixtureSessionView, harvestedSessionView, recordedNow } from "../../lib
 
 const report = () => sessionQuotaReport(fixtureSessionView());
 
-describe("the session quota JSON contract, version 1", () => {
+describe("the session quota JSON contract, version 3", () => {
   test("survives a JSON round trip and decodes against its own published schema", () => {
     const decoded = Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(JSON.stringify(report())));
-    expect(decoded.schemaVersion).toBe(1);
+    expect(decoded.schemaVersion).toBe(3);
     expect(decoded.scope).toBe("local");
     expect(decoded.estimate.upperBound).toBe(true);
   });
@@ -138,6 +138,19 @@ describe("a version-1 north.json report from before window sources and credentia
   });
 });
 
+describe("a window with no cycle in a single-machine report", () => {
+  const withoutCycle = (machine: SessionQuotaReport): SessionQuotaReport => ({
+    ...machine,
+    windows: machine.windows.map((window, index) => (index === 0 ? { ...window, startsAt: null, elapsedFraction: null } : window)),
+  });
+
+  test("reads it at version 3 instead of refusing the null startsAt", () => {
+    const versionThree = { ...withoutCycle(machineReport("north")), schemaVersion: 3 as const };
+    const decoded = Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(JSON.stringify(versionThree)));
+    expect([decoded.windows[0]?.startsAt, decoded.windows[0]?.elapsedFraction]).toEqual([null, null]);
+  });
+});
+
 const harvestedViaOf = (json: string) => {
   const view = valueOf(sessionQuotaViewOf(Schema.decodeUnknownSync(SessionQuotaReport)(JSON.parse(json)), "north"));
   return view.accounts
@@ -177,11 +190,11 @@ describe("a pre-ledger version-1 report and the via of its harvested windows", (
   });
 });
 
-describe("the composed session quota JSON contract, version 2", () => {
+describe("the composed session quota JSON contract, version 4", () => {
   test("survives a JSON round trip and decodes against its own published schema", () => {
     const decoded = composedReport();
     expect([decoded.schemaVersion, decoded.scope, decoded.estimate.basis, decoded.estimate.upperBound]).toEqual([
-      2,
+      4,
       "composed",
       "machine-logs",
       true,

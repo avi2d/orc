@@ -97,7 +97,6 @@ const liveRows = (body: Extract<QuotaBlockBody, { readonly kind: "live" }>, now:
         percentLeft: window.percentRemaining,
         timeRemainingPercent: window.pace?.timeRemainingPercent,
         outlook,
-        // A countdown runs on the clock its reading was taken at: quota-axi's report, or now for a log reading.
         resetSeconds: resetOf(outlook, secondsUntil(window.source.kind === "harvested" ? now : body.reportedAt, window.resetsAt)),
         reserve: window.pace?.reservePercentPoints,
       },

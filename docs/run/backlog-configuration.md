@@ -43,6 +43,13 @@ For example:
 }
 ```
 
+### Machine slots and load
+
+Set a machine's `pinnedOnly` to `true` to reserve all its slots for tasks pinned to that machine and for parked runs that started there.
+For example, `{ "name": "mac", "slots": 1, "pinnedOnly": true, "start": ["orc", "runner", "start"] }` gives ordinary tasks no Mac slots.
+Use `orc backlog add <project> <task-file> --machine mac` to pin a task.
+Set `slots` to `0` to stop all new starts on a machine, including pinned tasks.
+
 Set a machine's `loadLimit` above zero to pause starts while its five-minute load is above the limit or unread.
 The start command must run `orc runner start`.
 
@@ -100,6 +107,7 @@ A document with no windows or duplicate account keys leaves the quota unread.
 ### Quota from subquo
 
 The quota command may instead print the `subquo.v1` snapshot `subquo read --json` prints, such as `["subquo", "read", "--json"]`.
+A quota command whose program is `subquo` runs the subquo copy installed with Orc's [npm](https://www.npmjs.com) package, and runs `subquo` from PATH when that copy is missing.
 Orc reads the account room as the smallest `percentLeft` among its windows with scope `all`, so a window that covers one model only does not limit the account.
 The reset time is the `resetsAt` of the limiting window, the latest one when several tie.
 An account with a stale or unavailable reading, a fresh reading past its `validUntil`, or an unknown percent or reset cannot run.

@@ -1,4 +1,4 @@
-import { Effect, FileSystem } from "effect"
+import { Effect, FileSystem, Schema } from "effect"
 import type { GateRefusal } from "./gate-refusals"
 import type { OrcRunCommit } from "../../shared/process/index"
 import type { PiTokenUse } from "../agent/index"
@@ -8,6 +8,8 @@ import { toFileUrl } from "./run-history-read"
 import { agentReportFileName } from "../backlog/index"
 
 export const reportFileName = "report.md"
+export const reviewerWaitFileName = "reviewer-wait.json"
+export const ReviewerWait = Schema.Struct({ implementerProviders: Schema.Array(Schema.String), reason: Schema.String })
 
 export type { OrcRunCommit } from "../../shared/process/index"
 
@@ -57,6 +59,7 @@ export interface OrcRunReport {
   readonly prLink: string | null
   readonly noMistakes: NoMistakesRecord | null
   readonly endReason: string
+  readonly waitingForReviewer?: true
 }
 
 const findingLine = (finding: NoMistakesFinding): string =>
@@ -87,6 +90,7 @@ export const noMistakesSignals = (record: NoMistakesRecord): ReadonlyArray<{ rea
   { name: "finding-count", value: record.findings.length.toString() },
   { name: "result", value: record.status },
   { name: "gates-answered", value: record.gatesAnswered.toString() },
+  { name: "gate-stops", value: record.gateStops.toString() },
   ...(record.gate === null ? [] : [{ name: "gate", value: record.gate }]),
   ...(record.prLink === null ? [] : [{ name: "pr-link", value: record.prLink }]),
   ...(record.reviewer === null ? [] : [{ name: "reviewer", value: record.reviewer }]),
@@ -209,6 +213,9 @@ export const reportMarkdown = (taskText: string, taskFileUrl: string, reportUrl:
 export const runStatus = (report: OrcRunReport): string => {
   if (report.completed) {
     return "completed"
+  }
+  if (report.waitingForReviewer === true) {
+    return "waiting for reviewer quota"
   }
   if (!report.markerVerified) {
     return "incomplete"

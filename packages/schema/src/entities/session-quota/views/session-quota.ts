@@ -1,5 +1,5 @@
 import { DateTime } from "effect";
-import { type Failed, failureOf, type Outcome } from "../../../shared/lib";
+import { type Failed, failureOf, type Outcome, unreachable } from "../../../shared/lib";
 import { withCaptured } from "../sources/capture";
 import { type CountedCall, countedCalls, type Ledger } from "../sources/ledger";
 import { resolveSessions, type Session, sessionLabel, type UnmatchedRuns } from "../sources/live";
@@ -14,6 +14,7 @@ import { accountTitle } from "./quotas";
 import { localMidnight, type SessionModels, sessionModelsSinceMidnight } from "./session-models";
 import type { SourcedEntry, SourcedProvider, SourcedWindow, WindowSource } from "../sources/window-sources";
 import { presenceFieldsOf, presenceOf, type PresenceFields } from "./session-pane-presence";
+import { uncycledFields } from "./uncycled-window";
 
 interface ModelShare {
   readonly model: string | undefined;
@@ -35,18 +36,15 @@ export interface SessionShare {
   readonly flagged: boolean;
 }
 
-export interface WindowView {
+interface WindowDetails {
   readonly id: string;
   readonly label: string;
   readonly kind: QuotaWindow["kind"];
   readonly source: WindowSource;
-  readonly cycleSeconds: number;
-  readonly startsAt: DateTime.Utc;
   readonly resetsAt: DateTime.Utc;
   readonly usedPoints: number;
   readonly leftPoints: number;
   readonly pace: NonNullable<QuotaWindow["pace"]>["status"];
-  readonly elapsedFraction: number;
   readonly aheadOfPace: boolean;
   readonly pastFirstTenth: boolean;
   readonly exhaustsBeforeReset: boolean;
@@ -60,6 +58,12 @@ export interface WindowView {
   readonly sessions: ReadonlyArray<SessionShare>;
   readonly otherCycle: ReadonlyArray<string>;
 }
+
+export type WindowTiming =
+  | { readonly cycleSeconds: number; readonly startsAt: DateTime.Utc; readonly elapsedFraction: number }
+  | { readonly cycleSeconds: undefined; readonly startsAt: null; readonly elapsedFraction: null };
+
+export type WindowView = WindowDetails & WindowTiming;
 
 export interface AccountView {
   readonly provider: QuotaProviderId;
@@ -135,22 +139,18 @@ const firstTenth = 0.1;
 
 const trackedKinds = new Set<QuotaWindow["kind"]>(["session", "weekly", "monthly", "unknown"]);
 
-interface PacedWindow<W extends QuotaWindow = SourcedWindow> {
-  readonly window: W;
+interface MeteredWindow {
+  readonly window: SourcedWindow;
   readonly percentRemaining: number;
   readonly resetsAt: DateTime.Utc;
-  readonly cycleSeconds: number;
 }
 
-// Only a metered window with a reset and a cycle has a start, and model and credit windows meter something other than the account.
-const pacedWindow = <W extends QuotaWindow>(window: W): PacedWindow<W> | undefined => {
-  const cycleSeconds = window.pace?.cycleSeconds;
-  if (!("percentRemaining" in window) || window.resetsAt === undefined || cycleSeconds === undefined) return undefined;
-  if (!trackedKinds.has(window.kind)) return undefined;
-  return { window, percentRemaining: window.percentRemaining, resetsAt: window.resetsAt, cycleSeconds };
+const meteredWindow = (window: SourcedWindow): MeteredWindow | undefined => {
+  if (!("percentRemaining" in window) || window.resetsAt === undefined || !trackedKinds.has(window.kind)) return undefined;
+  return { window, percentRemaining: window.percentRemaining, resetsAt: window.resetsAt };
 };
 
-const startOf = (paced: PacedWindow<QuotaWindow>): number => DateTime.toEpochMillis(paced.resetsAt) - paced.cycleSeconds * 1000;
+const startOf = (metered: MeteredWindow, cycleSeconds: number): number => DateTime.toEpochMillis(metered.resetsAt) - cycleSeconds * 1000;
 
 const liveEntries = (quota: QuotaRead, now: DateTime.Utc): ReadonlyArray<SourcedProvider> =>
   sourcedEntries(quota, now).flatMap((entry) => ("kind" in entry ? [] : [entry]));
@@ -159,8 +159,9 @@ const earliestStart = (entries: ReadonlyArray<SourcedProvider>, fallback: number
   Math.min(
     fallback,
     ...entries.flatMap((entry) => entry.windows.flatMap((window) => {
-      const paced = pacedWindow(window);
-      return paced === undefined ? [] : [startOf(paced)];
+      const metered = meteredWindow(window);
+      const cycleSeconds = window.pace?.cycleSeconds;
+      return metered === undefined || cycleSeconds === undefined ? [] : [startOf(metered, cycleSeconds)];
     })),
   );
 
@@ -205,21 +206,33 @@ const modelShares = (
     .toSorted((a, b) => tokenTotal(b.tokens) - tokenTotal(a.tokens));
 
 const windowView = (
-  paced: PacedWindow,
+  metered: MeteredWindow,
   calls: ReadonlyArray<CountedCall>,
   inputs: SessionQuotaInputs,
   sessionsById: ReadonlyMap<string, Session>,
   availability: ReadonlyArray<QuotaAvailability>,
 ): WindowView => {
+  const usedPoints = 100 - metered.percentRemaining;
+  const head = {
+    id: metered.window.id,
+    label: metered.window.label,
+    kind: metered.window.kind,
+    source: metered.window.source,
+    resetsAt: metered.resetsAt,
+    usedPoints,
+    leftPoints: metered.percentRemaining,
+    otherCycle: [],
+  };
+  const cycleSeconds = metered.window.pace?.cycleSeconds;
+  if (cycleSeconds === undefined) return { ...head, ...uncycledFields(usedPoints) };
   const now = DateTime.toEpochMillis(inputs.now);
-  const start = startOf(paced);
-  const resetsAt = DateTime.toEpochMillis(paced.resetsAt);
+  const start = startOf(metered, cycleSeconds);
+  const resetsAt = DateTime.toEpochMillis(metered.resetsAt);
   // quota-axi can hand back a window that has already reset, and calls after its reset belong to the next cycle.
   const end = Math.min(now, resetsAt);
   const hourCutoff = now - hourMillis;
   const spanHours = rateSpanHours(start, resetsAt, now);
   const inWindow = calls.filter((call) => call.at >= start && call.at < resetsAt && call.at <= now);
-  const usedPoints = 100 - paced.percentRemaining;
   const bySession = groupedBy(inWindow, (call) => inputs.sessionOfFile.get(call.file));
   const all = { raw: weighed(inWindow, hourCutoff, "raw"), priced: weighed(inWindow, hourCutoff, "priced") };
   const rows = [...bySession.entries()].flatMap(([id, mine]) => {
@@ -240,24 +253,18 @@ const windowView = (
       },
     ];
   });
-  const elapsedFraction = (end - start) / (paced.cycleSeconds * 1000);
-  const pace = now < resetsAt ? (paced.window.pace?.status ?? "unknown") : "unknown";
+  const elapsedFraction = (end - start) / (cycleSeconds * 1000);
+  const pace = now < resetsAt ? (metered.window.pace?.status ?? "unknown") : "unknown";
   const aheadOfPace = pace === "ahead";
   const pastFirstTenth = elapsedFraction >= firstTenth;
   const sustainablePointsPerHour =
-    now < resetsAt ? paced.percentRemaining / Math.max((resetsAt - now) / hourMillis, 1 / 60) : null;
-  const verdict = paced.window.source.kind === "quota-axi" ? verdictBeforeReset(availability, paced.window.id, resetsAt) : null;
+    now < resetsAt ? metered.percentRemaining / Math.max((resetsAt - now) / hourMillis, 1 / 60) : null;
+  const verdict = metered.window.source.kind === "quota-axi" ? verdictBeforeReset(availability, metered.window.id, resetsAt) : null;
   const gate = spendGate(rows, aheadOfPace && pastFirstTenth, sustainablePointsPerHour, verdict);
   return {
-    id: paced.window.id,
-    label: paced.window.label,
-    kind: paced.window.kind,
-    source: paced.window.source,
-    cycleSeconds: paced.cycleSeconds,
+    ...head,
+    cycleSeconds,
     startsAt: DateTime.makeUnsafe(start),
-    resetsAt: paced.resetsAt,
-    usedPoints,
-    leftPoints: paced.percentRemaining,
     pace,
     elapsedFraction,
     aheadOfPace,
@@ -273,7 +280,6 @@ const windowView = (
     sessions: rows
       .toSorted(byPricedShare)
       .map((row) => ({ ...row, flagged: gate.flagged.has(row.session) })),
-    otherCycle: [],
   };
 };
 
@@ -282,6 +288,11 @@ interface AccountContext {
   readonly inputs: SessionQuotaInputs;
   readonly sessionsById: ReadonlyMap<string, Session>;
 }
+
+const unreadStates = new Set<SourcedProvider["state"]["status"]>(["unavailable", "auth_required", "rate_limited", "error"]);
+
+const unreadBody = ({ provider, state }: SourcedProvider): Failed =>
+  unreachable(`quota-axi reads ${provider} as ${state.status}${state.error === undefined ? "" : `: ${state.error}`}`);
 
 const accountView = (
   entry: SourcedEntry,
@@ -301,9 +312,10 @@ const accountView = (
   const calls = joined.map(({ call }) => call);
   const availability = entry.state.stale ? [] : entry.quotaSemantics?.effectiveAvailability ?? [];
   const windows = entry.windows.flatMap((window) => {
-    const paced = pacedWindow(window);
-    return paced === undefined ? [] : [windowView(paced, calls, inputs, sessionsById, availability)];
+    const metered = meteredWindow(window);
+    return metered === undefined ? [] : [windowView(metered, calls, inputs, sessionsById, availability)];
   });
+  if (windows.length === 0 && unreadStates.has(entry.state.status)) return { ...head, body: unreadBody(entry) };
   return { ...head, body: { kind: "windows", windows } };
 };
 

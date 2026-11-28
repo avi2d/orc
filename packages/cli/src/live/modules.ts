@@ -7,6 +7,7 @@ import { queueFeedLayer, queueSourcesLive } from "@avi2dg/orc-queues";
 import {
   attentionSourceLayer,
   ciRunsLayer,
+  configuredQuotaSourceLayer,
   hostSourcesLayer,
   linuxTaskProcessesSourceLayer,
   macTaskProcessesSourceLayer,
@@ -15,7 +16,6 @@ import {
   orcMachinesLayer,
   orcQuotaSourceLayer,
   quotaFeedLayer,
-  quotaSourceLayer,
   remoteTaskHistoryLayer,
   remoteTaskLiveLayer,
   resourceMachinesLayer,
@@ -43,7 +43,7 @@ const tasksTimeout = Duration.minutes(2);
 const runnerSources = Layer.mergeAll(ciRunsLayer, machineSchedulesLayer(onMac ? "mac" : "linux")).pipe(Layer.provideMerge(runnerReposLayer));
 
 const commandSources = Layer.mergeAll(
-  quotaSourceLayer,
+  configuredQuotaSourceLayer.pipe(Layer.provide(BunFileSystem.layer)),
   orcQuotaSourceLayer,
   attentionSourceLayer,
   hostSourcesLayer,

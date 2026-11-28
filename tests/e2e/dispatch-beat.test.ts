@@ -95,6 +95,16 @@ describe("orc beat", () => {
     })
   }, beatTimeout)
 
+  test("ordinary tasks cannot fill spare pin-only slots, and pinned tasks cannot exceed those slots", async () => {
+    await withFixture({ mac: 2, macPinnedOnly: true, linux: 1, floorPercent: 15 }, async (fixture) => {
+      await addTasks(fixture, 5, (index) => index < 2 ? null : "mac")
+      const beat = await orcOk(fixture, ["beat"])
+      expect(beat).toContain("waits orc-2: no machine with a checkout of orc has room")
+      expect(beat).toContain("waits orc-5: mac has no room")
+      expect(await settledStarts(fixture, 3)).toEqual(["orc-1 linux", "orc-3 mac", "orc-4 mac"])
+    })
+  }, beatTimeout)
+
   test("a task with no priority waits while a P1 task takes the slot, and once set to 0 starts before a newer P0 task", async () => {
     await withFixture({ mac: 1, linux: 0, floorPercent: 15 }, async (fixture) => {
       await orcOk(fixture, ["backlog", "add", "orc", "task.md"])
@@ -174,7 +184,7 @@ describe("orc beat", () => {
       await chmod(join(fixture.dir, "bin", "subquo"), 0o755)
       const dispatch = join(fixture.dir, "home", "backlog", "dispatch.json")
       const machines = [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 0, start: ["true"] }]
-      await writeFile(dispatch, JSON.stringify({ machines, quota: { ...quotaConfig(15), command: ["subquo", "read", "--json"] } }))
+      await writeFile(dispatch, JSON.stringify({ machines, quota: { ...quotaConfig(15), command: [join(fixture.dir, "bin", "subquo"), "read", "--json"] } }))
       await addTasks(fixture, 1)
       expect(await orcOk(fixture, ["beat"])).toContain("second 80% left until " + validUntil + ", floor 15%: runs use second\nroom: mac 0 of 1 busy, linux 0 of 0 busy\nstarted orc-1 on mac with second")
       await writeFile(dispatch, JSON.stringify({ machines: machines.map((machine) => ({ ...machine, slots: machine.name === "mac" ? 2 : 0 })), quota: quotaConfig(15) }))
@@ -195,7 +205,7 @@ describe("orc beat", () => {
       const machines = [{ name: "mac", slots: 1, start: ["sh", "-c", "echo \"$ORC_TASK_PROVIDER $ORC_TASK_ACCOUNT $ORC_TASK_IMPLEMENTER_MODEL $ORC_TASK_FIXER_MODEL\" > '" + seen + "'"] }, { name: "linux", slots: 0, start: ["true"] }]
       const models = { implementer: "codex/gpt-5.5", fixer: "codex/gpt-5.5-mini" }
       const accounts = [{ name: "main", tokenFile: "/secrets/main-token" }, { name: "openai", provider: "codex", models, tokenFile: "/secrets/openai-token" }]
-      await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({ machines, quota: { ...quotaConfig(15), command: ["subquo", "read", "--json"], accounts } }))
+      await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({ machines, quota: { ...quotaConfig(15), command: [join(fixture.dir, "bin", "subquo"), "read", "--json"], accounts } }))
       await addTasks(fixture, 1)
       expect(await orcOk(fixture, ["beat"])).toContain("runs use openai")
       expect(await eventually(() => readFile(seen, "utf8").catch(() => ""), (text) => text !== "")).toBe("codex openai codex/gpt-5.5 codex/gpt-5.5-mini\n")

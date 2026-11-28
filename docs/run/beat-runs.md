@@ -22,6 +22,9 @@ An account needs room above zero and at or above the configured floor.
 Without [dispatch rules](dispatch-rules.md), the beat chooses the account with the most room.
 With routing, the rules choose an account and models for each runnable task.
 A task restricted to a machine waits for a slot there.
+On a machine with `pinnedOnly` set to `true`, only an explicit machine pin makes a task eligible.
+A parked run's origin limits it to its original machine, and that origin also makes it eligible on a `pinnedOnly` machine, so a parked run resumes where it started.
+A new or unparked task without a pin still waits on a `pinnedOnly` machine.
 New tasks start in priority order, as [Set priority](backlog-tasks.md#set-priority) describes.
 
 ## Starting and closing runs
@@ -72,7 +75,7 @@ It reports starts, closures, parked questions, stalls, upstream changes, attenti
 `placements` lists the tasks that reached machine selection in the beat.
 Each entry names the `task` and lists its `machines` in dispatch configuration order.
 Each machine has a `machine` name and a `kind` of `eligible` or `rejected`.
-A rejected machine also has a `code` and a `reason` for the check that ruled it out, such as a different parked origin, an explicit pin, a missing checkout, no free slot, or load.
+A rejected machine also has a `code` and a `reason` for the check that ruled it out, such as a different parked origin, an explicit or required pin, a missing checkout, no free slot, or load.
 More than one machine can be eligible even though only one is chosen.
 Eligibility uses the slots free when the beat considers that task, and does not mean the task started.
 The `actions` list still reports what the beat did.

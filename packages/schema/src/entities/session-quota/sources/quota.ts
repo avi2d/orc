@@ -1,4 +1,4 @@
-import { Context, Duration, Effect, Layer, Schema } from "effect";
+import { Context, DateTime, Duration, Effect, Layer, Schema } from "effect";
 import { CommandRunner } from "../../../shared/lib";
 import { type Decoded, decodeJson, decodeValue, decoded, flatMapDecoded, rejected } from "../../../shared/lib";
 import type { Failed, Reading } from "../../../shared/lib";
@@ -89,9 +89,9 @@ const Envelope = Schema.Struct({
   providers: Schema.Array(Schema.Unknown),
 });
 
-export type QuotaWindow = typeof QuotaWindow.Type;
+export type QuotaWindow = typeof QuotaWindow.Type & { readonly subquoReadAt?: DateTime.Utc };
 export type QuotaAvailability = typeof QuotaAvailability.Type;
-export type QuotaProvider = typeof ShownProvider.Type;
+export type QuotaProvider = Omit<typeof ShownProvider.Type, "windows"> & { readonly windows: ReadonlyArray<QuotaWindow> };
 
 export type FailedQuotaEntry = { readonly provider: typeof ShownProviderId.Type; readonly accountKey: string | undefined } & Failed;
 
@@ -152,13 +152,14 @@ export class QuotaSource extends Context.Service<
   { readonly read: (providers: ReadonlyArray<QuotaProviderId>) => Effect.Effect<Reading<QuotaReport>> }
 >()("orc-dash/QuotaSource") {}
 
+export const readQuotaAxi = (providers: ReadonlyArray<QuotaProviderId>): Effect.Effect<Reading<QuotaReport>, never, CommandRunner> => stamped(runDecoded(quotaCommand(providers), decodeQuota));
+
 export const quotaSourceLayer = Layer.effect(
   QuotaSource,
   Effect.gen(function* () {
     const runner = yield* CommandRunner;
     return {
-      read: (providers: ReadonlyArray<QuotaProviderId>) =>
-        Effect.provideService(stamped(runDecoded(quotaCommand(providers), decodeQuota)), CommandRunner, runner),
+      read: (providers: ReadonlyArray<QuotaProviderId>) => Effect.provideService(readQuotaAxi(providers), CommandRunner, runner),
     };
   }),
 );

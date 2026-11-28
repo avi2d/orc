@@ -4,7 +4,7 @@ import type { FailedQuotaEntry, QuotaProvider, QuotaProviderEntry, QuotaWindow }
 import { type AccountJoin, readingJoin } from "./account-join";
 
 export type WindowSource =
-  | { readonly kind: "quota-axi"; readonly readAt: DateTime.Utc }
+  | { readonly kind: "quota-axi" | "subquo"; readonly readAt: DateTime.Utc }
   | (HarvestOrigin & {
       readonly kind: "harvested";
       readonly observedAt: DateTime.Utc;
@@ -43,7 +43,7 @@ export type WindowShape = Pick<QuotaWindow, "id" | "label" | "kind">;
 // quota-axi's published deadband: a reserve within a point of zero reads on pace.
 const onPaceDeadband = 1;
 
-const linearPace = (cycleSeconds: number, percentRemaining: number, resetsAt: number, now: number): Pace => {
+export const linearPace = (cycleSeconds: number, percentRemaining: number, resetsAt: number, now: number): Pace => {
   const timeRemainingPercent = (100 * (resetsAt - now)) / (cycleSeconds * 1000);
   const reservePercentPoints = percentRemaining - timeRemainingPercent;
   const status =
@@ -80,13 +80,12 @@ export const sourcedProvider = (
 ): SourcedProvider => {
   const readAt = entry.state.refreshedAt ?? reportedAt;
   const nowMillis = DateTime.toEpochMillis(now);
-  const readMillis = DateTime.toEpochMillis(readAt);
   const own = readings.filter((joined) => joined.entry === entry);
   const windows = entry.windows.map((window): SourcedWindow => {
-    const asRead: SourcedWindow = { ...window, source: { kind: "quota-axi", readAt } };
+    const asRead: SourcedWindow = { ...window, source: window.subquoReadAt === undefined ? { kind: "quota-axi", readAt } : { kind: "subquo", readAt: window.subquoReadAt } };
     if (!("percentRemaining" in window)) return asRead;
     const newer = own.find(
-      ({ reading }) => reading.windowId === window.id && reading.resetsAt > nowMillis && reading.observedAt > readMillis,
+      ({ reading }) => reading.windowId === window.id && reading.resetsAt > nowMillis && reading.observedAt > DateTime.toEpochMillis(window.subquoReadAt ?? readAt),
     );
     return newer === undefined ? asRead : harvestedWindow(window, newer.reading, newer.join, nowMillis);
   });

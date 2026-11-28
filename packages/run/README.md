@@ -8,7 +8,7 @@ It also applies a worker split proposal, as [Task kinds](https://github.com/avi2
 ## Before you begin
 
 - Git 2.48 or later, tested on 2.56.0.
-- nono from https://nono.sh, tested on 0.80.0, for a run you start by hand with `orc run` unless you pass `--sandbox none`.
+- nono from https://nono.sh, tested on 0.80.0, to sandbox a run you start by hand with `orc run --sandbox nono`.
 - Node, tested on 24.22.1.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with the login, token file or Pi packages each provider in [Configuring providers](https://github.com/avi2d/orc/blob/main/docs/run/configuring-providers.md) takes.
 - no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](https://github.com/avi2d/orc/blob/main/docs/run/installing-no-mistakes.md) says, for every run except `direct-PR` and `orc`.
@@ -22,7 +22,7 @@ To install orc:
 
 Orc prints its version.
 The npm package runs without Bun on Apple silicon macOS and Linux x64 with glibc.
-If the compiled binary is missing, install Bun to run orc from source.
+If the compiled binary is missing, install Bun to run the bundled `dist/bin.js`.
 To upgrade orc, run the same install command again or follow [Updating orc](https://github.com/avi2d/orc/blob/main/docs/run/updating-orc.md).
 To run orc from a checkout of the repository instead, follow [Contribute](https://github.com/avi2d/orc/blob/main/docs/contribute.md#run-orc-from-a-checkout).
 

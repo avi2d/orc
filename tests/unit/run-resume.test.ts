@@ -500,7 +500,7 @@ describe("resume reads the sandbox kind from the run history", () => {
     })
   })
 
-  test("a resume without the flag after a no-sandbox start takes none instead of the nono default", async () => {
+  test("a resume without the flag after a no-sandbox start takes none instead of entering a sandbox", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)
       try {
@@ -560,23 +560,23 @@ describe("resume reads the sandbox kind from the run history", () => {
     })
   })
 
-  test("a branch with no prior run takes the flag, and nono without one, instead of refusing for want of a record", async () => {
+  test("a branch with no prior run honors explicit flags and defaults to none instead of nono", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)
       try {
-        expect([await sandboxOutcome(db, join(home, "repo"), "none"), await sandboxOutcome(db, join(home, "repo"), undefined)]).toEqual(["none", "nono"])
+        expect([await sandboxOutcome(db, join(home, "repo"), "none"), await sandboxOutcome(db, join(home, "repo"), "nono"), await sandboxOutcome(db, join(home, "repo"), undefined)]).toEqual(["none", "nono", "none"])
       } finally {
         db.close()
       }
     })
   })
 
-  test("a run recorded with no kind takes the flag instead of refusing every flag", async () => {
+  test("a run recorded with no kind honors explicit flags and defaults to none instead of nono", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)
       try {
         await seedSandboxRun(db, "prior-1", join(home, "repo"), null)
-        expect([await sandboxOutcome(db, join(home, "repo"), "none"), await sandboxOutcome(db, join(home, "repo"), undefined)]).toEqual(["none", "nono"])
+        expect([await sandboxOutcome(db, join(home, "repo"), "none"), await sandboxOutcome(db, join(home, "repo"), "nono"), await sandboxOutcome(db, join(home, "repo"), undefined)]).toEqual(["none", "nono", "none"])
       } finally {
         db.close()
       }

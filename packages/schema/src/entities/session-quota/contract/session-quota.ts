@@ -73,7 +73,7 @@ const HarvestedFields = { kind: Schema.Literal("harvested"), observedAt: Schema.
 
 // A report with no via predates the capture ledger, when every harvested reading came from a log.
 export const WindowSourceJson = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("quota-axi"), readAt: Schema.String }),
+  Schema.Struct({ kind: Schema.Literals(["quota-axi", "subquo"]), readAt: Schema.String }),
   Schema.Struct({ ...HarvestedFields, harness: Schema.Literal("codex"), via: Schema.optionalKey(Schema.Literal("log")) }),
   Schema.Struct({
     ...HarvestedFields,
@@ -116,12 +116,12 @@ export const WindowJson = Schema.Struct({
   label: Schema.String,
   kind: Schema.Literals(["session", "weekly", "monthly", "model", "credits", "unknown"]),
   source: Schema.optionalKey(WindowSourceJson),
-  startsAt: Schema.String,
+  startsAt: Schema.NullOr(Schema.String),
   resetsAt: Schema.String,
   usedPoints: Count,
   leftPoints: Count,
   pace: Schema.Literals(["ahead", "on_pace", "behind", "unknown"]),
-  elapsedFraction: Count,
+  elapsedFraction: Schema.NullOr(Count),
   gate: Schema.Struct({ aheadOfPace: Schema.Boolean, pastFirstTenth: Schema.Boolean, open: Schema.Boolean }),
   exhaustsBeforeReset: Schema.optionalKey(Schema.Boolean),
   verdict: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
@@ -161,7 +161,7 @@ export const LedgerJson = Schema.Struct({
 export const UnmeteredJson = Schema.Struct({ route: Schema.String, calls: Count, tokens: TokensJson });
 
 export const SessionQuotaReport = Schema.Struct({
-  schemaVersion: Schema.Literal(1),
+  schemaVersion: Schema.Literals([1, 3]),
   generatedAt: Schema.String,
   panePresence: Schema.optionalKey(Schema.Array(PanePresenceJson)),
   headlessFolders: Schema.optionalKey(Schema.Array(HeadlessFolderJson)),

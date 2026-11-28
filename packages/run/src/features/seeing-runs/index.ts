@@ -2,6 +2,7 @@ export { decodeRunsJson, encodeRunsJson, formatRunsTable, readRunsJsonRuns, runs
 export { decodeVersionJson, encodeMachinesJson, encodeVersionJson, readMachineVersions } from "./machine-versions"
 export { readOtherMachinesFrom, withOtherMachines } from "./other-machines"
 export { readListedRuns, titleOf } from "./run-facts"
+export { decodeMetricsJson, encodeMetricsJson, formatMetricsTable, readRunMetrics } from "./run-metrics"
 export { InvalidScore, recordStepScore, UnknownRun, UnknownStep } from "./run-scores"
 export { decodeShowJson, encodeShowJson, formatShow, readShow } from "./show"
 export { readStepLog, stepLogFile } from "./step-log"

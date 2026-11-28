@@ -72,6 +72,21 @@ export const runsForBranch = (
     Effect.map((rows) => rows.map(runRecordOf))
   )
 
+export const writerModelsForBranch = (db: Database, project: string, branch: string): Effect.Effect<ReadonlyArray<string>, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() =>
+    db.query(`
+      SELECT DISTINCT steps.model AS model
+      FROM runs
+      JOIN steps ON steps.run_id = runs.id
+      WHERE runs.project = ? AND runs.branch = ?
+        AND steps.name IN ('implement', 'fix') AND steps.model IS NOT NULL
+      ORDER BY model
+    `).all(project, branch)
+  ).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ model: Schema.String })))),
+    Effect.map((rows) => rows.map(({ model }) => model))
+  )
+
 export const stepsForRun = (
   db: Database,
   runId: string

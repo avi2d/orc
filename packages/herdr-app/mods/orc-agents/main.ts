@@ -2,23 +2,25 @@ import { type AsyncContext, type Context, type Element, View } from "gpui-kit"
 import { InputState, h_flex } from "gpui-base"
 import { layout, run, setShared, shared } from "herdr"
 import { AgentAttentionSection } from "../../src/agent-attention-view"
-import type { InboxItem } from "../../src/inbox"
 import type { AgentAttention } from "../../src/inbox-read"
-import { type Card, type Filter, cardAnswers, filterCards, goesOn, openedFilter, recordedStatus } from "../../src/agents"
-import { type RunAgent, runAgent } from "../../src/run-agent"
+import { type Card, type CardStatus, type Filter, approvalOf, cardAttention, filterCards, goesOn, openedFilter, recordedStatus, unfoldedCards } from "../../src/agents"
+import { type RunFacts, runFacts } from "../../src/run-agent"
 import { type LocalAgents, agentsDocuments, readAgentQuestions, readLocalAgents } from "../../src/agents-read"
 import type { AttentionQueue } from "../../src/guard-attention"
-import { type AgentsActions, type Chosen, type DetailShown, type Keyed, approvalOf, askMerge, detailView, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
-import { type MenuName, runsColumn } from "../../src/runs-view"
+import { type AgentsActions, type Chosen, type DetailShown, type Keyed, askMerge, detailView, submitSendBack } from "../../src/agents-view"
+import { type ListReading, type Reread, runsColumn } from "../../src/runs-view"
 import { type Merge, mergeCommand, mergedNote, runMerge, watchMerges } from "../../src/agents-merge"
 import { type RunChanges, changesKey } from "../../src/changes"
 import { readChanges } from "../../src/changes-read"
 import { show, type Show, type ShownStep } from "../../src/guard"
-import { InboxAnswers } from "../../src/inbox-view"
+import { InboxAnswers, threadBoxes } from "../../src/inbox-view"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
-import type { Pane } from "../../src/step-bar"
 import { StepOutput } from "../../src/step-output"
+import { thread } from "../../src/task-guard"
+import type { Thread } from "../../src/thread"
+import { targetOf } from "../../src/agents-target"
+import { threadShown } from "../../src/agents-thread"
 import { activeChild, agentsOpenKey, openAsk, viewsStack } from "../../src/views"
 
 type Palette = ReturnType<typeof palette>
@@ -32,29 +34,27 @@ const shown = (): boolean => {
   return active === null || active === thisView
 }
 
-const cardAttention = (card: Card): ReadonlyArray<InboxItem> => {
-  const approval = approvalOf(card)
-  return approval === null ? cardAnswers(card) : [approval]
-}
-
 const readingOf = <A>(keyed: Keyed<A> | null, of: string | null): Reading<A> =>
   of !== null && keyed?.of === of ? keyed.reading : { kind: "reading" }
 
 export default class OrcAgents extends View {
-  cards: Reading<ReadonlyArray<Card>> = { kind: "reading" }
-  filter: Filter = { project: null, status: null, allRuns: false }
-  menu: MenuName | null = null
+  list: ListReading = { kind: "reading" }
+  filter: Filter = { project: null, allRuns: false }
+  find = InputState.new({ placeholder: "Find a run" })
+  menuOpen = false
   selectedKey: string | null = null
+  shownKey: string | null = null
   chosen: Chosen | null = null
-  pane: Pane = "parsed"
   opened = 0
   folded = false
+  foldedGroups = new Set<CardStatus>()
   steps: Keyed<Show> | null = null
+  told: Keyed<Thread> | null = null
   output = new StepOutput()
   openThinking = new Set<string>()
   openCalls = new Set<string>()
   flippedChecks = new Set<string>()
-  agents = new Map<string, RunAgent | null>()
+  facts = new Map<string, RunFacts | null>()
   labelling = false
   changesProblem: string | null = null
   sharedChanges: string | null = null
@@ -65,9 +65,10 @@ export default class OrcAgents extends View {
   questionsBusy = false
   questions: AttentionQueue = { items: [], decided: [] }
   local: LocalAgents | null = null
+  listed = new Date().toISOString()
   review = InputState.new({ placeholder: "What to change before this PR merges" })
   sent: Keyed<string> | null = null
-  answers = new InboxAnswers((cx) => this.refresh(cx))
+  answers = new InboxAnswers((cx) => this.refresh(cx), threadBoxes)
   agent: AgentAttention = { pending: [], decided: [] }
   agentAttention = new AgentAttentionSection()
 
@@ -77,6 +78,7 @@ export default class OrcAgents extends View {
       this.selectedKey = this.selectedCard()?.key ?? null
       changed.notify()
     })
+    this.find.on("change", (_event, changed) => this.moveSelection(changed, () => undefined, this.shownKey))
     this.refresh(cx)
     cx.spawn((task) => watchMerges(task, (spot, id) => this.startMerge(spot, id)))
     cx.timer.every(everyMs, (tick) => {
@@ -84,6 +86,8 @@ export default class OrcAgents extends View {
         this.refresh(tick)
       }
     })
+    // Taking an Open run ask notifies, which the App refuses during render.
+    cx.timer.every(150, (tick) => this.openAsked(tick))
   }
 
   refresh(cx: Context): void {
@@ -113,16 +117,16 @@ export default class OrcAgents extends View {
       this.questionsBusy = false
       if (reading.kind === "ok") {
         this.questions = reading.value
-        this.showCards(task)
+        this.showCards(task, this.list.kind === "ok" ? this.list.reread : null)
       }
       task.notify()
     }))
   }
 
-  showCards(cx: Context): void {
+  showCards(cx: Context, reread: Reread | null): void {
     if (this.local === null) return
     const documents = agentsDocuments(this.local, this.questions)
-    this.cards = { kind: "ok", value: documents.cards }
+    this.list = { kind: "ok", cards: documents.cards, reread }
     this.agent = documents.agent
     this.answers.sync(cx, documents.cards.flatMap(cardAttention))
   }
@@ -131,16 +135,31 @@ export default class OrcAgents extends View {
     return readLocalAgents().then((reading) => {
       if (reading.kind === "ok") {
         this.local = reading.value
-        this.showCards(cx)
+        this.listed = new Date().toISOString()
+        this.showCards(cx, null)
+      } else if (this.list.kind === "ok") {
+        this.list = { ...this.list, reread: reading.kind === "failed" ? { reason: reading.reason, listed: this.listed } : null }
       } else {
         this.local = null
-        this.cards = reading
+        this.list = reading
       }
       cx.notify()
       if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {
         this.review.set_value("")
       }
-      return Promise.all([this.readSelectedRun(), this.readSelectedChanges()]).then(() => undefined)
+      return Promise.all([this.readSelectedRun(), this.readSelectedThread(), this.readSelectedChanges()]).then(() => undefined)
+    })
+  }
+
+  readSelectedThread(): Promise<void> {
+    const card = this.selectedCard()
+    const task = card === null ? undefined : this.local?.details.find((detail) => detail.id === card.id)
+    if (card === null || task === undefined) {
+      this.told = null
+      return Promise.resolve()
+    }
+    return readJson("orc", ["backlog", "thread", task.id, "--json"], thread).then((reading) => {
+      if (this.selectedCard()?.id === task.id) this.told = { of: task.id, reading }
     })
   }
 
@@ -155,12 +174,12 @@ export default class OrcAgents extends View {
       this.steps = { of: runId, reading: showReading }
       const card = this.selectedCard()
       if (showReading.kind !== "ok" || card?.runId !== runId) return
-      this.agents.set(runId, runAgent(showReading.value.steps))
+      this.facts.set(runId, runFacts(showReading.value))
       const step = this.stepShown()
       if (step === null) return
       const of = `${runId}/${step.id}`
       const status = recordedStatus(step.status, card.standing.status)
-      return this.output.read(of, runId, { ...step, status }, this.pane, showReading.value.taskFile)
+      return this.output.read(of, runId, { ...step, status }, showReading.value.taskFile)
     })
   }
 
@@ -189,17 +208,18 @@ export default class OrcAgents extends View {
     }
   }
 
+  allCards(): ReadonlyArray<Card> {
+    return this.list.kind === "ok" ? this.list.cards : []
+  }
+
   labelRuns(cx: AsyncContext): void {
-    const cards = this.cards.kind === "ok" ? this.cards.value : []
-    const wanted = cards.flatMap((card) => card.runId !== null && (!this.agents.has(card.runId) || goesOn(card.standing)) ? [card.runId] : [])
-    if (this.labelling || wanted.length === 0) {
-      return
-    }
+    const wanted = this.allCards().flatMap((card) => card.runId !== null && (!this.facts.has(card.runId) || goesOn(card.standing)) ? [card.runId] : [])
+    if (this.labelling || wanted.length === 0) return
     this.labelling = true
     const label = (runId: string): Promise<void> =>
       readJson("orc", ["show", runId, "--json"], show).then((reading) => {
         if (reading.kind === "ok") {
-          this.agents.set(runId, runAgent(reading.value.steps))
+          this.facts.set(runId, runFacts(reading.value))
         }
       })
     const from = (start: number, task: AsyncContext): Promise<void> =>
@@ -215,10 +235,8 @@ export default class OrcAgents extends View {
   }
 
   startMerge(cx: AsyncContext, task: string): void {
-    if (this.merge?.outcome.kind === "merging") {
-      return
-    }
-    const approval = this.cards.kind === "ok" ? this.cards.value.map(approvalOf).find((item) => item?.task === task) : undefined
+    if (this.merge?.outcome.kind === "merging") return
+    const approval = this.allCards().map(approvalOf).find((item) => item?.task === task)
     if (approval === undefined || approval === null || this.answers.busy(approval.key)) return
     this.answers.sent.set(approval.key, { kind: "sending" })
     this.merge = { task, outcome: { kind: "merging" } }
@@ -240,7 +258,8 @@ export default class OrcAgents extends View {
   }
 
   visibleCards(): ReadonlyArray<Card> {
-    return this.cards.kind === "ok" ? filterCards(this.cards.value, this.filter) : []
+    const words = this.find.value()
+    return unfoldedCards(filterCards(this.allCards(), this.filter, words), this.foldedGroups)
   }
 
   selectedCard(): Card | null {
@@ -262,22 +281,7 @@ export default class OrcAgents extends View {
 
   target(): Chosen | null {
     const card = this.selectedCard()
-    if (card === null) {
-      return null
-    }
-    const approval = approvalOf(card) !== null
-    if (this.chosen?.kind === "approve" && approval) {
-      return this.chosen
-    }
-    const ids = this.recordedSteps(card).map((step) => step.id)
-    if (this.chosen?.kind === "step" && ids.includes(this.chosen.id)) {
-      return this.chosen
-    }
-    if (approval) {
-      return { kind: "approve" }
-    }
-    const last = ids.at(-1)
-    return last === undefined ? null : { kind: "step", id: last }
+    return card === null ? null : targetOf(card, this.chosen, this.recordedSteps(card))
   }
 
   stepShown(): ShownStep | null {
@@ -289,13 +293,15 @@ export default class OrcAgents extends View {
     return this.recordedSteps(card).find((step) => step.id === target.id) ?? null
   }
 
-  moveSelection(cx: Context, change: () => void): void {
-    const before = this.selectedCard()?.key ?? null
-    this.chosen = null
-    this.menu = null
+  moveSelection(cx: Context, change: () => void, before: string | null = this.selectedCard()?.key ?? null): void {
+    this.menuOpen = false
     change()
-    if ((this.selectedCard()?.key ?? null) !== before) {
+    this.selectedKey = this.selectedCard()?.key ?? null
+    this.shownKey = this.selectedKey
+    if (before === null || this.selectedKey !== before) {
+      this.chosen = null
       this.changesProblem = null
+      this.told = null
       this.shareChanges(null)
       this.review.set_value("")
     }
@@ -308,16 +314,14 @@ export default class OrcAgents extends View {
   }
 
   choose(cx: Context, chosen: Chosen): void {
-    this.moveSelection(cx, () => { this.chosen = chosen })
+    const key = this.selectedCard()?.key ?? null
+    this.moveSelection(cx, () => {
+      this.selectedKey = key
+      this.chosen = chosen
+    })
   }
 
-  setPane(cx: Context, pane: Pane): void {
-    this.pane = pane
-    this.refresh(cx)
-    cx.notify()
-  }
-
-  flip(open: Set<string>, id: string, cx: Context): void {
+  flip<A>(open: Set<A>, id: A, cx: Context): void {
     if (open.has(id)) {
       open.delete(id)
     } else {
@@ -332,55 +336,53 @@ export default class OrcAgents extends View {
 
   openAsked(cx: Context): void {
     const asked = openAsk(shared(agentsOpenKey))
-    if (asked === null || asked.at === this.opened || this.cards.kind !== "ok") return
+    if (asked === null || asked.at === this.opened || this.list.kind !== "ok") return
     this.opened = asked.at
-    this.filter = openedFilter(this.cards.value, asked.run)
-    this.select(cx, asked.run)
+    this.moveSelection(cx, () => {
+      this.filter = openedFilter(this.allCards(), asked.run)
+      this.find.set_value("")
+      this.foldedGroups.clear()
+      this.selectedKey = asked.run
+    })
     setShared(agentsOpenKey, null)
   }
 
-  render(cx: Context): Element {
-    this.openAsked(cx)
+  render(): Element {
     const t = palette()
     const card = this.selectedCard()
+    this.shownKey = card?.key ?? null
     const act: AgentsActions = {
       select: (spot, key) => this.select(spot, key),
-      toggleFold: (spot) => { this.folded = !this.folded; this.menu = null; spot.notify() },
+      toggleFold: (spot) => { this.folded = !this.folded; this.menuOpen = false; spot.notify() },
+      toggleGroup: (spot, status) => this.moveSelection(spot, () => this.flip(this.foldedGroups, status, spot)),
       setFilter: (spot, filter) => this.moveSelection(spot, () => { this.filter = filter }),
-      openMenu: (spot, menu) => { this.menu = menu; spot.notify() },
+      openMenu: (spot, open) => { this.menuOpen = open; spot.notify() },
+      clearFind: (spot) => this.moveSelection(spot, () => this.find.set_value("")),
+      retry: (spot) => this.refresh(spot),
       choose: (spot, chosen) => this.choose(spot, chosen),
-      setPane: (spot, pane) => this.setPane(spot, pane),
       askMerge: (asked, approval) => askMerge(approval, `${thisView}.${mergeCommand}${asked.id}`)
     }
     return h_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)
       .child(runsColumn(t, {
-        cards: this.cards, filter: this.filter, menu: this.menu, selectedKey: card?.key ?? null, agents: this.agents, folded: this.folded,
-        attention: (listed) => cardAttention(listed).map((item) => this.answers.item(t, item, (asked) => act.askMerge(listed, asked))),
+        list: this.list, filter: this.filter, find: this.find, menuOpen: this.menuOpen, selectedKey: card?.key ?? null,
+        facts: this.facts, now: Date.now(), folded: this.folded, foldedGroups: this.foldedGroups,
         ...(this.agentAttention.shows(this.agent) ? { agentAttention: () => this.agentAttention.render(t, this.agent) } : {})
       }, act))
-      .child(stepsColumn(t, card, {
-        reading: card === null ? null : this.currentSteps(card),
-        target: this.target(),
-        changesProblem: this.changesProblem
-      }, act))
-      .child(this.detail(t, card, act))
+      .child(detailView(t, card, act, this.shownDetail(t, card, act)))
   }
 
-  detail(t: Palette, card: Card | null, act: AgentsActions): Element {
-    return detailView(t, card, act, this.shownDetail(t, card))
-  }
-
-  shownDetail(t: Palette, card: Card | null): DetailShown {
+  shownDetail(t: Palette, card: Card | null, act: AgentsActions): DetailShown {
     const step = card === null ? null : this.stepShown()
     const runId = card?.runId ?? null
     const of = step === null || runId === null ? null : `${runId}/${step.id}`
     return {
+      reading: card === null ? null : this.currentSteps(card),
       target: this.target(),
       merge: card === null ? null : this.merge?.task === card.id ? this.merge.outcome : null,
       step,
-      steps: card === null ? [] : this.recordedSteps(card),
-      back: card === null ? [] : sendBackBar(t, card, this.review, this.sent?.of === card.key ? this.sent.reading : null, (cx) => this.sendBack(cx)),
-      pane: this.pane,
+      thread: threadShown(t, card, act, this),
+      back: { review: this.review, sent: card !== null && this.sent?.of === card.key ? this.sent.reading : null, send: (cx) => this.sendBack(cx) },
+      changesProblem: this.changesProblem,
       turns: readingOf(this.output.turns, of),
       log: readingOf(this.output.log, of),
       summary: readingOf(this.output.summary, of),

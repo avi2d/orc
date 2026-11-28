@@ -5,7 +5,7 @@ import type { HarvestOrigin } from "../sources/harvest";
 import type { Session, SessionIdentity } from "../sources/live";
 import type { Tokens } from "../contract/tokens";
 import { spendGate } from "./estimate";
-import type { AccountView, SessionQuotaView, SessionShare, WindowView } from "./session-quota";
+import type { AccountView, SessionQuotaView, SessionShare, WindowTiming, WindowView } from "./session-quota";
 import type { WindowSource } from "../sources/window-sources";
 import type { SessionQuotaReport } from "../contract/session-quota";
 
@@ -93,15 +93,15 @@ const rowsOf = (
         });
   });
 
-const originOf = (source: Exclude<WindowJson["source"], undefined | { readonly kind: "quota-axi" }>): HarvestOrigin =>
+const originOf = (source: Extract<WindowJson["source"], { readonly kind: "harvested" }>): HarvestOrigin =>
   source.harness === "codex" ? { harness: "codex", via: "log" } : { harness: "claude-code", via: source.via ?? "log" };
 
 // A report with no window source predates log harvesting, when every window came from the quota-axi read its report made.
 const sourceOf = (window: WindowJson, where: string, reportedAt: DateTime.Utc): Decoded<WindowSource> => {
   const source = window.source;
   if (source === undefined) return decoded({ kind: "quota-axi", readAt: reportedAt });
-  if (source.kind === "quota-axi") {
-    return mapDecoded(instantOf(source.readAt, `${where}.source.readAt`), (readAt) => ({ kind: "quota-axi", readAt }));
+  if (source.kind !== "harvested") {
+    return mapDecoded(instantOf(source.readAt, `${where}.source.readAt`), (readAt) => ({ kind: source.kind, readAt }));
   }
   return mapDecoded(instantOf(source.observedAt, `${where}.source.observedAt`), (observedAt) => ({
     kind: "harvested",
@@ -112,14 +112,25 @@ const sourceOf = (window: WindowJson, where: string, reportedAt: DateTime.Utc): 
   }));
 };
 
+const timingOf = (window: WindowJson, resetsAt: DateTime.Utc, where: string): Decoded<WindowTiming> => {
+  if (window.startsAt === null && window.elapsedFraction === null) return decoded({ startsAt: null, cycleSeconds: undefined, elapsedFraction: null });
+  if (window.startsAt === null || window.elapsedFraction === null) return rejected(`${where} has incomplete cycle timing`);
+  const elapsedFraction = window.elapsedFraction;
+  return mapDecoded(instantOf(window.startsAt, `${where}.startsAt`), (startsAt) => ({
+    startsAt,
+    cycleSeconds: (DateTime.toEpochMillis(resetsAt) - DateTime.toEpochMillis(startsAt)) / 1000,
+    elapsedFraction,
+  }));
+};
+
 const windowOf = (
   window: WindowJson,
   where: string,
   sessions: ReadonlyMap<string, Session>,
   reportedAt: DateTime.Utc,
 ): Decoded<WindowView> =>
-  flatMapDecoded(instantOf(window.startsAt, `${where}.startsAt`), (startsAt) =>
-    flatMapDecoded(instantOf(window.resetsAt, `${where}.resetsAt`), (resetsAt) =>
+  flatMapDecoded(instantOf(window.resetsAt, `${where}.resetsAt`), (resetsAt) =>
+    flatMapDecoded(timingOf(window, resetsAt, where), (timing) =>
       flatMapDecoded(sourceOf(window, where, reportedAt), (source) =>
         mapDecoded(rowsOf(window, where, sessions), (rows) => {
           const gate = spendGate(
@@ -133,13 +144,11 @@ const windowOf = (
             label: window.label,
             kind: window.kind,
             source,
-            cycleSeconds: (DateTime.toEpochMillis(resetsAt) - DateTime.toEpochMillis(startsAt)) / 1000,
-            startsAt,
+            ...timing,
             resetsAt,
             usedPoints: window.usedPoints,
             leftPoints: window.leftPoints,
             pace: window.pace,
-            elapsedFraction: window.elapsedFraction,
             aheadOfPace: window.gate.aheadOfPace,
             pastFirstTenth: window.gate.pastFirstTenth,
             exhaustsBeforeReset: gate.exhaustsBeforeReset,

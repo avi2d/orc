@@ -1,12 +1,15 @@
-import { Effect } from "effect"
+import { Array as Arr, Effect } from "effect"
+import { providerOfModel } from "../../shared/config/index"
 import { OrcRunError } from "../../shared/lib/index"
 import { runChecksRound, summarizeChecksRound, type ChecksCommand } from "./checks"
 import { finishAfterChecks, reviewOrc } from "./run-finish"
-import { runReviewTurn } from "./review-turn"
-import type { ReviewFinding, ReviewOutcome } from "./review-outcome"
+import type { ReviewFinding } from "./review-outcome"
+import { passesRoundTwoBar, sameFinding, type ReviewStop } from "./left-findings"
 import type { RunStopped } from "./loop-pause"
-import type { ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
+import { writeReviewWait } from "./review-wait"
+import type { ResumePlan, ReviewEligibility, RunCheckpoints, SandboxOps } from "./run-ops"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
+import { sentBackAnswersOf } from "./worker-question"
 
 interface ReviewLoop {
   readonly run: HistoryRun
@@ -22,10 +25,27 @@ interface ReviewLoop {
 }
 
 const findingsForRound = (findings: ReadonlyArray<ReviewFinding>, round: number): ReadonlyArray<ReviewFinding> =>
-  round === 1 ? findings : findings.filter((finding) => finding.severity === "error")
+  findings.filter((finding) => finding.action !== "ask-user" && (round === 1 || passesRoundTwoBar(finding)))
 
-const mayStartRound = (round: number, review: ReviewOutcome): boolean =>
-  round <= 2 && review.status === "passed" && findingsForRound(review.findings, round).length > 0
+const stopForReview = (findings: ReadonlyArray<ReviewFinding>, round: number, limit: number, sent: ReadonlyArray<ReadonlyArray<ReviewFinding>>): ReviewStop | null => {
+  const unresolved = findings.filter((finding) => finding.action !== "ask-user" && (finding.severity === "error" || finding.severity === "warning"))
+  if (unresolved.length === 0) return "cleared"
+  if (round > limit) return "round-limit"
+  const eligible = findingsForRound(findings, round)
+  if (eligible.some((finding) => sent.some((previous) => previous.some((earlier) => sameFinding(earlier, finding))))) return "repeat"
+  if (eligible.length === 0) return "severity-bar"
+  return null
+}
+
+const collectAskUser = (kept: Array<ReviewFinding>, findings: ReadonlyArray<ReviewFinding>): void => {
+  for (const finding of findings) {
+    const earlier = kept.findIndex((held) => sameFinding(held, finding))
+    if (finding.action !== "ask-user") {
+      if (earlier !== -1) kept.splice(earlier, 1)
+    } else if (earlier === -1) kept.push(finding)
+    else kept[earlier] = finding
+  }
+}
 
 const stopReport = (loop: ReviewLoop, endReason: string): OrcRunReport => ({
   ...loop.base, commits: loop.commits, completed: false, checksRounds: loop.rounds,
@@ -79,19 +99,50 @@ const runOneRound = (loop: ReviewLoop, findings: ReadonlyArray<ReviewFinding>, r
     return yield* checkAfterFix(loop)
   })
 
+const reviewEligibility = ({ checkpoints, plan }: Pick<ReviewLoop, "checkpoints" | "plan">): Effect.Effect<ReviewEligibility, OrcRunError> =>
+  checkpoints.branchWriterModels.pipe(Effect.map((models) => ({
+    implementerProviders: Arr.dedupe([...plan.reviewWait?.implementerProviders ?? [], ...models.map(providerOfModel)]),
+    resumedForQuota: plan.reviewWait !== undefined
+  })))
+
+const appliedSendBackIds = (plan: ResumePlan): ReadonlyArray<string> =>
+  Arr.dedupe([...plan.reviewWait?.appliedSendBackIds ?? [], ...sentBackAnswersOf(plan.answers).map(({ question }) => question)])
+
 export const finishChecked = (loop: ReviewLoop): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const { run, ops, base, rounds, fixes, commits, plan, checkpoints } = loop
     if (run.delivery.kind !== "orc") {
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir)
     }
+    const limit = run.delivery.maxFixRounds
     const reviewer = run.delivery.reviewer
-    let review = yield* reviewOrc(run, reviewer, checkpoints, ops.runAgent)
-    for (let round = 1; mayStartRound(round, review); round += 1) {
-      if (review.status !== "passed") break
-      const failure = yield* runOneRound(loop, findingsForRound(review.findings, round), round)
-      if (failure !== null) return stopReport(loop, failure)
-      review = yield* runReviewTurn(run, ops.runAgent, reviewer, "orc")
-    }
-    return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, review)
+    const sentPerRound = [...plan.reviewWait?.sentPerRound ?? []]
+    const askUserFindings = [...plan.reviewWait?.askUserFindings ?? []]
+    const eligibility = reviewEligibility(loop)
+    const reviewNext = () => eligibility.pipe(Effect.flatMap((writers) =>
+      reviewOrc(run, reviewer, checkpoints, ops.runAgent, sentPerRound.length + 1, writers)
+    ))
+    return yield* Effect.gen(function*() {
+      let review = yield* reviewNext()
+      while (review.status === "passed") {
+        const round = sentPerRound.length + 1
+        collectAskUser(askUserFindings, review.findings)
+        const stop = stopForReview(review.findings, round, limit, sentPerRound)
+        if (stop !== null) {
+          return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review, sentPerRound, stop, askUserFindings, eligibility: yield* eligibility })
+        }
+        const sent = findingsForRound(review.findings, round)
+        sentPerRound.push(sent)
+        const failure = yield* runOneRound(loop, sent, round)
+        if (failure !== null) return stopReport(loop, failure)
+        review = yield* reviewNext()
+      }
+      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints, ops.runAgent, plan.priorDir, { review })
+    }).pipe(
+      Effect.catchTag("NoReviewerRoom", ({ implementerProviders, message }) =>
+        writeReviewWait(run, { implementerProviders, reason: message, sentPerRound, askUserFindings, appliedSendBackIds: appliedSendBackIds(plan) }).pipe(
+          Effect.as({ ...stopReport(loop, message), waitingForReviewer: true as const })
+        )
+      )
+    )
   })

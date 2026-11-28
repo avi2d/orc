@@ -70,6 +70,7 @@ const fakeQuota = (arrivals: string): string =>
 
 interface FixtureShape {
   readonly mac: number
+  readonly macPinnedOnly?: boolean
   readonly linux: number
   readonly floorPercent: number
 }
@@ -88,7 +89,7 @@ export const withFixture = async (shape: FixtureShape, body: (fixture: Fixture) 
     await chmod(join(bin, "orc-quota"), 0o755)
     const start = ["sh", "-c", "sleep 0.1; echo \"$ORC_TASK_ID $ORC_TASK_MACHINE\" >> '" + startLog + "'"]
     await writeFile(join(backlog, "dispatch.json"), JSON.stringify({
-      machines: [{ name: "mac", slots: shape.mac, start }, { name: "linux", slots: shape.linux, start }],
+      machines: [{ name: "mac", slots: shape.mac, pinnedOnly: shape.macPinnedOnly, start }, { name: "linux", slots: shape.linux, start }],
       quota: quotaConfig(shape.floorPercent)
     }))
     await writeFile(join(backlog, "projects.json"), JSON.stringify({

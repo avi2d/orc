@@ -24,6 +24,7 @@ Runs and their results:
   log        Print the output of one step of a run
   score      Score one step of a run from 1 to 5
   refusals   Count the gates and rules past runs kept hitting
+  metrics    Count each run's failed steps, gate stops, minutes and fix rounds
 
 The backlog and the beat:
   backlog    See the backlog, and add, hold, answer or close its tasks
@@ -36,7 +37,7 @@ The runner:
   runner     Queue, renew, read and stop task runs through pueue
   heavy      Check and watch the queue of heavy tool calls
   version    Print the orc version this machine runs
-  machines   List the orc version each dispatch machine runs
+  machines   List dispatch machine versions and slots
 
 Chat and the app:
   chat       Talk to the orchestrator, which adds, holds and answers tasks
@@ -75,15 +76,17 @@ Options:
   --delivery <no-mistakes|direct-PR|orc>
                             How a ship task reaches its PR. Defaults to
                             no-mistakes. direct-PR records a review before
-                            opening the PR, and orc rebases and records a review
-                            before opening the PR without a CI verdict.
+                            opening the PR, and orc rebases, reviews and fixes
+                            the findings in up to two rounds by default, set by
+                            review.maxFixRounds, before opening the PR without a
+                            CI verdict.
   --branch <name>           The branch to commit to, or to resume. Defaults to
                             orc/<run-id>.
-  --sandbox <nono|none>     Where the agent runs. Runs you start by hand default
-                            to nono. none runs on the host as you. Queued tasks
-                            pass none without a per-agent sandbox. Their safety
-                            boundary is the isolated space around the whole
-                            agent system.
+  --sandbox <nono|none>     Where the agent runs. The default is no per-agent
+                            sandbox: none runs the agent on the host as you, and
+                            the safety boundary is the isolated space around the
+                            whole agent system. Queued tasks always run that
+                            way. Pass nono to sandbox a run you start by hand.
   --token-file <path>       A file holding the provider token the run uses.
   --provider <id>           The provider id from config.json the run must use.
   --implementer-model <model>
@@ -182,6 +185,23 @@ Options:
 
 Examples:
   orc refusals
+```
+
+### orc metrics
+
+```text
+Usage: orc metrics [--json]
+
+Prints one row per run, newest first: its failed steps, gate stops, minutes from
+start to end and fix rounds. Gate stops count each failed checks round, each orc
+review turn that started a fix round or failed, and each no-mistakes step the
+run parked at, once per step. A resumed run counts only the steps it ran itself.
+
+Options:
+  --json  Print the counts as an orc.metrics.v1 JSON document.
+
+Examples:
+  orc metrics
 ```
 
 ## The backlog and the beat
@@ -839,10 +859,11 @@ Examples:
 ```text
 Usage: orc machines --json
 
-Reads the machines in dispatch.json. A machine that starts orc runner start here
-shows this orc's version. A machine reached through orc runner start --
-<command> is asked through that command with orc version --json --local, and
-shows its error when it does not answer within 10 seconds.
+Reads each runner machine's slots and pinnedOnly setting from dispatch.json. A
+machine that starts orc runner start here shows this orc's version. A machine
+reached through orc runner start -- <command> is asked through that command with
+orc version --json --local, and shows its error when it does not answer within
+10 seconds.
 
 Options:
   --json  Print the machines as an orc.machines.v1 JSON document.

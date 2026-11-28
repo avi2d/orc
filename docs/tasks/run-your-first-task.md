@@ -21,7 +21,7 @@ To put the `orc` command on your PATH:
 
 Orc prints `orc` and its version.
 The npm package runs without Bun on Apple silicon macOS and Linux x64 with glibc.
-If the compiled binary is missing, install [Bun](https://bun.com) to run orc from source.
+If the compiled binary is missing, install [Bun](https://bun.com) to run the bundled `dist/bin.js`.
 To upgrade orc later, run the same install command again.
 
 ## Name a provider and its models
@@ -64,7 +64,7 @@ To run it:
 
 Orc prints the branch, its commits, the checks, the review and the pull request link.
 `--sandbox none` runs the agent on the host as your user.
-With [nono](https://nono.sh) installed, drop the flag and the run works inside the nono sandbox.
+With [nono](https://nono.sh) installed, swap the flag for `--sandbox nono` and the run works inside the nono sandbox.
 
 ## See what happened
 

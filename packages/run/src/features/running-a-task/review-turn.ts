@@ -4,11 +4,12 @@ import { runGit } from "../../shared/process/index"
 import type { HistoryRun } from "./run-record"
 import { OrcRunError } from "../../shared/lib/index"
 import type { AgentRunResult, SandboxOps } from "./run-ops"
+import { pathRulesSection, projectPathRules } from "./review-path-rules"
 import { decodeOrcReviewFindings, RecordedReview, ReviewFindings, type ReviewFinding, type ReviewOutcome, type ReviewAtHeadOutcome } from "./review-outcome"
 
 const ReviewCheckpoint = Schema.Struct({ head: Schema.String, outcome: RecordedReview })
 const decodeCheckpoint = Schema.decodeUnknownOption(Schema.fromJsonString(ReviewCheckpoint))
-const checkpointFileName = "review-checkpoint.json"
+export const checkpointFileName = "review-checkpoint.json"
 
 const reviewFileName = "review.json"
 
@@ -16,7 +17,7 @@ const maxReviewAnswers = 2
 
 const decodeFindings = Schema.decodeUnknownResult(Schema.fromJsonString(ReviewFindings))
 
-const readOnlyTools = ["read", "grep", "find", "ls"]
+export const readOnlyTools = ["read", "grep", "find", "ls"]
 
 const readFindings = (reply: string | null, mode: "direct-PR" | "orc"): Result.Result<ReadonlyArray<ReviewFinding>, string> => {
   if (reply === null) {
@@ -32,7 +33,7 @@ const readFindings = (reply: string | null, mode: "direct-PR" | "orc"): Result.R
 
 const diffFileName = "diff.md"
 
-const readDiff = (
+export const readDiff = (
   run: Pick<HistoryRun, "fs" | "path" | "piSessionDir" | "spawner" | "git" | "projectDir" | "branch">
 ): Effect.Effect<string, OrcRunError> =>
   Effect.gen(function*() {
@@ -56,17 +57,18 @@ const rerunPrompt = (problem: string): string =>
     "Print only the findings JSON array again, with nothing before or after it and no code fence."
   ].join("\n")
 
-const readReply = (run: Pick<HistoryRun, "fs">, sessionFile: string | null): Effect.Effect<string | null> =>
+export const readReply = (run: Pick<HistoryRun, "fs">, sessionFile: string | null): Effect.Effect<string | null> =>
   sessionFile === null
     ? Effect.succeed(null)
     : run.fs.readFileString(sessionFile).pipe(Effect.map(finalReplyText), Effect.catchTag("PlatformError", () => Effect.succeed(null)))
 
 const recordReview = (
   run: Pick<HistoryRun, "fs" | "path" | "runDir">,
-  findings: ReadonlyArray<ReviewFinding>
+  findings: ReadonlyArray<ReviewFinding>,
+  attempt: number
 ): Effect.Effect<ReviewOutcome> =>
   Effect.gen(function*() {
-    const file = run.path.join(run.runDir, reviewFileName)
+    const file = run.path.join(run.runDir, attempt === 1 ? reviewFileName : "review-" + attempt.toString() + ".json")
     const written = yield* run.fs.writeFileString(file, JSON.stringify(findings, null, 2) + "\n").pipe(Effect.result)
     return Result.isSuccess(written)
       ? { status: "passed", findings, file }
@@ -74,17 +76,22 @@ const recordReview = (
   })
 
 export const runReviewTurn = (
-  run: Pick<HistoryRun, "fs" | "path" | "runDir" | "piSessionDir" | "spawner" | "git" | "projectDir" | "branch">,
+  run: Pick<HistoryRun, "fs" | "path" | "runDir" | "piSessionDir" | "spawner" | "git" | "projectDir" | "worktreeDir" | "branch">,
   runAgent: SandboxOps["runAgent"],
   reviewer: AgentFile,
-  mode: "direct-PR" | "orc" = "direct-PR"
+  mode: "direct-PR" | "orc" = "direct-PR",
+  attempt = 1
 ): Effect.Effect<ReviewOutcome> =>
   Effect.gen(function*() {
     const diffed = yield* readDiff(run).pipe(Effect.result)
     if (Result.isFailure(diffed)) {
       return { status: "failed", reason: diffed.failure.message }
     }
-    const first = reviewPrompt(reviewer, run.path.join(run.piSessionDir, "task.md"), diffed.success) + (mode === "orc" ? "\nFor this review, severity must be error, warning or info, instead of any other severity names." : "")
+    const rules = mode === "orc" ? yield* projectPathRules(run).pipe(Effect.result) : Result.succeed([])
+    if (Result.isFailure(rules)) {
+      return { status: "failed", reason: rules.failure.message }
+    }
+    const first = reviewPrompt(reviewer, run.path.join(run.piSessionDir, "task.md"), diffed.success) + (mode === "orc" ? "\nFor this review, severity must be error, warning or info, instead of any other severity names. Add a topic field to each finding: a short stable slug for the problem. Keep the same topic for the same problem across review rounds. Set action to exactly ask-user when the finding needs the user's decision; otherwise describe the fix." : "") + pathRulesSection(rules.success)
     let prompt = first
     let resumeSession: string | null = null
     let problem = ""
@@ -95,7 +102,7 @@ export const runReviewTurn = (
       }
       const findings = readFindings(yield* readReply(run, result.success.sessionFile), mode)
       if (Result.isSuccess(findings)) {
-        return yield* recordReview(run, findings.success)
+        return yield* recordReview(run, findings.success, attempt)
       }
       problem = findings.failure
       resumeSession = result.success.sessionFile ?? resumeSession
@@ -120,7 +127,7 @@ export const reviewAtHead = (
     const reusable = head !== "" && Option.isSome(decoded) && decoded.value.head === head ? decoded.value : null
     const reusedFrom = reusable !== null && priorDir !== null ? run.path.basename(priorDir) : null
     const outcome = reusable !== null
-      ? yield* recordReview(run, reusable.outcome.findings)
+      ? yield* recordReview(run, reusable.outcome.findings, 1)
       : yield* runReviewTurn(run, runAgent, reviewer)
     if (outcome.status === "passed" && head !== "") {
       const file = run.path.join(run.runDir, checkpointFileName)

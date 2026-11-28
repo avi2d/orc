@@ -32,6 +32,21 @@ This example names opencode-go through a [Pi](https://pi.dev) login, anthropic t
 
 [Dispatch rules](dispatch-rules.md) can pick different agent models for each backlog task.
 
+## Reviewer chain
+The optional `reviewers` list names the reviewers an [`orc` delivery](delivery-modes.md#reviewer-chain) run tries, in order.
+Each entry names a `provider` from `providers` and a `model` from that provider:
+
+```json
+{
+  "reviewers": [
+    { "provider": "opencode-go", "model": "opencode-go/kimi-k2" },
+    { "provider": "anthropic", "model": "anthropic/claude-opus-5-5" }
+  ]
+}
+```
+
+Orc refuses an empty list, a model that does not start with its provider and a slash, and a provider that `providers` does not name.
+
 ## Provider credentials
 
 Each provider names its Pi provider `id`, the part of a model name before the `/`, and its `credential`:
@@ -41,10 +56,10 @@ Each provider names its Pi provider `id`, the part of a model name before the `/
   Its `nono` entry may name `injectHeader` and `credentialFormat`.
   `injectHeader` names the HTTP header the proxy fills with the key and defaults to `Authorization`.
   `credentialFormat` names the header value with `{}` where the key goes and defaults to `Bearer {}`.
-  A login provider without a `nono` entry runs only with `--sandbox none`.
+  A login provider without a `nono` entry runs only without a per-agent sandbox.
 - `token-file` reads the token from a file, whose absolute path `tokenFile` takes from the variable `env` names or from `path`.
   `orc run --token-file <path>` takes the path from the flag instead.
-  The nono sandbox carries only a Pi login, so a token file provider runs only with `--sandbox none`.
+  The nono sandbox carries only a Pi login, so a token file provider runs only without a per-agent sandbox.
 
 ## Package providers
 
@@ -61,7 +76,7 @@ It takes no `tokenFile` or `tokenCommand`, so it completes the `credential` list
 - A source that failed to install stays out of `$ORC_HOME/pi-packages` until a later run installs it.
 - An absolute path to a package already on the machine, such as one under `~/.pi/agent/git`, loads without the fetch.
 - `env` names variables orc sets for the run's Pi over your environment, for the chat's Pi when `models.orchestrator` names this provider, for the planner's Pi when `models.planner` does, and for the decider's Pi when `models.decider` does, such as the `CLAUDE_CONFIG_DIR` of the account a [Claude Code](https://claude.com/product/claude-code) package runs on.
-- The nono sandbox carries only a Pi login, so a package provider runs only with `--sandbox none`.
+- The nono sandbox carries only a Pi login, so a package provider runs only without a per-agent sandbox.
 
 ## Validation and token files
 

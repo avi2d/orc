@@ -23,10 +23,10 @@ import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
 import { runDirFor, type ReportKind } from "../../entities/backlog/index"
 import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "../../entities/review-gate/index"
 import { isRunId, newRunId } from "../../shared/lib/index"
-import { dropEndedPiAgentDir, dropResumedPiAgentDir, runInstructions } from "./run-folders"
+import { dropEndedPiAgentDir, dropResumedPiAgentDir, reviewerAgentDirOf, runInstructions } from "./run-folders"
 import { prepareAgents } from "./run-prepare"
-import { subprocessDeliverer } from "./run-deliverer"
-import type { RunDelivery } from "../../shared/config/index"
+import { chainReviewer, subprocessDeliverer } from "./run-deliverer"
+import type { RoomReading, RunDelivery } from "../../shared/config/index"
 import { closeTaskCopy, openTaskCopy, writeAgentGitConfig } from "../../entities/task-copy/index"
 import { ensureHeavyQueue, readHeavySettings } from "../../entities/heavy-queue/index"
 import { ciOnlyBashFile, runStepPath, withHeavyPath } from "../../entities/heavy-queue/index"
@@ -55,6 +55,10 @@ export interface OrcRunRequest {
   readonly resumeRun?: string | undefined
   readonly rebase?: HistoryRun["rebase"] | undefined
   readonly agentsDir?: string | undefined
+}
+
+export interface AgentStepRequest extends OrcRunRequest {
+  readonly readReviewerRoom: (orcHome: string) => Effect.Effect<RoomReading, never, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner>
 }
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
@@ -198,7 +202,7 @@ export const runReportStep = (
   }))
 
 export const runAgentStep = (
-  request: OrcRunRequest
+  request: AgentStepRequest
 ): Effect.Effect<OrcRunReport, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.scoped(Effect.gen(function*() {
     const hostPath = Bun.env.PATH
@@ -208,7 +212,7 @@ export const runAgentStep = (
     const opened = yield* openRun(request)
     const { fs, path, spawner, home, runId, git, checkout, sandboxKind } = opened
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: withHeavyPath(home, hostPath ?? ""), git: checkout.git }
-    const { folders, agent, fixer, reviewer, plan } = yield* prepareRunAgents(opened, request).pipe(
+    const { folders, agent, fixer, reviewer, plan, planReviewer, maxFixRounds } = yield* prepareRunAgents(opened, request).pipe(
       Effect.tap(() => request.delivery !== undefined && request.delivery !== "no-mistakes" ? Effect.void : requireNoMistakes(noMistakes, checkout.projectDir)),
       Effect.onError(() => removeRunDir(opened))
     )
@@ -216,7 +220,8 @@ export const runAgentStep = (
     const copy = yield* openTaskCopy(fs, path, spawner, git, checkout, home)
     yield* Effect.addFinalizer(() => closeTaskCopy(spawner, git, checkout.projectDir, copy).pipe(Effect.catch((error) => Console.log(error.message))))
     yield* writeAgentGitConfig(spawner, git, Bun.which("git") ?? "git", checkout.projectDir, copy.dir, agentGitConfig(folders))
-    const exec = yield* openAgentExec(plan, folders, copy.dir, toolchain, { ...Bun.env, PATH: runStepPath(home, Bun.env.PATH ?? ""), BASH_ENV: ciOnlyBashFile(home) })
+    const agentEnv = { ...Bun.env, PATH: runStepPath(home, Bun.env.PATH ?? ""), BASH_ENV: ciOnlyBashFile(home) }
+    const exec = yield* openAgentExec(plan, folders, copy.dir, toolchain, agentEnv)
     yield* installCopy(spawner, fs, path, exec, path.join(folders.runDir, "prepare.log"))
     const priorOpen = request.resumeRun === undefined ? [] : yield* Effect.acquireUseRelease(
       openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
@@ -225,13 +230,26 @@ export const runAgentStep = (
     )
     const asks = askSetupFor(folders.runDir, folders.piSessionDir, answerWaitSeconds, request.answers ?? [], priorOpen)
     const ops = agentOps({ spawner, fs, path, git }, exec, folders, piPacing(idleTimeoutSeconds), asks)
+    const services = yield* Effect.context<FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner | Scope.Scope>()
+    const pickChain = (chain: Parameters<typeof chainReviewer>[0]["chain"]) => chainReviewer({
+      chain,
+      readRoom: request.readReviewerRoom(home).pipe(Effect.provideContext(services)),
+      openReviewer: (entry, position) => {
+        const reviewerFolders = { ...folders, piAgentDir: reviewerAgentDirOf(path, folders.runDir, position) }
+        return planReviewer(entry, reviewerFolders.piAgentDir).pipe(
+          Effect.flatMap((reviewerPlan) => openAgentExec(reviewerPlan, reviewerFolders, copy.dir, toolchain, agentEnv)),
+          Effect.map((reviewerExec) => agentOps({ spawner, fs, path, git }, reviewerExec, reviewerFolders, piPacing(idleTimeoutSeconds), asks).runAgent),
+          Effect.provideContext(services)
+        )
+      }
+    })
     const history: HistoryRun = {
       fs, path, spawner, git: checkout.git, projectDir: checkout.projectDir, runId, asks,
       runDir: folders.runDir, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
       taskPath: folders.taskPath, instructions: folders.instructionsPath, agent, fixer, branch: checkout.branch, sandbox: sandboxKind, started,
       worktreeDir: copy.dir,
       machine: opened.machine,
-      delivery: subprocessDeliverer({ ...noMistakes, worktreeDir: copy.dir, branch: checkout.branch }, reviewer),
+      delivery: subprocessDeliverer({ ...noMistakes, worktreeDir: copy.dir, branch: checkout.branch, maxFixRounds }, reviewer, pickChain),
       allow: request.allow ?? [],
       answers: request.answers ?? [],
       resumeRun: request.resumeRun,

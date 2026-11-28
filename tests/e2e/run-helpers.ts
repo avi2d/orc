@@ -9,10 +9,14 @@ import { subprocessNoMistakesRunner, type QuestionAnswer } from "../../packages/
 import type { OpenQuestion } from "../../packages/run/src/entities/review-gate/index"
 import { subprocessPullRequestOpener } from "../../packages/run/src/entities/pull-request/direct-pr"
 import { hostGitShim } from "../../packages/run/src/shared/sandbox/host"
+import { readOrcConfig } from "../../packages/run/src/shared/config/index"
 import { askSetupFor, orcCompletionLine } from "../../packages/run/src/entities/agent/index"
 import { runWithHistory } from "../../packages/run/src/features/running-a-task/run"
+import { type ChainReviewer, fixedReviewer } from "../../packages/run/src/features/running-a-task/run-deliverer"
+import type { ReviewerPick } from "../../packages/run/src/features/running-a-task/run-ops"
 import type { OrcRunReport, RunDeliverer } from "../../packages/run/src/features/running-a-task/run-record"
 import { listRuns, openDatabase, openQuestionsForRun, type RunRecord } from "../../packages/run/src/entities/run-history/index"
+import { readRunMetrics } from "../../packages/run/src/features/seeing-runs/index"
 import { type FakeAgent, type FakeCheck, fakeOps } from "../lib/fake-ops"
 
 export const git = (dir: string, args: ReadonlyArray<string>): string => {
@@ -42,6 +46,9 @@ export const withRepo = async (use: (dir: string) => Promise<void>): Promise<voi
   }
 }
 
+export const recordedMetrics = (home: string): Promise<Effect.Success<ReturnType<typeof readRunMetrics>>> =>
+  Effect.runPromise(Effect.acquireUseRelease(openDatabase(home), readRunMetrics, (db) => Effect.sync(() => db.close())).pipe(Effect.provide(BunServices.layer)))
+
 export const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
   const home = await mkdtemp(join(tmpdir(), "orc-run-home-"))
   try {
@@ -50,6 +57,25 @@ export const withHome = async (use: (home: string) => Promise<void>): Promise<vo
     await rm(home, { recursive: true, force: true })
   }
 }
+
+export const withOrigin = async (dir: string, use: (origin: string) => Promise<void>): Promise<void> => {
+  const origin = await mkdtemp(join(tmpdir(), "orc-origin-"))
+  try {
+    git(origin, ["init", "-q", "--bare"])
+    git(dir, ["remote", "add", "origin", origin])
+    await use(origin)
+  } finally {
+    await rm(origin, { recursive: true, force: true })
+  }
+}
+
+export const withPushedBase = (dir: string, use: (origin: string) => Promise<void>): Promise<void> =>
+  withOrigin(dir, async (origin) => {
+    const baseBranch = git(dir, ["branch", "--show-current"])
+    git(dir, ["push", "-u", "origin", baseBranch])
+    git(dir, ["remote", "set-head", "origin", baseBranch])
+    await use(origin)
+  })
 
 const implementer: AgentFile = {
   kind: "implementer",
@@ -108,6 +134,8 @@ export interface RunFacts {
   readonly branch: string
   readonly machine: string | null
   readonly worktreeDir?: string | undefined
+  readonly implementerModel?: string | undefined
+  readonly fixerModel?: string | undefined
 }
 
 const handRunFacts: RunFacts = { branch: "orc/test", machine: null }
@@ -237,11 +265,12 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
   }
 }
 
-export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+export const runOrcDeliveryStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, reviewerPick: ReviewerPick = fixedReviewer(reviewer), options: Pick<RunFacts, "worktreeDir" | "implementerModel" | "fixerModel"> & { readonly resumeRun?: string; readonly runId?: string; readonly answers?: ReadonlyArray<QuestionAnswer> } = {}): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+  const config = await Effect.runPromise(readOrcConfig(home).pipe(Effect.provide(BunServices.layer)))
   const gh = await stubGh()
   try {
-    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
-      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }), reviewer }), gh.dir + ":")
+    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, options.answers ?? [], fixtureGit, (spawner, hostGit, pathEnv, worktreeDir) =>
+      ({ kind: "orc", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir: options.worktreeDir ?? worktreeDir, branch: "orc/test" }), reviewer: reviewerPick, maxFixRounds: config.review.maxFixRounds }), gh.dir + ":", { ...handRunFacts, ...options }, options.resumeRun === undefined ? null : { runId: options.runId ?? "step-run-2", resumeRun: options.resumeRun })
     return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
   } finally {
     await rm(gh.dir, { recursive: true, force: true })
@@ -268,6 +297,7 @@ const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: F
       const runId = resume?.runId ?? "step-run-1"
       const runDir = path.join(home, "runs", runId)
       yield* fs.makeDirectory(path.join(runDir, "sessions"), { recursive: true })
+      yield* fs.makeDirectory(path.join(runDir, "session"), { recursive: true })
       const stub = yield* Effect.promise(() => stubNoMistakes(nmReplies))
       yield* fs.writeFileString(path.join(runDir, "task.md"), "Do the thing.\n")
       const hostGit = yield* prepareGit(fs, path, Bun.which("git") ?? "git")
@@ -282,7 +312,9 @@ const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: F
             const report = yield* runWithHistory(db, {
               fs, path, spawner, git: hostGit, projectDir: dir, runId, runDir, resumeRun: resume?.resumeRun,
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
-              taskPath: path.join(runDir, "task.md"), instructions: null, agent: implementer, fixer, branch: facts.branch, sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
+              taskPath: path.join(runDir, "task.md"), instructions: null, branch: facts.branch, sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
+              agent: { ...implementer, model: facts.implementerModel ?? implementer.model },
+              fixer: { ...fixer, model: facts.fixerModel ?? fixer.model },
               asks: askSetupFor(runDir, path.join(runDir, "session"), 600, answers, priorOpen),
               worktreeDir: facts.worktreeDir ?? dir, machine: facts.machine,
               delivery: deliver(spawner, hostGit, extraPath + stub.dir + ":" + (process.env.PATH ?? ""), dir),
@@ -320,6 +352,11 @@ const reviewer: AgentFile = {
   body: "Review the change.",
   path: "bundled/reviewer.md",
   source: "bundled"
+}
+
+export const chainEntry = (model: string): ChainReviewer => {
+  const provider = model.slice(0, model.indexOf("/"))
+  return { provider, model, reviewer: { ...reviewer, model }, credential: { kind: "only-account" } }
 }
 
 const sessionFileName = "2026-10-19T10-00-00-000Z_" + sessionId + ".jsonl"

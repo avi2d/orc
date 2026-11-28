@@ -64,8 +64,20 @@ const UpdateConfig = Schema.Struct({
   command: Schema.optional(Schema.NonEmptyArray(Schema.String.check(Schema.isNonEmpty())))
 })
 
+const ReviewerEntry = Schema.Struct({
+  provider: ProviderId,
+  model: ModelRef
+})
+export type ReviewerEntry = typeof ReviewerEntry.Type
+
+const ReviewConfig = Schema.Struct({
+  maxFixRounds: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(2)))
+})
+
 const OrcConfigFile = Schema.Struct({
   providers: Schema.Array(Provider),
+  reviewers: Schema.optional(Schema.NonEmptyArray(ReviewerEntry)),
+  review: ReviewConfig.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
   heavy: Schema.optional(HeavyConfig),
   update: Schema.optional(UpdateConfig),
   models: Schema.optional(Schema.Struct({
@@ -84,15 +96,28 @@ export interface OrcConfig extends OrcConfigFile {
 
 const orcConfigFile = (orcHome: string): string => orcHome + "/config.json"
 
+const reviewerProblem = (config: OrcConfigFile): string | null => {
+  for (const entry of config.reviewers ?? []) {
+    if (!entry.model.startsWith(entry.provider + "/")) {
+      return "the reviewer model " + entry.model + " is not from its provider " + entry.provider
+    }
+    if (!config.providers.some((provider) => provider.id === entry.provider)) {
+      return "the reviewer provider " + entry.provider + " is not among the providers"
+    }
+  }
+  return null
+}
+
 export const readOrcConfig = (orcHome: string): Effect.Effect<OrcConfig, ConfigError, FileSystem.FileSystem> => {
   const file = orcConfigFile(orcHome)
   return readJsonFileIfPresent(file, OrcConfigFile, { onExcessProperty: "error" }).pipe(
-    Effect.flatMap((config) => {
-      const read = config ?? { providers: [] }
+    Effect.flatMap((config) => config === null ? Schema.decodeUnknownEffect(OrcConfigFile)({ providers: [] }).pipe(Effect.orDie) : Effect.succeed(config)),
+    Effect.flatMap((read) => {
       const duplicate = duplicateOf(read.providers.map((provider) => provider.id))
-      return duplicate === null
+      const problem = duplicate === null ? reviewerProblem(read) : "the provider " + duplicate + " is named twice"
+      return problem === null
         ? Effect.succeed({ ...read, file })
-        : Effect.fail(new ConfigError({ file, detail: "the provider " + duplicate + " is named twice" }))
+        : Effect.fail(new ConfigError({ file, detail: problem }))
     })
   )
 }

@@ -3,32 +3,55 @@ import { driveNoMistakes, waitForAnswers, type AllowWord, type QuestionAnswer } 
 import { type DirectPrRecord, openDirectPr, type PullRequestOpener } from "../../entities/pull-request/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
-import type { AgentFile, LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
+import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
-import type { RunCheckpoints, SandboxOps } from "./run-ops"
+import { type DiagramTurnResult, runDiagramTurn } from "./diagram-turn"
+import type { ReviewEligibility, ReviewerPick, RunCheckpoints, SandboxOps } from "./run-ops"
 import { reviewSentence, reviewAtHead, runReviewTurn } from "./review-turn"
 import type { ReviewOutcome, ReviewFinding } from "./review-outcome"
 import { beatReadsChecks } from "./checks"
+import { leftFindings, leftReasonLine, reviewStopReason, type LeftFinding, type ReviewStop } from "./left-findings"
+import type { NoReviewerRoom } from "./reviewer-chain"
 
-export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], priorDir: string | null, orcReview?: ReviewOutcome): Effect.Effect<OrcRunReport, OrcRunError> =>
+type OrcLoopEnd =
+  | { readonly review: Extract<ReviewOutcome, { readonly status: "failed" }> }
+  | {
+    readonly review: Extract<ReviewOutcome, { readonly status: "passed" }>
+    readonly sentPerRound: ReadonlyArray<ReadonlyArray<ReviewFinding>>
+    readonly stop: ReviewStop
+    readonly askUserFindings: ReadonlyArray<ReviewFinding>
+    readonly eligibility: ReviewEligibility
+  }
+
+type ReviewSection =
+  | { readonly kind: "failed" }
+  | { readonly kind: "unfixed"; readonly findings: ReadonlyArray<ReviewFinding> }
+  | { readonly kind: "left"; readonly findings: ReadonlyArray<LeftFinding> }
+
+const unfixedSection = (review: ReviewOutcome): ReviewSection =>
+  review.status === "failed" ? { kind: "failed" } : { kind: "unfixed", findings: review.findings }
+
+export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], priorDir: string | null, orcLoop?: OrcLoopEnd): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + (rounds.at(-1)?.passed === true ? ", and the checks passed. " : ". No local checks ran. ")
     const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
     if (run.delivery.kind === "orc") {
-      const review = orcReview ?? (yield* reviewOrc(run, run.delivery.reviewer, checkpoints, runAgent))
-      const reviewed = checked + reviewSentence(review)
-      if (review.status === "failed") {
+      if (orcLoop === undefined) {
+        return yield* new OrcRunError({ message: "orc: an orc delivery run reached its PR without the review fix loop" })
+      }
+      const reviewed = checked + reviewSentence(orcLoop.review)
+      if (!("stop" in orcLoop)) {
         return { ...settled, completed: false, prLink: null, endReason: reviewed }
       }
-      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints, review.findings)
-      return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
+      const pr = yield* openPullRequest(run, run.delivery.opener, drawWithPick(run, run.delivery.reviewer, runAgent, orcLoop.eligibility), rounds, checkpoints, { kind: "left", findings: leftFindings(orcLoop.review.findings, orcLoop.sentPerRound, orcLoop.stop, orcLoop.askUserFindings) })
+      return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + "The review fix loop stopped because " + reviewStopReason(orcLoop.stop) + ". " + pr.result }
     }
     if (run.delivery.kind === "direct-PR") {
       const reviewStarted = new Date().toISOString()
-      yield* checkpoints.reviewStart(run.delivery.reviewer, reviewStarted)
+      yield* checkpoints.reviewStart(run.delivery.reviewer, 1, reviewStarted)
       const review = yield* reviewAtHead(run, runAgent, run.delivery.reviewer, priorDir)
-      yield* checkpoints.reviewDone(run.delivery.reviewer, review, reviewStarted, new Date().toISOString())
-      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
+      yield* checkpoints.reviewDone(run.delivery.reviewer, 1, review, reviewStarted, new Date().toISOString())
+      const pr = yield* openPullRequest(run, run.delivery.opener, runDiagramTurn(run, runAgent, run.delivery.reviewer), rounds, checkpoints, unfixedSection(review))
       const reviewed = checked + reviewSentence(review)
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: reviewed + pr.result }
     }
@@ -42,32 +65,104 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-export const reviewOrc = (run: HistoryRun, reviewer: AgentFile, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]): Effect.Effect<ReviewOutcome, OrcRunError> =>
-  Effect.gen(function*() {
-    const started = new Date().toISOString()
-    yield* checkpoints.reviewStart(reviewer, started)
-    const review = yield* runReviewTurn(run, runAgent, reviewer, "orc")
-    yield* checkpoints.reviewDone(reviewer, { ...review, reusedFrom: null }, started, new Date().toISOString())
-    return review
-  })
+export const reviewOrc = (run: HistoryRun, pick: ReviewerPick, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"], attempt: number, eligibility: ReviewEligibility): Effect.Effect<ReviewOutcome, OrcRunError | NoReviewerRoom> =>
+  pick(runAgent, eligibility).pipe(
+    Effect.flatMap((picked) =>
+      Effect.gen(function*() {
+        const started = new Date().toISOString()
+        yield* checkpoints.reviewStart(picked.reviewer, attempt, started)
+        const review = yield* runReviewTurn(run, picked.runAgent, picked.reviewer, "orc", attempt)
+        yield* checkpoints.reviewDone(picked.reviewer, attempt, { ...review, reusedFrom: null }, started, new Date().toISOString())
+        return review
+      })
+    ),
+    Effect.catchTag("NoReviewerRoom", (error) => {
+      const failed: ReviewOutcome = { status: "failed", reason: error.message }
+      const at = new Date().toISOString()
+      return checkpoints.reviewDone(null, attempt, { ...failed, reusedFrom: null }, at, at).pipe(Effect.andThen(Effect.fail(error)))
+    })
+  )
 
-const openFindings = (findings: ReadonlyArray<ReviewFinding>): string =>
-  findings.length === 0 ? "" : "\nOpen review findings:\n" + findings.map((finding) => "- " + finding.severity + " " + finding.id + " (" + finding.file + (finding.line === null ? "" : ":" + finding.line.toString()) + "): " + finding.description + " " + finding.action).join("\n") + "\n"
+const findingLine = (finding: ReviewFinding): string =>
+  "- " + finding.severity + " `" + finding.id + "` at `" + finding.file + (finding.line === null ? "" : ":" + finding.line.toString()) + "`: " + finding.description + " Action: " + finding.action
 
-const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>, findings: ReadonlyArray<ReviewFinding>): string => {
-  const passed = rounds.at(-1)?.checks.map((check) => check.name) ?? []
-  const closing = passed.length === 0
-    ? "orc opened this PR without local checks or no-mistakes. " + beatReadsChecks + "\n"
-    : "orc opened this PR after " + passed.join(", ") + " passed, without no-mistakes.\n"
-  return (subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing) + openFindings(findings)
+const leftFindingLines = (left: LeftFinding): string =>
+  findingLine(left.finding) + "\n  - " + leftReasonLine(left.reason)
+
+export interface PrBodyInput {
+  readonly why: string | null
+  readonly taskText: string
+  readonly subjects: ReadonlyArray<string>
+  readonly diagram: string | null
+  readonly passed: ReadonlyArray<string>
+  readonly review: ReviewSection
 }
+
+const checkedSentence = (passed: ReadonlyArray<string>): string =>
+  passed.length === 0
+    ? "orc opened this PR without local checks or no-mistakes. " + beatReadsChecks
+    : "orc opened this PR after " + passed.join(", ") + " passed, without no-mistakes."
+
+const reviewStatusLine = (section: ReviewSection): string =>
+  section.kind === "failed"
+    ? "The review turn failed, so this PR lists no review findings."
+    : section.findings.length === 0
+      ? "The review found nothing."
+      : "The review left " + section.findings.length.toString() + (section.findings.length === 1 ? " finding" : " findings") + " open, listed below."
+
+const openFindingLines = (section: ReviewSection): string => {
+  if (section.kind === "failed" || section.findings.length === 0) {
+    return ""
+  }
+  if (section.kind === "unfixed") return "\n## Open review findings\n\n" + section.findings.map(findingLine).join("\n") + "\n"
+  const open = section.findings.filter((left) => left.finding.action !== "ask-user")
+  const needsPerson = section.findings.filter((left) => left.finding.action === "ask-user")
+  const openSection = open.length === 0 ? "" : "\n## Open review findings\n\n" + open.map(leftFindingLines).join("\n") + "\n"
+  const personSection = needsPerson.length === 0 ? "" : "\n## Findings that need a person\n\n" + needsPerson.map(leftFindingLines).join("\n") + "\n"
+  return openSection + personSection
+}
+
+const reasonFallback = "No reason was recorded for this change; see What changed."
+
+const normalizedWords = (text: string): Array<string> =>
+  text.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []
+
+const repeatsTaskText = (text: string, taskText: string): boolean => {
+  const words = normalizedWords(text)
+  const normalizedTask = " " + normalizedWords(taskText).join(" ") + " "
+  const copiedRun = words.some((_, index) =>
+    index + 8 <= words.length && normalizedTask.includes(" " + words.slice(index, index + 8).join(" ") + " ")
+  )
+  return copiedRun
+}
+
+export const prBody = (input: PrBodyInput): string => {
+  const reason = input.why?.trim() ?? ""
+  const why = reason === "" || repeatsTaskText(reason, input.taskText) ? reasonFallback : reason
+  const chart = input.diagram !== null && repeatsTaskText(input.diagram, input.taskText) ? null : input.diagram
+  const changed = input.subjects.length === 0
+    ? "No commits landed on the branch."
+    : input.subjects.map((subject) => "- " + subject).join("\n")
+  const diagram = chart === null ? "" : "\n## How it fits\n\n```mermaid\n" + chart + "\n```\n"
+  return "## Why\n\n" + why + "\n\n## What changed\n\n" + changed + "\n" + diagram + "\n## How it was checked\n\n" + checkedSentence(input.passed) + "\n" + reviewStatusLine(input.review) + "\n" + openFindingLines(input.review)
+}
+
+const drawWithPick = (run: HistoryRun, pick: ReviewerPick, runAgent: SandboxOps["runAgent"], eligibility: ReviewEligibility): Effect.Effect<DiagramTurnResult> =>
+  pick(runAgent, eligibility).pipe(
+    Effect.flatMap((picked) => runDiagramTurn(run, picked.runAgent, picked.reviewer)),
+    Effect.catchTags({
+      NoReviewerRoom: () => Effect.succeed({ diagram: { kind: "none" }, why: null } as const),
+      OrcRunError: () => Effect.succeed({ diagram: { kind: "none" }, why: null } as const)
+    })
+  )
 
 const openPullRequest = (
   run: HistoryRun,
   opener: PullRequestOpener,
+  drawDiagram: Effect.Effect<DiagramTurnResult>,
   rounds: ReadonlyArray<ChecksRoundSummary>,
   checkpoints: RunCheckpoints,
-  findings: ReadonlyArray<ReviewFinding> = []
+  review: ReviewSection
 ): Effect.Effect<DirectPrRecord, OrcRunError> =>
   Effect.gen(function*() {
     yield* checkpoints.pullRequestStart(new Date().toISOString())
@@ -78,11 +173,17 @@ const openPullRequest = (
     const listed = yield* branchCommits(run.spawner, run.git, run.branch, run.projectDir).pipe(Effect.catchTag("OrcRunError", () => Effect.succeed([] as Array<OrcRunCommit>)))
     const subjects = listed.map((commit) => commit.subject.trim()).filter((subject) => subject !== "")
     const bodySubjects = subjects.length > 0 ? subjects : (head !== "" ? [head] : [])
-    const bodyFile = run.path.join(run.runDir, prBodyFileName)
-    yield* run.fs.writeFileString(bodyFile, prBody(bodySubjects, rounds, findings)).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
-    )
-    const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, bodyFile)
+    const prepareBody = Effect.gen(function*() {
+      const drawn = yield* drawDiagram
+      const diagram = drawn.diagram.kind === "mermaid" ? drawn.diagram.chart : null
+      const taskText = yield* run.fs.readFileString(run.taskPath).pipe(Effect.catchTag("PlatformError", () => Effect.succeed("")))
+      const bodyFile = run.path.join(run.runDir, prBodyFileName)
+      yield* run.fs.writeFileString(bodyFile, prBody({ why: drawn.why, taskText, subjects: bodySubjects, diagram, passed: rounds.at(-1)?.checks.map((check) => check.name) ?? [], review })).pipe(
+        Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
+      )
+      return bodyFile
+    })
+    const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, prepareBody)
     yield* checkpoints.pullRequestDone(pr)
     return pr
   })

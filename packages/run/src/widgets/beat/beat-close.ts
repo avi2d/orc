@@ -7,7 +7,7 @@ import { type DispatchConfig, ownedBySweep, readJsonFileIfPresent, throughFor } 
 import { logWrittenAt, stallMillis } from "./stall"
 import { endSplit } from "./beat-split"
 import { type CloseReading, readClose, serveRunning } from "./beat-close-runner"
-import { type AskedQuestion, parkStartedTask, retryStartedTask } from "../../entities/parked-runs/index"
+import { type AskedQuestion, parkForReviewerQuota, parkStartedTask, retryStartedTask } from "../../entities/parked-runs/index"
 import { Asking, askingFileName } from "../../entities/review-gate/index"
 import type { RunEnding } from "../../features/queueing-a-task/index"
 
@@ -115,6 +115,24 @@ const endClosed = (
       : Option.some({ kind: "closed", task: task.spec.id, machine, outcome: ending.outcome, reason: ending.reason, pr: ending.pr, report: ending.report } satisfies BeatAction)
   })
 
+const endReviewerWait = Effect.fnUntraced(function*(root: string, task: TaskRecord, machine: string, reason: string, run: string | undefined) {
+  if (run === undefined) {
+    return Option.none<BeatAction>()
+  }
+  const parked = yield* parkForReviewerQuota(root, task.spec.id, run, reason, yield* nowIso).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
+  return parked?.parked == null
+    ? Option.none<BeatAction>()
+    : Option.some({
+      kind: "parked",
+      task: task.spec.id,
+      machine,
+      branch: parked.parked.branch,
+      questions: parked.parked.questions.filter((question) => question.answer === null).map((question) => question.id),
+      decider: [],
+      reason
+    } satisfies BeatAction)
+})
+
 const endTask = (
   root: string,
   home: string,
@@ -123,7 +141,10 @@ const endTask = (
   ending: RunEnding,
   run?: string
 ): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
-  ending.kind === "park" ? endParked(root, home, task, machine, ending, run) : ending.kind === "split" ? endSplit(root, task, machine, ending) : endClosed(root, task, machine, ending)
+  ending.kind === "reviewer-quota" ? endReviewerWait(root, task, machine, ending.wait.reason, run)
+    : ending.kind === "park" ? endParked(root, home, task, machine, ending, run)
+    : ending.kind === "split" ? endSplit(root, task, machine, ending)
+    : endClosed(root, task, machine, ending)
 
 const readSince = (
   fs: FileSystem.FileSystem,

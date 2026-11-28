@@ -28,7 +28,7 @@ const AccountJoin = Schema.Union([
 const harvested = { kind: Schema.Literal("harvested"), observedAt: Instant, file: Schema.String, join: AccountJoin };
 
 const WindowSource = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("quota-axi"), readAt: Instant }),
+  Schema.Struct({ kind: Schema.Literals(["quota-axi", "subquo"]), readAt: Instant }),
   Schema.Struct({ ...harvested, harness: Schema.Literal("codex"), via: Schema.Literal("log") }),
   Schema.Struct({ ...harvested, harness: Schema.Literal("claude-code"), via: Schema.Literals(["log", "statusline", "headless"]) }),
 ]);
@@ -103,18 +103,15 @@ const SessionShare = Schema.Struct({
   flagged: Schema.Boolean,
 });
 
-const WindowView = Schema.Struct({
+const windowFields = {
   id: Schema.String,
   label: Schema.String,
   kind: ShownWindow.fields.kind,
   source: WindowSource,
-  cycleSeconds: Schema.Finite,
-  startsAt: Instant,
   resetsAt: Instant,
   usedPoints: Schema.Finite,
   leftPoints: Schema.Finite,
   pace: Schema.Literals(["ahead", "on_pace", "behind", "unknown"]),
-  elapsedFraction: Schema.Finite,
   aheadOfPace: Schema.Boolean,
   pastFirstTenth: Schema.Boolean,
   exhaustsBeforeReset: Schema.Boolean,
@@ -127,7 +124,12 @@ const WindowView = Schema.Struct({
   unattributedPoints: Schema.Finite,
   sessions: Schema.Array(SessionShare),
   otherCycle: Schema.Array(Schema.String),
-});
+};
+
+const WindowView = Schema.Union([
+  Schema.Struct({ ...windowFields, cycleSeconds: Schema.Finite, startsAt: Instant, elapsedFraction: Schema.Finite }),
+  Schema.Struct({ ...windowFields, cycleSeconds: Schema.Undefined, startsAt: Schema.Null, elapsedFraction: Schema.Null }),
+]);
 
 const accountRef = {
   provider: Provider,

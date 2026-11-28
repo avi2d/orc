@@ -53,7 +53,7 @@ const prUrlIn = (text: string): string | null => /https:\/\/\S+\/pull\/\d+/.exec
 const firstLine = (reply: CommandReply): string =>
   (reply.stderr + "\n" + reply.stdout).split("\n").map((line) => line.trim()).find((line) => line !== "") ?? "exit " + reply.exitCode.toString()
 
-export const openDirectPr = (opener: PullRequestOpener, branch: string, title: string, bodyFile: string): Effect.Effect<DirectPrRecord> =>
+export const openDirectPr = <E>(opener: PullRequestOpener, branch: string, title: string, prepareBody: Effect.Effect<string, E>): Effect.Effect<DirectPrRecord, E> =>
   Effect.gen(function*() {
     const started = new Date().toISOString()
     const failed = (result: string): DirectPrRecord => ({ status: "failed", prLink: null, result: result + " No PR opens.", started, ended: new Date().toISOString() })
@@ -66,6 +66,7 @@ export const openDirectPr = (opener: PullRequestOpener, branch: string, title: s
     if (known !== null) {
       return { status: "opened", prLink: known, result: "orc pushed " + branch + " to the open PR " + known + ".", started, ended: new Date().toISOString() }
     }
+    const bodyFile = yield* prepareBody
     const created = yield* opener.create(title, bodyFile)
     const link = created.exitCode === 0 ? prUrlIn(created.stdout) : null
     if (link === null) {

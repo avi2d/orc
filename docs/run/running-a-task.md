@@ -10,7 +10,7 @@ A ship run creates an isolated worktree, asks [Pi](https://pi.dev) to make the c
 
 Install `git`, `pi`, `node`, and [`no-mistakes`](https://github.com/kunchenguid/no-mistakes) on the host `PATH`.
 A `direct-PR` or `orc` run does not need `no-mistakes`.
-Install [`nono`](https://nono.sh) for a run you start by hand unless you pass `--sandbox none`.
+Install [`nono`](https://nono.sh) to sandbox a run you start by hand with `--sandbox nono`.
 For no-mistakes delivery, use version 1.90.0 or later.
 
 Configure the provider and models as [Configuring providers](configuring-providers.md) describes.
@@ -64,7 +64,8 @@ See [Delivery modes](delivery-modes.md) and [Task kinds](task-kinds.md).
 
 Orc creates `orc/<run-id>` unless you give `--branch <name>`.
 The name must pass `git check-ref-format --branch`.
-A run you start by hand with `orc run` uses the nono sandbox by default unless you pass `--sandbox none`.
+A run you start by hand with `orc run` runs without a per-agent sandbox by default.
+Pass `--sandbox nono` to sandbox it.
 Queued tasks always pass `--sandbox none`, so Pi and the checks run on the host without a per-agent sandbox.
 Their safety boundary is the isolated space around the whole agent system, as [Running without a sandbox](running-without-a-sandbox.md) describes.
 
@@ -90,7 +91,7 @@ A running tool is not interrupted by the idle limit.
 
 ## Answer a review question
 
-To ask each review question for a recommended option, add the `review.path_instructions` entry in [Installing no-mistakes](installing-no-mistakes.md#ask-each-review-question-for-a-recommended-option).
+To ask each review question for a recommended option, add the `path_instructions` entry in [Installing no-mistakes](installing-no-mistakes.md#ask-each-review-question-for-a-recommended-option).
 
 A no-mistakes run waits 30 minutes for an unanswered review question.
 Set `ORC_ANSWER_WAIT_SECONDS` to change the wait, or set it to `0` to refuse the gate immediately.
@@ -133,7 +134,7 @@ The bundled reviewer prints only its findings JSON array, with nothing before or
 Each finding has `id`, `file`, `line`, `severity`, `action`, and `description`.
 An implementer or fixer model comes from its file, its role's model flag, or `config.json`, in that order.
 The implementer and the fixer must use a configured provider, and both must use the same provider.
-The reviewer runs only in direct-PR delivery, on the fixer model unless its file names a model, and it must use the same provider.
+The reviewer runs only in direct-PR and orc delivery, on the fixer model unless its file names a model, and it must use the same provider.
 Orc runs the reviewer with read, grep, find, and ls, regardless of the tools named in its agent file.
 Orc refuses models absent from Pi or with a context window of 150,000 tokens or less.
 Pi compacts context at 150,000 tokens in the nono sandbox.

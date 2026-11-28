@@ -84,6 +84,8 @@ describe("the quota pace rule", () => {
     expect(fired).toHaveLength(1);
     const event = fired[0].event;
     expect(Schema.decodeUnknownSync(AlertEvent)(JSON.parse(JSON.stringify(event)))).toEqual(event);
+    const elapsedFraction = fixtureReport().windows[1]?.elapsedFraction;
+    if (typeof elapsedFraction !== "number") throw new Error("the fixture seven_day window has no cycle");
     expect(event).toEqual({
       schemaVersion: 1,
       rule: "quota-pace",
@@ -92,7 +94,7 @@ describe("the quota pace rule", () => {
       window: "seven_day",
       windowLabel: "Weekly",
       leftPoints: 40,
-      elapsedFraction: fixtureReport().windows[1]?.elapsedFraction,
+      elapsedFraction,
       resetsAt: "2026-10-19T20:00:00.000Z",
       flags: fixtureReport().flags,
     });

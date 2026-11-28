@@ -136,7 +136,7 @@ describe("orc runs", () => {
       expect(result.stdout).toContain("no runs recorded")
       expect((await stat(join(home, ".orc", "orc.sqlite"))).isFile()).toBe(true)
     })
-  }, 60_000)
+  })
 
   test("concurrent first opens of a fresh home all list runs instead of one finding the history locked", async () => {
     for (let round = 0; round < concurrentOpenRounds; round += 1) {
@@ -159,7 +159,7 @@ describe("orc runs", () => {
         expect(result.stderr).toBe("orc: cannot read the run history: file is not a database\n")
       }
     })
-  }, 60_000)
+  })
 
   test("lists recorded runs with their project, branch, status and PR link", async () => {
     await withHome(async (home) => {
@@ -184,7 +184,7 @@ describe("orc runs", () => {
       expect(result.stdout).toContain("succeeded")
       expect(result.stdout).toContain("https://github.com/avi2d/orc/pull/1")
     })
-  }, 60_000)
+  })
 
   test("runs --json prints the version first and the listed facts", async () => {
     await withHome(async (home) => {
@@ -212,7 +212,7 @@ describe("orc runs", () => {
       expect(Object.keys(printed.runs[0] ?? {}).sort()).toEqual(["branch", "currentStep", "delivery", "endReason", "id", "kind", "machine", "prLink", "project", "questions", "state", "status", "step", "task", "title", "worktree"])
       expect(printed.runs[0]).toMatchObject({ id: "run-1", project: "orc", branch: "orc/x", status: "running", state: "running", currentStep: null })
     })
-  }, 60_000)
+  })
 
   test("runs --json on a fresh home prints an empty versioned document", async () => {
     await withHome(async (home) => {
@@ -224,7 +224,7 @@ describe("orc runs", () => {
       expect(document.schema).toBe("orc.runs.v1")
       expect(document.runs).toEqual([])
     })
-  }, 60_000)
+  })
 
   test("orc log prints a failed checks round's output as written, not its session file", async () => {
     await withHome(async (home) => {
@@ -247,7 +247,7 @@ describe("orc runs", () => {
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toBe("lint: 2 errors\n")
     })
-  }, 60_000)
+  })
 
   test("orc log names an unknown run on stderr instead of printing nothing", async () => {
     await withHome(async (home) => {
@@ -255,7 +255,7 @@ describe("orc runs", () => {
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toBe("orc: unknown run nope\n")
     })
-  }, 60_000)
+  })
 
   test("runs --json adds the runs another dispatch machine answers with to the list", async () => {
     await withHome(async (home) => {
@@ -271,7 +271,7 @@ describe("orc runs", () => {
       expect(document.runs[1]).toEqual(machineRun)
       expect(document.machines).toEqual([])
     })
-  }, 60_000)
+  })
 
   test("runs --json lists this home's queued pueue task as a queued entry before the recorded runs, and not a running or foreign one", async () => {
     await withHome(async (home) => {
@@ -289,7 +289,7 @@ describe("orc runs", () => {
       const document = Schema.decodeUnknownSync(Schema.Struct({ runs: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)) }))(JSON.parse(result.stdout))
       expect(document.runs.map((run) => [run["id"], run["state"], run["task"], run["branch"]])).toEqual([[null, "queued", "kelp-12", "orc/kelp-12"], ["run-1", "running", null, "orc/x"]])
     })
-  }, 60_000)
+  })
 
   test("runs --json still prints the recorded runs when pueue cannot be reached", async () => {
     await withHome(async (home) => {
@@ -301,7 +301,7 @@ describe("orc runs", () => {
       const document = Schema.decodeUnknownSync(Schema.Struct({ runs: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)) }))(JSON.parse(result.stdout))
       expect(document.runs.map((run) => run["id"])).toEqual(["run-1"])
     })
-  }, 60_000)
+  })
 
   test("a dispatch machine that fails is named in machines with its error while the local runs still print", async () => {
     await withHome(async (home) => {
@@ -317,7 +317,7 @@ describe("orc runs", () => {
       expect(document.machines[0]?.error).toContain("exited 3")
       expect(document.machines[0]?.error).toContain("orc: not installed")
     })
-  }, 60_000)
+  })
 
   test("a dispatch machine that prints JSON orc cannot read is named in machines and adds no runs", async () => {
     await withHome(async (home) => {
@@ -332,7 +332,7 @@ describe("orc runs", () => {
       expect(document.machines[0]?.machine).toBe("box")
       expect(document.machines[0]?.error).toContain("JSON orc cannot read")
     })
-  }, 60_000)
+  })
 
   test("an unknown runs flag prints usage and exits non-zero", async () => {
     await withHome(async (home) => {
@@ -340,16 +340,16 @@ describe("orc runs", () => {
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toContain("Usage: orc")
     })
-  }, 60_000)
+  })
 })
 
 describe("orc machines", () => {
-  test("machines --json lists this machine's version and the version a stand-in through command answers with", async () => {
+  test("machines --json includes configured capacity instead of reporting only installed versions", async () => {
     await withHome(async (home) => {
       const fake = await writeFakeMachine(home, { stdout: JSON.stringify({ schema: "orc.version.v1", version: "0.0.1-box" }) })
       await mkdir(join(home, ".orc", "backlog"), { recursive: true })
       await writeFile(join(home, ".orc", "backlog", "dispatch.json"), JSON.stringify({
-        machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start"] }, { name: "box", slots: 1, start: ["orc", "runner", "start", "--", "sh", fake.script] }],
+        machines: [{ name: "mac", slots: 1, pinnedOnly: true, start: ["orc", "runner", "start"] }, { name: "box", slots: 9, start: ["orc", "runner", "start", "--", "sh", fake.script] }],
         quota: { provider: "example", command: ["example-quota"], accounts: [{ name: "main", kind: "none" }] }
       }))
       const local = Schema.decodeUnknownSync(Schema.Struct({ schema: Schema.Literal("orc.version.v1"), version: Schema.String }))(JSON.parse((await runOrc(["version", "--json"], home)).stdout))
@@ -357,7 +357,7 @@ describe("orc machines", () => {
       expect(result.exitCode).toBe(0)
       expect(result.stderr).toBe("")
       expect(await readFile(fake.argv, "utf8")).toBe("version --json --local\n")
-      expect(JSON.parse(result.stdout)).toEqual({ schema: "orc.machines.v1", machines: [{ machine: "mac", version: local.version }, { machine: "box", version: "0.0.1-box" }] })
+      expect(JSON.parse(result.stdout)).toEqual({ schema: "orc.machines.v1", machines: [{ machine: "mac", slots: 1, pinnedOnly: true, version: local.version }, { machine: "box", slots: 9, pinnedOnly: false, version: "0.0.1-box" }] })
       expect(local.version).not.toBe("0.0.1-box")
     })
   }, 60_000)

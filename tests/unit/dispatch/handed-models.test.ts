@@ -75,7 +75,7 @@ describe("models the beat hands to orc run", () => {
     const route = Schema.decodeSync(RoutedModelsJson)(run.find((word) => word.startsWith(prefix))?.slice(prefix.length) ?? "")
     const roles = await Effect.runPromise(prepareRoles(
       { projectDir: "/unused/project", orcHome: "/unused/home", agentsDir: undefined },
-      { file: "config.json", models: { implementer: "legacy/worker", fixer: "legacy/repair" } },
+      { file: "config.json", providers: [], models: { implementer: "legacy/worker", fixer: "legacy/repair" } },
       "direct-PR", { implementerModel: undefined, fixerModel: undefined, implementerThinking: undefined, fixerThinking: undefined }, route
     ).pipe(Effect.provide(BunServices.layer)))
     expect({ implementer: roles.agent.model, fixer: roles.fixer.model, reviewer: roles.reviewer.kind === "direct-PR" ? roles.reviewer.reviewer.model : null }).toEqual(models)
@@ -92,7 +92,7 @@ describe("models the beat hands to orc run", () => {
     }
     const roles = await Effect.runPromise(prepareRoles(
       { projectDir: "/unused/project", orcHome: "/unused/home", agentsDir: undefined },
-      { file: "config.json" },
+      { file: "config.json", providers: [] },
       undefined, args, models
     ).pipe(Effect.provide(BunServices.layer)))
     expect([roles.agent.model, roles.fixer.model]).toEqual(role === "implementer"
@@ -111,7 +111,7 @@ describe("models the beat hands to orc run", () => {
       await writeFile(join(folder, role + ".md"), "---\nmodel: keyed/pinned\nthinking: high\ntools: read\n---\nPerform the task.\n")
       const roles = await Effect.runPromise(prepareRoles(
         { projectDir: root, orcHome: root, agentsDir: undefined },
-        { file: "config.json" },
+        { file: "config.json", providers: [] },
         "direct-PR", { implementerModel: undefined, fixerModel: undefined, implementerThinking: undefined, fixerThinking: undefined },
         { implementer: "keyed/worker", fixer: "keyed/repair", reviewer: "keyed/check" }
       ).pipe(Effect.provide(BunServices.layer)))
@@ -135,7 +135,7 @@ describe("models the beat hands to orc run", () => {
       await writeFile(join(root, "agents", role + ".md"), "---\nmodel: keyed/file\nthinking: high\ntools: read\n---\nPerform the task.\n")
       const roles = await Effect.runPromise(prepareRoles(
         { projectDir: root, orcHome: root, agentsDir: undefined },
-        { file: "config.json", models: { implementer: "keyed/config-worker", fixer: "keyed/config-repair" } },
+        { file: "config.json", providers: [], models: { implementer: "keyed/config-worker", fixer: "keyed/config-repair" } },
         "direct-PR", {
           implementerModel: role === "implementer" ? "keyed/flag" : undefined,
           fixerModel: role === "fixer" ? "keyed/flag" : undefined,
@@ -162,7 +162,7 @@ describe("models the beat hands to orc run", () => {
   })
 
   const keyed = { id: "keyed", credential: "token-file", tokenFile: { env: "KEYED_TOKEN_FILE" } } as const
-  const config: OrcConfig = { file: "/home/me/.orc/config.json", providers: [{ id: "acme", credential: "pi-login" }, keyed], models: { implementer: "acme/coder-large", fixer: "acme/coder-small" } }
+  const config: OrcConfig = { file: "/home/me/.orc/config.json", review: { maxFixRounds: 2 }, providers: [{ id: "acme", credential: "pi-login" }, keyed], models: { implementer: "acme/coder-large", fixer: "acme/coder-small" } }
 
   const route = (handed: { readonly implementer: string | undefined; readonly fixer: string | undefined }) => {
     const models = configuredModels(config, handed)

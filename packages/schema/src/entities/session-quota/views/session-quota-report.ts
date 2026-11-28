@@ -85,9 +85,9 @@ export const windowSessionJson = (row: SessionShare): typeof WindowSessionJson.T
 });
 
 const sourceJson = (source: WindowSource): typeof WindowSourceJson.Type =>
-  source.kind === "quota-axi"
-    ? { kind: "quota-axi", readAt: instant(source.readAt) }
-    : { ...source, observedAt: instant(source.observedAt) };
+  source.kind === "harvested"
+    ? { ...source, observedAt: instant(source.observedAt) }
+    : { kind: source.kind, readAt: instant(source.readAt) };
 
 export const windowJson = (account: AccountView, window: WindowView): typeof WindowJson.Type => ({
   account: accountRef(account),
@@ -95,7 +95,7 @@ export const windowJson = (account: AccountView, window: WindowView): typeof Win
   label: window.label,
   kind: window.kind,
   source: sourceJson(window.source),
-  startsAt: instant(window.startsAt),
+  startsAt: window.startsAt === null ? null : instant(window.startsAt),
   resetsAt: instant(window.resetsAt),
   usedPoints: window.usedPoints,
   leftPoints: window.leftPoints,
@@ -171,7 +171,7 @@ const panePresenceJson = (pane: NonNullable<SessionQuotaView["panePresence"]>[nu
 });
 
 export const sessionQuotaReport = (view: SessionQuotaView): SessionQuotaReport => ({
-  schemaVersion: 1,
+  schemaVersion: 3,
   generatedAt: instant(view.now),
   panePresence: (view.panePresence ?? []).map(panePresenceJson),
   headlessFolders: (view.headlessFolders ?? []).map(({ cwd }) => ({ cwd })),

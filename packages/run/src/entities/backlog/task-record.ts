@@ -1,3 +1,4 @@
+import { claimOf, startedOf, taskStateFields } from "@avi2dg/orc-schema"
 import { Data, Effect, Schema } from "effect"
 import { Decider } from "../../shared/lib/index"
 import { type Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-record-decision"
@@ -67,7 +68,12 @@ export interface Hold {
   readonly history?: ReadonlyArray<AnsweredHold>
 }
 
-const ParkedOrigin = Schema.Struct({ machine: Schema.String.check(Schema.isNonEmpty()), run: Schema.String.check(Schema.isNonEmpty()), pr: Schema.optional(Schema.String) })
+const ParkedOrigin = Schema.Struct({
+  machine: Schema.NonEmptyString,
+  run: Schema.NonEmptyString,
+  pr: Schema.optional(Schema.String),
+  reviewerQuota: Schema.optional(Schema.NonEmptyString)
+})
 
 export interface Parked {
   readonly origin?: typeof ParkedOrigin.Type
@@ -195,14 +201,7 @@ const Frontmatter = Schema.Struct({
   parked_at: Schema.optional(Schema.String),
   parked_sent_back_at: Schema.optional(Schema.String),
   parked_questions: Schema.optional(Schema.Array(QuestionFront)),
-  beat: Schema.optional(Schema.String),
-  taken_for: Schema.optional(Schema.String),
-  account: Schema.optional(Schema.String),
-  taken_at: Schema.optional(Schema.String),
-  started_at: Schema.optional(Schema.String),
-  start_log: Schema.optional(Schema.String),
-  outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed", "dropped"])),
-  closed_at: Schema.optional(Schema.String),
+  ...taskStateFields,
   landed_in: Schema.optional(Schema.String),
   reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),
@@ -214,14 +213,6 @@ const Frontmatter = Schema.Struct({
 type Frontmatter = typeof Frontmatter.Type
 
 export { fence } from "./task-record-parts"
-
-const claimOf = (front: Frontmatter): Claim | null =>
-  front.beat === undefined || front.taken_for === undefined || front.account === undefined || front.taken_at === undefined
-    ? null
-    : { beat: front.beat, machine: front.taken_for, account: front.account, takenAt: front.taken_at }
-
-const startedOf = (front: Frontmatter): Started | null =>
-  front.started_at === undefined ? null : { at: front.started_at, log: front.start_log ?? "" }
 
 const closingOf = (front: Frontmatter, started: Started | null): Closing | null => {
   const reason = front.reason ?? ""
@@ -271,9 +262,9 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (typeof questions === "string") {
     return questions
   }
-  return questions.length > 0 || ((front.retry !== undefined || front.rebase !== undefined) && front.parked_origin !== undefined)
+  return questions.length > 0 || (front.parked_origin !== undefined && (front.retry !== undefined || front.rebase !== undefined || front.parked_origin.reviewerQuota !== undefined))
     ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }), ...(front.parked_at === undefined ? {} : { at: front.parked_at }), ...(front.parked_sent_back_at === undefined ? {} : { sentBackAt: front.parked_sent_back_at }) }
-    : "a parked task names no question"
+    : "a parked task names no question or resume reason"
 }
 
 const holdOf = (front: Frontmatter): Hold | null | string => {

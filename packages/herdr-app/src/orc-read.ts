@@ -1,4 +1,4 @@
-import { exec } from "herdr"
+import { type ExecResult, exec } from "herdr"
 import { type Guard, guardJson } from "./guard"
 
 export type Reading<A> =
@@ -8,13 +8,18 @@ export type Reading<A> =
 
 const firstLine = (text: string): string => text.trim().split("\n")[0] ?? ""
 
+export const exitReason = (line: string, result: ExecResult): string => {
+  const said = firstLine(result.stderr) || firstLine(result.stdout)
+  return said === "" ? `${line} exited ${result.code}` : `${line} exited ${result.code}: ${said}`
+}
+
 export const readText = (command: string, args: ReadonlyArray<string>): Promise<Reading<string>> => {
   const line = [command, ...args].join(" ")
   return exec(command, [...args]).then(
     (result): Reading<string> =>
       result.code === 0
         ? { kind: "ok", value: result.stdout }
-        : { kind: "failed", reason: `${line} exited ${result.code}: ${firstLine(result.stderr) || firstLine(result.stdout)}` },
+        : { kind: "failed", reason: exitReason(line, result) },
     (): Reading<string> => ({ kind: "failed", reason: `Could not start ${command}. Check that it is on PATH.` })
   )
 }

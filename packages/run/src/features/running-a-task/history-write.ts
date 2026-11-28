@@ -8,7 +8,7 @@ import type { ChecksRoundSummary, OrcRunReport, RecordedFixAttempt } from "../..
 import { OrcRunError } from "../../shared/lib/index"
 import { historyFailure, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, sqlite, stepIdFor, updateRun, updateStep } from "../../entities/run-history/index"
 import type { EvidenceInput, SignalInput, StepInput } from "../../entities/run-history/index"
-import { measuredSignals, noMistakesSignals, openQuestionSignal } from "../../entities/run-history/index"
+import { measuredSignals, noMistakesSignals, openQuestionSignal, writerModelsForBranch } from "../../entities/run-history/index"
 import type { AgentStep, ResumePlan, RunCheckpoints } from "./run-ops"
 import type { AgentFile } from "../../entities/agent/index"
 import { liveAskQuestions, type AskSetup } from "../../entities/agent/index"
@@ -322,20 +322,20 @@ const recordNoMistakesDone = (db: Database, run: HistoryRun, record: NoMistakesR
     }
   })
 
-export const recordReviewStart = (db: Database, runId: string, reviewer: Pick<AgentFile, "path" | "model" | "thinking">, started: string): Effect.Effect<void, OrcRunError> =>
-  recordStep(db, { runId, name: "review", attempt: 1, status: "running", started, agentFile: reviewer.path, piSessionFile: null, ...stepAgent(reviewer) }).pipe(
+export const recordReviewStart = (db: Database, runId: string, reviewer: Pick<AgentFile, "path" | "model" | "thinking">, attempt: number, started: string): Effect.Effect<void, OrcRunError> =>
+  recordStep(db, { runId, name: "review", attempt, status: "running", started, agentFile: reviewer.path, piSessionFile: null, ...stepAgent(reviewer) }).pipe(
     Effect.asVoid,
     Effect.mapError((cause) => historyFailure("record the review step in", cause))
   )
 
-export const recordReviewDone = (db: Database, runId: string, reviewer: Pick<AgentFile, "path" | "model" | "thinking">, outcome: ReviewAtHeadOutcome, started: string, ended: string): Effect.Effect<void, OrcRunError> =>
+export const recordReviewDone = (db: Database, runId: string, reviewer: Pick<AgentFile, "path" | "model" | "thinking"> | null, attempt: number, outcome: ReviewAtHeadOutcome, started: string, ended: string): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const failed = (action: string) => (cause: unknown) => historyFailure(action, cause)
-    const known = yield* stepIdFor(db, runId, "review", 1).pipe(Effect.mapError(failed("read the review step in")))
-    const agent = outcome.reusedFrom === null
+    const known = yield* stepIdFor(db, runId, "review", attempt).pipe(Effect.mapError(failed("read the review step in")))
+    const agent = outcome.reusedFrom === null && reviewer !== null
       ? { agentFile: reviewer.path, model: reviewer.model, thinking: reviewer.thinking }
       : { agentFile: null, model: null, thinking: null }
-    const stepId = known ?? (yield* recordStep(db, { runId, name: "review", attempt: 1, status: outcome.status, started, ended, piSessionFile: null, ...agent }).pipe(Effect.mapError(failed("record the review step in"))))
+    const stepId = known ?? (yield* recordStep(db, { runId, name: "review", attempt, status: outcome.status, started, ended, piSessionFile: null, ...agent }).pipe(Effect.mapError(failed("record the review step in"))))
     if (known !== null) {
       yield* sqlite(() => db.query("UPDATE steps SET status = ?, ended = ?, agent_file = ?, model = ?, thinking = ? WHERE id = ?").run(outcome.status, ended, agent.agentFile, agent.model, agent.thinking, stepId)).pipe(Effect.mapError(failed("record the review step in")))
     }
@@ -372,11 +372,12 @@ const recordPullRequestDone = (db: Database, run: HistoryRun, record: DirectPrRe
     }
   })
 
-export const deliveryCheckpoints = (db: Database, run: HistoryRun): Pick<RunCheckpoints, "noMistakesStart" | "noMistakesDone" | "reviewStart" | "reviewDone" | "pullRequestStart" | "pullRequestDone"> => ({
+export const deliveryCheckpoints = (db: Database, run: HistoryRun): Pick<RunCheckpoints, "branchWriterModels" | "noMistakesStart" | "noMistakesDone" | "reviewStart" | "reviewDone" | "pullRequestStart" | "pullRequestDone"> => ({
+  branchWriterModels: writerModelsForBranch(db, run.projectDir, run.branch).pipe(Effect.mapError((cause) => historyFailure("read branch writers in", cause))),
   noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
   noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
-  reviewStart: (reviewer, started) => recordReviewStart(db, run.runId, reviewer, started),
-  reviewDone: (reviewer, outcome, started, ended) => recordReviewDone(db, run.runId, reviewer, outcome, started, ended),
+  reviewStart: (reviewer, attempt, started) => recordReviewStart(db, run.runId, reviewer, attempt, started),
+  reviewDone: (reviewer, attempt, outcome, started, ended) => recordReviewDone(db, run.runId, reviewer, attempt, outcome, started, ended),
   pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
   pullRequestDone: (record) => recordPullRequestDone(db, run, record)
 })

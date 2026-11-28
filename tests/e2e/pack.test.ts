@@ -44,9 +44,22 @@ const expectedFiles = [
   "agents/implementer.md",
   "agents/reviewer.md",
   "agents/support-check-policy.md",
+  "dist/bin.js",
+  "dist/chat-tools.ts",
+  "dist/decider-policy.md",
+  "dist/fixer.md",
+  "dist/heavy-standin-main.ts",
+  "dist/implementer.md",
+  "dist/orc-ask-extension.ts",
+  "dist/reviewer.md",
+  "dist/support-check-policy.md",
   "dist/herdr-app/keys.json",
   "dist/herdr-app/layouts/orc.json",
   "dist/herdr-app/layouts/orc.svg",
+  "dist/herdr-app/mods/orc-agents/icons/LICENSE-Lucide.txt",
+  "dist/herdr-app/mods/orc-agents/icons/circle-alert.svg",
+  "dist/herdr-app/mods/orc-agents/icons/circle-dashed.svg",
+  "dist/herdr-app/mods/orc-agents/icons/circle-x.svg",
   "dist/herdr-app/mods/orc-agents/main.js",
   "dist/herdr-app/mods/orc-agents/mod.json",
   "dist/herdr-app/mods/orc-board/main.js",
@@ -100,6 +113,7 @@ const expectedFiles = [
   "src/features/chat/chat.ts",
   "src/features/chat/chat-tools-bundle.ts",
   "src/features/running-a-task/checks.ts",
+  "src/features/running-a-task/diagram-turn.ts",
   "src/entities/task-copy/checkout.ts",
   "src/features/running-a-task/context-mark.ts",
   "src/shared/config/delivery.ts",
@@ -223,6 +237,7 @@ const expectedFiles = [
   "src/widgets/beat/quota-command.ts",
   "src/widgets/beat/quota.ts",
   "src/widgets/beat/retry-stall.ts",
+  "src/widgets/beat/reviewer-room.ts",
   "src/entities/task-copy/refresh.ts",
   "src/shared/process/runner-error.ts",
   "src/shared/process/runner-exec.ts",
@@ -236,6 +251,7 @@ const expectedFiles = [
   "src/features/queueing-a-task/send-back.ts",
   "src/entities/backlog/split.ts",
   "src/widgets/beat/stall.ts",
+  "src/widgets/beat/subquo-program.ts",
   "src/widgets/beat/subquo.ts",
   "src/entities/backlog/task-dependency.ts",
   "src/entities/backlog/task-wait.ts",
@@ -254,6 +270,7 @@ const expectedFiles = [
   "src/features/running-a-task/fix-guidance.ts",
   "src/features/running-a-task/history-write.ts",
   "src/features/running-a-task/index.ts",
+  "src/features/running-a-task/left-findings.ts",
   "src/features/running-a-task/loop-pause.ts",
   "src/features/running-a-task/rebase-delivery.ts",
   "src/features/running-a-task/worker-question.ts",
@@ -274,12 +291,17 @@ const expectedFiles = [
   "src/shared/sandbox/nono-profile.ts",
   "src/shared/sandbox/nono.ts",
   "src/shared/config/orc-config.ts",
+  "src/shared/config/provider-room.ts",
   "src/entities/agent/pi-run.ts",
   "src/entities/agent/pi.ts",
   "src/features/running-a-task/report-run.ts",
   "src/features/running-a-task/review-loop.ts",
   "src/features/running-a-task/review-outcome.ts",
+  "src/features/running-a-task/review-path-rules.ts",
   "src/features/running-a-task/review-turn.ts",
+  "src/features/running-a-task/review-wait-checkpoint.ts",
+  "src/features/running-a-task/review-wait.ts",
+  "src/features/running-a-task/reviewer-chain.ts",
   "src/features/running-a-task/run-args.ts",
   "src/entities/run-history/report.ts",
   "src/features/running-a-task/run-deliverer.ts",
@@ -339,6 +361,7 @@ const expectedFiles = [
   "src/features/seeing-runs/index.ts",
   "src/features/seeing-runs/machine-versions.ts",
   "src/features/seeing-runs/other-machines.ts",
+  "src/features/seeing-runs/run-metrics.ts",
   "src/features/signing-in/index.ts",
   "src/features/signing-in/private-window.ts",
   "src/features/signing-in/sign-in.ts",
@@ -410,11 +433,16 @@ const releaseFixture = async (dir: string) => {
     else await writeFile(join(cwd, binary), "not a binary for this host")
     return { manifest, tarball: pack(cwd, dir) }
   }))
+  const subquo = { name: "@avi2dg/subquo", version: runManifest.dependencies["@avi2dg/subquo"] }
+  const subquoDir = join(dir, "subquo")
+  await mkdir(subquoDir)
+  await writeFile(join(subquoDir, "package.json"), JSON.stringify(subquo))
+  const standIn = { manifest: subquo, tarball: pack(subquoDir, dir) }
   spawnPassing(["tar", "-xf", join(dir, pack(packageDir, dir))], dir)
   const main = join(dir, "package")
   const optionalDependencies = Object.fromEntries(tarballs.map(({ manifest }) => [manifest.name, version]))
   await writeFile(join(main, "package.json"), JSON.stringify({ ...runManifest, optionalDependencies }))
-  return { mainTarball: join(main, pack(main, main)), tarballs }
+  return { mainTarball: join(main, pack(main, main)), tarballs: [...tarballs, standIn] }
 }
 
 describe("the npm release", () => {
@@ -436,7 +464,7 @@ describe("the npm release", () => {
         if (asset !== undefined) return new Response(Bun.file(join(dir, asset.tarball)))
         const pkg = tarballs.find(({ manifest }) => manifest.name === path)
         if (pkg === undefined) return new Response("Not Found", { status: 404 })
-        const version = runManifest.version
+        const version = pkg.manifest.version
         return Response.json({
           name: pkg.manifest.name,
           "dist-tags": { latest: version },
@@ -542,7 +570,8 @@ describe("the packed tarball installed into an empty project without orc's lockf
     await rm(project, { recursive: true, force: true })
   })
 
-  test("orc --help prints its usage instead of failing on an effect module a newer resolved dependency asks for", () => {
+  test("orc --help without a native binary prints usage instead of importing the unpublished workspace schema", async () => {
+    expect(await Bun.file(join(project, "node_modules", "@avi2dg", "orc-schema", "package.json")).exists()).toBe(false)
     const path = dirname(process.execPath) + ":" + (Bun.env["PATH"] ?? "")
     const stdout = spawnPassing([join(project, "node_modules", ".bin", "orc"), "--help"], project, { PATH: path, HOME: project })
     expect(stdout).toContain("Usage: orc <command>")
