@@ -28,6 +28,17 @@ export const withdrawUnreachedMachine = (root: string, task: string, at: string)
     yield* Effect.forEach(open, (entry) => Effect.asVoid(withdrawItem(root, entry.id, "the machine answered again", at)), { discard: true })
   })
 
+const remoteLogPointer = (action: BeatAction): string => {
+  if (action.kind !== "closed" || action.remoteRun === undefined) {
+    return ""
+  }
+  const orc = action.remoteRun.through.join(" ")
+  const run = action.remoteRun.id
+  return "\n\nThe agent log of run " + run + " stays on " + action.machine + "."
+    + "\n" + orc + " show " + run + " --json lists its steps with each step id."
+    + "\n" + orc + " log " + run + " <step-id> prints the log of one step."
+}
+
 export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.forEach(actions, (action) =>
     (action.kind === "closed" && action.outcome === "failed") || action.kind === "start-failed"
@@ -38,7 +49,7 @@ export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, 
         yield* openItem(root, itemId(action.task, "run-died", at), {
           kind: "run-died",
           task: action.task,
-          text: "the run on " + action.machine + " died: " + action.reason + (tail === "" ? "" : "\n\n" + tail),
+          text: "the run on " + action.machine + " died: " + action.reason + (tail === "" ? "" : "\n\n" + tail) + remoteLogPointer(action),
           ...choice(
             "the run of " + action.task + " on " + action.machine,
             { text: "rerun", outcome: "orc backlog retry " + action.task + " returns the task to the backlog, and the next beat starts it" },

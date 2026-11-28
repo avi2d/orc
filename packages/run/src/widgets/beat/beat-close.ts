@@ -104,7 +104,8 @@ const endClosed = (
   root: string,
   task: TaskRecord,
   machine: string,
-  ending: CloseEnding
+  ending: CloseEnding,
+  remoteRun: { readonly id: string; readonly through: ReadonlyArray<string> } | null
 ): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const closed = yield* closeStartedTask(root, task.spec.id, ending.outcome, ending.reason, { pr: ending.pr, report: ending.report }, yield* nowIso).pipe(
@@ -112,7 +113,16 @@ const endClosed = (
     )
     return closed === null
       ? Option.none()
-      : Option.some({ kind: "closed", task: task.spec.id, machine, outcome: ending.outcome, reason: ending.reason, pr: ending.pr, report: ending.report } satisfies BeatAction)
+      : Option.some({
+        kind: "closed",
+        task: task.spec.id,
+        machine,
+        outcome: ending.outcome,
+        reason: ending.reason,
+        pr: ending.pr,
+        report: ending.report,
+        ...(remoteRun === null ? {} : { remoteRun })
+      } satisfies BeatAction)
   })
 
 const endReviewerWait = Effect.fnUntraced(function*(root: string, task: TaskRecord, machine: string, reason: string, run: string | undefined) {
@@ -139,12 +149,13 @@ const endTask = (
   task: TaskRecord,
   machine: string,
   ending: RunEnding,
-  run?: string
+  run?: string,
+  through: ReadonlyArray<string> | null = null
 ): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
   ending.kind === "reviewer-quota" ? endReviewerWait(root, task, machine, ending.wait.reason, run)
     : ending.kind === "park" ? endParked(root, home, task, machine, ending, run)
     : ending.kind === "split" ? endSplit(root, task, machine, ending)
-    : endClosed(root, task, machine, ending)
+    : endClosed(root, task, machine, ending, run === undefined || through === null ? null : { id: run, through })
 
 const readSince = (
   fs: FileSystem.FileSystem,
@@ -288,7 +299,7 @@ export const closeFinished = (
     if (stale === null && ending.kind === "close" && ending.outcome === "failed" && task.retry === undefined && run !== undefined) {
       return yield* retryDeadRun(context.root, task.spec.id, claim.machine, run)
     }
-    const ended = yield* endTask(context.root, context.home, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined)
+    const ended = yield* endTask(context.root, context.home, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined, through)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   }).pipe(
     Effect.tap((progress) => progress.kind === "ended" && (progress.action.kind === "retry" || progress.action.kind === "closed" || (progress.action.kind === "split" && task.spec.parent !== null))

@@ -119,6 +119,7 @@ describe("a failed run", () => {
       if (task === undefined) throw new Error("missing task")
       const progress = await Effect.runPromise(closeFinished({ root, home: root, config: sweepConfig }, task).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueDone(root, "Killed")))))
       expect(progress).toMatchObject({ kind: "ended", action: { kind: "closed", outcome: "failed" } })
+      expect(progress).not.toHaveProperty(["action", "remoteRun"])
       const closed = (await run(listTasks(root))).at(0)
       expect(closed?.state.kind).toBe("closed")
       expect(closed?.retry).toBeUndefined()
@@ -199,6 +200,50 @@ describe("a failed run", () => {
       expect(items).toHaveLength(1)
       expect(items[0]?.item).toMatchObject({ kind: "run-died" })
       expect(items[0]?.item.text).toContain("last diagnostic line")
+    })
+  })
+
+  test("a run-died item for a remote run points at the agent log on that machine", async () => {
+    await withBacklog(async (root) => {
+      await run(openRunDeaths(root, [{
+        kind: "closed",
+        task: "orc-1",
+        machine: "linux-box",
+        outcome: "failed",
+        reason: "orc exited 1",
+        pr: null,
+        report: null,
+        remoteRun: { id: "run-1", through: ["ssh", "linux-box", "orc"] }
+      }], "2026-10-27T10:06:00.000Z"))
+      const text = (await run(openItems(root))).at(0)?.item.text ?? ""
+      expect(text).toContain("The agent log of run run-1 stays on linux-box.")
+      expect(text).toContain("ssh linux-box orc show run-1 --json lists its steps with each step id.")
+      expect(text).toContain("ssh linux-box orc log run-1 <step-id> prints")
+    })
+  })
+
+  test("a failed run on a machine reached through a command closes with the run ID and that command", async () => {
+    await withBacklog(async (root) => {
+      const reach = join(root, "reach.sh")
+      const start = ["orc", "runner", "start", "--", "sh", reach] as const
+      const failed = JSON.stringify({
+        schema: "orc.runner.v1",
+        result: {
+          task: "orc-1", status: "failed", pueueTask: 11, started: "2026-10-27T10:02:00.000Z", ended: "2026-10-27T10:05:00.000Z", reason: "orc exited 1",
+          run: { id: "run-1", status: "failed", prLink: null, endReason: "orc exited 1", openQuestions: [] }
+        }
+      })
+      await writeFile(reach, "#!/bin/sh\nprintf '%s\\n' '" + failed + "'\n")
+      await startTaskOne(root, start, null)
+      const started = (await run(listTasks(root))).at(0)
+      if (started === undefined) throw new Error("missing task")
+      const task = { ...started, retry: { run: "run-0", at: "2026-10-27T10:01:30.000Z" } }
+      await run(writeTaken(root, task))
+      const progress = await run(closeFinished({ root, home: root, config: { ...config, machines: [{ name: "mac", slots: 1, start }] } }, task))
+      expect(progress).toMatchObject({ kind: "ended", action: { kind: "closed", outcome: "failed", remoteRun: { id: "run-1", through: ["sh", reach] } } })
+      if (progress.kind !== "ended") throw new Error("missing closing action")
+      await run(openRunDeaths(root, [progress.action], "2026-10-27T10:06:00.000Z"))
+      expect((await run(openItems(root))).at(0)?.item.text).toContain("sh " + reach + " show run-1 --json")
     })
   })
 })
