@@ -36,7 +36,7 @@ const documents = new Map<string, unknown>()
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node, list, uniform_list: uniformList, image: node, svg: node }))
 void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Input: { new: node }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
+  h_flex: node, v_flex: node, Link: { new: node }, Input: { new: node }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   Scrollbar: { vertical: node }, ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
   InputState: { new: () => ({ value: () => "", set_value: () => undefined, on: () => undefined, focus: () => undefined, release: () => undefined }) }
 }))

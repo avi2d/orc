@@ -11,7 +11,7 @@ import type { RunsActions } from "./runs-view"
 import type { Show, ShownStep } from "./guard"
 import type { InboxApproval } from "./inbox"
 import { type AlertShown, alert, button, card as kitCard, fieldWithButton, statusDot, tab } from "./kit"
-import { linkedText } from "./links-view"
+import { linkedCardText, linkedText } from "./links-view"
 import { type Reading, readText } from "./orc-read"
 import type { palette } from "./palette"
 import { type Turn } from "./turns"
@@ -77,7 +77,7 @@ const approveBody = (t: Palette, card: Card, approval: InboxApproval, merge: Mer
   const shown = approvalShown(merge, card.merge)
   return kitCard().p(12).gap(8)
     .child(div().text_size(12).text_color(t.muted).child(`Approve and merge runs orc ${approval.action.argv.join(" ")}.`))
-    .child(linkedText(`approve-${card.key}`, approval.link))
+    .child(linkedCardText(`approve-${card.key}`, approval.link))
     .child(h_flex().pt(4).gap(8).justify_end()
       .child(openOnGitHub(t, approval.link))
       .child(button(t, "approve-merge", shown.button, "primary", 32, merging ? null : () => act.askMerge(card, approval))))
@@ -90,11 +90,15 @@ interface SendBackShown {
   readonly send: (cx: Context) => void
 }
 
+const sendBackResult = (t: Palette, card: Card, sent: Reading<string>): Element => {
+  if (sent.kind === "failed") return alert(t, "send-back-failed", { tone: "error", title: "Could not send it back", body: sent.reason })
+  const resultText = card.sendBack === null ? linkedText : linkedCardText
+  return resultText("send-back-result", sent.kind === "reading" ? "Sending it back" : sent.value.trim()).text_size(12).text_color(t.muted).whitespace_normal()
+}
+
 const sendBackBody = (t: Palette, card: Card, back: SendBackShown, withLink: boolean): ReadonlyArray<Element> => {
   const sent = back.sent
-  const said = sent === null ? [] : [sent.kind === "failed"
-    ? alert(t, "send-back-failed", { tone: "error", title: "Could not send it back", body: sent.reason })
-    : div().text_size(12).text_color(t.muted).whitespace_normal().child(sent.kind === "reading" ? "Sending it back" : sent.value.trim())]
+  const said = sent === null ? [] : [sendBackResult(t, card, sent)]
   if (card.sendBack === null) return sent?.kind === "ok" ? said : []
   const ready = sendBackArgs(card, back.review.value()) !== null && sent?.kind !== "reading"
   const label = sent?.kind === "reading" ? "Sending back" : "Send back"
@@ -119,7 +123,7 @@ const logBody = (t: Palette, reading: Reading<string>, scroll: ScrollHandle): El
   if (reading.value === "") return note(t, "log-empty", { tone: "neutral", title: "Nothing written yet" })
   return v_flex().id("log").flex_1().min_h_0().overflow_y_scrollbar().track_scroll(scroll).px(20).py(12)
     .font_family(monospace()).text_size(12)
-    .children(logLines(reading.value).map((text) => div().child(text === "" ? " " : text)))
+    .children(logLines(reading.value).map((text, index) => linkedText(`log-${index}`, text === "" ? " " : text)))
 }
 
 const askedLine = (t: Palette, card: Card, act: AgentsActions): ReadonlyArray<Element> =>

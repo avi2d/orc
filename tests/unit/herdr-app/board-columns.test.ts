@@ -6,7 +6,7 @@ const called = (element: Node, name: string): boolean => element.calls.some((cal
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node }))
 void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Input: node, Avatar: node, AvatarFallback: node, AvatarImage: node,
+  h_flex: node, v_flex: node, Link: { new: node }, Input: node, Avatar: node, AvatarFallback: node, AvatarImage: node,
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) }
 }))
 void mock.module("herdr", () => ({
