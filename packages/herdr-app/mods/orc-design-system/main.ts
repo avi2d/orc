@@ -63,9 +63,9 @@ export default class OrcDesignSystem extends View {
   private preview: Preview = "active"
   private narrow = false
   private story: GalleryStory = galleryStories[0]
-  private search = InputState.new({ placeholder: "Find an example" })
-  private fixture = new GalleryExample()
-  private presetColours = new Map<Preset, Palette>()
+  private readonly search = InputState.new({ placeholder: "Find an example" })
+  private readonly fixture = new GalleryExample()
+  private readonly presetColours = new Map<Preset, Palette>()
   private overlay: string | null = null
   private focusHandle: FocusHandle | null = null
 
