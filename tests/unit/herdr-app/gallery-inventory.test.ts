@@ -61,7 +61,7 @@ test("the gallery catalog does not omit a component or reuse an example address"
   ]))
 })
 
-test("a missing enabled or disabled button example cannot be replaced by a duplicate at another address", () => {
+test("button examples keep their stable addresses and do not swap enabled and disabled states", () => {
   const buttons = galleryStories.filter((story) => story.component === "button")
   for (const size of [24, 32]) {
     for (const look of ["primary", "secondary", "ghost"]) {

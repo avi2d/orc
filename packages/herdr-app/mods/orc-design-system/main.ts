@@ -45,7 +45,9 @@ const colours = (t: Palette): Element =>
       [`${tone} fill`, ink.bg] as const, [`${tone} mark`, ink.colour] as const
     ])))
 
-const typeAndSpacing = (t: Palette, fixture: GalleryExample): Element =>
+type ControlHeight = typeof galleryControlHeights[number]
+
+const typeAndSpacing = (t: Palette, pressedHeight: ControlHeight | null, press: (height: ControlHeight, cx: Context) => void): Element =>
   v_flex().gap(12)
     .child(heading("Typography"))
     .child(div().text_size(13).child("13 px · Body and standard controls · Active UI font"))
@@ -55,13 +57,14 @@ const typeAndSpacing = (t: Palette, fixture: GalleryExample): Element =>
     .child(muted(t, "The kit has no shared spacing scale. These examples use its two control heights."))
     .children(galleryControlHeights.map((height) => h_flex().gap(8).items_center()
       .child(button(t, `control-height-${height}`, `${height} px`, "primary", height,
-        (cx) => fixture.record(`${height} px example button pressed.`, cx)))))
-    .children(fixture.receipt === null ? [] : [muted(t, fixture.receipt)])
+        (cx) => press(height, cx)))))
+    .children(pressedHeight === null ? [] : [muted(t, `${pressedHeight} px example button pressed.`)])
 
 export default class OrcDesignSystem extends View {
   private page: Page = "Examples"
   private preview: Preview = "active"
   private narrow = false
+  private pressedHeight: ControlHeight | null = null
   private story: GalleryStory = galleryStories[0]
   private readonly search = InputState.new({ placeholder: "Find an example" })
   private readonly fixture = new GalleryExample()
@@ -145,10 +148,13 @@ export default class OrcDesignSystem extends View {
     const content = this.page === "Examples"
       ? h_flex().flex_1().min_h_0().min_w_0().child(this.catalog(t)).child(this.example(t))
       : v_flex().id("gallery-reference").flex_1().min_h_0().overflow_y_scrollbar().p(12)
-        .child(this.page === "Colours" ? colours(t) : typeAndSpacing(t, this.fixture))
+        .child(this.page === "Colours" ? colours(t) : typeAndSpacing(t, this.pressedHeight, (height, cx) => {
+          this.pressedHeight = height
+          cx.notify()
+        }))
     const root = v_flex().id("orc-design-system").size_full().overflow_hidden().bg(t.surface).text_color(t.foreground).text_size(13)
-    if (this.focusHandle !== null) root.track_focus(this.focusHandle)
-    return root
+    const focused = this.focusHandle === null ? root : root.track_focus(this.focusHandle)
+    return focused
       .on_key_down((event, cx) => {
         if (event.key !== "escape") return
         if (!this.fixture.dismissSelect(cx)) this.closeWindow()

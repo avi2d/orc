@@ -1,5 +1,5 @@
 import { mock } from "bun:test"
-import type { AsyncContext, Context } from "gpui-kit"
+import type { AsyncContext, Context, FocusHandle } from "gpui-kit"
 import type { AgentsDocuments } from "../../../packages/herdr-app/src/agents-read"
 import type { InboxDocuments } from "../../../packages/herdr-app/src/inbox-read"
 import fixture from "../../fixtures/attention/herdr-app.json"
@@ -13,10 +13,12 @@ export const nodes = new WeakMap<object, Node>()
 
 const isKid = (value: unknown): value is object | string => typeof value === "string" || (typeof value === "object" && value !== null)
 
-export const node = (): object => {
-  const made: Node = { calls: [], kids: [] }
+export const node = (): object => elementFor({ calls: [], kids: [] })
+
+const elementFor = (made: Node): object => {
   const element: object = new Proxy({}, {
     get: (_target, name) => (...args: ReadonlyArray<unknown>) => {
+      if (name === "track_focus") return elementFor({ calls: [...made.calls, { name, args }], kids: [...made.kids] })
       const kids: ReadonlyArray<unknown> = name === "child" ? [args[0]] : name === "children" && Array.isArray(args[0]) ? args[0] : []
       if (name === "child" || name === "children") made.kids.push(...kids.filter(isKid))
       else made.calls.push({ name: String(name), args })
@@ -79,6 +81,37 @@ export const executed: Array<string> = []
 export const spawned: Array<Promise<unknown>> = []
 export const ran: Array<{ readonly name: string; readonly args: unknown }> = []
 export const stopped: Array<true> = []
+export const closedOverlays: Array<string> = []
+export const viewProps = new Map<string, unknown>()
+
+let focused: FocusHandle | null = null
+const focusHandle = (): FocusHandle => {
+  const handle: FocusHandle = {
+    focus: () => { focused = handle },
+    is_focused: () => focused === handle,
+    release: () => {
+      if (focused !== handle) return false
+      focused = null
+      return true
+    }
+  }
+  return handle
+}
+
+export const pressKey = (view: { render(cx: Context): object }, key: string): void => {
+  if (focused === null) return
+  const rendered = paths(view.render(cx))
+  const under = rendered.find((path) => path.at(-1)?.calls.some((call) => call.name === "track_focus" && call.args[0] === focused))
+  if (under === undefined) return
+  for (const made of [...under].reverse()) {
+    const handler = made.calls.find((call) => call.name === "on_key_down")?.args[0]
+    if (typeof handler !== "function") continue
+    const previous = stopped.length
+    handler({ key }, cx)
+    if (stopped.length !== previous) return
+  }
+}
+
 const unused = (): never => { throw new Error("Unexpected App context call") }
 const idleTask = () => ({ cancel: () => undefined, is_done: () => true })
 class IdleEntity {
@@ -91,7 +124,7 @@ export const cx: Context = Object.assign(IdleEntity, {
     return idleTask()
   },
   bind_keys: unused, propagate: unused, phase: unused, theme: unused, open_url: unused,
-  read_from_clipboard: unused, write_to_clipboard: unused, focus_handle: unused, sleep: unused,
+  read_from_clipboard: unused, write_to_clipboard: unused, focus_handle: focusHandle, sleep: unused,
   timer: { after: unused, every: unused }
 }) satisfies Context
 
@@ -185,7 +218,9 @@ void mock.module("herdr", () => ({
     return line === "orc attention --json" && stalledAttention.pending !== null ? stalledAttention.pending : reply(line)
   },
   shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => ({}),
-  settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined
+  settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined,
+  props: () => Object.fromEntries(viewProps), themes: () => [],
+  closeOverlay: (key: string) => { closedOverlays.push(key) }
 }))
 
 interface OpenTask {
