@@ -111,7 +111,7 @@ export {
   QuotaSource,
   quotaSourceLayer,
 } from "./sources/quota";
-export { overlaySubquo, quotaSourceLayerWithMappings } from "./sources/subquo";
+export { overlaySubquo, quotaSourceLayerWithMappings, subquoWindowOf } from "./sources/subquo";
 export {
   type OrcQuota,
   type OrcQuotaAccount,

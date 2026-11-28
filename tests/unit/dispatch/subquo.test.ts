@@ -80,6 +80,24 @@ describe("assessSubquo on a snapshot built from subquo's published subquo.v1 sch
     const reading = assessSubquo(schemaBuiltSnapshot(), settings("second"), Date.parse("2026-11-22T20:02:05.000Z"))
     expect(reading.kind === "read" ? reading.pick : "unread").toBeNull()
   })
+  for (const [id, provider] of [["main", "claude"], ["codex-home", "codex"]] as const) {
+    test(provider + " keeps weekly room instead of rejecting a five-hour window not returned by the provider", () => {
+      const weekly = { id: "weekly", scope: "all", percentLeft: 35, resetsAt: "2026-11-28T12:00:00.000Z" }
+      const observation = {
+        status: "fresh", observedAt: "2026-11-22T20:00:00.000Z", source: "provider",
+        validUntil: "2026-11-22T20:02:00.000Z", windows: [weekly]
+      }
+      const absent = assessSubquo(withAccount(id, observation), settings(id), now)
+      const notReturned = { id: "five-hour", percentLeft: null, resetsAt: null, status: "not_returned" }
+      const present = assessSubquo(withAccount(id, { ...observation, windows: [weekly, notReturned] }), settings(id), now)
+      expect(absent).toEqual({
+        kind: "read", floorPercent: 15,
+        accounts: [{ account: id, kind: "usable", remainingPercent: 35, resetsAt: weekly.resetsAt }],
+        pick: id
+      })
+      expect(present).toEqual(absent)
+    })
+  }
   test("an unknown percent is unusable instead of read as room", () => {
     const snapshot = withAccount("second", {
       status: "fresh",
