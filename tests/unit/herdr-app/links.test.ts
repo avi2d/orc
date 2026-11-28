@@ -4,7 +4,7 @@ import { lineWords, textParts } from "../../../packages/herdr-app/src/links"
 import type { CheckSummary } from "../../../packages/herdr-app/src/checks"
 import type { InboxItem } from "../../../packages/herdr-app/src/inbox"
 import { type TaskDetail, infoRows } from "../../../packages/herdr-app/src/task"
-import { type Node, appSettings, click, cx, find, node, nodes, stopped } from "./gpui-fakes"
+import { type Node, appSettings, click, cx, find, node, nodes, resolvedTheme, stopped } from "./gpui-fakes"
 
 const address = "https://github.com/avi2d/orc/pull/219"
 
@@ -147,16 +147,18 @@ test("keeps linked answer rows and tiles clickable without picking the option wh
   expect(choices).toBe(1)
 })
 
-const channel = (color: string, at: number): number => {
-  const value = Number.parseInt(color.slice(at, at + 2), 16) / 255
-  return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
-}
+const wcagWeights = [0.2126, 0.7152, 0.0722]
 
-const luminance = (color: string): number => 0.2126 * channel(color, 1) + 0.7152 * channel(color, 3) + 0.0722 * channel(color, 5)
+const wcagLuminance = (color: string): number =>
+  wcagWeights.reduce((sum, weight, index) => {
+    const srgb = Number.parseInt(color.slice(1 + index * 2, 3 + index * 2), 16) / 255
+    return sum + weight * (srgb <= 0.03928 ? srgb / 12.92 : Math.pow((srgb + 0.055) / 1.055, 2.4))
+  }, 0)
 
 const contrast = (first: string, second: string): number => {
-  const [a, b] = [luminance(first), luminance(second)]
-  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+  const lighter = Math.max(wcagLuminance(first), wcagLuminance(second))
+  const darker = Math.min(wcagLuminance(first), wcagLuminance(second))
+  return (lighter + 0.05) / (darker + 0.05)
 }
 
 const colorOf = (view: Node, call: "text_color" | "bg"): string => {
@@ -210,16 +212,24 @@ test("keeps dark cards readable in a light app and never uses the theme's status
   }
 })
 
-const themedLink = async (name: string): Promise<Node> => {
-  const { linkedText } = await import("../../../packages/herdr-app/src/links-view")
-  appSettings["theme"] = name
+const withResolvedTheme = <T>(resolved: string, read: () => T): T => {
+  appSettings["theme"] = { light: "Light preference", dark: "Dark preference" }
+  resolvedTheme.name = resolved
   try {
+    return read()
+  } finally {
+    appSettings["theme"] = "Graphite"
+    resolvedTheme.name = null
+  }
+}
+
+const themedLink = async (resolved: string): Promise<Node> => {
+  const { linkedText } = await import("../../../packages/herdr-app/src/links-view")
+  return withResolvedTheme(resolved, () => {
     const link = nativeLinks(linkedText("job", job)).at(0)
     if (link === undefined) throw new Error("Missing themed job link")
     return link
-  } finally {
-    appSettings["theme"] = "Graphite"
-  }
+  })
 }
 
 test("reads 4.5:1 link contrast from the resolved theme background instead of the theme's name", async () => {
@@ -227,12 +237,7 @@ test("reads 4.5:1 link contrast from the resolved theme background instead of th
   const colors = new Set<string>()
   for (const name of ["Graphite", "Paper", "Auto (light)", "Auto (dark)"]) {
     const link = await themedLink(name)
-    appSettings["theme"] = name
-    try {
-      checkLinkContrast(link, [palette().background])
-    } finally {
-      appSettings["theme"] = "Graphite"
-    }
+    withResolvedTheme(name, () => checkLinkContrast(link, [palette().background]))
     colors.add(colorOf(link, "text_color"))
   }
   expect(colors.size).toBe(2)

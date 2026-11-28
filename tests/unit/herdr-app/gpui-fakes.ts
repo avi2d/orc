@@ -171,6 +171,7 @@ const reply = (line: string): Promise<{ code: number; stdout: string; stderr: st
 }
 
 export const appSettings: Record<string, unknown> = { theme: "Graphite" }
+export const resolvedTheme: { name: string | null } = { name: null }
 
 const graphite = {
   background: "#17191d", surface: "#17191d", chrome: "#101114", raised: "#2c2e31",
@@ -194,7 +195,7 @@ void mock.module("herdr", () => ({
     executed.push(line)
     return line === "orc attention --json" && stalledAttention.pending !== null ? stalledAttention.pending : reply(line)
   },
-  shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => installedColors[String(appSettings["theme"])] ?? {},
+  shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => installedColors[resolvedTheme.name ?? String(appSettings["theme"])] ?? {},
   settings: () => appSettings, openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined
 }))
 
