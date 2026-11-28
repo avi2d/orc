@@ -38,11 +38,6 @@ The overview commands ask that host for `report subscriptions` and `report runni
 If the host lacks a report, the overview runs the configured command instead.
 A custom command that does not use a recognized [SSH](https://www.openssh.com) form runs unchanged.
 
-To measure the four App reads in a checkout, run `bun scripts/bench-app-reads.ts . overview example-42` with an ID from your backlog.
-Use `snapshot` in place of `overview` for the older Resources commands.
-Each line reports milliseconds to first output, milliseconds to exit, bytes, and a separate [Bun](https://bun.com) JSON parse time.
-The measurement uses the checkout's CLI entry points, not the installed launcher or the App renderer.
-
 ## Read the snapshot
 
 The snapshot is a version 1 JSON object with `generatedAt`, `machine`, and `sources`.
