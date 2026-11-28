@@ -130,6 +130,7 @@ const reference = [
     page("The beat and task runs", "/run/beat-runs")
   ] },
   page("Task kinds", "/run/task-kinds"),
+  page("Images for design work", "/run/design-images"),
   page("Delivery modes", "/run/delivery-modes"),
   page("Running a task", "/run/running-a-task"),
   page("How orc runs Pi", "/run/how-orc-runs-pi"),

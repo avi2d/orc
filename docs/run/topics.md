@@ -21,6 +21,7 @@ Each page below documents one part of the orc command.
 - [Parked runs](./parked-runs.md)
 - [The attention queue](./attention-queue.md)
 - [Task kinds](./task-kinds.md)
+- [Images for design work](./design-images.md)
 - [Delivery modes](./delivery-modes.md)
 - [Merging a task's PR](./merging-a-tasks-pr.md)
 - [Adding tasks from a chat](./chat.md)
