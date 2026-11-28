@@ -5,7 +5,7 @@ import { type RowFacts, rowFacts } from "./agent-row"
 import { type AlertAction, type AlertShown, alert, button, field, selectTrigger, statusDot, vendorLogo, zinc } from "./kit"
 import type { palette } from "./palette"
 import type { RunFacts } from "./run-agent"
-import { projectMenu, projectMenuPosition, runsHeader } from "./run-menus"
+import { projectMenu, runsHeader } from "./run-menus"
 import { uniformRows } from "./rows-list"
 import { shortTime } from "./task"
 
@@ -71,6 +71,9 @@ const { menuWidth, controlHeight, selectorWidth, foldWidth } = runsHeader
 const headerPadding = runsHeader.padding
 const headerTop = runsHeader.top
 const headerGap = runsHeader.gap
+const panelBorder = 1
+const menuLeft = listWidth - panelBorder - headerPadding - foldWidth - headerGap - menuWidth
+const menuTop = headerTop + controlHeight + 4
 
 const findWords = (shown: RunsShown): string => shown.find.value().trim()
 
@@ -148,8 +151,7 @@ const attentionView = (t: Palette, shown: RunsShown): ReadonlyArray<Element> =>
 
 const menuList = (t: Palette, all: ReadonlyArray<Card>, filter: Filter, act: RunsActions): Element => {
   const menu = projectMenu(all, filter)
-  const position = projectMenuPosition()
-  return div().absolute().top(position.top).left(position.left).w(menuWidth)
+  return div().absolute().top(menuTop).left(menuLeft).w(menuWidth)
     .child(v_flex().id("filter-project-menu").w_full().max_h(320).overflow_y_scrollbar()
       .on_mouse_down("left", (_event, cx) => cx.stop_propagation())
       .on_mouse_down_out((_event, cx) => act.openMenu(cx, false))
@@ -190,7 +192,7 @@ export const runsColumn = (t: Palette, shown: RunsShown, act: RunsActions): Elem
   if (shown.folded) return rail(t, shown, act)
   const all = shown.list.kind === "ok" ? shown.list.cards : []
   const body = listBody(shown, act)
-  return v_flex().relative().w(listWidth).h_full().flex_shrink_0().bg(t.chrome).border_r(1).border_color(t.border)
+  return v_flex().relative().w(listWidth).h_full().flex_shrink_0().bg(t.chrome).border_r(panelBorder).border_color(t.border)
     .child(header(t, all, shown, act))
     .children(notesView(t, body.notes))
     .child(uniformRows("cards", body.rows.map(shownRow(shown)), rowKey, (row) => listRow(t, shown, row), { x: 6, y: 6 }, pickRow(act)))

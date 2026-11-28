@@ -87,7 +87,7 @@ export const fieldWithButton = (state: InputState, action: Element): Element =>
 
 export const selectTrigger = (t: Palette, id: string, label: string, size: ControlSize, width: number, press: Press): Element =>
   h_flex().id(id).w(width).h(size).px(size === 32 ? 12 : 10).flex_none().items_center().gap(6).rounded(8).bg(zinc.s2).text_size(size === 32 ? 13 : 12).text_color(t.foreground)
-    .cursor_pointer().hover((style) => style.bg(zinc.s3)).tooltip(label)
+    .cursor_pointer().hover((style) => style.bg(zinc.s3))
     .on_mouse_down("left", (_event, cx) => press(cx))
     .child(div().flex_1().min_w_0().truncate().child(label)).child(div().text_color(zinc.muted).child("▾"))
 

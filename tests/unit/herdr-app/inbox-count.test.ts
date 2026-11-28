@@ -76,7 +76,7 @@ test("the open Project list is placed under its selector's right edge, not by th
   const row = toFold.at(-2)
   const trigger = find(element, "filter-project") ?? undefined
   const panelWidth = argOf(panel, "w") ?? NaN
-  const triggerRight = panelWidth - (argOf(row, "px") ?? NaN) - (argOf(toFold.at(-1), "w") ?? NaN) - (argOf(row, "gap") ?? NaN)
+  const triggerRight = panelWidth - (argOf(panel, "border_r") ?? NaN) - (argOf(row, "px") ?? NaN) - (argOf(toFold.at(-1), "w") ?? NaN) - (argOf(row, "gap") ?? NaN)
   const triggerBottom = (argOf(row, "pt") ?? NaN) + (argOf(trigger, "h") ?? NaN)
   expect((argOf(wrapper, "left") ?? NaN) + (argOf(wrapper, "w") ?? NaN)).toBe(triggerRight)
   const top = argOf(wrapper, "top") ?? NaN

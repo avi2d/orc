@@ -15,11 +15,6 @@ export type ProjectChoice = Filter
 
 export const runsHeader = { width: 360, padding: 12, gap: 8, top: 10, controlHeight: 32, selectorWidth: 132, foldWidth: 32, menuWidth: 200 } as const
 
-export const projectMenuPosition = () => ({
-  left: runsHeader.width - runsHeader.padding - runsHeader.foldWidth - runsHeader.gap - runsHeader.menuWidth,
-  top: runsHeader.top + runsHeader.controlHeight + 4
-})
-
 export const projectMenu = (cards: ReadonlyArray<Card>, filter: Filter): FilterMenu<ProjectChoice> => {
   const choices: ReadonlyArray<FilterChoice<ProjectChoice>> = [
     { value: { project: null, allRuns: false }, name: "All" },
