@@ -1,7 +1,7 @@
 import { type Context, type Element, div } from "gpui-kit"
 import { type ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { monospace } from "./fonts"
-import { linkedText } from "./links-view"
+import { linkedCardText, linkedText } from "./links-view"
 import { type CheckFailure, type CheckSummary, type ChecksSummary, checkTime } from "./checks"
 import { type CheckState, alert, card, checkIcon } from "./kit"
 import type { Reading } from "./orc-read"
@@ -32,7 +32,7 @@ const failureView = (t: Palette, id: string, failure: CheckFailure): Element => 
   return v_flex().ml(22).my(4).gap(8)
     .children(failure.failed.map((test, index) => v_flex().gap(4)
       .child(h_flex().gap(8).items_center().child(checkIcon("failed"))
-        .child(linkedText(`${id}-test-name-${index}`, test.name).min_w_0().whitespace_normal()))
+        .child(linkedCardText(`${id}-test-name-${index}`, test.name).min_w_0().whitespace_normal()))
       .children(test.error.length === 0 ? [] : [block(t, `${id}-test-error-${index}`, test.error)])))
     .children(tally === "" ? [] : [div().text_size(12).text_color(t.muted).child(tally)])
 }

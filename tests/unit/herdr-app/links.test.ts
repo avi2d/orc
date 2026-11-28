@@ -1,9 +1,10 @@
 import { expect, test } from "bun:test"
 import { buildCards } from "../../../packages/herdr-app/src/agents"
 import { lineWords, textParts } from "../../../packages/herdr-app/src/links"
+import type { CheckSummary } from "../../../packages/herdr-app/src/checks"
 import type { InboxItem } from "../../../packages/herdr-app/src/inbox"
 import { type TaskDetail, infoRows } from "../../../packages/herdr-app/src/task"
-import { type Node, appAppearance, click, cx, find, node, nodes, stopped } from "./gpui-fakes"
+import { type Node, appSettings, click, cx, find, node, nodes, stopped } from "./gpui-fakes"
 
 const address = "https://github.com/avi2d/orc/pull/219"
 
@@ -181,8 +182,8 @@ test("keeps dark cards readable in a light app and never uses the theme's status
   const { linkedText } = await import("../../../packages/herdr-app/src/links-view")
   const { palette } = await import("../../../packages/herdr-app/src/palette")
   const answers = new InboxAnswers(() => undefined)
-  for (const dark of [true, false]) {
-    appAppearance.dark = dark
+  for (const themeName of ["Graphite", "Paper"]) {
+    appSettings["theme"] = themeName
     try {
       const t = palette()
       const statusColors = [t.working, t.blocked, t.done]
@@ -204,8 +205,66 @@ test("keeps dark cards readable in a light app and never uses the theme's status
         expect(argument(link, "tab_stop")).toBe(true)
       }
     } finally {
-      appAppearance.dark = true
+      appSettings["theme"] = "Graphite"
     }
+  }
+})
+
+const themedLinkColor = async (name: string | null): Promise<string> => {
+  const { linkedText } = await import("../../../packages/herdr-app/src/links-view")
+  appSettings["theme"] = name ?? undefined
+  try {
+    const link = nativeLinks(linkedText("job", job)).at(0)
+    if (link === undefined) throw new Error("Missing themed job link")
+    return colorOf(link, "text_color")
+  } finally {
+    appSettings["theme"] = "Graphite"
+  }
+}
+
+test("uses dark link colours when the active theme name is missing or matches no entry instead of a light entry's", async () => {
+  const dark = await themedLinkColor("Graphite")
+  const light = await themedLinkColor("Paper")
+  expect(light).not.toBe(dark)
+  expect(await themedLinkColor("paper")).toBe(dark)
+  expect(await themedLinkColor("Retired Light")).toBe(dark)
+  expect(await themedLinkColor(null)).toBe(dark)
+})
+
+const linksOnSurfaces = (element: object | string, surface: string | null): ReadonlyArray<{ readonly link: Node; readonly surface: string | null }> => {
+  const view = typeof element === "string" ? undefined : nodes.get(element)
+  if (view === undefined) return []
+  const fill = argument(view, "bg")
+  const shown = typeof fill === "string" ? fill : surface
+  const here = view.calls.some((call) => call.name === "href") ? [{ link: view, surface: shown }] : []
+  return [...here, ...view.kids.flatMap((kid) => linksOnSurfaces(kid, shown))]
+}
+
+test("keeps failed test names and error lines readable on the surface each sits on in a light app instead of the light link on the dark card", async () => {
+  const { checksView } = await import("../../../packages/herdr-app/src/checks-view")
+  const { palette } = await import("../../../packages/herdr-app/src/palette")
+  const { ScrollHandle } = await import("gpui-base")
+  const { div } = await import("gpui-kit")
+  const check = {
+    name: "ci/e2e", seconds: 12,
+    outcome: { kind: "failed", failure: { kind: "tests", failed: [{ name: `e2e retries ${job}`, error: [`See ${otherJob}`] }], passCount: 3, failCount: 1 } }
+  } satisfies CheckSummary
+  const shown = { of: "run", flipped: new Set<string>(), flip: () => undefined }
+  appSettings["theme"] = "Paper"
+  try {
+    const t = palette()
+    const view = checksView(t, { kind: "ok", value: [check] }, shown, ScrollHandle.new(), () => div())
+    const links = linksOnSurfaces(view, null)
+    expect(links.map(({ link }) => argument(link, "href"))).toEqual([job, otherJob])
+    expect(links.map(({ surface }) => surface)).toEqual(["#1f1f22", t.chrome])
+    for (const { link, surface } of links) {
+      if (surface === null) throw new Error("Missing link surface")
+      checkLinkContrast(link, [surface])
+      expect(link.calls.map(({ name }) => name)).toContain("underline")
+      expect(argument(link, "tab_stop")).toBe(true)
+    }
+  } finally {
+    appSettings["theme"] = "Graphite"
   }
 })
 
