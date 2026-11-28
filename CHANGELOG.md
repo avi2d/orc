@@ -2,6 +2,52 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.26.0
+
+Released 2026-11-28.
+
+### Features
+
+- **herdr-app:** show machine overview and subscriptions in the herdr app [#475](https://github.com/avi2d/orc/pull/475)
+- **run:** add pinnedOnly machines that only run explicitly pinned tasks [#464](https://github.com/avi2d/orc/pull/464)
+- **herdr-app:** rebuild the Agents page from the approved round-6 design [#455](https://github.com/avi2d/orc/pull/455)
+- **herdr-app:** show why a parked task waits for a reviewer in its Info tab [#458](https://github.com/avi2d/orc/pull/458)
+- **run:** pick a reviewer from a quota-ranked chain and park the run when none has room [#454](https://github.com/avi2d/orc/pull/454)
+- **run:** fix loop with config-held round limits and stop rules [#453](https://github.com/avi2d/orc/pull/453)
+- **run:** give orc PR bodies a fixed structure and an optional mermaid diagram [#450](https://github.com/avi2d/orc/pull/450)
+- **run:** add orc metrics command for failed steps, gate stops, minutes, fix rounds [#444](https://github.com/avi2d/orc/pull/444)
+- **run:** pick the review turn's reviewer from a quota-checked chain [#448](https://github.com/avi2d/orc/pull/448)
+- **run:** list why each remaining finding was left in an orc PR body [#447](https://github.com/avi2d/orc/pull/447)
+- **run:** add project review path rules to the orc-mode review [#446](https://github.com/avi2d/orc/pull/446)
+- **run:** list review findings in the PR body [#442](https://github.com/avi2d/orc/pull/442)
+- **run:** read quota through the subquo dependency [#432](https://github.com/avi2d/orc/pull/432)
+- **run:** group decisions by owner and agent in every listing [#428](https://github.com/avi2d/orc/pull/428)
+
+### Fixes
+
+- **herdr-app:** open web links in the browser from every tab [#474](https://github.com/avi2d/orc/pull/474)
+- **herdr-app:** compact runs header and pin project dropdown to its selector [#472](https://github.com/avi2d/orc/pull/472)
+- **run:** treat subquo not_returned windows as missing [#468](https://github.com/avi2d/orc/pull/468)
+- **run:** create file-claim lock guard with mode 0600 on macOS [#462](https://github.com/avi2d/orc/pull/462)
+- **herdr-app:** show Claude quota failures, awaiting rows, Inbox and render error [#460](https://github.com/avi2d/orc/pull/460)
+- **run:** list ask-user review findings in the PR body instead of stopping the loop [#457](https://github.com/avi2d/orc/pull/457)
+- **run:** write the PR body Why from the branch diff, not the task file [#452](https://github.com/avi2d/orc/pull/452)
+- **run:** take file claims on native Windows through LockFileEx [#451](https://github.com/avi2d/orc/pull/451)
+- **run:** default to no per-agent sandbox and make docs and help say so [#443](https://github.com/avi2d/orc/pull/443)
+- **session-quota:** show claude windows in the Herdr resources tab [#445](https://github.com/avi2d/orc/pull/445)
+- resolve package preloads in the Stryker bun runner [#436](https://github.com/avi2d/orc/pull/436)
+- **run:** share task front schema from orc-schema and launch the bundled bin.js [#437](https://github.com/avi2d/orc/pull/437)
+- **deps:** clear the 11 open dependency advisories [#438](https://github.com/avi2d/orc/pull/438)
+- **herdr-app:** hide bookkeeping holds from the Inbox and keep link sentences whole [#430](https://github.com/avi2d/orc/pull/430)
+- **herdr-app:** load Resources tab in background and show every quota account [#429](https://github.com/avi2d/orc/pull/429)
+- **herdr-app:** virtualize the card, rail and inbox lists so scrolling stays fast [#427](https://github.com/avi2d/orc/pull/427)
+- **herdr-app:** label retried runs as Retried, not Sent back [#426](https://github.com/avi2d/orc/pull/426)
+- **run:** record who decided in Orc [#422](https://github.com/avi2d/orc/pull/422)
+
+### Performance
+
+- **run:** poll answers and tokens every 250 ms and speed up text measuring [#440](https://github.com/avi2d/orc/pull/440)
+
 ## 0.25.0
 
 Released 2026-11-26.
