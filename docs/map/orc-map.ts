@@ -59,15 +59,15 @@ export const parts: readonly MapPart[] = [
     inside: "chat",
     title: "The orchestrator model",
     short: "A Pi session that edits only the backlog",
-    details: { text: "A Pi session with sixteen tools and no others. It can change the backlog and nothing else." }
+    details: { text: "A Pi session with eighteen tools and no others. It can change the backlog and nothing else." }
   },
   {
     id: "chat-tools",
     inside: "chat",
-    title: "Sixteen tools, each an orc command",
+    title: "Eighteen tools, each an orc command",
     short: "Shape, move, read and merge tasks",
     details: {
-      points: ["four shape the backlog: add, edit, priority and hold", "seven move a task along: stop, retry, drop, send back, note, depend and thread", "five read it and answer: backlog, backlog answer, attention, attention answer and board", "one merges a pull request"]
+      points: ["four shape the backlog: add, edit, priority and hold", "seven move a task along: stop, retry, drop, send back, note, depend and thread", "six read it and answer: backlog, machines, backlog answer, attention, attention answer and board", "one merges a pull request"]
     }
   },
   {
