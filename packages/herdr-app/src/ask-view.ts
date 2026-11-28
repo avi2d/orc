@@ -4,7 +4,7 @@ import { hasLinks } from "./links"
 import { linkedText } from "./links-view"
 import { exec, nextCommand } from "herdr"
 import { exitReason } from "./orc-read"
-import type { palette } from "./palette"
+import type { LinkPalette, palette } from "./palette"
 import { type AskOption, optionShape } from "./thread"
 
 type Palette = ReturnType<typeof palette>
@@ -58,9 +58,9 @@ const optionTile = (t: Palette, id: string, option: AskOption, label: string | E
     : div().id(id).min_w_0().max_w_full().px(12).py(4).rounded(6).border(1).border_color(t.border).bg(t.background).child(label)
 }
 
-export const optionView = (t: Palette, id: string, option: AskOption, control: (element: Element) => Element): Element => {
+export const optionView = (t: Palette, id: string, option: AskOption, control: (element: Element) => Element, links?: LinkPalette): Element => {
   const label = `${option.letter}) ${option.text}`
-  return control(optionTile(t, id, option, hasLinks(label) ? linkedText(`${id}-text`, label).whitespace_normal() : label))
+  return control(optionTile(t, id, option, hasLinks(label) ? linkedText(`${id}-text`, label, undefined, links).whitespace_normal() : label))
 }
 
 export const actionButton = (t: Palette, id: string, label: string, busy: boolean, press: (cx: Context) => void): Element => {

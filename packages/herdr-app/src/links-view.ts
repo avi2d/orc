@@ -1,17 +1,20 @@
-import { type Element, div } from "gpui-kit"
+import { type Context, type Element, div } from "gpui-kit"
 import { Link, h_flex, v_flex } from "gpui-base"
 import { hasLinks, lineWords } from "./links"
-import { linkPalette } from "./palette"
+import { type LinkPalette, linkPalette } from "./palette"
 
-type LinkPalette = ReturnType<typeof linkPalette>
+type OpenLink = (url: string, cx: Context) => void
 
 let pointerFocusedId: string | null = null
 
-const webLink = (t: LinkPalette, id: string, url: string): Element => {
-  const link = Link.new(id).href(url).tab_stop(true).cursor_pointer().min_w_0().truncate()
+const webLink = (t: LinkPalette, id: string, url: string, open: OpenLink | undefined): Element => {
+  const link = (open === undefined ? Link.new(id).href(url) : Link.new(id)).tab_stop(true).cursor_pointer().min_w_0().truncate()
     .text_color(t.link).underline().tooltip(url)
     .hover((style) => style.text_color(t.linkHover))
-    .on_click((_event, cx) => cx.stop_propagation())
+    .on_click((_event, cx) => {
+      cx.stop_propagation()
+      open?.(url, cx)
+    })
     .child(url)
   if (pointerFocusedId === id) {
     // Tab moves focus on key-down, so only its release reaches the new link.
@@ -29,21 +32,22 @@ const webLink = (t: LinkPalette, id: string, url: string): Element => {
 }
 
 // A flex item per clause would wrap the whole clause instead of filling the line beside a link.
-const linkedLine = (t: LinkPalette, id: string, line: string): Element => {
+const linkedLine = (t: LinkPalette, id: string, line: string, open: OpenLink | undefined): Element => {
   const words = lineWords(line).map((word, wordIndex) => {
     const parts = word.map((part, index) => part.opens === null
       ? div().child(part.text === "" ? " " : part.text)
-      : webLink(t, `${id}-${wordIndex}-${index}`, part.opens))
+      : webLink(t, `${id}-${wordIndex}-${index}`, part.opens, open))
     return h_flex().min_w_0().max_w_full().children(parts)
   })
   return h_flex().flex_wrap().items_start().min_w_0().children(words)
 }
 
-const linkedTextOn = (surface: Parameters<typeof linkPalette>[0], id: string, text: string): Element => {
+const linkedTextOn = (links: () => LinkPalette, id: string, text: string, open?: OpenLink): Element => {
   if (!hasLinks(text)) return div().child(text)
-  const t = linkPalette(surface)
-  return v_flex().min_w_0().children(text.split("\n").map((line, index) => linkedLine(t, `${id}-link-${index}`, line)))
+  const t = links()
+  return v_flex().min_w_0().children(text.split("\n").map((line, index) => linkedLine(t, `${id}-link-${index}`, line, open)))
 }
 
-export const linkedText = (id: string, text: string): Element => linkedTextOn("theme", id, text)
-export const linkedCardText = (id: string, text: string): Element => linkedTextOn("card", id, text)
+export const linkedText = (id: string, text: string, open?: OpenLink, links?: LinkPalette): Element =>
+  linkedTextOn(() => links ?? linkPalette("theme"), id, text, open)
+export const linkedCardText = (id: string, text: string): Element => linkedTextOn(() => linkPalette("card"), id, text)

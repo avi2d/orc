@@ -23,8 +23,8 @@ To install the layout:
    Check `keys.json` for your `layout.switch` binding.
    Use it again to return to your other layout.
 
-The install command copies the `orc-tabs`, `orc-board`, `orc-task`, `orc-resources`, `orc-agents`, `orc-changes`, `orc-inbox`, and `orc-drawer` mods into `~/.config/herdr-app/mods/`.
-It also copies `orc.json` and `orc.svg` to `~/.config/herdr-app/layouts/`.
+The install command copies the `orc-tabs`, `orc-board`, `orc-task`, `orc-resources`, `orc-agents`, `orc-changes`, `orc-inbox`, `orc-drawer`, and `orc-design-system` mods into `~/.config/herdr-app/mods/`.
+It also copies `orc.json`, `orc.svg`, and `orc-design-system.json` to `~/.config/herdr-app/layouts/`.
 It adds `cmd-1`, `cmd-2`, `cmd-3`, `cmd-4`, and `cmd-k` under `layout:orc` in `keys.json`.
 Existing bindings stay in place and are reported as skipped.
 The command writes only names beginning with `orc`, leaving Herdr's own mods and layouts untouched.
@@ -41,6 +41,12 @@ The command writes only names beginning with `orc`, leaving Herdr's own mods and
 The Resources tab refreshes in the background, and the other tabs refresh while visible.
 Each tab shows a reason when a command fails.
 Click an underlined link in any tab to open it in your browser.
+
+## Open the design system gallery
+
+Select **Design system** in the Orc top bar to see Orc's colours and components with sample data.
+To open the gallery directly, run `herdr-app do layout.switch --name orc-design-system`.
+To return, select **Back to Orc**, press Escape, or run `herdr-app do layout.switch --name orc`.
 
 ## Answer in the Inbox
 

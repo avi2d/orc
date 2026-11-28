@@ -2,7 +2,7 @@ import { type Context, type Element, div } from "gpui-kit"
 import { type InputState, h_flex, v_flex } from "gpui-base"
 import { type Card, type CardStatus, type Filter, cardStatuses, filterCards, railLabel, unfoldedCards } from "./agents"
 import { type RowFacts, rowFacts } from "./agent-row"
-import { type AlertAction, type AlertShown, alert, button, field, selectTrigger, statusDot, vendorLogo, zinc } from "./kit"
+import { type AlertAction, type AlertShown, alert, button, field, groupRow, listRowHeight, menuPanel, runRow, selectTrigger, statusDot, zinc } from "./kit"
 import type { palette } from "./palette"
 import type { RunFacts } from "./run-agent"
 import { projectMenu, runsHeader } from "./run-menus"
@@ -66,7 +66,6 @@ interface ListBody {
 
 const listWidth = runsHeader.width
 const railWidth = 112
-const rowHeight = 26
 const { menuWidth, controlHeight, selectorWidth, foldWidth } = runsHeader
 const headerPadding = runsHeader.padding
 const headerTop = runsHeader.top
@@ -122,26 +121,16 @@ const pickRow = (act: RunsActions) => (row: ShownRow, cx: Context): void => {
   else act.select(cx, row.card.key)
 }
 
-const groupView = (t: Palette, status: CardStatus, count: number, folded: boolean): Element =>
-  h_flex().id(`group-${status}`).h(rowHeight).px(8).gap(6).items_center().rounded(6).text_size(12).text_color(t.muted).cursor_pointer()
-    .hover((style) => style.text_color(t.foreground))
-    .child(`${status} (${count.toString()})`)
-    .children(folded ? [div().text_color(t.dim).child("▸")] : [])
-
-const cardView = (t: Palette, card: Card, facts: RowFacts, selected: boolean): Element =>
-  h_flex().id(`card-${card.key}`).h(rowHeight).px(8).gap(8).items_center().rounded(6).text_size(13).cursor_pointer()
-    .when(selected, (row) => row.bg(t.selected))
-    .hover((style) => style.bg(selected ? t.selected : zinc.s2))
-    .child(statusDot(card.standing.status).tooltip(card.standing.status))
-    .child(vendorLogo(facts.vendor))
-    .child(div().flex_1().min_w_0().truncate().text_color(t.foreground).child(facts.title))
-    .child(div().flex_none().text_size(12).text_color(t.muted).child(facts.waits ?? facts.model ?? ""))
-    .child(div().w(30).flex_none().flex().justify_end().text_size(12).text_color(t.muted).child(facts.duration ?? ""))
-
 const listRow = (t: Palette, shown: RunsShown, row: ShownRow): Element =>
   row.kind === "group"
-    ? groupView(t, row.status, row.count, shown.foldedGroups.has(row.status))
-    : cardView(t, row.card, row.facts, row.card.key === shown.selectedKey)
+    ? groupRow(t, `group-${row.status}`, row.status, row.count, shown.foldedGroups.has(row.status))
+    : runRow(t, `card-${row.card.key}`, {
+      status: row.card.standing.status,
+      vendor: row.facts.vendor,
+      title: row.facts.title,
+      detail: row.facts.waits ?? row.facts.model,
+      duration: row.facts.duration
+    }, row.card.key === shown.selectedKey)
 
 const notesView = (t: Palette, notes: ReadonlyArray<Note>): ReadonlyArray<Element> =>
   notes.length === 0 ? [] : [v_flex().px(12).pt(12).gap(8).flex_none().children(notes.map((note) => alert(t, `list-${note.key}`, note.shown)))]
@@ -152,20 +141,8 @@ const attentionView = (t: Palette, shown: RunsShown): ReadonlyArray<Element> =>
 const menuList = (t: Palette, all: ReadonlyArray<Card>, filter: Filter, act: RunsActions): Element => {
   const menu = projectMenu(all, filter)
   return div().absolute().top(menuTop).left(menuLeft).w(menuWidth)
-    .child(v_flex().id("filter-project-menu").w_full().max_h(320).overflow_y_scrollbar()
-      .on_mouse_down("left", (_event, cx) => cx.stop_propagation())
-      .on_mouse_down_out((_event, cx) => act.openMenu(cx, false))
-      .p(4).gap(2).rounded(12).border(1).border_color(zinc.borderAccent).bg(zinc.s1).shadow_md()
-      .children(menu.choices.map((choice) => {
-        const chosen = choice === menu.chosen
-        return h_flex().id(`filter-project-${choice.name}`).h(28).px(8).gap(8).items_center().rounded(8).justify_between().cursor_pointer()
-          .text_color(chosen ? t.foreground : zinc.muted)
-          .when(chosen, (row) => row.bg(zinc.s2))
-          .hover((style) => style.bg(zinc.s2).text_color(t.foreground))
-          .on_click((_event, cx) => act.setFilter(cx, choice.value))
-          .child(div().min_w_0().truncate().child(choice.name))
-          .child(div().flex_shrink_0().text_color(zinc.muted).child(choice.count.toString()))
-      })))
+    .child(menuPanel(t, "filter-project", menu.choices, (choice) => choice === menu.chosen,
+      (choice, cx) => act.setFilter(cx, choice.value), (cx) => act.openMenu(cx, false)))
 }
 
 const titleRow = 28
@@ -181,7 +158,7 @@ const rail = (t: Palette, shown: RunsShown, act: RunsActions): Element => {
   return v_flex().id("rail").w(railWidth).h_full().flex_shrink_0().bg(t.chrome).border_r(1).border_color(t.border)
     .child(h_flex().h(titleRow + headerTop * 2).px(8).items_center().child(button(t, "unfold", "»", "ghost", 24, act.toggleFold)))
     .child(uniformRows("rail-ids", cards, (card) => card.key, (card) =>
-      h_flex().id(`rail-${card.key}`).h(rowHeight).px(6).gap(6).items_center().rounded(6).cursor_pointer()
+      h_flex().id(`rail-${card.key}`).h(listRowHeight).px(6).gap(6).items_center().rounded(6).cursor_pointer()
         .when(card.key === shown.selectedKey, (row) => row.bg(t.selected))
         .hover((style) => style.bg(card.key === shown.selectedKey ? t.selected : zinc.s2))
         .child(statusDot(card.standing.status).tooltip(card.standing.status))

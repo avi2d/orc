@@ -61,13 +61,15 @@ test("the gallery catalog does not omit a component or reuse an example address"
   ]))
 })
 
-test("each button size and look has both an enabled and disabled example at different addresses", () => {
+test("button examples keep their stable addresses and do not swap enabled and disabled states", () => {
+  const buttons = galleryStories.filter((story) => story.component === "button")
   for (const size of [24, 32]) {
     for (const look of ["primary", "secondary", "ghost"]) {
-      for (const disabled of [false, true]) {
-        const id = `button.${size}.${look}.${disabled ? "disabled" : "enabled"}`
-        expect(galleryStories.find((story) => story.id === id)).toMatchObject({ component: "button", size, look, disabled })
-      }
+      const shown = buttons.filter((story) => story.size === size && story.look === look)
+      expect(shown.map((story) => ({ id: story.id, disabled: story.disabled })).sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+        { id: `button.${size}.${look}.disabled`, disabled: true },
+        { id: `button.${size}.${look}.enabled`, disabled: false }
+      ])
     }
   }
 })

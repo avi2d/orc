@@ -12,6 +12,7 @@
     "./orc-task": "./mods/orc-task/main.ts",
     "./orc-drawer": "./mods/orc-drawer/main.ts",
     "./orc-changes": "./mods/orc-changes/main.ts",
+    "./orc-design-system": "./mods/orc-design-system/main.ts",
     "./orc-inbox": "./mods/orc-inbox/main.ts"
   },
   "scripts": {

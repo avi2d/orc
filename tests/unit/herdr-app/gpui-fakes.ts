@@ -1,5 +1,5 @@
 import { mock } from "bun:test"
-import type { AsyncContext, Context } from "gpui-kit"
+import type { AsyncContext, Context, FocusHandle } from "gpui-kit"
 import type { AgentsDocuments } from "../../../packages/herdr-app/src/agents-read"
 import type { InboxDocuments } from "../../../packages/herdr-app/src/inbox-read"
 import fixture from "../../fixtures/attention/herdr-app.json"
@@ -13,10 +13,12 @@ export const nodes = new WeakMap<object, Node>()
 
 const isKid = (value: unknown): value is object | string => typeof value === "string" || (typeof value === "object" && value !== null)
 
-export const node = (): object => {
-  const made: Node = { calls: [], kids: [] }
+export const node = (): object => elementFor({ calls: [], kids: [] })
+
+const elementFor = (made: Node): object => {
   const element: object = new Proxy({}, {
     get: (_target, name) => (...args: ReadonlyArray<unknown>) => {
+      if (name === "track_focus") return elementFor({ calls: [...made.calls, { name, args }], kids: [...made.kids] })
       const kids: ReadonlyArray<unknown> = name === "child" ? [args[0]] : name === "children" && Array.isArray(args[0]) ? args[0] : []
       if (name === "child" || name === "children") made.kids.push(...kids.filter(isKid))
       else made.calls.push({ name: String(name), args })
@@ -79,6 +81,35 @@ export const executed: Array<string> = []
 export const spawned: Array<Promise<unknown>> = []
 export const ran: Array<{ readonly name: string; readonly args: unknown }> = []
 export const stopped: Array<true> = []
+
+let focused: FocusHandle | null = null
+const focusHandle = (): FocusHandle => {
+  const handle: FocusHandle = {
+    focus: () => { focused = handle },
+    is_focused: () => focused === handle,
+    release: () => {
+      if (focused !== handle) return false
+      focused = null
+      return true
+    }
+  }
+  return handle
+}
+
+export const pressKey = (view: { render(cx: Context): object }, key: string): void => {
+  if (focused === null) return
+  const rendered = paths(view.render(cx))
+  const under = rendered.find((path) => path.at(-1)?.calls.some((call) => call.name === "track_focus" && call.args[0] === focused))
+  if (under === undefined) return
+  for (const made of [...under].reverse()) {
+    const handler = made.calls.find((call) => call.name === "on_key_down")?.args[0]
+    if (typeof handler !== "function") continue
+    const previous = stopped.length
+    handler({ key }, cx)
+    if (stopped.length !== previous) return
+  }
+}
+
 const unused = (): never => { throw new Error("Unexpected App context call") }
 const idleTask = () => ({ cancel: () => undefined, is_done: () => true })
 class IdleEntity {
@@ -91,7 +122,7 @@ export const cx: Context = Object.assign(IdleEntity, {
     return idleTask()
   },
   bind_keys: unused, propagate: unused, phase: unused, theme: unused, open_url: unused,
-  read_from_clipboard: unused, write_to_clipboard: unused, focus_handle: unused, sleep: () => Promise.resolve(),
+  read_from_clipboard: unused, write_to_clipboard: unused, focus_handle: focusHandle, sleep: () => Promise.resolve(),
   timer: { after: unused, every: unused }
 }) satisfies Context
 
@@ -147,7 +178,13 @@ export const pressRow = (element: object, listId: string, key: string): void => 
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow, uniform_list: everyRange, image: node, svg: node }))
 void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Link: { new: node }, Scrollbar: { vertical: node }, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
+  h_flex: node, v_flex: node, Link: { new: node }, Scrollbar: { vertical: node }, Input: { new: () => node() },
+  Button: { new: (id: string | number) => {
+    const element = node()
+    nodes.get(element)?.calls.push({ name: "id", args: [id] })
+    return element
+  } },
+  TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
   InputState: { new: () => {
     let typed = ""
@@ -196,7 +233,8 @@ void mock.module("herdr", () => ({
     return line === "orc attention --json" && stalledAttention.pending !== null ? stalledAttention.pending : reply(line)
   },
   shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => installedColors[resolvedTheme.name ?? String(appSettings["theme"])] ?? {},
-  settings: () => appSettings, openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined
+  settings: () => appSettings, openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined,
+  themes: () => [{ name: "graphite", light: false, colors: graphite }, { name: "paper", light: true, colors: paper }]
 }))
 
 interface OpenTask {

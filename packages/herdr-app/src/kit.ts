@@ -82,6 +82,53 @@ export const selectTrigger = (t: Palette, id: string, label: string, size: Contr
     .on_mouse_down("left", (_event, cx) => press(cx))
     .child(div().flex_1().min_w_0().truncate().child(label)).child(div().text_color(zinc.muted).child("▾"))
 
+export interface MenuChoice {
+  readonly name: string
+  readonly count: number
+}
+
+export const menuPanel = <A extends MenuChoice>(t: Palette, id: string, choices: ReadonlyArray<A>, chosen: (choice: A) => boolean, pick: (choice: A, cx: Context) => void, dismiss: Press): Element =>
+  v_flex().id(`${id}-menu`).w_full().max_h(320).overflow_y_scrollbar()
+    .on_mouse_down("left", (_event, cx) => cx.stop_propagation())
+    .on_mouse_down_out((_event, cx) => dismiss(cx))
+    .p(4).gap(2).rounded(12).border(1).border_color(zinc.borderAccent).bg(zinc.s1).shadow_md()
+    .children(choices.map((choice) => {
+      const isChosen = chosen(choice)
+      return h_flex().id(`${id}-${choice.name}`).h(28).px(8).gap(8).items_center().rounded(8).justify_between().cursor_pointer()
+        .text_color(isChosen ? t.foreground : zinc.muted)
+        .when(isChosen, (row) => row.bg(zinc.s2))
+        .hover((style) => style.bg(zinc.s2).text_color(t.foreground))
+        .on_click((_event, cx) => pick(choice, cx))
+        .child(div().min_w_0().truncate().child(choice.name))
+        .child(div().flex_shrink_0().text_color(zinc.muted).child(choice.count.toString()))
+    }))
+
+export const listRowHeight = 26
+
+export const groupRow = (t: Palette, id: string, label: string, count: number, folded: boolean): Element =>
+  h_flex().id(id).h(listRowHeight).px(8).gap(6).items_center().rounded(6).text_size(12).text_color(t.muted).cursor_pointer()
+    .hover((style) => style.text_color(t.foreground))
+    .child(`${label} (${count.toString()})`)
+    .children(folded ? [div().text_color(t.dim).child("▸")] : [])
+
+export interface RunRowShown {
+  readonly status: CardStatus
+  readonly vendor: Vendor | null
+  readonly title: string
+  readonly detail: string | null
+  readonly duration: string | null
+}
+
+export const runRow = (t: Palette, id: string, shown: RunRowShown, selected: boolean): Element =>
+  h_flex().id(id).h(listRowHeight).px(8).gap(8).items_center().rounded(6).text_size(13).cursor_pointer()
+    .when(selected, (row) => row.bg(t.selected))
+    .hover((style) => style.bg(selected ? t.selected : zinc.s2))
+    .child(statusDot(shown.status).tooltip(shown.status))
+    .child(vendorLogo(shown.vendor))
+    .child(div().flex_1().min_w_0().truncate().text_color(t.foreground).child(shown.title))
+    .child(div().flex_none().text_size(12).text_color(t.muted).child(shown.detail ?? ""))
+    .child(div().w(30).flex_none().flex().justify_end().text_size(12).text_color(t.muted).child(shown.duration ?? ""))
+
 export const card = (): Element => v_flex().rounded(12).border(1).border_color(zinc.border).bg(zinc.s1)
 
 export const kbd = (t: Palette, key: string): Element =>
