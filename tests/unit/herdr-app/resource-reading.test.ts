@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test"
 import { documents, sharedValues } from "./gpui-fakes"
-import { readingTime, resourceReading } from "../../../packages/herdr-app/src/resource-reading"
 import { subscriptionsSnapshot } from "../../../packages/herdr-app/src/resources"
+
+const { readingTime, resourceReading } = await import("../../../packages/herdr-app/src/resource-reading")
 
 test("a warm Resources open keeps the last rows and their time through a failed refresh", async () => {
   const report = "subscription-overview"

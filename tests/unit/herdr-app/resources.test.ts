@@ -252,7 +252,7 @@ describe("the subscriptions table over a subquo reading", () => {
     const compact = subscriptionOverview(subscriptionReport(local.accounts, local.now), [
       { name: "remote", reading: { kind: "ok", value: subscriptionReport(remote.accounts, remote.now) } }
     ])
-    expect(compact.windows.find((window) => window.label === "month")?.startsAt)
+    expect(compact.windows.find((window) => window.resetsAt === DateTime.formatIso(sameReset))?.startsAt)
       .toBe("2026-11-07T10:59:08.000Z")
     const monthly = composed.accounts
       .flatMap((account) => account.body.kind === "windows" ? account.body.windows : [])
