@@ -37,9 +37,17 @@ export class GalleryExample {
     cx.notify()
   }
 
-  send(cx: Context): void {
-    const answer = this.input.value().trim()
-    this.record(answer === "" ? "No sample answer to send." : `Sample answer: ${answer}`, cx)
+  private sendAction(story: GalleryStory): ((cx: Context) => void) | null {
+    if (!((story.component === "fieldWithButton" && story.action === "send")
+      || (story.component === "threadEntry" && story.reply.kind !== "read-only"))) return null
+    return (cx) => {
+      const answer = this.input.value().trim()
+      this.record(answer === "" ? "No sample answer to send." : `Sample answer: ${answer}`, cx)
+    }
+  }
+
+  submit(story: GalleryStory, cx: Context): void {
+    this.sendAction(story)?.(cx)
   }
 
   dismissSelect(cx: Context): boolean {
@@ -91,11 +99,12 @@ export class GalleryExample {
   }
 
   private thread(t: Palette, story: Extract<GalleryStory, { component: "threadEntry" }>): Element {
-    if (story.reply.kind === "read-only") return threadEntry(t, story.card, readOnlyThread)
+    const send = this.sendAction(story)
+    if (send === null) return threadEntry(t, story.card, readOnlyThread)
     const reply = story.reply
     const controls: ThreadControls = {
       option: (_card, option, shown) => shown.cursor_pointer().on_click((_event, cx) => this.record(`Sample option: ${option.text}`, cx)),
-      reply: () => [fieldWithButton(this.input, button(t, "gallery-thread-send", "Send", "primary", 32, (cx) => this.send(cx)))],
+      reply: () => [fieldWithButton(this.input, button(t, "gallery-thread-send", "Send", "primary", 32, send))],
       failure: () => reply.kind === "failed" ? [div().text_color(t.blocked).whitespace_normal().child(reply.reason)] : []
     }
     return threadEntry(t, story.card, controls)
@@ -107,7 +116,7 @@ export class GalleryExample {
         story.disabled ? null : (cx) => this.record("Example button pressed.", cx))
       case "field": return field(this.input, story.size)
       case "fieldWithButton": return fieldWithButton(this.input, button(t, story.id, story.action === "sending" ? "Sending" : "Send",
-        "primary", 32, story.action === "sending" ? null : (cx) => this.send(cx)))
+        "primary", 32, this.sendAction(story)))
       case "selectTrigger": return this.select(t, story)
       case "card": return card().p(12).gap(8).child(div().whitespace_normal().child(story.body))
         .child(h_flex().gap(6).items_center().child(radio(true)).child("In Herdr"))

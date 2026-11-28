@@ -66,7 +66,10 @@ test("a missing enabled or disabled button example cannot be replaced by a dupli
   for (const size of [24, 32]) {
     for (const look of ["primary", "secondary", "ghost"]) {
       const shown = buttons.filter((story) => story.size === size && story.look === look)
-      expect(shown.map((story) => story.disabled).sort()).toEqual([false, true])
+      expect(shown.map((story) => ({ id: story.id, disabled: story.disabled })).sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+        { id: `button.${size}.${look}.disabled`, disabled: true },
+        { id: `button.${size}.${look}.enabled`, disabled: false }
+      ])
     }
   }
 })

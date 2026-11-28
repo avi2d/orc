@@ -6,7 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { herdrAppSourceDir, installApp, readyBundledApp } from "../../../packages/run/src/features/installing-the-app/index"
 
-test("installs a fresh checkout's design system without docking the gallery on first launch", async () => {
+test("does not refuse sources without a build or dock the gallery on first launch", async () => {
   const root = await mkdtemp(join(tmpdir(), "orc-app-test-"))
   try {
     const bundled = join(root, "dist", "herdr-app")

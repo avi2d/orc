@@ -147,7 +147,13 @@ export const pressRow = (element: object, listId: string, key: string): void => 
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow, uniform_list: everyRange, image: node, svg: node }))
 void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Scrollbar: { vertical: node }, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
+  h_flex: node, v_flex: node, Scrollbar: { vertical: node }, Input: { new: () => node() },
+  Button: { new: (id: string | number) => {
+    const element = node()
+    nodes.get(element)?.calls.push({ name: "id", args: [id] })
+    return element
+  } },
+  TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
   InputState: { new: () => {
     let typed = ""

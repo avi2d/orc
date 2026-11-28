@@ -1,4 +1,4 @@
-import { type AsyncContext, type Color, type Context, type Element, View, div } from "gpui-kit"
+import { type AsyncContext, type Color, type Context, type Element, type FocusHandle, View, div } from "gpui-kit"
 import { Button, Input, InputState, h_flex, v_flex } from "gpui-base"
 import { closeOverlay, props, themes } from "herdr"
 import { monospace } from "../../src/fonts"
@@ -45,7 +45,7 @@ const colours = (t: Palette): Element =>
       [`${tone} fill`, ink.bg] as const, [`${tone} mark`, ink.colour] as const
     ])))
 
-const typeAndSpacing = (t: Palette): Element =>
+const typeAndSpacing = (t: Palette, fixture: GalleryExample): Element =>
   v_flex().gap(12)
     .child(heading("Typography"))
     .child(div().text_size(13).child("13 px · Body and standard controls · Active UI font"))
@@ -54,7 +54,9 @@ const typeAndSpacing = (t: Palette): Element =>
     .child(heading("Control heights"))
     .child(muted(t, "The kit has no shared spacing scale. These examples use its two control heights."))
     .children(galleryControlHeights.map((height) => h_flex().gap(8).items_center()
-      .child(button(t, `control-height-${height}`, `${height} px`, "primary", height, null))))
+      .child(button(t, `control-height-${height}`, `${height} px`, "primary", height,
+        (cx) => fixture.record(`${height} px example button pressed.`, cx)))))
+    .children(fixture.receipt === null ? [] : [muted(t, fixture.receipt)])
 
 export default class OrcDesignSystem extends View {
   private page: Page = "Examples"
@@ -65,8 +67,11 @@ export default class OrcDesignSystem extends View {
   private fixture = new GalleryExample()
   private presetColours = new Map<Preset, Palette>()
   private overlay: string | null = null
+  private focusHandle: FocusHandle | null = null
 
   override init(_props: unknown, cx: AsyncContext): void {
+    this.focusHandle = cx.focus_handle()
+    this.focusHandle.focus()
     const received = fields(props(), "")
     if (received.kind !== "refused" && typeof received.value["overlay"] === "string") {
       this.overlay = received.value["overlay"]
@@ -78,9 +83,7 @@ export default class OrcDesignSystem extends View {
     }
     this.search.on("change", (_event, changed) => changed.notify())
     this.fixture.input.on("submit", (_event, submitted) => {
-      const story = this.story
-      if (this.page === "Examples" && ((story.component === "fieldWithButton" && story.action === "send")
-        || (story.component === "threadEntry" && story.reply.kind !== "read-only"))) this.fixture.send(submitted)
+      if (this.page === "Examples") this.fixture.submit(this.story, submitted)
     })
     this.fixture.reset(this.story, cx)
   }
@@ -88,6 +91,7 @@ export default class OrcDesignSystem extends View {
   override close(_cx: AsyncContext): void {
     this.search.release()
     this.fixture.input.release()
+    this.focusHandle?.release()
   }
 
   private closeWindow(): void {
@@ -141,8 +145,10 @@ export default class OrcDesignSystem extends View {
     const content = this.page === "Examples"
       ? h_flex().flex_1().min_h_0().min_w_0().child(this.catalog(t)).child(this.example(t))
       : v_flex().id("gallery-reference").flex_1().min_h_0().overflow_y_scrollbar().p(12)
-        .child(this.page === "Colours" ? colours(t) : typeAndSpacing(t))
-    return v_flex().id("orc-design-system").size_full().overflow_hidden().bg(t.surface).text_color(t.foreground).text_size(13)
+        .child(this.page === "Colours" ? colours(t) : typeAndSpacing(t, this.fixture))
+    const root = v_flex().id("orc-design-system").size_full().overflow_hidden().bg(t.surface).text_color(t.foreground).text_size(13)
+    if (this.focusHandle !== null) root.track_focus(this.focusHandle)
+    return root
       .on_key_down((event, cx) => {
         if (event.key !== "escape") return
         if (!this.fixture.dismissSelect(cx)) this.closeWindow()

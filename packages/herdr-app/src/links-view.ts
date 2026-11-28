@@ -2,11 +2,11 @@ import { type Context, type Element, div } from "gpui-kit"
 import { h_flex, v_flex } from "gpui-base"
 import { lineWords, textParts } from "./links"
 
-// One flex item per word: an item holding a whole clause moves below the link as one block instead of wrapping beside it.
 type OpenLink = (url: string, cx: Context) => void
 
 const openUrl: OpenLink = (url, cx) => { cx.open_url(url) }
 
+// One flex item per word: an item holding a whole clause moves below the link as one block instead of wrapping beside it.
 export const linkedText = (id: string, text: string, open: OpenLink = openUrl): Element => {
   const parts = textParts(text)
   if (parts.every((part) => part.opens === null)) return div().child(text)
