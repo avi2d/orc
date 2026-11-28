@@ -111,7 +111,7 @@ describe("the result label on stdin", () => {
     expect(await run(readStdinLabel(Effect.succeed(JSON.stringify({ label: "/homes/a task-1" }))))).toBe("/homes/a task-1")
   })
   test("a pipe holding no document is refused instead of read as a label", async () => {
-    await assert.rejects(run(readStdinLabel(Effect.succeed("no json"))))
+    expect(await run(readStdinLabel(Effect.succeed("no json"))).then(() => "resolved", () => "rejected")).toBe("rejected")
   })
 })
 

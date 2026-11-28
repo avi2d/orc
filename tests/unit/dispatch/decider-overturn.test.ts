@@ -152,7 +152,7 @@ describe("a decider overturn", () => {
   test("the captain's answer is never replaced by a second one, unlike a decider's", async () => {
     await withAskingTask(async (root) => {
       await run(answerTask(root, "orc-1", "r2=Two retries", "2026-11-02T10:22:00.000Z"))
-      await assert.rejects(run(answerTask(root, "orc-1", "r2=Three retries", "2026-11-02T10:23:00.000Z")))
+      expect(await run(answerTask(root, "orc-1", "r2=Three retries", "2026-11-02T10:23:00.000Z")).then(() => "resolved", () => "rejected")).toBe("rejected")
     })
   })
 
