@@ -14,8 +14,8 @@ const webLink = (t: LinkPalette, id: string, url: string): Element => {
     .child(url)
   if (pointerFocusedId === id) {
     // Tab moves focus on key-down, so only its release reaches the new link.
-    return link.on_key_up((_event, cx) => {
-      if (pointerFocusedId !== id) return
+    return link.on_key_up((event, cx) => {
+      if (event.key !== "tab" || pointerFocusedId !== id) return
       pointerFocusedId = null
       cx.notify()
     })

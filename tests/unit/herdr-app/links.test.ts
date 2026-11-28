@@ -152,7 +152,7 @@ test("draws readable link colours in each appearance instead of a status colour 
   }
 })
 
-test("a pointer press does not leave the job link highlighted and tabbing back restores visible focus", async () => {
+test("releasing Escape does not bring back the pointer highlight but tabbing back shows keyboard focus", async () => {
   const { linkedText } = await import("../../../packages/herdr-app/src/links-view")
   const jobLink = () => {
     const link = nativeLinks(linkedText("focus-job", job)).at(0)
@@ -170,9 +170,11 @@ test("a pointer press does not leave the job link highlighted and tabbing back r
   expect(argument(pointerLink, "href")).toBe(job)
   expect(argument(pointerLink, "tab_stop")).toBe(true)
 
-  const onTabRelease = argument(pointerLink, "on_key_up")
-  if (typeof onTabRelease !== "function") throw new Error("Missing keyboard handler")
-  onTabRelease({ key: "tab" }, cx)
+  const onKeyRelease = argument(pointerLink, "on_key_up")
+  if (typeof onKeyRelease !== "function") throw new Error("Missing keyboard handler")
+  onKeyRelease({ key: "escape" }, cx)
+  expect(argument(jobLink(), "focus")).toBeUndefined()
+  onKeyRelease({ key: "tab" }, cx)
   expect(argument(jobLink(), "focus")).toBeFunction()
 })
 
