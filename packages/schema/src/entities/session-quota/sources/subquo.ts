@@ -111,11 +111,7 @@ const overlayProvider = (
   const observation = match.observation;
   if (!freshAt(observation, now)) return entry;
   const returned = observation.windows.filter((window) => window.status !== "not_returned");
-  const notReturned = observation.windows.filter((window) => window.status === "not_returned");
-  const windows = entry.windows.filter((window) => !notReturned.some((item) =>
-    quotaWindowId(entry.provider, item.id, item.scope ?? "all") === window.id &&
-    (entry.provider !== "opencode-go" || item.id !== "five-hour" || window.windowSeconds === 18_000),
-  )).map((window): QuotaWindow => {
+  const windows = entry.windows.map((window): QuotaWindow => {
     if (!("percentRemaining" in window)) return window;
     const found = returned.filter((item) =>
       quotaWindowId(entry.provider, item.id, item.scope ?? "all") === window.id &&
@@ -142,7 +138,6 @@ const standaloneSubquo = (
 ): ReadonlyArray<QuotaProvider> => matchSubquo(snapshot, mappings).flatMap(({ mapping, observation }) => {
   if (!freshAt(observation, now)) return [];
   const windows = observation.windows.flatMap((window): ReadonlyArray<QuotaWindow> => {
-    if (window.status === "not_returned") return [];
     const id = quotaWindowId(mapping.provider, window.id, window.scope ?? "all");
     if (id === undefined || window.percentLeft === null || window.resetsAt === null) return [];
     const shape = windowShape(id, window.id);

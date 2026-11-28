@@ -68,7 +68,7 @@ describe("subquo quota account mappings", () => {
     expect(opencodeWindow("five-hour", "rolling")).toBe(37);
   });
 
-  test("does not show a quota-axi measurement when subquo says the window was not returned", () => {
+  const claudeWindows = (windows: ReadonlyArray<unknown>) => {
     const subquo = {
       version: "subquo.v1",
       writtenAt: "2026-11-22T20:00:30.000Z",
@@ -77,19 +77,23 @@ describe("subquo quota account mappings", () => {
         observation: {
           status: "fresh", source: "provider", observedAt: "2026-11-22T20:00:00.000Z",
           validUntil: "2026-11-22T20:02:00.000Z",
-          windows: [
-            { id: "weekly", scope: "all", percentLeft: 35, resetsAt: "2026-11-28T12:00:00.000Z" },
-            { id: "five-hour", percentLeft: null, resetsAt: null, status: "not_returned" },
-          ],
+          windows,
         },
       }],
     };
     const result = overlaySubquo(report, subquo, [mapping], now);
     const entry = result.providers.find((item) => item.provider === "claude" && !("kind" in item));
     if (entry === undefined || "kind" in entry) throw new Error("Claude account missing");
-    expect(entry.windows.find((window) => window.id === "five_hour")).toBeUndefined();
-    const week = entry.windows.find((window) => window.id === "seven_day");
-    expect(week && "percentRemaining" in week ? week.percentRemaining : undefined).toBe(35);
+    return entry.windows;
+  };
+
+  test("keeps the quota-axi window as for an absent window instead of dropping it when subquo did not return it", () => {
+    const weekly = { id: "weekly", scope: "all", percentLeft: 35, resetsAt: "2026-11-28T12:00:00.000Z" };
+    const notReturned = claudeWindows([weekly, { id: "five-hour", percentLeft: null, resetsAt: null, status: "not_returned" }]);
+    const original = report.providers.find((item) => item.provider === "claude" && !("kind" in item));
+    if (original === undefined || "kind" in original) throw new Error("Claude account missing");
+    expect(notReturned).toEqual(claudeWindows([weekly]));
+    expect(notReturned.find((window) => window.id === "five_hour")).toEqual(original.windows.find((window) => window.id === "five_hour"));
   });
 
   test("keeps quota-axi instead of using an expired subquo reading", () => {
