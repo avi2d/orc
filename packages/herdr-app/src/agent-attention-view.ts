@@ -4,7 +4,7 @@ import { section } from "./ask-view"
 import { button, card } from "./kit"
 import type { AttentionItem, DecidedAttention } from "./guard-attention"
 import type { AgentAttention } from "./inbox-read"
-import { linkedText } from "./links-view"
+import { linkedCardText } from "./links-view"
 import type { palette } from "./palette"
 
 type Palette = ReturnType<typeof palette>
@@ -12,8 +12,8 @@ type Palette = ReturnType<typeof palette>
 const pendingView = (t: Palette, item: AttentionItem): Element =>
   card().id(`pending-${item.id}`).gap(4).p(12).min_w_0()
     .child(div().font_semibold().child(`${item.task} · With the agent`))
-    .child(linkedText(`pending-text-${item.id}`, item.subject ?? item.text).whitespace_normal())
-    .child(section(t, "Basis", linkedText(`pending-basis-${item.id}`, item.decision?.basis ?? "The attention record assigns this item to the agent.").whitespace_normal()))
+    .child(linkedCardText(`pending-text-${item.id}`, item.subject ?? item.text).whitespace_normal())
+    .child(section(t, "Basis", linkedCardText(`pending-basis-${item.id}`, item.decision?.basis ?? "The attention record assigns this item to the agent.").whitespace_normal()))
 
 type Decider = DecidedAttention["answer"]["decider"]
 type Decision = NonNullable<DecidedAttention["decision"]>
@@ -37,17 +37,17 @@ const decidedView = (t: Palette, item: DecidedAttention, answer: DecidedAttentio
   const id = `${replaced ? "replaced" : "decided"}-${item.id}`
   return card().id(id).gap(4).p(12).min_w_0()
     .child(div().font_semibold().child(`${item.task}${answer.inferred ? " · inferred" : ""}`))
-    .child(linkedText(`${id}-text`, item.text).whitespace_normal())
-    .child(section(t, replaced ? "Replaced answer" : "Answer", linkedText(`${id}-answer`, answer.words).whitespace_normal()))
-    .children(basisOf(item, answer.decider).map((basis) => section(t, "Basis", linkedText(`${id}-basis`, basis).whitespace_normal())))
+    .child(linkedCardText(`${id}-text`, item.text).whitespace_normal())
+    .child(section(t, replaced ? "Replaced answer" : "Answer", linkedCardText(`${id}-answer`, answer.words).whitespace_normal()))
+    .children(basisOf(item, answer.decider).map((basis) => section(t, "Basis", linkedCardText(`${id}-basis`, basis).whitespace_normal())))
 }
 
 const unansweredView = (t: Palette, item: DecidedAttention, decision: Decision): Element =>
   card().id(`agent-decision-${item.id}`).gap(4).p(12).min_w_0()
     .child(div().font_semibold().child(item.task))
-    .child(linkedText(`agent-decision-text-${item.id}`, item.text).whitespace_normal())
+    .child(linkedCardText(`agent-decision-text-${item.id}`, item.text).whitespace_normal())
     .child(section(t, "Decision", div().whitespace_normal().child(decisionWords[decision.kind])))
-    .child(section(t, "Basis", linkedText(`agent-decision-basis-${item.id}`, decision.basis).whitespace_normal()))
+    .child(section(t, "Basis", linkedCardText(`agent-decision-basis-${item.id}`, decision.basis).whitespace_normal()))
 
 const agentDecisionWithoutAnswer = (item: DecidedAttention): Decision | null =>
   item.decision?.decider === "agent" && item.answer.decider !== "agent" && item.overturned?.decider !== "agent" ? item.decision : null

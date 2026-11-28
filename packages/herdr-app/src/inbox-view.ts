@@ -4,7 +4,7 @@ import { type Sent, failureLine, optionView, section, sendOrc } from "./ask-view
 import { button, card, fieldWithButton, kbd, radio, zinc } from "./kit"
 import { type InboxApproval, type InboxItem, choice, inboxArgv, optionByNumber } from "./inbox"
 import { hasLinks } from "./links"
-import { linkedText } from "./links-view"
+import { linkedCardText } from "./links-view"
 import type { palette } from "./palette"
 import { shortTime } from "./task"
 import { type AskOption, whoLabel } from "./thread"
@@ -201,10 +201,10 @@ export class InboxAnswers {
       .child(hasOptionLinks ? pick(radioTarget) : radioTarget)
       .child(v_flex().flex_1().min_w_0().gap(2)
         .child(h_flex().gap(8).items_center()
-          .child(linkedText(`${id}-text`, option.text).text_size(13).font_weight(500).text_color(checked ? t.foreground : zinc.muted).whitespace_normal())
+          .child(linkedCardText(`${id}-text`, option.text).text_size(13).font_weight(500).text_color(checked ? t.foreground : zinc.muted).whitespace_normal())
           .children(option.text === item.recommendation ? [div().text_size(12).text_color(t.muted).child("Recommended")] : []))
-        .child(linkedText(`${id}-outcome`, outcome).text_size(12).text_color(t.muted).whitespace_normal())
-        .children(option.picture === null ? [] : [linkedText(`${id}-picture`, `Picture: ${option.picture}`).text_size(12).text_color(t.dim).whitespace_normal()]))
+        .child(linkedCardText(`${id}-outcome`, outcome).text_size(12).text_color(t.muted).whitespace_normal())
+        .children(option.picture === null ? [] : [linkedCardText(`${id}-picture`, `Picture: ${option.picture}`).text_size(12).text_color(t.dim).whitespace_normal()]))
       .children(index < keyedOptions ? [hasOptionLinks ? pick(number.id(`${id}-number`)) : number] : [])
     return !enabled ? row.opacity(0.5) : hasOptionLinks ? row : pick(row)
   }
@@ -229,12 +229,12 @@ export class InboxAnswers {
       .child(h_flex().gap(8).text_size(12).flex_wrap()
         .child(div().text_color(t.muted).child(asked))
         .children(item.overdueSeconds === undefined ? [] : [div().text_color(t.blocked).child(`Overdue · Waited ${ageLabel(item.overdueSeconds)}`)]))
-      .child(linkedText(`ask-question-${item.key}`, ask.question).font_weight(600).whitespace_normal())
-      .children(ask.context === null ? [] : [linkedText(`ask-context-${item.key}`, ask.context).whitespace_normal()])
+      .child(linkedCardText(`ask-question-${item.key}`, ask.question).font_weight(600).whitespace_normal())
+      .children(ask.context === null ? [] : [linkedCardText(`ask-context-${item.key}`, ask.context).whitespace_normal()])
       .child(ask.options.length === 0 ? div().text_size(12).text_color(t.muted).child("No options recorded")
         : v_flex().gap(2).children(ask.options.map((option, index) => this.optionRow(t, item, option, index, askMerge))))
       .children(item.recommendation === null || ask.options.some((option) => option.text === item.recommendation) ? []
-        : [linkedText(`ask-recommendation-${item.key}`, `Recommended: ${item.recommendation}`).text_size(12).text_color(t.muted).whitespace_normal()])
+        : [linkedCardText(`ask-recommendation-${item.key}`, `Recommended: ${item.recommendation}`).text_size(12).text_color(t.muted).whitespace_normal()])
       .children(item.action.kind !== "event" ? [] : [div().text_size(12).text_color(t.muted).whitespace_normal().child("An answer records your choice. It does not run the command in the outcome.")])
       .children(this.askActions(t, item))
       .children(failureLine(t, this.sent.get(item.key)))
@@ -249,7 +249,7 @@ export class InboxAnswers {
     })
     return v_flex().gap(3).min_w_0().items_start()
       .child(display)
-      .child(linkedText(`option-outcome-${item.key}-${option.letter}`, option.outcome ?? "No outcome recorded").text_color(t.muted).whitespace_normal())
+      .child(linkedCardText(`option-outcome-${item.key}-${option.letter}`, option.outcome ?? "No outcome recorded").text_color(t.muted).whitespace_normal())
   }
 
   actions(t: Palette, item: InboxItem, askMerge: AskMerge): ReadonlyArray<Element> {
@@ -268,19 +268,19 @@ export class InboxAnswers {
     return card().id(`item-${item.key}`).gap(6).p(12).min_w_0().flex_shrink_0()
       .child(h_flex().gap(8).flex_wrap()
         .child(div().font_semibold().child(item.task))
-        .child(linkedText(`title-${item.key}`, item.title).min_w_0().text_color(t.muted).whitespace_normal()))
+        .child(linkedCardText(`title-${item.key}`, item.title).min_w_0().text_color(t.muted).whitespace_normal()))
       .child(h_flex().gap(6).text_size(12).flex_wrap()
         .child(div().font_semibold().child(whoLabel(item)))
         .child(div().text_color(t.muted).child(inboxKind[item.kind]))
         .children(item.asked === null ? [] : [div().text_color(t.muted).child(shortTime(item.asked))])
         .children(item.overdueSeconds === undefined ? [] : [div().text_color(t.blocked).child(`Overdue · Waited ${ageLabel(item.overdueSeconds)}`)]))
-      .child(section(t, "About", linkedText(`question-${item.key}`, ask.question).whitespace_normal()))
+      .child(section(t, "About", linkedCardText(`question-${item.key}`, ask.question).whitespace_normal()))
       .child(ask.options.length === 0 ? div().text_color(t.muted).child("No options recorded")
         : section(t, "Options", v_flex().gap(8).children(ask.options.map((option) => this.option(t, item, option, askMerge)))))
       .children(item.action.kind !== "event" ? [] : [div().text_color(t.muted).whitespace_normal().child("An answer records your choice. It does not run the command in the outcome.")])
-      .child(section(t, "Recommendation", linkedText(`recommendation-${item.key}`, item.recommendation ?? "No recommendation recorded").whitespace_normal()))
+      .child(section(t, "Recommendation", linkedCardText(`recommendation-${item.key}`, item.recommendation ?? "No recommendation recorded").whitespace_normal()))
       .children(this.actions(t, item, askMerge))
       .children(failureLine(t, this.sent.get(item.key)))
-      .children(ask.context === null ? [] : [section(t, "Details", linkedText(`context-${item.key}`, ask.context).whitespace_normal())])
+      .children(ask.context === null ? [] : [section(t, "Details", linkedCardText(`context-${item.key}`, ask.context).whitespace_normal())])
   }
 }

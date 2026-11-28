@@ -135,7 +135,7 @@ export function feedbackPickImages(): Promise<({ path: string } | { error: strin
 export function feedbackAttachImages(paths: string[]): ({ path: string } | { error: string })[];
 export function feedbackClearImages(): null;
 export function sendFeedback(body: import("gpui-kit").HostValue, images?: string[]): Promise<string | null>;
-export function settings(): Record<string, unknown>;
+export function settings(): Record<string, unknown> & { dark: boolean };
 export function keys(): { section: string; keys: string; action: string }[];
 export interface OverlaySpec {
   mod?: string;

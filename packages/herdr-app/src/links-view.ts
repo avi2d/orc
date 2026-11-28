@@ -38,8 +38,11 @@ const linkedLine = (t: LinkPalette, id: string, line: string): Element => {
   return h_flex().flex_wrap().items_start().min_w_0().children(words)
 }
 
-export const linkedText = (id: string, text: string): Element => {
+const linkedTextOn = (surface: Parameters<typeof linkPalette>[0], id: string, text: string): Element => {
   if (!hasLinks(text)) return div().child(text)
-  const t = linkPalette()
+  const t = linkPalette(surface)
   return v_flex().min_w_0().children(text.split("\n").map((line, index) => linkedLine(t, `${id}-link-${index}`, line)))
 }
+
+export const linkedText = (id: string, text: string): Element => linkedTextOn("theme", id, text)
+export const linkedCardText = (id: string, text: string): Element => linkedTextOn("card", id, text)

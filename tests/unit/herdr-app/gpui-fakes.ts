@@ -1,5 +1,6 @@
 import { mock } from "bun:test"
 import type { AsyncContext, Context } from "gpui-kit"
+import type { settings } from "herdr"
 import type { AgentsDocuments } from "../../../packages/herdr-app/src/agents-read"
 import type { InboxDocuments } from "../../../packages/herdr-app/src/inbox-read"
 import fixture from "../../fixtures/attention/herdr-app.json"
@@ -170,7 +171,16 @@ const reply = (line: string): Promise<{ code: number; stdout: string; stderr: st
   return Promise.resolve({ code: 0, stdout: JSON.stringify(document), stderr: "" })
 }
 
-export const appAppearance = { dark: true }
+export const appAppearance: Pick<ReturnType<typeof settings>, "dark"> = { dark: true }
+
+const graphite = {
+  background: "#17191d", surface: "#17191d", chrome: "#101114", raised: "#2c2e31",
+  working: "#e5c07b", blocked: "#f0705f", done: "#76a8ff"
+}
+const paper = {
+  background: "#ffffff", surface: "#ffffff", chrome: "#f1f1ee", raised: "#f6f6f6",
+  working: "#9a6700", blocked: "#c93c2c", done: "#2f6fe4"
+}
 
 void mock.module("herdr", () => ({
   run: (name: string, args: unknown) => ran.push({ name, args }),
@@ -180,7 +190,7 @@ void mock.module("herdr", () => ({
     executed.push(line)
     return line === "orc attention --json" && stalledAttention.pending !== null ? stalledAttention.pending : reply(line)
   },
-  shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => ({}),
+  shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => appAppearance.dark ? graphite : paper,
   settings: () => appAppearance, openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined
 }))
 

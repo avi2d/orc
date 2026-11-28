@@ -37,6 +37,11 @@ const run = "https://github.com/example/project/actions/runs/46077057199"
 const job = `${run}/job/140772971862`
 const otherJob = `${run}/job/140773513101`
 const report = `${pull}: the check ci/e2e (1) ${job}, ci/checks ${otherJob} is red`
+const inboxReport = {
+  key: "example/report", task: "example", title: "Example", kind: "event", who: "beat", asked: null, recommendation: null,
+  ask: { question: `The PR ${pull}`, context: `${report}. Run: ${run}.`, options: [] },
+  action: { kind: "event", id: "example" }
+} satisfies InboxItem
 
 test("detects the pull request and both jobs in a Beat report without swallowing the colon or comma", () => {
   expect(textParts(report)).toEqual([
@@ -96,20 +101,16 @@ const styled = (link: Node, state: "hover" | "focus"): Node => {
 test("passes exact report URLs to the native open action instead of plain text or punctuated targets", async () => {
   const { InboxAnswers } = await import("../../../packages/herdr-app/src/inbox-view")
   const { palette } = await import("../../../packages/herdr-app/src/palette")
-  const item: InboxItem = {
-    key: "example/report", task: "example", title: "Example", kind: "event", who: "beat", asked: null, recommendation: null,
-    ask: { question: `The PR ${pull}`, context: `${report}. Run: ${run}.`, options: [] },
-    action: { kind: "event", id: "example" }
-  }
   const answers = new InboxAnswers(() => undefined)
-  for (const view of [answers.item(palette(), item, () => undefined), answers.askCard(palette(), item, () => undefined)]) {
+  const t = palette()
+  for (const view of [answers.item(t, inboxReport, () => undefined), answers.askCard(t, inboxReport, () => undefined)]) {
     expect(nativeLinks(view).map((link) => argument(link, "href"))).toEqual([pull, pull, job, otherJob, run])
   }
 })
 
 const channel = (color: string, at: number): number => {
   const value = Number.parseInt(color.slice(at, at + 2), 16) / 255
-  return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
 }
 
 const luminance = (color: string): number => 0.2126 * channel(color, 1) + 0.7152 * channel(color, 3) + 0.0722 * channel(color, 5)
@@ -125,27 +126,45 @@ const colorOf = (view: Node, call: "text_color" | "bg"): string => {
   return color
 }
 
-test("draws readable link colours in each appearance instead of a status colour or the dark blue on a light theme", async () => {
+const checkLinkContrast = (link: Node, surfaces: ReadonlyArray<string>): void => {
+  const rest = colorOf(link, "text_color")
+  const hover = colorOf(styled(link, "hover"), "text_color")
+  const focus = styled(link, "focus")
+  expect(hover).not.toBe(rest)
+  for (const surface of surfaces) {
+    expect(contrast(rest, surface)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(hover, surface)).toBeGreaterThanOrEqual(4.5)
+  }
+  expect(contrast(colorOf(focus, "text_color"), colorOf(focus, "bg"))).toBeGreaterThanOrEqual(4.5)
+}
+
+test("keeps dark cards readable in a light app and never uses the theme's status colours for links", async () => {
+  const { InboxAnswers } = await import("../../../packages/herdr-app/src/inbox-view")
   const { linkedText } = await import("../../../packages/herdr-app/src/links-view")
   const { palette } = await import("../../../packages/herdr-app/src/palette")
-  for (const look of [{ dark: true, background: "#282c34" }, { dark: false, background: "#fafafa" }]) {
-    appAppearance.dark = look.dark
+  const answers = new InboxAnswers(() => undefined)
+  for (const dark of [true, false]) {
+    appAppearance.dark = dark
     try {
-      const link = nativeLinks(linkedText("job", job)).at(0)
-      if (link === undefined) throw new Error("Missing job link")
-      const rest = colorOf(link, "text_color")
-      if (look.dark) expect(rest).toBe("#74ade8")
-      const { working, blocked, done } = palette()
-      expect([working, blocked, done]).not.toContain(rest)
-      expect(contrast(rest, look.background)).toBeGreaterThanOrEqual(4.5)
-      expect(link.calls.map(({ name }) => name)).toContain("underline")
-      expect(link.calls.map(({ name }) => name)).toContain("cursor_pointer")
-      expect(argument(link, "tab_stop")).toBe(true)
-      const hover = colorOf(styled(link, "hover"), "text_color")
-      expect(hover).not.toBe(rest)
-      expect(contrast(hover, look.background)).toBeGreaterThanOrEqual(4.5)
-      const focus = styled(link, "focus")
-      expect(contrast(colorOf(focus, "text_color"), colorOf(focus, "bg"))).toBeGreaterThanOrEqual(4.5)
+      const t = palette()
+      const statusColors = [t.working, t.blocked, t.done]
+      const themedLink = nativeLinks(linkedText("job", job)).at(0)
+      if (themedLink === undefined) throw new Error("Missing themed job link")
+      const card = answers.askCard(t, inboxReport, () => undefined)
+      const cardNode = nodes.get(card)
+      const cardLink = nativeLinks(card).find((link) => argument(link, "href") === job)
+      if (cardNode === undefined || cardLink === undefined) throw new Error("Missing report card or job link")
+      const cardSurface = colorOf(cardNode, "bg")
+      expect(cardSurface).toBe("#1f1f22")
+      checkLinkContrast(cardLink, [cardSurface])
+      checkLinkContrast(themedLink, [t.background, t.surface, t.chrome, t.raised])
+      expect(colorOf(cardLink, "text_color")).toBe("#74ade8")
+      for (const link of [themedLink, cardLink]) {
+        expect(statusColors).not.toContain(colorOf(link, "text_color"))
+        expect(link.calls.map(({ name }) => name)).toContain("underline")
+        expect(link.calls.map(({ name }) => name)).toContain("cursor_pointer")
+        expect(argument(link, "tab_stop")).toBe(true)
+      }
     } finally {
       appAppearance.dark = true
     }

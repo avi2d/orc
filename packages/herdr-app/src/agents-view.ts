@@ -11,7 +11,7 @@ import type { RunsActions } from "./runs-view"
 import type { Show, ShownStep } from "./guard"
 import type { InboxApproval } from "./inbox"
 import { type AlertShown, alert, button, card as kitCard, fieldWithButton, statusDot, tab } from "./kit"
-import { linkedText } from "./links-view"
+import { linkedCardText, linkedText } from "./links-view"
 import { type Reading, readText } from "./orc-read"
 import type { palette } from "./palette"
 import { type Turn } from "./turns"
@@ -77,7 +77,7 @@ const approveBody = (t: Palette, card: Card, approval: InboxApproval, merge: Mer
   const shown = approvalShown(merge, card.merge)
   return kitCard().p(12).gap(8)
     .child(div().text_size(12).text_color(t.muted).child(`Approve and merge runs orc ${approval.action.argv.join(" ")}.`))
-    .child(linkedText(`approve-${card.key}`, approval.link))
+    .child(linkedCardText(`approve-${card.key}`, approval.link))
     .child(h_flex().pt(4).gap(8).justify_end()
       .child(openOnGitHub(t, approval.link))
       .child(button(t, "approve-merge", shown.button, "primary", 32, merging ? null : () => act.askMerge(card, approval))))
@@ -92,9 +92,10 @@ interface SendBackShown {
 
 const sendBackBody = (t: Palette, card: Card, back: SendBackShown, withLink: boolean): ReadonlyArray<Element> => {
   const sent = back.sent
+  const resultText = card.sendBack === null ? linkedText : linkedCardText
   const said = sent === null ? [] : [sent.kind === "failed"
     ? alert(t, "send-back-failed", { tone: "error", title: "Could not send it back", body: sent.reason })
-    : linkedText("send-back-result", sent.kind === "reading" ? "Sending it back" : sent.value.trim()).text_size(12).text_color(t.muted).whitespace_normal()]
+    : resultText("send-back-result", sent.kind === "reading" ? "Sending it back" : sent.value.trim()).text_size(12).text_color(t.muted).whitespace_normal()]
   if (card.sendBack === null) return sent?.kind === "ok" ? said : []
   const ready = sendBackArgs(card, back.review.value()) !== null && sent?.kind !== "reading"
   const label = sent?.kind === "reading" ? "Sending back" : "Send back"
