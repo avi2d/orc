@@ -42,8 +42,10 @@ The Resources tab refreshes in the background, and the other tabs refresh while 
 Each tab shows a reason when a command fails.
 Click an underlined link in any tab to open it in your browser.
 
-The **Design system** button in the top bar switches to the `orc-design-system` layout, which shows Orc's colours and sample components with sample data only.
-To open it directly, run `herdr-app do layout.switch --name orc-design-system`.
+## Open the design system gallery
+
+Select **Design system** in the Orc top bar to see Orc's colours and components with sample data.
+To open the gallery directly, run `herdr-app do layout.switch --name orc-design-system`.
 To return, select **Back to Orc**, press Escape, or run `herdr-app do layout.switch --name orc`.
 
 ## Answer in the Inbox
