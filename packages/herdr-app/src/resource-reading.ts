@@ -33,7 +33,7 @@ export const resourceReading = <A>(report: string, guard: Guard<A>): Refreshed<T
       let doc: unknown
       try { doc = JSON.parse(result.value) } catch { return failed(`orc-dash report ${report} printed invalid JSON`) }
       const reading = saved(doc, guard)
-      if (reading.kind === "refused") return failed(`orc-dash report ${report} printed a report this view cannot read: ${reading.reason}`)
+      if (reading.kind === "refused") return failed(`orc-dash report ${report} printed a document this view cannot read: ${reading.reason}`)
       setShared(key, doc)
       last = reading.value
       return reading.value

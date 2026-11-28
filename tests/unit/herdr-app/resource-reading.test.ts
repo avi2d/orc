@@ -35,10 +35,10 @@ test("a report the view refuses names the field instead of only saying the repor
   try {
     documents.set(command, { schemaVersion: 1, generatedAt: "2026-01-03T11:00:00Z" })
     expect(await resourceReading(report, subscriptionsSnapshot).load())
-      .toEqual({ kind: "failed", reason: command + " printed a report this view cannot read: sources is missing" })
+      .toEqual({ kind: "failed", reason: command + " printed a document this view cannot read: sources is missing" })
     documents.set(command, { schemaVersion: 1, sources: {} })
     expect(await resourceReading(report, subscriptionsSnapshot).load())
-      .toEqual({ kind: "failed", reason: command + " printed a report this view cannot read: generatedAt is missing" })
+      .toEqual({ kind: "failed", reason: command + " printed a document this view cannot read: generatedAt is missing" })
   } finally {
     documents.delete(command)
     sharedValues.delete("orc.resources." + report)
