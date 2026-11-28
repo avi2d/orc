@@ -90,7 +90,7 @@ const expectRoleArgv = (role: "implementer" | "fixer" | "reviewer", argv: Readon
 describe("runPi", () => {
   for (const agentDir of ["run", "inherited", "home", "default"] as const) {
     for (const installed of [true, false]) {
-      test("passes -e only for an installed cap with " + agentDir + " agent dir and " + (installed ? "an installed" : "a missing") + " cap", async () => {
+      test((installed ? "passes the cap with -e when it is installed" : "passes no -e when the cap is missing") + ", with the " + agentDir + " agent dir", async () => {
         await withFakePi((fixture) => [emit(header), 'printf \'%s\' "$PI_CODING_AGENT_DIR" > ' + quoted(join(fixture.dir, "agent-dir"))], async (fixture) => {
           const cap = join(fixture.dir, ".pi", "agent", "extensions", "tool-time-cap.ts")
           if (installed) {
