@@ -30,7 +30,9 @@ export const machineOverviewDocument = <Runs>(
       status: "ok",
       machines: machines.map(({ name, reading }) => ({
         name,
-        reading: mapOutcome(reading, ({ machine: { cpu, load, memory, disk } }) => ({ machine: { cpu, load, memory, disk } })),
+        reading: mapOutcome(reading, ({ machine: { cpu, load, memory, disk } }) => ({
+          machine: disk === undefined ? { cpu, load, memory } : { cpu, load, memory, disk },
+        })),
       })),
     },
     queues: { status: "ok", machines: counts },
