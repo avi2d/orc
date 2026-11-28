@@ -17,7 +17,7 @@ test("does not refuse sources without a build or dock the gallery on first launc
     const result = await Effect.runPromise(installApp(ready, home).pipe(Effect.provide(BunServices.layer)))
     const mods = ["orc-agents", "orc-board", "orc-changes", "orc-design-system", "orc-drawer", "orc-inbox", "orc-resources", "orc-tabs", "orc-task"]
     expect(result.mods).toEqual(mods)
-    expect(result.layouts).toEqual(["orc.json", "orc.svg"])
+    expect(result.layouts).toEqual(["orc-design-system.json", "orc.json", "orc.svg"])
     expect(result.added).toEqual([
       { section: "layout:orc", key: "cmd-1" },
       { section: "layout:orc", key: "cmd-2" },
@@ -28,7 +28,7 @@ test("does not refuse sources without a build or dock the gallery on first launc
     expect((await readdir(join(home, "mods"))).sort()).toEqual(mods)
     const gallery: unknown = JSON.parse(await readFile(join(home, "mods", "orc-design-system", "mod.json"), "utf8"))
     expect(gallery).toMatchObject({ place: "none" })
-    expect((await readdir(join(home, "layouts"))).sort()).toEqual(["orc.json", "orc.svg"])
+    expect((await readdir(join(home, "layouts"))).sort()).toEqual(["orc-design-system.json", "orc.json", "orc.svg"])
     const keys: unknown = JSON.parse(await readFile(join(home, "keys.json"), "utf8"))
     expect(keys).toEqual({
       "layout:orc": {

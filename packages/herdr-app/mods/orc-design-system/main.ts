@@ -1,12 +1,11 @@
 import { type AsyncContext, type Color, type Context, type Element, type FocusHandle, View, div } from "gpui-kit"
-import { Button, Input, InputState, h_flex, v_flex } from "gpui-base"
-import { closeOverlay, props, themes } from "herdr"
+import { InputState, h_flex, v_flex } from "gpui-base"
+import { run, themes } from "herdr"
 import { monospace } from "../../src/fonts"
 import { GalleryExample } from "../../src/gallery-example"
 import { findGalleryStories } from "../../src/gallery-selection"
 import { type GalleryStory, galleryControlHeights, galleryStories } from "../../src/gallery-stories"
-import { fields } from "../../src/guard"
-import { button } from "../../src/kit"
+import { button, field, tab } from "../../src/kit"
 import { alertColors, dotColour, tw, zinc } from "../../src/kit-colors"
 import { type Palette, resolvePalette } from "../../src/palette-values"
 import { palette } from "../../src/palette"
@@ -24,8 +23,26 @@ const heading = (words: string): Element => div().font_semibold().text_size(15).
 
 const muted = (t: Palette, words: string): Element => div().text_size(12).text_color(t.muted).whitespace_normal().child(words)
 
-const choice = (id: string, label: string, pressed: boolean, act: (cx: Context) => void): Element =>
-  Button.new(id).pressed(pressed).child(label).on_click((_event, cx) => act(cx))
+const previewWidth = 320
+
+const widths = [
+  { id: "gallery-width-full", label: "Full width", narrow: false },
+  { id: "gallery-narrow", label: `${previewWidth} px preview`, narrow: true }
+] as const
+
+const leaveGallery = (): void => {
+  run("layout.switch", { name: "orc" })
+}
+
+const catalogEntry = (t: Palette, story: GalleryStory, chosen: boolean, choose: (cx: Context) => void): Element =>
+  h_flex().id(`choose-${story.id}`).h(28).flex_none().px(8).gap(6).items_center().rounded(6).cursor_pointer()
+    .when(chosen, (row) => row.bg(t.selected))
+    .hover((style) => style.bg(chosen ? t.selected : zinc.s2))
+    .tooltip(story.id)
+    .accessibility_label(`${story.component}: ${story.label}`)
+    .on_click((_event, cx) => choose(cx))
+    .child(div().flex_none().text_size(12).text_color(t.muted).child(story.component))
+    .child(div().flex_1().min_w_0().truncate().text_color(t.foreground).child(story.label))
 
 const swatchSet = (t: Palette, label: string, values: ReadonlyArray<readonly [string, Color]>): Element =>
   v_flex().gap(8).child(heading(label)).child(h_flex().flex_wrap().gap(8).children(values.map(([name, value]) =>
@@ -69,16 +86,11 @@ export default class OrcDesignSystem extends View {
   private readonly search = InputState.new({ placeholder: "Find an example" })
   private readonly fixture = new GalleryExample()
   private readonly presetColours = new Map<Preset, Palette>()
-  private overlay: string | null = null
   private focusHandle: FocusHandle | null = null
 
   override init(_props: unknown, cx: AsyncContext): void {
     this.focusHandle = cx.focus_handle()
     this.focusHandle.focus()
-    const received = fields(props(), "")
-    if (received.kind !== "refused" && typeof received.value["overlay"] === "string") {
-      this.overlay = received.value["overlay"]
-    }
     const available = themes()
     for (const name of presets) {
       const preset = available.find((value) => value.name === name)
@@ -97,48 +109,43 @@ export default class OrcDesignSystem extends View {
     this.focusHandle?.release()
   }
 
-  private closeWindow(): void {
-    if (this.overlay !== null) closeOverlay(this.overlay)
-  }
-
   private toolbar(t: Palette): Element {
     const previews: ReadonlyArray<Preview> = ["active", ...this.presetColours.keys()]
-    return v_flex().gap(8).px(12).pb(10).bg(t.chrome).border_b(1).border_color(t.border)
-      .child(h_flex().gap(6).flex_wrap().children(pages.map((page, index) =>
-        choice(`gallery-page-${index}`, page, this.page === page, (cx) => { this.page = page; cx.notify() }))))
-      .child(h_flex().gap(6).flex_wrap().children(previews.map((preview) =>
-        choice(`gallery-theme-${preview}`, previewLabels[preview], this.preview === preview,
-          (cx) => { this.preview = preview; cx.notify() }))))
+    return v_flex().flex_none().gap(8).px(12).py(8).bg(t.chrome).border_b(1).border_color(t.border)
+      .child(h_flex().gap(16).flex_wrap()
+        .child(h_flex().gap(4).children(pages.map((page, index) =>
+          tab(t, `gallery-page-${index}`, page, this.page === page, (cx) => { this.page = page; cx.notify() }))))
+        .child(h_flex().gap(4).children(previews.map((preview) =>
+          tab(t, `gallery-theme-${preview}`, previewLabels[preview], this.preview === preview,
+            (cx) => { this.preview = preview; cx.notify() })))))
       .children(this.preview === "active" ? [] : [muted(t, "The preview changes Orc colours only. Native inputs still use the active Herdr theme.")])
   }
 
   private catalog(t: Palette): Element {
     const matches = findGalleryStories(this.search.value())
-    return v_flex().w(200).min_w(142).gap(8).p(10).min_h_0().border_r(1).border_color(t.border)
-      .child(Input.new(this.search).w_full().accessibility_label("Find an example"))
-      .child(v_flex().id("gallery-catalog").flex_1().min_h_0().overflow_y_scrollbar().gap(4)
+    return v_flex().id("gallery-sidebar").w(240).flex_none().h_full().min_h_0().gap(8).p(10).bg(t.chrome).border_r(1).border_color(t.border)
+      .child(h_flex().h(32).flex_none().child(field(this.search, 32)))
+      .child(v_flex().id("gallery-catalog").flex_1().min_h_0().overflow_y_scrollbar().gap(2)
         .children(matches.length === 0 ? [muted(t, "No examples match your search.")] : matches.map((story) =>
-          Button.new(`choose-${story.id}`).pressed(story.id === this.story.id).w_full().min_w_0()
-            .accessibility_label(`${story.component}: ${story.label}`)
-            .child(div().min_w_0().truncate().child(`${story.component} · ${story.label}`))
-            .on_click((_event, cx) => {
-              if (this.story.id === story.id) return
-              this.story = story
-              this.fixture.reset(story, cx)
-            }))))
+          catalogEntry(t, story, story.id === this.story.id, (cx) => {
+            if (this.story.id === story.id) return
+            this.story = story
+            this.fixture.reset(story, cx)
+          }))))
   }
 
   private example(t: Palette): Element {
     const story = this.story
-    const sample = v_flex().id("gallery-specimen").w_full().min_w_0().p(12).gap(8).bg(t.surface)
+    const frame = v_flex().id("gallery-specimen").items_start().p(12).gap(8).bg(t.surface)
       .rounded(8).border(1).border_color(t.border).overflow_x_scrollbar()
       .child(this.fixture.render(t, story))
-    const tools = h_flex().gap(6).flex_wrap()
-      .child(choice("gallery-narrow", "320 px preview", this.narrow, (cx) => { this.narrow = !this.narrow; cx.notify() }))
-      .child(Button.new("gallery-reset").child("Reset example").on_click((_event, cx) => this.fixture.reset(story, cx)))
-    return v_flex().id("gallery-example").flex_1().min_w_0().min_h_0().overflow_y_scrollbar().p(12).gap(8)
+    const tools = h_flex().gap(16).flex_wrap()
+      .child(h_flex().gap(4).children(widths.map((width) =>
+        tab(t, width.id, width.label, this.narrow === width.narrow, (cx) => { this.narrow = width.narrow; cx.notify() }))))
+      .child(button(t, "gallery-reset", "Reset example", "secondary", 24, (cx) => this.fixture.reset(story, cx)))
+    return v_flex().id("gallery-example").flex_1().min_w_0().h_full().min_h_0().overflow_y_scrollbar().p(12).gap(8)
       .child(heading(story.label)).child(muted(t, story.id)).child(tools)
-      .child(this.narrow ? sample.max_w(320) : sample)
+      .child(this.narrow ? frame.w(previewWidth).max_w_full() : frame.w_full())
       .children(this.fixture.receipt === null ? [] : [div().id("gallery-receipt").text_color(t.muted).whitespace_normal().child(this.fixture.receipt)])
   }
 
@@ -146,7 +153,7 @@ export default class OrcDesignSystem extends View {
     const active = palette()
     const t = this.preview === "active" ? active : this.presetColours.get(this.preview) ?? active
     const content = this.page === "Examples"
-      ? h_flex().flex_1().min_h_0().min_w_0().child(this.catalog(t)).child(this.example(t))
+      ? h_flex().flex_1().min_h_0().min_w_0().items_start().child(this.catalog(t)).child(this.example(t))
       : v_flex().id("gallery-reference").flex_1().min_h_0().overflow_y_scrollbar().p(12)
         .child(this.page === "Colours" ? colours(t) : typeAndSpacing(t, this.pressedHeight, (height, cx) => {
           this.pressedHeight = height
@@ -157,17 +164,15 @@ export default class OrcDesignSystem extends View {
     return focused
       .on_key_down((event, cx) => {
         if (event.key !== "escape") return
-        if (!this.fixture.dismissSelect(cx)) this.closeWindow()
+        if (!this.fixture.dismissSelect(cx)) leaveGallery()
         cx.stop_propagation()
       })
-      .child(h_flex().gap(8).p(12).items_center().bg(t.chrome)
+      .child(h_flex().flex_none().gap(8).px(12).py(10).items_center().bg(t.chrome)
         .child(v_flex().flex_1().min_w_0().gap(2)
           .child(heading("Orc Design System"))
           .child(muted(t, "Examples use sample data. No Orc task can change here.")))
-        .children(this.overlay === null ? [] : [Button.new("gallery-close").child("Close")
-          .on_mouse_down("left", (_event, cx) => cx.stop_propagation())
-          .on_click(() => this.closeWindow())]))
-      .child(v_flex().flex_1().min_h_0().min_w_0().on_mouse_down("left", (_event, cx) => cx.stop_propagation())
-        .child(this.toolbar(t)).child(content))
+        .child(button(t, "gallery-back", "Back to Orc", "secondary", 24, leaveGallery)))
+      .child(this.toolbar(t))
+      .child(content)
   }
 }

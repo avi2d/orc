@@ -2,13 +2,27 @@ import { type Context, type Element, div } from "gpui-kit"
 import { Button, InputState, h_flex, v_flex } from "gpui-base"
 import { visibleGalleryRows } from "./gallery-selection"
 import type { GalleryStory } from "./gallery-stories"
-import { alert, button, card, checkIcon, field, fieldWithButton, kbd, radio, selectTrigger, statusDot, tab, vendorLogo } from "./kit"
+import { type MenuChoice, alert, button, card, checkIcon, field, fieldWithButton, groupRow, kbd, menuPanel, radio, runRow, selectTrigger, statusDot, tab, vendorLogo } from "./kit"
 import { linkedText } from "./links-view"
 import type { Palette } from "./palette-values"
 import { uniformRows } from "./rows-list"
+import { runsHeader } from "./run-menus"
 import { type ThreadControls, readOnlyThread, threadDecided, threadEntry } from "./thread-view"
 
-const projects = ["All projects", "Garden", "Orc"] as const
+const projects: ReadonlyArray<MenuChoice> = [
+  { name: "All", count: 12 },
+  { name: "garden", count: 5 },
+  { name: "orchard-runner-with-a-long-project-name", count: 7 },
+  { name: "All runs", count: 20 }
+]
+
+const threadWidth = 460
+
+const specimenWidths = {
+  button: null, field: 320, fieldWithButton: threadWidth, selectTrigger: null, card: threadWidth, tab: null, kbd: null, radio: null,
+  statusDot: null, checkIcon: null, vendorLogo: null, alert: threadWidth, uniformRows: runsHeader.width, linkedText: threadWidth,
+  threadEntry: threadWidth, threadDecided: threadWidth
+} as const satisfies Record<GalleryStory["component"], number | null>
 
 export class GalleryExample {
   input = InputState.new({ placeholder: "Write a sample answer" })
@@ -58,42 +72,36 @@ export class GalleryExample {
   }
 
   private select(t: Palette, story: Extract<GalleryStory, { component: "selectTrigger" }>): Element {
-    const choose = (value: string, cx: Context): void => {
-      this.selectedProject = value
-      this.selectOpen = false
-      this.record(`Sample project: ${value}`, cx)
-    }
-    const trigger = selectTrigger(t, story.id, this.selectedProject ?? story.value, story.size, 176, (cx) => {
-      this.selectOpen = !this.selectOpen
+    const label = this.selectedProject ?? story.value
+    const open = this.selectOpen
+    const trigger = selectTrigger(t, story.id, label, story.size, 176, (cx) => {
+      this.selectOpen = !open
       cx.notify()
     })
-    return v_flex().id("gallery-select-example").gap(4).items_start()
-      .on_mouse_down_out((_event, cx) => { this.dismissSelect(cx) })
+    const menu = menuPanel(t, "gallery-project", projects, (choice) => choice.name === label, (choice, cx) => {
+      this.selectedProject = choice.name
+      this.selectOpen = false
+      this.record(`Sample project: ${choice.name}`, cx)
+    }, (cx) => { this.dismissSelect(cx) })
+    return v_flex().gap(4).items_start()
       .child(trigger)
-      .children(this.selectOpen ? [v_flex().p(4).gap(2).bg(t.raised).rounded(8)
-        .children(projects.map((project, index) => Button.new(`project-${index}`).child(project)
-          .on_click((_event, cx) => choose(project, cx))))] : [])
+      .children(open ? [div().w(runsHeader.menuWidth).max_w_full().child(menu)] : [])
   }
 
   private rows(t: Palette, story: Extract<GalleryStory, { component: "uniformRows" }>): Element {
     const rows = visibleGalleryRows(story, this.folded)
-    return v_flex().h(198).w_full().border(1).border_color(t.border).rounded(8)
+    return v_flex().h(198).w_full().bg(t.chrome).border(1).border_color(t.border).rounded(8)
       .children(rows.length === 0 ? [div().p(8).text_color(t.muted).child("No runs in this example.")] : [])
-      .child(uniformRows(story.id, rows, (row) => row.key, (row) => {
-        const line = h_flex().h(26).px(8).items_center().gap(6).rounded(4)
-          .bg(this.selectedRun === row.key ? t.selected : t.surface)
-          .hover((style) => style.bg(t.hover))
-        return row.kind === "group"
-          ? line.font_semibold().child(this.folded.has(row.key) ? "▸" : "▾").child(row.label)
-          : line.child(statusDot(row.status)).child(div().min_w_0().truncate().child(row.label))
-      }, { x: 6, y: 6 }, (row, cx) => {
+      .child(uniformRows(story.id, rows, (row) => row.key, (row) => row.kind === "group"
+        ? groupRow(t, row.key, row.status, row.count, this.folded.has(row.key))
+        : runRow(t, row.key, row, this.selectedRun === row.key), { x: 6, y: 6 }, (row, cx) => {
         if (row.kind === "group") {
           if (this.folded.has(row.key)) this.folded.delete(row.key)
           else this.folded.add(row.key)
           cx.notify()
         } else {
           this.selectedRun = row.key
-          this.record(`Sample run: ${row.label}`, cx)
+          this.record(`Sample run: ${row.title}`, cx)
         }
       }))
   }
@@ -111,10 +119,16 @@ export class GalleryExample {
   }
 
   render(t: Palette, story: GalleryStory): Element {
+    const drawn = this.draw(t, story)
+    const width = specimenWidths[story.component]
+    return width === null ? drawn : v_flex().w_full().max_w(width).child(drawn)
+  }
+
+  private draw(t: Palette, story: GalleryStory): Element {
     switch (story.component) {
       case "button": return button(t, story.id, "Run example", story.look, story.size,
         story.disabled ? null : (cx) => this.record("Example button pressed.", cx))
-      case "field": return field(this.input, story.size)
+      case "field": return h_flex().child(field(this.input, story.size))
       case "fieldWithButton": return fieldWithButton(this.input, button(t, story.id, story.action === "sending" ? "Sending" : "Send",
         "primary", 32, this.sendAction(story)))
       case "selectTrigger": return this.select(t, story)

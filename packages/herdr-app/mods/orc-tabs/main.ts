@@ -1,6 +1,7 @@
 import { type Element, View, div } from "gpui-kit"
-import { Button, h_flex } from "gpui-base"
-import { layout, openOverlay, run } from "herdr"
+import { h_flex } from "gpui-base"
+import { layout, run } from "herdr"
+import { button } from "../../src/kit"
 import { palette } from "../../src/palette"
 import { activeChild, views, viewsStack } from "../../src/views"
 
@@ -19,8 +20,8 @@ export default class OrcTabs extends View {
           .child(div().text_color(t.dim).child(view.key))
       }))
       .child(div().flex_1())
-      .child(Button.new("open-orc-design-system").flex_shrink_0().child("Design system").on_click(() => {
-        openOverlay({ mod: "orc-design-system", kind: "window", key: "orc-design-system", width: 760, height: 600 })
+      .child(button(t, "open-orc-design-system", "Design system", "ghost", 24, () => {
+        run("layout.switch", { name: "orc-design-system" })
       }))
   }
 }

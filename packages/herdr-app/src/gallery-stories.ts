@@ -1,12 +1,12 @@
 import type { CardStatus } from "./agents"
-import type { AlertShown, ButtonLook, CheckState, ControlSize, Vendor } from "./kit"
+import type { AlertShown, ButtonLook, CheckState, ControlSize, RunRowShown, Vendor } from "./kit"
 import type { AskOption, Thread, ThreadCard, ThreadLine } from "./thread"
 
 type AlertExample = Omit<AlertShown, "actions"> & { readonly actions?: ReadonlyArray<string> }
 
-type GalleryRow =
-  | { readonly kind: "group"; readonly key: string; readonly label: string }
-  | { readonly kind: "run"; readonly key: string; readonly label: string; readonly status: CardStatus }
+export type GalleryRow =
+  | { readonly kind: "group"; readonly key: string; readonly status: CardStatus }
+  | { readonly kind: "run"; readonly key: string } & RunRowShown
 
 type ThreadReply =
   | { readonly kind: "read-only" }
@@ -66,11 +66,13 @@ const question = {
 const reply = entry("user", "answer", answer)
 
 const runs: ReadonlyArray<GalleryRow> = [
-  { kind: "group", key: "attention", label: "Awaiting you" },
-  { kind: "run", key: "garden", label: "Compare colours on Paper", status: "Awaiting you" },
-  { kind: "group", key: "active", label: "Running" },
-  ...Array.from({ length: 24 }, (_, index) => ({
-    kind: "run" as const, key: `run-${index + 1}`, label: `Check the wide layout, run ${index + 1}`, status: "Running" as const
+  { kind: "group", key: "attention", status: "Awaiting you" },
+  { kind: "run", key: "garden", status: "Awaiting you", vendor: "claude", title: "garden-42-compare-colours-on", detail: "question", duration: "3h" },
+  { kind: "group", key: "active", status: "Running" },
+  ...Array.from({ length: 24 }, (_, index): GalleryRow => ({
+    kind: "run", key: `run-${index + 1}`, status: "Running", vendor: index % 2 === 0 ? "claude" : "openai",
+    title: index === 0 ? `${longProject}-7-check-the-wide` : `orc-${index + 100}-check-the-wide`,
+    detail: index % 2 === 0 ? "opus-5-5 h" : "5.5 m", duration: `${index + 1}m`
   }))
 ]
 
@@ -83,7 +85,7 @@ export const galleryStories: ReadonlyArray<GalleryStory> = [
   { id: "field-with-button.empty", label: "Empty answer", component: "fieldWithButton", value: "", action: "send" },
   { id: "field-with-button.ready", label: "Answer ready to send", component: "fieldWithButton", value: answer, action: "send" },
   { id: "field-with-button.sending", label: "Sending an answer", component: "fieldWithButton", value: answer, action: "sending" },
-  { id: "select-trigger.24", label: "24 px project select", component: "selectTrigger", size: 24, value: "All projects" },
+  { id: "select-trigger.24", label: "24 px project select", component: "selectTrigger", size: 24, value: "All" },
   { id: "select-trigger.32.long", label: "32 px long project name", component: "selectTrigger", size: 32, value: longProject },
   { id: "card.inbox", label: "Inbox surface", component: "card", body: "Where should the gallery live?" },
   { id: "tab.active", label: "Active", component: "tab", active: true, disabled: false },

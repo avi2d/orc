@@ -81,8 +81,6 @@ export const executed: Array<string> = []
 export const spawned: Array<Promise<unknown>> = []
 export const ran: Array<{ readonly name: string; readonly args: unknown }> = []
 export const stopped: Array<true> = []
-export const closedOverlays: Array<string> = []
-export const viewProps = new Map<string, unknown>()
 
 let focused: FocusHandle | null = null
 const focusHandle = (): FocusHandle => {
@@ -218,9 +216,7 @@ void mock.module("herdr", () => ({
     return line === "orc attention --json" && stalledAttention.pending !== null ? stalledAttention.pending : reply(line)
   },
   shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => ({}),
-  settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined,
-  props: () => Object.fromEntries(viewProps), themes: () => [],
-  closeOverlay: (key: string) => { closedOverlays.push(key) }
+  settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined, themes: () => []
 }))
 
 interface OpenTask {

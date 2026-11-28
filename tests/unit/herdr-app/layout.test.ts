@@ -26,6 +26,22 @@ test("floats only blocks with content, never a column Herdr refuses with the who
   expect(entries.filter((entry) => !holdsContent(entry))).toEqual([])
 })
 
+const mods = (node: unknown): ReadonlyArray<string> => {
+  if (!isRecord(node)) return []
+  const content = isRecord(node["content"]) && typeof node["content"]["mod"] === "string" ? [node["content"]["mod"]] : []
+  const header = isRecord(node["header"]) ? mods(node["header"]) : []
+  const nested = ["children", "floating"].flatMap((key) => Array.isArray(node[key]) ? node[key].flatMap(mods) : [])
+  return [...content, ...header, ...nested]
+}
+
+test("the design system layout holds only the gallery, and the orc layout never docks the gallery beside the board", async () => {
+  const root = join(import.meta.dir, "../../../packages/herdr-app/layouts")
+  const gallery: unknown = JSON.parse(await readFile(join(root, "orc-design-system.json"), "utf8"))
+  const orc: unknown = JSON.parse(await readFile(join(root, "orc.json"), "utf8"))
+  expect(mods(gallery)).toEqual(["orc-design-system"])
+  expect(mods(orc)).not.toContain("orc-design-system")
+})
+
 const stackChildren = (node: unknown, stack: string): ReadonlyArray<string> => {
   if (!isRecord(node)) return []
   const children = Array.isArray(node["children"]) ? node["children"] : []

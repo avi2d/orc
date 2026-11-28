@@ -8,11 +8,12 @@ test("search finds a multiword example regardless of case instead of including o
   expect(findGalleryStories("unmatched words")).toEqual([])
 })
 
-test("folding one group keeps its header and other groups' runs instead of hiding the rest of the list", () => {
+test("folding one group keeps its header, its run count and other groups' runs instead of hiding the rest of the list", () => {
   const story = findGalleryStories("rows.grouped").find((candidate) => candidate.component === "uniformRows")
   if (story?.component !== "uniformRows") throw new Error("Grouped list fixture is missing")
   const shown = visibleGalleryRows(story, new Set(["attention"]))
   expect(shown.slice(0, 3).map((row) => row.key)).toEqual(["attention", "active", "run-1"])
+  expect(shown.slice(0, 2).map((row) => row.kind === "group" ? row.count : null)).toEqual([1, 24])
   expect(shown.map((row) => row.key)).not.toContain("garden")
   expect(shown.at(-1)?.key).toBe("run-24")
 })

@@ -1,0 +1,7 @@
+{
+  "id": "orc-design-system",
+  "type": "row",
+  "children": [
+    { "id": "orc-design-system-gallery", "type": "block", "content": { "mod": "orc-design-system" } }
+  ]
+}

@@ -54,6 +54,7 @@ const expectedFiles = [
   "dist/reviewer.md",
   "dist/support-check-policy.md",
   "dist/herdr-app/keys.json",
+  "dist/herdr-app/layouts/orc-design-system.json",
   "dist/herdr-app/layouts/orc.json",
   "dist/herdr-app/layouts/orc.svg",
   "dist/herdr-app/mods/orc-agents/icons/LICENSE-Lucide.txt",

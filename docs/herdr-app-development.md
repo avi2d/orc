@@ -36,9 +36,10 @@ Every other command runs the installed orc.
 
 ## Check the design system gallery
 
-Open the Orc layout in your test App and select **Design system** in the top bar.
-The gallery opens as a window, not a layout tab.
+Open the Orc layout in your test App and select **Design system** in the top bar, or run `herdr-app do layout.switch --name orc-design-system`.
+The gallery fills the App as its own `orc-design-system` layout.
 It reads host theme values and uses sample data for all actions.
+To return, select **Back to Orc**, press Escape, or run `herdr-app do layout.switch --name orc`.
 
 1. Search **Examples** for `button.32.primary.enabled`, press the button, and check for a receipt.
    Select `button.32.primary.disabled` and check that it produces no receipt.
@@ -47,7 +48,8 @@ It reads host theme values and uses sample data for all actions.
    Use **Reset example** to restore the starting answer and clear the receipt.
 1. Open `rows.grouped`.
    Fold the first group and check that its run hides while the other group still scrolls.
-1. Compare `thread.delivered` and `linked-text.wrapped` with **320 px preview** both on and off.
+1. Open `select-trigger.24`, open the project menu, and check that Escape closes the menu before it leaves the gallery.
+1. Compare `thread.delivered` and `linked-text.wrapped` with **Full width** and **320 px preview** selected.
    The sample link should show its destination in the gallery without opening a browser.
 1. Capture **Colours** and the examples in the active theme, then with **Graphite** and **Paper** selected.
    Those choices preview Orc colours only.
