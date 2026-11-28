@@ -46,6 +46,10 @@ test("the Machines table reads the running Orc jobs that machine-overview writes
   } })
 })
 
+test("a peer running-orc read gives up after the 20 s the remote pueue read allowed, not the 90 s quota limit", async () => {
+  expect((await countsByMachine(0, 1)).timeouts).toEqual([Duration.seconds(20)])
+})
+
 test("the Subscriptions table shows the per-machine warnings that subscription-overview writes", () => {
   const now = DateTime.makeUnsafe("2026-01-03T11:00:00Z")
   const earlier = DateTime.makeUnsafe("2026-01-03T10:50:00Z")
