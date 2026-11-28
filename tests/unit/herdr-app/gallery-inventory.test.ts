@@ -9,7 +9,7 @@ const graphite = {
   foreground: "#eeeeef", muted: "#98999b", dim: "#696a6d", accent: "#96b2d7",
   working: "#e5c07b", blocked: "#f0705f", done: "#76a8ff", ansi1: "#dc8c95", ansi2: "#a6bd91",
   solid: "#eeeeef", solid_foreground: "#111215"
-}
+} as const
 
 const paper = {
   background: "#ffffff", surface: "#ffffff", chrome: "#f1f1ee", raised: "#f6f6f6",
@@ -17,7 +17,7 @@ const paper = {
   foreground: "#1b1b1e", muted: "#69696b", dim: "#969698", accent: "#1f62d0",
   working: "#9a6700", blocked: "#c93c2c", done: "#2f6fe4", ansi1: "#c62a2a", ansi2: "#1a7f37",
   solid: "#1b1b1e", solid_foreground: "#ffffff"
-}
+} as const
 
 test("resolving Graphite and Paper retains every panel role without leaking terminal-only colours", () => {
   expect(resolvePalette({ ...graphite, ansi0: "#334455" })).toEqual(graphite)
