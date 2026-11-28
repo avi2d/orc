@@ -323,7 +323,6 @@ test("a scroll past the drawn Inbox cards redraws them on the next tick instead 
   }
   measure(view.render())
   const third = inbox.items[2]
-  if (third === undefined) throw new Error("The fixture has fewer than three Inbox items")
   expect(find(view.render(), `space-${third.key}`)).not.toBeNull()
   const notify = spyOn(cx, "notify")
   try {

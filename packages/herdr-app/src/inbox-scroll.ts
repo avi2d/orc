@@ -12,12 +12,16 @@ const metric = (value: unknown, key: string): number | null => {
   return typeof field === "number" && Number.isFinite(field) && field >= 0 ? field : null
 }
 
+const call = (scroll: ScrollHandle, name: "offset" | "viewport_size"): unknown => {
+  const method: unknown = Reflect.get(scroll, name)
+  return typeof method === "function" ? Reflect.apply(method, scroll, []) : null
+}
+
 const viewport = (scroll: ScrollHandle) => {
-  if (!("offset" in scroll) || typeof scroll.offset !== "function" || !("viewport_size" in scroll) || typeof scroll.viewport_size !== "function") return null
-  const size: unknown = scroll.viewport_size()
+  const size = call(scroll, "viewport_size")
   const width = metric(size, "width")
   const height = metric(size, "height")
-  const offset = metric(scroll.offset(), "y")
+  const offset = metric(call(scroll, "offset"), "y")
   return !width || !height || offset === null ? null : { width, height, offset }
 }
 

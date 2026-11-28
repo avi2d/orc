@@ -2,7 +2,11 @@ import { Duration, Effect } from "effect";
 import { decodeJson, mapOutcome, readSubscriptions, selector, SessionMachines, SubscriptionReport, subscriptionOverview, subscriptionReport } from "@avi2dg/orc-schema";
 import { peerReport, preferPeerReport } from "./peer-report";
 
-export const subscriptionOverviewDocument = (...[local, remotes]: Parameters<typeof subscriptionOverview>) => ({
+export const subscriptionOverviewDocument = (...[local, remotes]: Parameters<typeof subscriptionOverview>): {
+  readonly schemaVersion: 1;
+  readonly generatedAt: string;
+  readonly sources: { readonly quota: { readonly status: "ok"; readonly report: ReturnType<typeof subscriptionOverview> } };
+} => ({
   schemaVersion: 1,
   generatedAt: new Date(local.readAt).toISOString(),
   sources: { quota: { status: "ok", report: subscriptionOverview(local, remotes) } },

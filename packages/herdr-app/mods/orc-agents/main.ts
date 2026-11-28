@@ -15,6 +15,7 @@ import { readChanges } from "../../src/changes-read"
 import { show, type Show, type ShownStep } from "../../src/guard"
 import { InboxAnswers, threadBoxes } from "../../src/inbox-view"
 import { type Reading, readJson } from "../../src/orc-read"
+import { readRunFacts } from "../../src/run-facts-read"
 import { palette } from "../../src/palette"
 import { StepOutput } from "../../src/step-output"
 import { thread } from "../../src/task-guard"
@@ -27,7 +28,6 @@ type Palette = ReturnType<typeof palette>
 const everyMs = 4000
 const thisView = "orc-agents"
 const changesBlock = "orc-changes"
-const showsAtOnce = 4
 
 const shown = (): boolean => {
   const active = activeChild(layout(), viewsStack)
@@ -228,20 +228,7 @@ export default class OrcAgents extends View {
     const wanted = this.allCards().flatMap((card) => card.runId !== null && (!this.facts.has(card.runId) || goesOn(card.standing)) ? [card.runId] : [])
     if (this.labelling || wanted.length === 0) return
     this.labelling = true
-    const label = (runId: string): Promise<void> =>
-      readJson("orc", ["show", runId, "--json"], show).then((reading) => {
-        if (reading.kind === "ok") {
-          this.facts.set(runId, runFacts(reading.value))
-        }
-      })
-    const from = (start: number, task: AsyncContext): Promise<void> =>
-      start >= wanted.length
-        ? Promise.resolve()
-        : Promise.all(wanted.slice(start, start + showsAtOnce).map(label)).then(() => {
-          task.notify()
-          return from(start + showsAtOnce, task)
-        })
-    cx.spawn((task) => from(0, task).then(() => {
+    cx.spawn((task) => readRunFacts(wanted, this.facts, () => task.notify()).then(() => {
       this.labelling = false
     }))
   }
