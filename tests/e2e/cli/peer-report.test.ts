@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Effect } from "effect";
+import { Duration, Effect } from "effect";
 import { CommandRunner, ok } from "@avi2dg/orc-schema";
 import { peerReport, preferPeerReport } from "@avi2dg/orc-cli";
 
@@ -9,9 +9,11 @@ for (const report of ["subscriptions", "running-orc"] as const) {
     const argv = peerReport(report, command);
     if (!argv) throw new Error("Missing report command");
     let legacyReads = 0;
-    const result = await Effect.runPromise(preferPeerReport(argv, (text) => ok(text.trim()),
+    const timeouts: Array<Duration.Duration> = [];
+    const result = await Effect.runPromise(preferPeerReport(argv, Duration.seconds(20), (text) => ok(text.trim()),
       Effect.sync(() => { legacyReads++; return ok("older"); })).pipe(Effect.provideService(CommandRunner, {
-      run: ({ argv: [ssh, host, script] }) => Effect.promise(async () => {
+      run: ({ argv: [ssh, host, script], timeout }) => Effect.promise(async () => {
+        timeouts.push(timeout);
         if (ssh !== "ssh" || host !== "example" || !script) throw new Error("Unexpected transport");
         const body = installed ? `[ "$*" = "report ${report}" ] && printf 'compact\\n'` : "return 1";
         const peer = Bun.spawn(["bash", "-c", `orc-dash() { ${body}; }; ${script}`], { stdout: "pipe" });
@@ -20,14 +22,14 @@ for (const report of ["subscriptions", "running-orc"] as const) {
         return stdout;
       }),
     })));
-    return { result, legacyReads };
+    return { result, legacyReads, timeouts };
   };
 
   test(`a peer supporting ${report} does not transfer the legacy reading`, async () => {
-    expect(await withPeer(true)).toEqual({ result: ok("compact"), legacyReads: 0 });
+    expect(await withPeer(true)).toEqual({ result: ok("compact"), legacyReads: 0, timeouts: [Duration.seconds(20)] });
   });
   test(`an older peer without ${report} reads the configured legacy command once`, async () => {
-    expect(await withPeer(false)).toEqual({ result: ok("older"), legacyReads: 1 });
+    expect(await withPeer(false)).toEqual({ result: ok("older"), legacyReads: 1, timeouts: [Duration.seconds(20)] });
   });
 }
 

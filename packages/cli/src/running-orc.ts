@@ -28,7 +28,7 @@ export const runningOrcByMachine = Effect.gen(function* () {
   return yield* Effect.forEach(machines, (machine, index) => {
     const legacy = Effect.map(machine.read, (reading) => mapOutcome(reading, runningOrcCount));
     const count = index === 0 ? Effect.map(localRunningOrc, (report) => report.count)
-      : preferPeerReport(peerReport("running-orc", command, quota), decodeCount, legacy);
+      : preferPeerReport(peerReport("running-orc", command, quota), Duration.seconds(20), decodeCount, legacy);
     return Effect.map(count, (runs) => ({ name: machine.name, runs }));
   }, { concurrency: "unbounded" });
 });

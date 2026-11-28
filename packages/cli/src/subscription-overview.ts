@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Duration, Effect } from "effect";
 import { decodeJson, mapOutcome, readSubscriptions, selector, SessionMachines, SubscriptionReport, subscriptionOverview, subscriptionReport } from "@avi2dg/orc-schema";
 import { peerReport, preferPeerReport } from "./peer-report";
 
@@ -7,7 +7,7 @@ export const readSubscriptionOverview = Effect.gen(function* () {
   const command = yield* selector("ORC_DASH_REMOTE_SESSION_QUOTA");
   const peers = Effect.forEach(machines.remotes, (machine) => {
     const legacy = Effect.map(machine.read, (reading) => mapOutcome(reading, (view) => subscriptionReport(view.accounts, view.now)));
-    return Effect.map(preferPeerReport(peerReport("subscriptions", command), decodeJson(SubscriptionReport), legacy),
+    return Effect.map(preferPeerReport(peerReport("subscriptions", command), Duration.seconds(90), decodeJson(SubscriptionReport), legacy),
       (reading) => ({ name: machine.name, reading }));
   }, { concurrency: "unbounded" });
   const [local, remotes] = yield* Effect.all([readSubscriptions, peers], { concurrency: "unbounded" });

@@ -32,11 +32,12 @@ export const peerReport = (report: Report, command: string | undefined, quotaCom
 
 export const preferPeerReport = <A>(
   argv: readonly [string, ...string[]] | undefined,
+  timeout: Duration.Duration,
   decode: (text: string) => Outcome<A>,
   legacy: Effect.Effect<Outcome<A>>,
 ): Effect.Effect<Outcome<A>, never, CommandRunner> => argv === undefined ? legacy : Effect.gen(function* () {
   const runner = yield* CommandRunner;
-  return yield* runner.run({ argv, timeout: Duration.seconds(90) }).pipe(
+  return yield* runner.run({ argv, timeout }).pipe(
     Effect.flatMap((stdout) => stdout.trim().endsWith(unsupported) ? legacy : Effect.succeed(decode(stdout))),
     Effect.catchTags({
       CommandAbsent: (error) => Effect.succeed(unreachable(error.reason)),
