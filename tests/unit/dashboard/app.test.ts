@@ -230,7 +230,7 @@ describe("the live dashboard", () => {
         eventType: "press",
         source: "raw",
       });
-      await Effect.runPromise(Fiber.join(fiber).pipe(Effect.timeout("5 seconds")));
+      expect(await Effect.runPromise(Fiber.join(fiber).pipe(Effect.timeout("5 seconds")))).toBeUndefined();
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));
       await setup.dispose();
@@ -316,7 +316,7 @@ describe("the live dashboard's levels", () => {
       setup.mockInput.pressKey("u");
       await setup.frameWhere((frame) => frame.includes("queued in pueue"));
       setup.mockInput.pressKey("g");
-      await setup.frameWhere((frame) => !frame.includes("quota-pace"));
+      expect(await setup.frameWhere((frame) => !frame.includes("quota-pace"))).toContain("queued in pueue");
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));
       await setup.dispose();

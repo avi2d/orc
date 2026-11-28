@@ -39,7 +39,7 @@
               "**/*.cts"
             ],
             "exclude": [
-              "tests/**",
+              "tests/**/*",
               "**/*.test.ts",
               "**/*.test.tsx",
               "packages/run/scripts/launch.ts",
@@ -50,16 +50,29 @@
               "packages/run/src/entities/heavy-queue/heavy-standin-exec.ts",
               "packages/run/src/entities/heavy-queue/heavy-standin-helper.ts",
               "packages/run/src/entities/heavy-queue/heavy-standin-main.ts",
-              "packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts"
+              "packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts",
+              "packages/herdr-app/**/*",
+              "docs/.vitepress/**/*",
+              "**/node_modules/**/*",
+              "**/dist/**/*",
+              "release-assets/**/*",
+              "packages/run/CHANGELOG.md",
+              "**/reports/**/*",
+              "**/.stryker-tmp/**/*",
+              "**/.orc-home/**/*",
+              "repos/*",
+              "docs/.vitepress/dist/**/*",
+              "docs/.vitepress/cache/**/*",
+              "trials/bb/.scratch/**/*"
             ],
             "options": {
               "diagnosticSeverity": {
                 "nodeBuiltinImport": "error",
-                "asyncFunction": "error",
-                "newPromise": "error",
                 "extendsNativeError": "error",
                 "processEnv": "error",
-                "processEnvInEffect": "error"
+                "processEnvInEffect": "error",
+                "asyncFunction": "error",
+                "newPromise": "error"
               }
             }
           }

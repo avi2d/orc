@@ -28,43 +28,48 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
-      - name: restore the last full report
+      - name: restore the last full report and the state a stopped run left
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bunx checks-mutation-baseline --full "$RUNNER_TEMP/last-full/mutation.json"
+        run: bunx checks-mutation-baseline --full "$RUNNER_TEMP/last-full/mutation.json" "$RUNNER_TEMP/last-full/stryker-incremental.json"
       - id: shards
         name: split the tree into shards
         env:
-          SHARDS: "4"
+          SHARDS: "16"
         run: bunx checks-ci mutation shards
 
   refresh-shard:
     needs: refresh-plan
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 35
     strategy:
+      fail-fast: false
+      max-parallel: 4
       matrix:
         shard: ${{ fromJSON(needs.refresh-plan.outputs.shards) }}
     permissions:
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+      - name: restore the state the last run left
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bunx checks-mutation-baseline --full "$RUNNER_TEMP/last-full/mutation.json" reports/stryker-incremental.json
       - name: run one shard
         env:
           SHARD: ${{ matrix.shard }}
-        run: bunx stryker run --mutate "$SHARD"
-      # A lone shard's artifact downloads with no folder of its own, so only the file's name tells the reports apart.
-      - name: name the report after its shard
-        env:
           INDEX: ${{ strategy.job-index }}
-        run: mv reports/mutation/mutation.json "reports/mutation/shard-$INDEX.json"
+          CHECKS_MUTATION_MODE: refresh
+        run: bunx checks-ci mutation shard
+      # A lone shard's artifact downloads with no folder of its own, so only the file's name tells the states apart.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mutation-shard-${{ strategy.job-index }}
-          path: reports/mutation/shard-${{ strategy.job-index }}.json
+          path: reports/shard/
           retention-days: 1
           if-no-files-found: error
 
@@ -85,19 +90,35 @@ jobs:
           pattern: mutation-shard-*
           path: shards
           merge-multiple: true
-      - name: merge the shard reports
-        run: bunx checks-mutation-merge reports/mutation/mutation.json shards/shard-*.json
-      - if: always()
+      - id: pass
+        name: find out whether every shard finished
+        run: bunx checks-ci mutation finished
+      - name: merge the shard states
+        run: bunx checks-mutation-merge reports/mutation/mutation.json shards/state-*.json
+      - if: ${{ always() && steps.pass.outputs.finished == 'true' }}
         name: score the refresh
         run: bunx checks-ci mutation score
-      - name: slim the merged report
+      - if: ${{ steps.pass.outputs.finished == 'true' }}
+        name: slim the merged report
         run: bunx checks-mutation-baseline --slim reports/mutation/mutation.json "$RUNNER_TEMP/full/mutation.json"
-      - name: save the merged report as the state a baseline starts from
+      - if: ${{ steps.pass.outputs.finished == 'true' }}
+        name: save the merged report as the state a baseline starts from
         run: cp "$RUNNER_TEMP/full/mutation.json" "$RUNNER_TEMP/full/stryker-incremental.json"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - if: ${{ steps.pass.outputs.finished == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mutation-baseline-full
           path: ${{ runner.temp }}/full/
+          retention-days: 30
+          if-no-files-found: error
+      - if: ${{ steps.pass.outputs.finished == 'false' }}
+        name: slim the merged state a later run resumes from
+        run: bunx checks-mutation-baseline --slim reports/mutation/mutation.json "$RUNNER_TEMP/refresh/stryker-incremental.json"
+      - if: ${{ steps.pass.outputs.finished == 'false' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-refresh-state
+          path: ${{ runner.temp }}/refresh/
           retention-days: 30
           if-no-files-found: error
       - name: prune superseded baselines

@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect } from "effect"
+import { Effect, Exit } from "effect"
 import { attentionText } from "../../../packages/run/src/features/attention-list/index"
 import { serveCorrections } from "../../../packages/run/src/widgets/beat/beat-close-runner"
 import { routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
@@ -152,7 +152,7 @@ describe("a decider overturn", () => {
   test("the captain's answer is never replaced by a second one, unlike a decider's", async () => {
     await withAskingTask(async (root) => {
       await run(answerTask(root, "orc-1", "r2=Two retries", "2026-11-02T10:22:00.000Z"))
-      await assert.rejects(run(answerTask(root, "orc-1", "r2=Three retries", "2026-11-02T10:23:00.000Z")))
+      expect(Exit.isFailure(await run(Effect.exit(answerTask(root, "orc-1", "r2=Three retries", "2026-11-02T10:23:00.000Z"))))).toBe(true)
     })
   })
 

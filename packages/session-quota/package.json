@@ -18,10 +18,10 @@
     "build": "bun ../../scripts/compile-dashboard.ts orc-dash-capture"
   },
   "dependencies": {
-    "@effect/platform-bun": "4.1.4",
+    "@effect/platform-bun": "4.1.6",
     "@opentui/core": "0.6.5",
     "@avi2dg/orc-schema": "workspace:*",
     "@avi2dg/orc-ui": "workspace:*",
-    "effect": "4.1.4"
+    "effect": "4.1.6"
   }
 }
