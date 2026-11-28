@@ -129,7 +129,8 @@ The beat opens an item for each run event, owned by the user:
 - A run that died opens a `run-died` item, when its task closes failed or its start fails.
   A run that ends done or that you stop opens none.
   The item holds the tail of the task log the beat writes.
-  For a run on a machine reached through `orc runner start -- <command>`, the agent log stays on that machine, so the item names the run and the `<command> show <run-id>` and `<command> log <run-id> <step-id>` commands that print it.
+  For a run on a machine reached through `orc runner start -- <command>`, the agent log stays on that machine, so the item names the run and two commands.
+  `<command> show <run-id> --json` gives each step its id, and `<command> log <run-id> <step-id>` prints the log of that step.
   A confirmed failed run [retries once](#retry-a-dead-run-once) first, and the item opens when the task closes after that.
   Two other failures recover without opening a `run-died` item.
   When no-mistakes refuses to start because the repository is not initialized, the run runs `no-mistakes init --skip-user-skill` and starts no-mistakes again.

@@ -35,7 +35,7 @@ const remoteLogPointer = (action: BeatAction): string => {
   const orc = action.remoteRun.through.join(" ")
   const run = action.remoteRun.id
   return "\n\nThe agent log of run " + run + " stays on " + action.machine + "."
-    + "\n" + orc + " show " + run + " lists its steps with each log path."
+    + "\n" + orc + " show " + run + " --json lists its steps with each step id."
     + "\n" + orc + " log " + run + " <step-id> prints the log of one step."
 }
 
