@@ -35,7 +35,7 @@ jobs:
       - id: shards
         name: split the tree into shards
         env:
-          SHARDS: "12"
+          SHARDS: "16"
         run: bunx checks-ci mutation shards
 
   refresh-shard:
