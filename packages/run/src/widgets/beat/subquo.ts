@@ -10,12 +10,16 @@ const Timestamp = Schema.String.check(Schema.makeFilter((value) => {
 }))
 const Label = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9_-]{0,63}$/))
 const FailureCode = Schema.Literals(["timeout", "rate_limited", "auth_required", "auth_unverified"])
-const Window = Schema.Struct({
-  id: Label,
-  scope: Label,
-  percentLeft: Schema.NullOr(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 }))),
-  resetsAt: Schema.NullOr(Timestamp)
-})
+const Window = Schema.Union([
+  Schema.Struct({ id: Label, scope: Schema.optionalKey(Label), percentLeft: Schema.Null, resetsAt: Schema.Null, status: Schema.Literal("not_returned") }),
+  Schema.Struct({
+    id: Label,
+    scope: Label,
+    percentLeft: Schema.NullOr(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 }))),
+    resetsAt: Schema.NullOr(Timestamp),
+    status: Schema.optionalKey(Schema.String)
+  })
+])
 type SubquoWindow = typeof Window.Type
 type KnownWindow = SubquoWindow & { readonly percentLeft: number; readonly resetsAt: string }
 const Windows = Schema.NonEmptyArray(Window)
@@ -56,7 +60,7 @@ const figureOf = (entry: SubquoAccount, nowMillis: number): AccountReading => {
   if (nowMillis >= Date.parse(observation.validUntil)) {
     return { account, kind: "unusable", reason: "subquo's reading from " + observation.observedAt + " went stale at " + observation.validUntil }
   }
-  const limits = observation.windows.filter((window) => window.scope === everyModel)
+  const limits = observation.windows.filter((window) => window.scope === everyModel && window.status !== "not_returned")
   if (limits.length === 0) {
     return { account, kind: "unusable", reason: "subquo reads no window with scope " + everyModel }
   }

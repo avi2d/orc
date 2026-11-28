@@ -7,12 +7,16 @@ import { linearPace } from "./window-sources";
 const Instant = Schema.DateTimeUtcFromString;
 const Label = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9_-]{0,63}$/u));
 const FailureCode = Schema.Literals(["timeout", "rate_limited", "auth_required", "auth_unverified"]);
-const Window = Schema.Struct({
-  id: Label,
-  scope: Label,
-  percentLeft: Schema.NullOr(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 }))),
-  resetsAt: Schema.NullOr(Instant),
-});
+const Window = Schema.Union([
+  Schema.Struct({ id: Label, scope: Schema.optionalKey(Label), percentLeft: Schema.Null, resetsAt: Schema.Null, status: Schema.Literal("not_returned") }),
+  Schema.Struct({
+    id: Label,
+    scope: Label,
+    percentLeft: Schema.NullOr(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 }))),
+    resetsAt: Schema.NullOr(Instant),
+    status: Schema.optionalKey(Schema.String),
+  }),
+]);
 const Windows = Schema.NonEmptyArray(Window).check(
   Schema.makeFilter((windows) => new Set(windows.map((window) => window.id)).size === windows.length),
 );
@@ -106,10 +110,15 @@ const overlayProvider = (
 ): QuotaProvider => {
   const observation = match.observation;
   if (!freshAt(observation, now)) return entry;
-  const windows = entry.windows.map((window): QuotaWindow => {
+  const returned = observation.windows.filter((window) => window.status !== "not_returned");
+  const notReturned = observation.windows.filter((window) => window.status === "not_returned");
+  const windows = entry.windows.filter((window) => !notReturned.some((item) =>
+    quotaWindowId(entry.provider, item.id, item.scope ?? "all") === window.id &&
+    (entry.provider !== "opencode-go" || item.id !== "five-hour" || window.windowSeconds === 18_000),
+  )).map((window): QuotaWindow => {
     if (!("percentRemaining" in window)) return window;
-    const found = observation.windows.filter((item) =>
-      quotaWindowId(entry.provider, item.id, item.scope) === window.id &&
+    const found = returned.filter((item) =>
+      quotaWindowId(entry.provider, item.id, item.scope ?? "all") === window.id &&
       (entry.provider !== "opencode-go" || item.id !== "five-hour" || window.windowSeconds === 18_000),
     );
     const reading = found.length === 1 ? found[0] : undefined;
@@ -133,7 +142,8 @@ const standaloneSubquo = (
 ): ReadonlyArray<QuotaProvider> => matchSubquo(snapshot, mappings).flatMap(({ mapping, observation }) => {
   if (!freshAt(observation, now)) return [];
   const windows = observation.windows.flatMap((window): ReadonlyArray<QuotaWindow> => {
-    const id = quotaWindowId(mapping.provider, window.id, window.scope);
+    if (window.status === "not_returned") return [];
+    const id = quotaWindowId(mapping.provider, window.id, window.scope ?? "all");
     if (id === undefined || window.percentLeft === null || window.resetsAt === null) return [];
     const shape = windowShape(id, window.id);
     return [{

@@ -68,6 +68,30 @@ describe("subquo quota account mappings", () => {
     expect(opencodeWindow("five-hour", "rolling")).toBe(37);
   });
 
+  test("does not show a quota-axi measurement when subquo says the window was not returned", () => {
+    const subquo = {
+      version: "subquo.v1",
+      writtenAt: "2026-11-22T20:00:30.000Z",
+      accounts: [{
+        id: "main", provider: "claude",
+        observation: {
+          status: "fresh", source: "provider", observedAt: "2026-11-22T20:00:00.000Z",
+          validUntil: "2026-11-22T20:02:00.000Z",
+          windows: [
+            { id: "weekly", scope: "all", percentLeft: 35, resetsAt: "2026-11-28T12:00:00.000Z" },
+            { id: "five-hour", percentLeft: null, resetsAt: null, status: "not_returned" },
+          ],
+        },
+      }],
+    };
+    const result = overlaySubquo(report, subquo, [mapping], now);
+    const entry = result.providers.find((item) => item.provider === "claude" && !("kind" in item));
+    if (entry === undefined || "kind" in entry) throw new Error("Claude account missing");
+    expect(entry.windows.find((window) => window.id === "five_hour")).toBeUndefined();
+    const week = entry.windows.find((window) => window.id === "seven_day");
+    expect(week && "percentRemaining" in week ? week.percentRemaining : undefined).toBe(35);
+  });
+
   test("keeps quota-axi instead of using an expired subquo reading", () => {
     const result = overlaySubquo(report, snapshot, [mapping], DateTime.makeUnsafe("2026-11-22T20:03:00.000Z"));
     expect(result.providers).toEqual(report.providers);
