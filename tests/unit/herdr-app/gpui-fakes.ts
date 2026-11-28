@@ -178,7 +178,7 @@ export const pressRow = (element: object, listId: string, key: string): void => 
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow, uniform_list: everyRange, image: node, svg: node }))
 void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Scrollbar: { vertical: node }, Input: { new: () => node() },
+  h_flex: node, v_flex: node, Link: { new: node }, Scrollbar: { vertical: node }, Input: { new: () => node() },
   Button: { new: (id: string | number) => {
     const element = node()
     nodes.get(element)?.calls.push({ name: "id", args: [id] })
@@ -207,6 +207,23 @@ const reply = (line: string): Promise<{ code: number; stdout: string; stderr: st
   return Promise.resolve({ code: 0, stdout: JSON.stringify(document), stderr: "" })
 }
 
+export const appSettings: Record<string, unknown> = { theme: "Graphite" }
+export const resolvedTheme: { name: string | null } = { name: null }
+
+const graphite = {
+  background: "#17191d", surface: "#17191d", chrome: "#101114", raised: "#2c2e31",
+  working: "#e5c07b", blocked: "#f0705f", done: "#76a8ff"
+}
+const paper = {
+  background: "#ffffff", surface: "#ffffff", chrome: "#f1f1ee", raised: "#f6f6f6",
+  working: "#9a6700", blocked: "#c93c2c", done: "#2f6fe4"
+}
+const dawn = { ...paper, background: "#f4ecd8", surface: "#f4ecd8", chrome: "#e9dfc6", raised: "#faf4e4" }
+const dusk = { ...graphite, background: "#0b1220", surface: "#0b1220", chrome: "#070b14", raised: "#1a2236" }
+const installedColors: Readonly<Record<string, Record<string, string>>> = {
+  Graphite: graphite, Paper: paper, "Auto (light)": dawn, "Auto (dark)": dusk
+}
+
 void mock.module("herdr", () => ({
   run: (name: string, args: unknown) => ran.push({ name, args }),
   readTextFile: (file: string) => Promise.resolve(sessionFiles.get(file) ?? null),
@@ -215,8 +232,8 @@ void mock.module("herdr", () => ({
     executed.push(line)
     return line === "orc attention --json" && stalledAttention.pending !== null ? stalledAttention.pending : reply(line)
   },
-  shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => ({}),
-  settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined, themes: () => []
+  shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => installedColors[resolvedTheme.name ?? String(appSettings["theme"])] ?? {},
+  settings: () => appSettings, openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined, themes: () => []
 }))
 
 interface OpenTask {

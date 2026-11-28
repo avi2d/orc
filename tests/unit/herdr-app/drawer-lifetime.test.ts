@@ -259,7 +259,7 @@ const nextListen = () => new Promise<void>((resolve) => { listening.push(resolve
 const element = (): object => new Proxy({}, { get: (_target, _name, self: object) => () => self })
 
 void mock.module("gpui-kit", () => ({ View: Object, div: element }))
-void mock.module("gpui-base", () => ({ h_flex: element, v_flex: element, ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) } }))
+void mock.module("gpui-base", () => ({ h_flex: element, v_flex: element, Link: { new: element }, ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) } }))
 void mock.module("herdr", () => ({
   exec: (program: string, args: ReadonlyArray<string>) => app.exec(program, args),
   hc: (args: ReadonlyArray<string>) => app.hc(args),
