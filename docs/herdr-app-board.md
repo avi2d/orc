@@ -65,5 +65,7 @@ An unreadable machine shows dashes and a reason below the table.
 
 Subscriptions and Machines read separately, so machines show before the slower quota read ends.
 Both refresh every minute, whichever tab is open.
+Each table shows when it was read and keeps its last rows during a refresh.
+The tab reads the [overview reports](dash-resources.md#print-the-resources-tab-reports).
 
 ![Resources tab with the second machine unreachable](images/herdr-resources-unreachable.png)

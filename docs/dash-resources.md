@@ -45,6 +45,17 @@ Each reading is `ok`, `unreachable` with a reason, or `invalid` with an issue.
 
 The complete field definitions are in `ResourcesReport` in `packages/schema/src/entities/resources/contract/resources.ts`.
 
+### Print the Resources tab reports
+
+To print the subscription rows that the [Herdr App's Resources tab](herdr-app-board.md#read-the-resources-tab) reads, run `orc-dash report subscription-overview`.
+To print machine resources and the number of running jobs in each machine's `orc` group, run `orc-dash report machine-overview`.
+These commands omit session histories, completed jobs, and GitHub Actions runs.
+
+For example, set `ORC_DASH_REMOTE_SESSION_QUOTA="ssh other-host 'orc-dash report session-quota'"` and `ORC_DASH_REMOTE_PUEUE="ssh other-host 'pueue status --json'"`.
+The overview commands ask that host for `report subscriptions` and `report running-orc`.
+If the host lacks a report, the overview runs the configured command instead.
+A custom command that does not use a recognized [SSH](https://www.openssh.com) form runs unchanged.
+
 ### Read the tasks block
 
 When `ORC_DASH_TASKS` prints a tasks report, the resources report includes live task processes.

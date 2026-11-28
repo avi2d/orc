@@ -26,19 +26,7 @@ The longest chain of commands a source runs ends inside its limit.
 So a slow machine's reason lands in its reading, and the source still answers.
 The quota source reads a week of agent logs and takes the longest, so leave it out of `--only` when only the machines matter.
 
-## Read the Resources tab
-
-To print the subscription rows that the [Herdr](https://herdr.dev) App reads, run `orc-dash report subscription-overview`.
-To print machine resources and the number of running jobs in each machine's `orc` group, run `orc-dash report machine-overview`.
-These commands omit session histories, completed jobs, and GitHub Actions runs.
-The tab shows when it read each table and keeps the last rows visible during a refresh.
-
-For example, set `ORC_DASH_REMOTE_SESSION_QUOTA="ssh other-host 'orc-dash report session-quota'"` and `ORC_DASH_REMOTE_PUEUE="ssh other-host 'pueue status --json'"`.
-The overview commands ask that host for `report subscriptions` and `report running-orc`.
-If the host lacks a report, the overview runs the configured command instead.
-A custom command that does not use a recognized [SSH](https://www.openssh.com) form runs unchanged.
-
-## Read the snapshot
+### Read the snapshot
 
 The snapshot is a version 1 JSON object with `generatedAt`, `machine`, and `sources`.
 Each selected source is `ok` with its fields or `failed` with an error.
