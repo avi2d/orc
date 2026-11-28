@@ -92,23 +92,35 @@ const childAwaited = (child: TaskDetail): boolean => child.state.status !== "clo
 const dependencyAwaited = (task: TaskDetail, dependency: TaskDetail | undefined): boolean =>
   dependency === undefined || dependency.state.status !== "closed" || (task.kind === "ship" && unmergedShip(dependency))
 
-const tasksAwaited = (task: TaskDetail, backlog: ReadonlyArray<TaskDetail>): ReadonlyArray<string> => {
-  const byId = new Map(backlog.map((other) => [other.id, other]))
-  const children = backlog.filter((other) => other.parent === task.id && childAwaited(other)).map((child) => child.id)
+const tasksAwaited = (task: TaskDetail, byId: ReadonlyMap<string, TaskDetail>, awaitedChildren: ReadonlyMap<string, ReadonlyArray<string>>): ReadonlyArray<string> => {
   const dependencies = task.dependsOn.filter((id) => dependencyAwaited(task, byId.get(id)))
-  return [...new Set([...children, ...dependencies])]
+  return [...new Set([...(awaitedChildren.get(task.id) ?? []), ...dependencies])]
+}
+
+const awaitedChildrenByParent = (backlog: ReadonlyArray<TaskDetail>): ReadonlyMap<string, ReadonlyArray<string>> => {
+  const byParent = new Map<string, Array<string>>()
+  for (const child of backlog) {
+    if (child.parent === null || !childAwaited(child)) continue
+    const siblings = byParent.get(child.parent)
+    if (siblings === undefined) byParent.set(child.parent, [child.id])
+    else siblings.push(child.id)
+  }
+  return byParent
 }
 
 export const waitsOnLabel = (awaited: ReadonlyArray<string>): string => `Waits on ${awaited.join(", ")}`
 
 // A bare hold only keeps its task from starting. While orc's scheduler still waits on other tasks, an answer would not start it either.
-export const holdsOnTasks = (backlog: ReadonlyArray<TaskDetail>): ReadonlyMap<string, ReadonlyArray<string>> =>
-  new Map(backlog.flatMap((task) => {
+export const holdsOnTasks = (backlog: ReadonlyArray<TaskDetail>): ReadonlyMap<string, ReadonlyArray<string>> => {
+  const byId = new Map(backlog.map((task) => [task.id, task]))
+  const awaitedChildren = awaitedChildrenByParent(backlog)
+  return new Map(backlog.flatMap((task) => {
     const hold = task.hold
     if (task.state.status === "closed" || hold === null || hold.answer !== null || hold.questions.length > 0) return []
-    const awaited = tasksAwaited(task, backlog)
+    const awaited = tasksAwaited(task, byId, awaitedChildren)
     return awaited.length === 0 ? [] : [[task.id, awaited] as const]
   }))
+}
 
 const holdCards = (task: TaskDetail, overdue: boolean, onTasks: boolean): ReadonlyArray<InboxAnswer> => {
   const hold = task.hold
