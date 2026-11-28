@@ -33,6 +33,7 @@ export type BeatAction =
     readonly reason: string
     readonly pr: string | null
     readonly report: string | null
+    readonly remoteRun?: { readonly id: string; readonly through: ReadonlyArray<string> }
   }
   | { readonly kind: "retry"; readonly task: string; readonly machine: string; readonly run: string }
   | { readonly kind: "split"; readonly task: string; readonly machine: string; readonly children: ReadonlyArray<string>; readonly reason: string }

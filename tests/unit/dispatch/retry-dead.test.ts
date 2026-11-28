@@ -201,4 +201,23 @@ describe("a failed run", () => {
       expect(items[0]?.item.text).toContain("last diagnostic line")
     })
   })
+
+  test("a run-died item for a remote run points at the agent log on that machine", async () => {
+    await withBacklog(async (root) => {
+      await run(openRunDeaths(root, [{
+        kind: "closed",
+        task: "orc-1",
+        machine: "linux-box",
+        outcome: "failed",
+        reason: "orc exited 1",
+        pr: null,
+        report: null,
+        remoteRun: { id: "run-1", through: ["ssh", "linux-box", "orc"] }
+      }], "2026-10-27T10:06:00.000Z"))
+      const text = (await run(openItems(root))).at(0)?.item.text ?? ""
+      expect(text).toContain("The agent log of run run-1 stays on linux-box.")
+      expect(text).toContain("ssh linux-box orc show run-1 lists its steps")
+      expect(text).toContain("ssh linux-box orc log run-1 <step-id> prints")
+    })
+  })
 })
