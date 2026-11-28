@@ -1,19 +1,12 @@
 import { type Color, type Context, type Element, div, image, svg } from "gpui-kit"
 import { Input, type InputState, h_flex, v_flex } from "gpui-base"
 import type { CardStatus } from "./agents"
-import type { palette } from "./palette"
+import { alertColors, dotColour, tw, zinc } from "./kit-colors"
+import type { Palette } from "./palette-values"
 
-type Palette = ReturnType<typeof palette>
+export { zinc } from "./kit-colors"
+
 type Press = (cx: Context) => void
-
-export const zinc = {
-  s1: "#1f1f22", s2: "#27272a", s3: "#3f3f46", border: "#27272a", borderAccent: "#303036",
-  accent: "#e4e4e7", accentFg: "#18181b", muted: "#a1a1aa", clear: "#00000000"
-} as const satisfies Readonly<Record<string, Color>>
-
-const dotColour: Readonly<Record<CardStatus, Color>> = {
-  "Awaiting you": "#db932e", Running: "#5caaf6", Queued: "#71717a", Failed: "#f7796d", Done: "#35c264"
-}
 
 const markWidth = 14
 
@@ -43,8 +36,6 @@ const logoSize = 14
 
 export const vendorLogo = (vendor: Vendor | null): Element =>
   vendor === null ? div().size(logoSize).flex_none() : image(vendor === "claude" ? "icons/claude.svg" : "icons/codex.svg").w(logoSize).h(logoSize).flex_none()
-
-const tw = { red400: "#ff6467", amber500: "#fe9a00", emerald400: "#00d492", emerald500: "#00bc7d", blue400: "#51a2ff", blue500: "#2b7fff", error: "#fb414a" } as const
 
 export type CheckState = "running" | "passed" | "failed"
 
@@ -110,14 +101,14 @@ export const tab = (t: Palette, id: string, label: string, on: boolean, press: P
   return press === null ? made : made.cursor_pointer().hover((style) => style.text_color(t.foreground)).on_click((_event, cx) => press(cx))
 }
 
-type AlertTone = "neutral" | "info" | "warning" | "error" | "success"
+type AlertTone = keyof typeof alertColors
 
-const alertLook: Readonly<Record<AlertTone, { readonly bg: Color; readonly icon: IconName; readonly colour: Color }>> = {
-  neutral: { bg: "#ffffff0f", icon: "circle-dashed", colour: zinc.muted },
-  info: { bg: `${tw.blue500}29`, icon: "spinner", colour: tw.blue400 },
-  warning: { bg: `${tw.amber500}29`, icon: "circle-alert", colour: tw.amber500 },
-  error: { bg: `${tw.error}29`, icon: "circle-x", colour: tw.error },
-  success: { bg: `${tw.emerald500}29`, icon: "circle-check", colour: tw.emerald400 }
+const alertIcons: Readonly<Record<AlertTone, IconName>> = {
+  neutral: "circle-dashed",
+  info: "spinner",
+  warning: "circle-alert",
+  error: "circle-x",
+  success: "circle-check"
 }
 
 const alertIcon = 16
@@ -137,11 +128,11 @@ export interface AlertShown {
 }
 
 export const alert = (t: Palette, id: string, shown: AlertShown): Element => {
-  const look = alertLook[shown.tone]
+  const look = alertColors[shown.tone]
   const actions = shown.actions ?? []
   return v_flex().id(id).gap(4).px(14).py(12).rounded(12).bg(look.bg).text_size(13).min_w_0().flex_shrink_0()
     .child(h_flex().gap(alertGap).items_center()
-      .child(icon(look.icon, alertIcon, look.colour))
+      .child(icon(alertIcons[shown.tone], alertIcon, look.colour))
       .child(div().flex_1().min_w_0().font_weight(700).text_color(t.foreground).whitespace_normal().child(shown.title)))
     .children(shown.body === undefined ? [] : [div().pl(alertIcon + alertGap).text_color(t.foreground).whitespace_normal().child(shown.body)])
     .children(actions.length === 0 ? [] : [h_flex().pt(8).gap(8).justify_end()
