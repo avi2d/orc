@@ -5,7 +5,7 @@ import { AgentAttentionSection } from "../../src/agent-attention-view"
 import type { AgentAttention } from "../../src/inbox-read"
 import { type Card, type CardStatus, type Filter, approvalOf, cardAttention, filterCards, goesOn, openedFilter, recordedStatus, unfoldedCards } from "../../src/agents"
 import { type RunFacts, runFacts } from "../../src/run-agent"
-import { type LocalAgents, agentsDocuments, readAgentQuestions, readLocalAgents } from "../../src/agents-read"
+import { type LocalAgents, agentsDocuments, readAgentQuestions, readLocalAgents, sameLocalAgents } from "../../src/agents-read"
 import type { AttentionQueue } from "../../src/guard-attention"
 import { type AgentsActions, type Chosen, type DetailShown, type Keyed, askMerge, detailView, submitSendBack } from "../../src/agents-view"
 import { type ListReading, type Reread, runsColumn } from "../../src/runs-view"
@@ -115,7 +115,7 @@ export default class OrcAgents extends View {
     this.questionsBusy = true
     cx.spawn((task) => readAgentQuestions().then((reading) => {
       this.questionsBusy = false
-      if (reading.kind === "ok") {
+      if (reading.kind === "ok" && reading.value !== this.questions) {
         this.questions = reading.value
         this.showCards(task, this.list.kind === "ok" ? this.list.reread : null)
       }
@@ -134,9 +134,13 @@ export default class OrcAgents extends View {
   readAll(cx: Context): Promise<void> {
     return readLocalAgents().then((reading) => {
       if (reading.kind === "ok") {
-        this.local = reading.value
         this.listed = new Date().toISOString()
-        this.showCards(cx, null)
+        if (this.list.kind === "ok" && sameLocalAgents(this.local, reading.value)) {
+          this.list = { ...this.list, reread: null }
+        } else {
+          this.local = reading.value
+          this.showCards(cx, null)
+        }
       } else if (this.list.kind === "ok") {
         this.list = { ...this.list, reread: reading.kind === "failed" ? { reason: reading.reason, listed: this.listed } : null }
       } else {

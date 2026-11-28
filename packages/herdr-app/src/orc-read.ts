@@ -24,13 +24,24 @@ export const readText = (command: string, args: ReadonlyArray<string>): Promise<
   )
 }
 
+const readingOf = <A>(command: string, args: ReadonlyArray<string>, text: string, guard: Guard<A>): Reading<A> => {
+  const guarded = guardJson(text, guard)
+  return guarded.kind === "ok"
+    ? { kind: "ok", value: guarded.value }
+    : { kind: "failed", reason: `${[command, ...args].join(" ")} printed a document this view cannot read: ${guarded.reason}` }
+}
+
 export const readJson = <A>(command: string, args: ReadonlyArray<string>, guard: Guard<A>): Promise<Reading<A>> =>
-  readText(command, args).then((reading): Reading<A> => {
-    if (reading.kind !== "ok") {
-      return reading
-    }
-    const guarded = guardJson(reading.value, guard)
-    return guarded.kind === "ok"
-      ? { kind: "ok", value: guarded.value }
-      : { kind: "failed", reason: `${[command, ...args].join(" ")} printed a document this view cannot read: ${guarded.reason}` }
+  readText(command, args).then((reading): Reading<A> => reading.kind === "ok" ? readingOf(command, args, reading.value, guard) : reading)
+
+// Output identical to the last read gives back the same Reading object, so a caller can skip rebuilding by comparing references.
+export const rememberedJson = <A>(command: string, args: ReadonlyArray<string>, guard: Guard<A>): (() => Promise<Reading<A>>) => {
+  let last: { readonly text: string; readonly reading: Reading<A> } | null = null
+  return () => readText(command, args).then((reading): Reading<A> => {
+    if (reading.kind !== "ok") return reading
+    if (last?.text === reading.value) return last.reading
+    const read = readingOf(command, args, reading.value, guard)
+    last = { text: reading.value, reading: read }
+    return read
   })
+}
