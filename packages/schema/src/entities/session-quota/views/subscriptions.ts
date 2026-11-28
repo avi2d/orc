@@ -4,6 +4,7 @@ import { AccountRef, type AccountJson, type WindowJson } from "../contract/sessi
 import type { Session } from "../sources/live";
 import { readQuotas, sourcedEntries } from "../sources/quota-read";
 import { groupLogins, keysCarried } from "./group-logins";
+import { sameCycleMillis, staleAfterMillis } from "./remote-quota-rules";
 import { type AccountView, accountView, type WindowView } from "./session-quota";
 
 const epoch = Schema.Finite.check(Schema.isBetween({ minimum: -8.64e15, maximum: 8.64e15 }));
@@ -54,7 +55,7 @@ const windowAnchors = (windows: ReadonlyArray<typeof Window.Type>) =>
   [...Map.groupBy(windows, (window) => window.id).values()].flatMap((group) => {
     const first = group.at(0);
     if (first === undefined) return [];
-    return [group.find((w) => Math.abs(w.reset - first.reset) <= 60_000 && w.start !== null) ?? first];
+    return [group.find((w) => Math.abs(w.reset - first.reset) <= sameCycleMillis && w.start !== null) ?? first];
   });
 
 type Overview = {
@@ -66,7 +67,7 @@ type Overview = {
 export const subscriptionOverview = (local: Report, remotes: ReadonlyArray<Remote>): Overview => {
   const accounts = [
     ...local.accounts.map((account) => ({ ...account, machine: null })),
-    ...remotes.flatMap(({ name, reading }) => reading.kind === "ok" && local.readAt - reading.value.readAt <= 300_000
+    ...remotes.flatMap(({ name, reading }) => reading.kind === "ok" && local.readAt - reading.value.readAt <= staleAfterMillis
       ? reading.value.accounts.map((account) => ({ ...account, machine: name })) : []),
   ];
   const rows = groupLogins(accounts.map((account, order) => ({ ...account, order }))).flatMap((login) => {
@@ -83,7 +84,7 @@ export const subscriptionOverview = (local: Report, remotes: ReadonlyArray<Remot
   return {
       warnings: remotes.flatMap(({ name, reading }) => reading.kind !== "ok"
         ? [name + ": " + (reading.kind === "invalid" ? reading.issue : reading.reason)]
-        : local.readAt - reading.value.readAt > 300_000 ? [name + ": quota reading is stale"] : []),
+        : local.readAt - reading.value.readAt > staleAfterMillis ? [name + ": quota reading is stale"] : []),
       accounts: rows.map(({ title, quota }) => ({ title, quota })),
       windows: rows.flatMap(({ title, windows }) => windows.map(({ label, start, reset, elapsedFraction, usedPoints, leftPoints }) => ({
         account: { title }, label, startsAt: start === null ? null : new Date(start).toISOString(),

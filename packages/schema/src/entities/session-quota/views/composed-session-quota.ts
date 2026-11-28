@@ -31,10 +31,7 @@ import {
   windowsOf,
 } from "./session-quota-report";
 
-const staleAfterMillis = 5 * 60_000;
-
-// quota-axi reads the vendor's reset instant on each machine, so one cycle of one account agrees to well inside a minute.
-const sameCycleMillis = 60_000;
+import { sameCycleMillis, staleAfterMillis } from "./remote-quota-rules";
 
 export interface RemoteReading {
   readonly name: string;
