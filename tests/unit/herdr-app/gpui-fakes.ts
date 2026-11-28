@@ -236,3 +236,8 @@ export const loadAttention = async (): Promise<{ readonly agents: AgentsDocument
   if (inbox.kind !== "ok") throw new Error(inbox.kind === "failed" ? inbox.reason : inbox.kind)
   return { agents: agents.value, inbox: inbox.value }
 }
+
+export const wordsOf = (element: object | string): ReadonlyArray<string> =>
+  typeof element === "string" ? [element] : (nodes.get(element)?.kids ?? []).flatMap(wordsOf)
+
+export const wordsUnder = (element: object, id: string): ReadonlyArray<string> => find(element, id)?.kids.flatMap(wordsOf) ?? []
