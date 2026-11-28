@@ -40,6 +40,7 @@ The command writes only names beginning with `orc`, leaving Herdr's own mods and
 
 The Resources tab refreshes in the background, and the other tabs refresh while visible.
 Each tab shows a reason when a command fails.
+Click an underlined link in any tab to open it in your browser.
 
 ## Answer in the Inbox
 
@@ -53,7 +54,6 @@ The Inbox outlines the recommended option.
 If Orc did not record options, the card shows the original text and says **No options recorded**.
 An overdue card shows how long it has waited.
 The Agents tab shows the same question in the **Thread** tab of its run.
-Click an underlined link to open it in your browser.
 
 To answer a question, a decision, a hold or an event:
 

@@ -4,7 +4,7 @@ export interface TextPart {
 }
 
 const webAddress = /(https?:\/\/)(?=[^\s<>"`“”‘’/?#])[^\s<>"`“”‘’]+/gi
-const prosePunctuation = /[.,:;!?']+$/
+const prosePunctuation = /[.,:;!?'*_~]+$/
 const openingFor = new Map([[")", "("], ["]", "["], ["}", "{"]])
 
 const trimProse = (candidate: string): string => {

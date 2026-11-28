@@ -64,6 +64,13 @@ test("keeps ports, path suffixes, balanced parentheses, query punctuation, and f
   expect(textParts(files)).toEqual([{ text: files, opens: files }])
 })
 
+test("drops trailing Markdown emphasis marks from the target instead of opening an address ending in them", () => {
+  expect(textParts(`**${pull}**`)).toEqual([{ text: "**", opens: null }, { text: pull, opens: pull }, { text: "**", opens: null }])
+  expect(textParts(`_${run}_, ~~${job}~~.`)).toEqual([
+    { text: "_", opens: null }, { text: run, opens: run }, { text: "_, ~~", opens: null }, { text: job, opens: job }, { text: "~~.", opens: null }
+  ])
+})
+
 test("does not offer to open plain text or a bare scheme", () => {
   const text = "Reading the task with no target at https://."
   expect(textParts(text)).toEqual([{ text, opens: null }])
@@ -100,24 +107,45 @@ test("passes exact report URLs to the native open action instead of plain text o
   }
 })
 
-test("uses blue link colours in each appearance instead of a status colour", async () => {
+const channel = (color: string, at: number): number => {
+  const value = Number.parseInt(color.slice(at, at + 2), 16) / 255
+  return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+}
+
+const luminance = (color: string): number => 0.2126 * channel(color, 1) + 0.7152 * channel(color, 3) + 0.0722 * channel(color, 5)
+
+const contrast = (first: string, second: string): number => {
+  const [a, b] = [luminance(first), luminance(second)]
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+}
+
+const colorOf = (view: Node, call: "text_color" | "bg"): string => {
+  const color = argument(view, call)
+  if (typeof color !== "string") throw new Error(`Missing ${call}`)
+  return color
+}
+
+test("draws readable link colours in each appearance instead of a status colour or the dark blue on a light theme", async () => {
   const { linkedText } = await import("../../../packages/herdr-app/src/links-view")
-  for (const look of [
-    { dark: true, rest: "#74ade8", hover: "#a8d1ff", focusText: "#0d1117" },
-    { dark: false, rest: "#00458f", hover: "#002f66", focusText: "#ffffff" }
-  ]) {
+  const { palette } = await import("../../../packages/herdr-app/src/palette")
+  for (const look of [{ dark: true, background: "#282c34" }, { dark: false, background: "#fafafa" }]) {
     appAppearance.dark = look.dark
     try {
       const [link] = nativeLinks(linkedText("job", job))
       if (link === undefined) throw new Error("Missing job link")
-      expect(argument(link, "text_color")).toBe(look.rest)
+      const rest = colorOf(link, "text_color")
+      if (look.dark) expect(rest).toBe("#74ade8")
+      const { working, blocked, done } = palette()
+      expect([working, blocked, done]).not.toContain(rest)
+      expect(contrast(rest, look.background)).toBeGreaterThanOrEqual(4.5)
       expect(link.calls.map(({ name }) => name)).toContain("underline")
       expect(link.calls.map(({ name }) => name)).toContain("cursor_pointer")
       expect(argument(link, "tab_stop")).toBe(true)
-      expect(argument(styled(link, "hover"), "text_color")).toBe(look.hover)
+      const hover = colorOf(styled(link, "hover"), "text_color")
+      expect(hover).not.toBe(rest)
+      expect(contrast(hover, look.background)).toBeGreaterThanOrEqual(4.5)
       const focus = styled(link, "focus")
-      expect(argument(focus, "bg")).toBe(look.rest)
-      expect(argument(focus, "text_color")).toBe(look.focusText)
+      expect(contrast(colorOf(focus, "text_color"), colorOf(focus, "bg"))).toBeGreaterThanOrEqual(4.5)
     } finally {
       appAppearance.dark = true
     }
