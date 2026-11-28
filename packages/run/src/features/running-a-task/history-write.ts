@@ -335,9 +335,9 @@ export const recordReviewDone = (db: Database, runId: string, reviewer: Pick<Age
     const agent = outcome.reusedFrom === null && reviewer !== null
       ? { agentFile: reviewer.path, model: reviewer.model, thinking: reviewer.thinking }
       : { agentFile: null, model: null, thinking: null }
-    const stepId = known ?? (yield* recordStep(db, { runId, name: "review", attempt, status: outcome.status, started, ended, piSessionFile: null, ...agent }).pipe(Effect.mapError(failed("record the review step in"))))
+    const stepId = known ?? (yield* recordStep(db, { runId, name: "review", attempt, status: outcome.status, started, ended, piSessionFile: outcome.sessionFile ?? null, ...agent }).pipe(Effect.mapError(failed("record the review step in"))))
     if (known !== null) {
-      yield* sqlite(() => db.query("UPDATE steps SET status = ?, ended = ?, agent_file = ?, model = ?, thinking = ? WHERE id = ?").run(outcome.status, ended, agent.agentFile, agent.model, agent.thinking, stepId)).pipe(Effect.mapError(failed("record the review step in")))
+      yield* sqlite(() => db.query("UPDATE steps SET status = ?, ended = ?, pi_session_file = COALESCE(?, pi_session_file), agent_file = ?, model = ?, thinking = ? WHERE id = ?").run(outcome.status, ended, outcome.sessionFile ?? null, agent.agentFile, agent.model, agent.thinking, stepId)).pipe(Effect.mapError(failed("record the review step in")))
     }
     if (outcome.reusedFrom !== null) {
       yield* recordSignal(db, { stepId, name: "review-reused-from", value: outcome.reusedFrom }).pipe(Effect.mapError(failed("record the review reuse in")))
