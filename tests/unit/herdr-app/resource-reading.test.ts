@@ -27,3 +27,20 @@ test("a warm Resources open keeps the last rows and their time through a failed 
     sharedValues.delete("orc.resources." + report)
   }
 })
+
+test("a report the view refuses names the field instead of only saying the report is invalid", async () => {
+  const report = "subscription-overview"
+  const command = "orc-dash report " + report
+  sharedValues.delete("orc.resources." + report)
+  try {
+    documents.set(command, { schemaVersion: 1, generatedAt: "2026-01-03T11:00:00Z" })
+    expect(await resourceReading(report, subscriptionsSnapshot).load())
+      .toEqual({ kind: "failed", reason: command + " printed a report this view cannot read: sources is missing" })
+    documents.set(command, { schemaVersion: 1, sources: {} })
+    expect(await resourceReading(report, subscriptionsSnapshot).load())
+      .toEqual({ kind: "failed", reason: command + " printed a report this view cannot read: generatedAt is missing" })
+  } finally {
+    documents.delete(command)
+    sharedValues.delete("orc.resources." + report)
+  }
+})
