@@ -12,8 +12,8 @@ Their safety boundary is the isolated space around the whole agent system, as [R
 
 - Orc passes the agent file's model, thinking level and tools, and the run's `sessions` folder as `--session-dir`.
 - When `~/.pi/agent/extensions/tool-time-cap.ts` exists, orc passes it to Pi with `-e`, because a run's own Pi folder in `PI_CODING_AGENT_DIR` hides your `~/.pi/agent/extensions`.
-  Orc passes it in the nono sandbox, where it adds the resolved file as a read-only grant, and on `--sandbox none` with a token file or package provider.
-  Pi on a login provider without a sandbox loads it itself.
+  Orc passes it in the nono sandbox, where it adds the resolved file as a read-only grant, and on `--sandbox none`.
+  When Pi also loads it from `~/.pi/agent/extensions`, Pi keeps one copy, because it drops an extension whose canonical path it already holds.
 - Orc writes the prompt to Pi’s standard input, and the prompt asks the agent to print `ORC_COMPLETE` on its own line once the work is committed.
 - The prompt also tells the agent to leave repository tests to [GitHub](https://github.com) CI, to run only `build`, `lint`, or `typecheck` locally, not to start or rerun CI by hand once a pull request run exists, not to wait for CI in a tool call, and to print `ORC_SPLIT` on its own line and then a JSON document when the change outgrows the budget.
 - Pi prints one JSON event per line, and its first line is the `session` header with the session id and timestamp.

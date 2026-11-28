@@ -33,17 +33,9 @@ export const openAgentExec = (
         SHLVL: "1",
         ...(plan.own === null ? {} : { PI_CODING_AGENT_DIR: plan.own.piAgentDir, ...plan.own.env })
       })
-      const agentDir = new Map(Object.entries(exec.env)).get("PI_CODING_AGENT_DIR")
-      if (agentDir === undefined) {
-        return exec
-      }
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const home = hostEnv.HOME || homedir()
-      if (path.resolve(copyDir, agentDir) === path.join(home, ".pi", "agent")) {
-        return exec
-      }
-      const piExtension = yield* toolTimeCap(fs, path, home).pipe(
+      const piExtension = yield* toolTimeCap(fs, path, hostEnv.HOME || homedir()).pipe(
         Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot resolve the Pi time cap: " + cause.message }))
       )
       return { ...exec, piExtension }

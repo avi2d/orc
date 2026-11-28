@@ -90,7 +90,7 @@ const expectRoleArgv = (role: "implementer" | "fixer" | "reviewer", argv: Readon
 describe("runPi", () => {
   for (const agentDir of ["run", "inherited", "home", "default"] as const) {
     for (const installed of [true, false]) {
-      test("does not lose an isolated cap or duplicate home loading with " + agentDir + " agent dir and " + (installed ? "an installed" : "a missing") + " cap", async () => {
+      test((installed ? "passes the cap with -e when it is installed" : "passes no -e when the cap is missing") + ", with the " + agentDir + " agent dir", async () => {
         await withFakePi((fixture) => [emit(header), 'printf \'%s\' "$PI_CODING_AGENT_DIR" > ' + quoted(join(fixture.dir, "agent-dir"))], async (fixture) => {
           const cap = join(fixture.dir, ".pi", "agent", "extensions", "tool-time-cap.ts")
           if (installed) {
@@ -133,8 +133,7 @@ describe("runPi", () => {
             expect(result.end).toEqual({ kind: "exited", exitCode: 0 })
             const argv = (await readFile(join(fixture.dir, "argv"), "utf8")).trimEnd().split("\n")
             const caps = argv.flatMap((arg, index) => arg === "-e" ? [argv[index + 1]] : [])
-            const isolated = agentDir === "run" || agentDir === "inherited"
-            expect(caps).toEqual(installed && isolated ? [cap] : [])
+            expect(caps).toEqual(installed ? [cap] : [])
             expect(await readFile(join(fixture.dir, "agent-dir"), "utf8")).toBe(expectedAgentDir(agentDir, fixture.dir))
             expectRoleArgv(role, argv)
           }
