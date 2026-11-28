@@ -34,6 +34,27 @@ Every other command runs the installed orc.
 - For the Inbox screenshot, run `packages/herdr-app/scripts/capture-board.sh tests/fixtures/herdr-inbox docs/images/herdr-inbox.png orc-inbox`.
 - For the Checks screenshot, run `packages/herdr-app/scripts/capture-board.sh tests/fixtures/herdr-checks docs/images/herdr-agents-checks.png orc-agents`.
 
+## Check the design system gallery
+
+Open the Orc layout in your test App and select **Design system** in the top bar.
+The gallery opens as a window, not a layout tab.
+It reads host theme values and uses sample data for all actions.
+
+1. Search **Examples** for `button.32.primary.enabled`, press the button, and check for a receipt.
+   Select `button.32.primary.disabled` and check that it produces no receipt.
+1. Search for `field-with-button.ready`.
+   Change the sample answer, press Enter, and check that the receipt contains the new text.
+   Use **Reset example** to restore the starting answer and clear the receipt.
+1. Open `rows.grouped`.
+   Fold the first group and check that its run hides while the other group still scrolls.
+1. Compare `thread.delivered` and `linked-text.wrapped` with **320 px preview** both on and off.
+   The sample link should show its destination in the gallery without opening a browser.
+1. Capture **Colours** and the examples in the active theme, then with **Graphite** and **Paper** selected.
+   Those choices preview Orc colours only.
+   To check native input colour, repeat in test App instances that already use each theme.
+
+Use the story ID, theme name, and preview width in each capture's filename.
+
 ## Change the mods
 
 The TypeScript mods are in `packages/herdr-app/mods/`.

@@ -33,9 +33,10 @@ type Example =
 
 export type GalleryStory = Example & { readonly id: string; readonly label: string }
 
-const sizes = [24, 32] as const
+export const galleryControlHeights = [24, 32] as const satisfies ReadonlyArray<ControlSize>
+
 const looks = ["primary", "secondary", "ghost"] as const
-const buttonStories = sizes.flatMap((size) => looks.flatMap((look) => ([false, true] as const).map((disabled) => ({
+const buttonStories = galleryControlHeights.flatMap((size) => looks.flatMap((look) => ([false, true] as const).map((disabled) => ({
   id: `button.${size}.${look}.${disabled ? "disabled" : "enabled"}`,
   label: `${size} px ${look}${disabled ? ", disabled" : ""}`,
   component: "button" as const,
