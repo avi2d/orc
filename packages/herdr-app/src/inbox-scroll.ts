@@ -21,8 +21,14 @@ const viewport = (scroll: ScrollHandle) => {
   return !width || !height || offset === null ? null : { width, height, offset }
 }
 
+interface Band {
+  readonly from: number
+  readonly to: number
+}
+
 export class InboxScroll {
   private heights = new Map<string, number>()
+  private band: Band | null = null
   private items: ReadonlyArray<InboxItem> | null = null
   private width = 0
   private zoom = 1
@@ -41,18 +47,28 @@ export class InboxScroll {
       this.width = view.width
       this.zoom = zoom
     }
+    const band = view === null ? null : { from: view.offset - view.height, to: view.offset + 2 * view.height }
+    this.band = null
     const heights = this.heights
     let top: number | null = inboxPadding
     return (key: string, draw: () => Element): Element => {
       const height = heights.get(key)
       const start: number | null = top
       top = start === null || height === undefined ? null : start + height + inboxGap
-      if (view !== null && start !== null && height !== undefined &&
-        (start + height < view.offset - view.height || start > view.offset + 2 * view.height)) {
+      if (band !== null && start !== null && height !== undefined && (start + height < band.from || start > band.to)) {
+        this.band = band
         return div().id(`space-${key}`).flex_shrink_0().h(height)
       }
       // Interactive rows cannot register input handlers inside a native virtual list.
       return draw().on_size_change((size) => { if (size.height > 0) heights.set(key, size.height / zoom) })
     }
+  }
+
+  // Native scrolling does not invalidate the view, so a poll has to notice the viewport nearing a spacer.
+  leftDrawnBand(scroll: ScrollHandle): boolean {
+    const band = this.band
+    const view = viewport(scroll)
+    return band !== null && view !== null &&
+      (view.offset < band.from + view.height / 2 || view.offset + view.height * 1.5 > band.to)
   }
 }

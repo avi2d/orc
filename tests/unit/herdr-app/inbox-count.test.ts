@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { expect, spyOn, test } from "bun:test"
 import fixture from "../../fixtures/attention/herdr-app.json"
 import type { Card } from "../../../packages/herdr-app/src/agents"
 import type { BoardTask } from "../../../packages/herdr-app/src/board"
@@ -305,6 +305,53 @@ test("the Inbox registers its option, Send and fold handlers outside a virtual l
   expect(find(view.render(), "toggle-agent-attention")).not.toBeNull()
   expect(handlersInRows(view.render())).toEqual([])
 })
+
+test("a scroll past the drawn Inbox cards redraws them on the next tick instead of leaving blank spacers until the next reload", async () => {
+  const { default: OrcInbox } = await import("../../../packages/herdr-app/mods/orc-inbox/main")
+  const { inbox } = await loadAttention()
+  const view = new OrcInbox()
+  view.reading = { kind: "ok", value: inbox }
+  view.visible = true
+  view.answers.sync(cx, inbox.items)
+  let offset = 0
+  Object.assign(view.scroll, { offset: () => ({ x: 0, y: offset }), viewport_size: () => ({ width: 720, height: 100 }) })
+  const measure = (element: object): void => {
+    for (const made of walk(element)) {
+      const handler = made.calls.find((call) => call.name === "on_size_change")?.args[0]
+      if (typeof handler === "function") handler({ width: 720, height: 300 }, cx)
+    }
+  }
+  measure(view.render())
+  const third = inbox.items[2]
+  if (third === undefined) throw new Error("The fixture has fewer than three Inbox items")
+  expect(find(view.render(), `space-${third.key}`)).not.toBeNull()
+  const notify = spyOn(cx, "notify")
+  try {
+    view.tick(cx)
+    expect(notify).toHaveBeenCalledTimes(0)
+    offset = 16 + 2 * 312
+    view.tick(cx)
+    expect(notify).toHaveBeenCalledTimes(1)
+    expect(find(view.render(), `item-${third.key}`)).not.toBeNull()
+    view.tick(cx)
+    expect(notify).toHaveBeenCalledTimes(1)
+    offset = 0
+    view.tick(cx)
+    expect(notify).toHaveBeenCalledTimes(2)
+    expect(find(view.render(), `item-${inbox.items[0]?.key ?? ""}`)).not.toBeNull()
+    view.visible = false
+    offset = 16 + 2 * 312
+    view.tick(cx)
+    expect(notify).toHaveBeenCalledTimes(2)
+  } finally {
+    notify.mockRestore()
+  }
+})
+
+const walk = (element: object | string): ReadonlyArray<Node> => {
+  const made = typeof element === "string" ? undefined : nodes.get(element)
+  return made === undefined ? [] : [made, ...made.kids.flatMap(walk)]
+}
 
 const idsIn = (lane: Node | null): ReadonlyArray<string> =>
   (lane?.kids ?? []).flatMap((kid) => typeof kid === "string" ? [] : (nodes.get(kid)?.calls ?? []).flatMap((call) => call.name === "id" ? [String(call.args[0])] : []))

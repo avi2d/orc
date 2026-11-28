@@ -28,10 +28,14 @@ export default class OrcInbox extends View {
 
   override init(_props: unknown, cx: AsyncContext): void {
     refreshWhenShown("orc-inbox", 10_000, cx, this)
-    cx.timer.every(150, (tick) => {
-      if (this.reading.kind === "ok") this.answers.sync(tick, this.reading.value.items)
-    })
+    cx.timer.every(150, (tick) => this.tick(tick))
     cx.spawn((task) => listenFor("merge", () => this.merge(task)))
+  }
+
+  tick(cx: Context): void {
+    if (this.reading.kind !== "ok") return
+    this.answers.sync(cx, this.reading.value.items)
+    if (this.visible && this.window.leftDrawnBand(this.scroll)) cx.notify()
   }
 
   askMerge(item: InboxApproval): void {
