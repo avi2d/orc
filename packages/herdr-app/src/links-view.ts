@@ -11,6 +11,7 @@ const webLink = (t: LinkPalette, id: string, url: string): Element => {
   const link = Link.new(id).href(url).tab_stop(true).cursor_pointer().min_w_0().truncate()
     .text_color(t.link).underline().tooltip(url)
     .hover((style) => style.text_color(t.linkHover))
+    .on_click((_event, cx) => cx.stop_propagation())
     .child(url)
   if (pointerFocusedId === id) {
     // Tab moves focus on key-down, so only its release reaches the new link.

@@ -3,7 +3,7 @@ import { buildCards } from "../../../packages/herdr-app/src/agents"
 import { lineWords, textParts } from "../../../packages/herdr-app/src/links"
 import type { InboxItem } from "../../../packages/herdr-app/src/inbox"
 import { type TaskDetail, infoRows } from "../../../packages/herdr-app/src/task"
-import { type Node, appAppearance, cx, node, nodes } from "./gpui-fakes"
+import { type Node, appAppearance, click, cx, find, node, nodes, stopped } from "./gpui-fakes"
 
 const address = "https://github.com/avi2d/orc/pull/219"
 
@@ -106,6 +106,44 @@ test("passes exact report URLs to the native open action instead of plain text o
   for (const view of [answers.item(t, inboxReport, () => undefined), answers.askCard(t, inboxReport, () => undefined)]) {
     expect(nativeLinks(view).map((link) => argument(link, "href"))).toEqual([pull, pull, job, otherJob, run])
   }
+})
+
+const clickThrough = (link: Node, parent: Node): void => {
+  const before = stopped.length
+  click(link)
+  if (stopped.length === before) click(parent)
+}
+
+test("keeps linked answer rows and tiles clickable without picking the option when its link opens", async () => {
+  const { InboxAnswers } = await import("../../../packages/herdr-app/src/inbox-view")
+  const { optionView } = await import("../../../packages/herdr-app/src/ask-view")
+  const { palette } = await import("../../../packages/herdr-app/src/palette")
+  const option = { letter: "A", text: `Review ${job}.`, picture: null }
+  const item = { ...inboxReport, ask: { ...inboxReport.ask, options: [option] } }
+  const answers = new InboxAnswers(() => undefined)
+  answers.sync(cx, [item])
+  const t = palette()
+  const row = answers.optionRow(t, item, option, 0, () => undefined)
+  const parent = nodes.get(row)
+  const rowLink = nativeLinks(row).at(0)
+  if (parent === undefined || rowLink === undefined) throw new Error("Missing linked answer row")
+  expect(argument(parent, "hover")).toBeFunction()
+  expect(argument(rowLink, "href")).toBe(job)
+  clickThrough(rowLink, parent)
+  expect(answers.isPicked(item, option)).toBe(false)
+  click(parent)
+  expect(answers.isPicked(item, option)).toBe(true)
+
+  let choices = 0
+  const tile = optionView(t, "option-with-link", option, (shown) => shown.on_click(() => { choices++ }))
+  const tileParent = find(tile, "option-with-link")
+  const tileLink = nativeLinks(tile).at(0)
+  if (tileParent === null || tileLink === undefined) throw new Error("Missing linked answer tile")
+  expect(argument(tileLink, "href")).toBe(job)
+  clickThrough(tileLink, tileParent)
+  expect(choices).toBe(0)
+  click(tileParent)
+  expect(choices).toBe(1)
 })
 
 const channel = (color: string, at: number): number => {

@@ -3,7 +3,6 @@ import { InputState, h_flex, v_flex } from "gpui-base"
 import { type Sent, failureLine, optionView, section, sendOrc } from "./ask-view"
 import { button, card, fieldWithButton, kbd, radio, zinc } from "./kit"
 import { type InboxApproval, type InboxItem, choice, inboxArgv, optionByNumber } from "./inbox"
-import { hasLinks } from "./links"
 import { linkedCardText } from "./links-view"
 import type { palette } from "./palette"
 import { shortTime } from "./task"
@@ -192,21 +191,18 @@ export class InboxAnswers {
     const checked = this.isPicked(item, option)
     const id = `option-${item.key}-${option.letter}`
     const outcome = option.outcome ?? "No outcome recorded"
-    const pick = (target: Element): Element =>
-      enabled ? target.cursor_pointer().hover((style) => style.bg(zinc.s2)).on_click((_event, cx) => this.pick(cx, item, option, askMerge)) : target
-    const hasOptionLinks = [option.text, outcome, option.picture ?? ""].some(hasLinks)
-    const radioTarget = div().id(`${id}-select`).h(20).flex().items_center().child(radio(checked))
-    const number = kbd(t, String(index + 1))
     const row = h_flex().id(id).gap(10).items_start().px(8).py(6).rounded(6).min_w_0()
-      .child(hasOptionLinks ? pick(radioTarget) : radioTarget)
+      .child(div().h(20).flex().items_center().child(radio(checked)))
       .child(v_flex().flex_1().min_w_0().gap(2)
         .child(h_flex().gap(8).items_center()
           .child(linkedCardText(`${id}-text`, option.text).text_size(13).font_weight(500).text_color(checked ? t.foreground : zinc.muted).whitespace_normal())
           .children(option.text === item.recommendation ? [div().text_size(12).text_color(t.muted).child("Recommended")] : []))
         .child(linkedCardText(`${id}-outcome`, outcome).text_size(12).text_color(t.muted).whitespace_normal())
         .children(option.picture === null ? [] : [linkedCardText(`${id}-picture`, `Picture: ${option.picture}`).text_size(12).text_color(t.dim).whitespace_normal()]))
-      .children(index < keyedOptions ? [hasOptionLinks ? pick(number.id(`${id}-number`)) : number] : [])
-    return !enabled ? row.opacity(0.5) : hasOptionLinks ? row : pick(row)
+      .children(index < keyedOptions ? [kbd(t, String(index + 1))] : [])
+    return enabled
+      ? row.cursor_pointer().hover((style) => style.bg(zinc.s2)).on_click((_event, cx) => this.pick(cx, item, option, askMerge))
+      : row.opacity(0.5)
   }
 
   askActions(t: Palette, item: InboxItem): ReadonlyArray<Element> {
