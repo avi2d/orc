@@ -1,9 +1,16 @@
 import type { Color } from "gpui-kit"
-import { theme } from "herdr"
+import { settings, theme } from "herdr"
 
 type ColorName =
   | "background" | "surface" | "chrome" | "raised" | "hover" | "selected" | "border"
   | "foreground" | "muted" | "dim" | "accent" | "working" | "blocked" | "done" | "ansi1" | "ansi2" | "solid" | "solid_foreground"
+
+const linkColors = {
+  dark: { link: "#74ade8", linkHover: "#a8d1ff", linkFocusForeground: "#0d1117" },
+  light: { link: "#00458f", linkHover: "#002f66", linkFocusForeground: "#ffffff" }
+} as const satisfies Record<"dark" | "light", Record<"link" | "linkHover" | "linkFocusForeground", Color>>
+
+export const linkPalette = () => settings().dark === false ? linkColors.light : linkColors.dark
 
 const isColor = (value: string | undefined): value is Color => value?.startsWith("#") === true
 

@@ -1,5 +1,7 @@
 import { type Context, type Element, div } from "gpui-kit"
-import { Avatar, AvatarFallback, AvatarImage, v_flex } from "gpui-base"
+import { Avatar, AvatarFallback, AvatarImage, h_flex, v_flex } from "gpui-base"
+import { hasLinks } from "./links"
+import { linkedText } from "./links-view"
 import { exec, nextCommand } from "herdr"
 import { exitReason } from "./orc-read"
 import type { palette } from "./palette"
@@ -45,8 +47,7 @@ export const listenFor = (command: string, act: () => void): Promise<void> =>
 export const section = (t: Palette, label: string, content: Element): Element =>
   v_flex().gap(2).child(div().text_size(12).text_color(t.muted).child(label)).child(content)
 
-export const optionView = (t: Palette, id: string, option: AskOption): Element => {
-  const label = `${option.letter}) ${option.text}`
+const optionTile = (t: Palette, id: string, option: AskOption, label: string): Element => {
   const shape = optionShape(option)
   return shape.kind === "tile"
     ? v_flex().id(id).w(180).rounded(6).border(1).border_color(t.border).bg(t.background).overflow_hidden()
@@ -55,6 +56,14 @@ export const optionView = (t: Palette, id: string, option: AskOption): Element =
         .fallback(AvatarFallback.new().size_full().items_center().justify_center().p(6).text_size(11).text_color(t.muted).child(shape.picture)))
       .child(div().p(6).child(label))
     : div().id(id).px(12).py(4).rounded(6).border(1).border_color(t.border).bg(t.background).child(label)
+}
+
+export const optionView = (t: Palette, id: string, option: AskOption, control: (element: Element) => Element): Element => {
+  const letter = `${option.letter})`
+  if (!hasLinks(option.text)) return control(optionTile(t, id, option, `${letter} ${option.text}`))
+  return h_flex().gap(6).items_start().min_w_0()
+    .child(control(optionTile(t, id, option, letter)))
+    .child(linkedText(`${id}-text`, option.text).flex_1().whitespace_normal())
 }
 
 export const actionButton = (t: Palette, id: string, label: string, busy: boolean, press: (cx: Context) => void): Element => {

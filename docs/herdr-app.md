@@ -53,6 +53,7 @@ The Inbox outlines the recommended option.
 If Orc did not record options, the card shows the original text and says **No options recorded**.
 An overdue card shows how long it has waited.
 The Agents tab shows the same question in the **Thread** tab of its run.
+Click an underlined link to open it in your browser.
 
 To answer a question, a decision, a hold or an event:
 

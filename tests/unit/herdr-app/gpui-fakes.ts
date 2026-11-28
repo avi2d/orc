@@ -147,7 +147,7 @@ export const pressRow = (element: object, listId: string, key: string): void => 
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node, list: everyRow, uniform_list: everyRange, image: node, svg: node }))
 void mock.module("gpui-base", () => ({
-  h_flex: node, v_flex: node, Scrollbar: { vertical: node }, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
+  h_flex: node, v_flex: node, Link: { new: node }, Scrollbar: { vertical: node }, Input: { new: () => node() }, TextView: { markdown: node }, Avatar: node, AvatarFallback: node, AvatarImage: node,
   ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) },
   InputState: { new: () => {
     let typed = ""
@@ -170,6 +170,8 @@ const reply = (line: string): Promise<{ code: number; stdout: string; stderr: st
   return Promise.resolve({ code: 0, stdout: JSON.stringify(document), stderr: "" })
 }
 
+export const appAppearance = { dark: true }
+
 void mock.module("herdr", () => ({
   run: (name: string, args: unknown) => ran.push({ name, args }),
   readTextFile: (file: string) => Promise.resolve(sessionFiles.get(file) ?? null),
@@ -179,7 +181,7 @@ void mock.module("herdr", () => ({
     return line === "orc attention --json" && stalledAttention.pending !== null ? stalledAttention.pending : reply(line)
   },
   shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => ({}),
-  settings: () => ({}), openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined
+  settings: () => appAppearance, openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined
 }))
 
 interface OpenTask {

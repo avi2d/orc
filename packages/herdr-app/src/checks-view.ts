@@ -1,6 +1,7 @@
 import { type Context, type Element, div } from "gpui-kit"
 import { type ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { monospace } from "./fonts"
+import { linkedText } from "./links-view"
 import { type CheckFailure, type CheckSummary, type ChecksSummary, checkTime } from "./checks"
 import { type CheckState, alert, card, checkIcon } from "./kit"
 import type { Reading } from "./orc-read"
@@ -14,24 +15,25 @@ export interface ChecksShown {
   readonly flip: (key: string, cx: Context) => void
 }
 
-const block = (t: Palette, lines: ReadonlyArray<string>): Element =>
+const block = (t: Palette, id: string, lines: ReadonlyArray<string>): Element =>
   v_flex().px(10).py(6).rounded(8).bg(t.chrome).font_family(monospace()).text_size(12)
-    .children(lines.map((line) => div().child(line === "" ? " " : line)))
+    .children(lines.map((line, index) => linkedText(`${id}-${index}`, line === "" ? " " : line)))
 
 const counts = (passCount: number | null, failCount: number | null): string =>
   [passCount === null ? null : `${passCount.toString()} pass`, failCount === null ? null : `${failCount.toString()} fail`].filter((part) => part !== null).join(" · ")
 
-const failureView = (t: Palette, failure: CheckFailure): Element => {
+const failureView = (t: Palette, id: string, failure: CheckFailure): Element => {
   if (failure.kind === "tail") {
     return v_flex().ml(22).my(4).gap(4)
       .child(div().text_size(12).text_color(t.muted).child("Last lines before the exit"))
-      .child(block(t, failure.lines))
+      .child(block(t, id, failure.lines))
   }
   const tally = counts(failure.passCount, failure.failCount)
   return v_flex().ml(22).my(4).gap(8)
-    .children(failure.failed.map((test) => v_flex().gap(4)
-      .child(h_flex().gap(8).items_center().child(checkIcon("failed")).child(div().min_w_0().whitespace_normal().child(test.name)))
-      .children(test.error.length === 0 ? [] : [block(t, test.error)])))
+    .children(failure.failed.map((test, index) => v_flex().gap(4)
+      .child(h_flex().gap(8).items_center().child(checkIcon("failed"))
+        .child(linkedText(`${id}-test-name-${index}`, test.name).min_w_0().whitespace_normal()))
+      .children(test.error.length === 0 ? [] : [block(t, `${id}-test-error-${index}`, test.error)])))
     .children(tally === "" ? [] : [div().text_size(12).text_color(t.muted).child(tally)])
 }
 
@@ -61,7 +63,7 @@ const checkView = (t: Palette, check: CheckSummary, shown: ChecksShown): Element
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
     .on_click((_event, cx) => shown.flip(key, cx))
     .child(div().w(12).flex_shrink_0().text_color(t.muted).child(open ? "▾" : "▸"))
-  return open ? v_flex().child(toggle).child(failureView(t, outcome.failure)) : toggle
+  return open ? v_flex().child(toggle).child(failureView(t, key, outcome.failure)) : toggle
 }
 
 export const checksView = (t: Palette, reading: Reading<ChecksSummary>, shown: ChecksShown, scroll: ScrollHandle, unbounded: () => Element): Element => {

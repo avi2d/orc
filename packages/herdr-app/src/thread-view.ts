@@ -32,8 +32,8 @@ const askBody = (t: Palette, card: ThreadCard, controls: ThreadControls): Readon
     ...(ask.context === null ? [] : [section(t, "Context", linkedText(`context-${card.key}`, ask.context))]),
     section(t, "Question", linkedText(`question-${card.key}`, ask.question)),
     ...(ask.options.length === 0 ? [] : [section(t, "Options", h_flex().flex_wrap().gap(8).children(ask.options.map((option) =>
-      controls.option(card, option, optionView(t, `option-${card.key}-${option.letter}`, option)))))]),
-    ...(pictures.length === 0 ? [] : [section(t, "Evidence", v_flex().text_color(t.muted).children(pictures.map((picture) => div().child(picture))))])
+      optionView(t, `option-${card.key}-${option.letter}`, option, (shown) => controls.option(card, option, shown)))))]),
+    ...(pictures.length === 0 ? [] : [section(t, "Evidence", v_flex().text_color(t.muted).children(pictures.map((picture, index) => linkedText(`picture-${card.key}-${index}`, picture))))])
   ]
 }
 
@@ -60,7 +60,7 @@ const decidedGroup = (t: Palette, key: string, heading: string, lines: ReadonlyA
     .children(lines.map((line) => v_flex().id(`decided-${key}-${line.key}`).gap(4).p(10).rounded(6).bg(t.raised).min_w_0()
       .child(div().text_size(12).font_semibold().child(line.what))
       .child(linkedText(`decided-text-${key}-${line.key}`, line.words))
-      .children("basis" in line && line.basis !== null ? [section(t, "Basis", div().whitespace_normal().child(line.basis))] : [])))
+      .children("basis" in line && line.basis !== null ? [section(t, "Basis", linkedText(`decided-basis-${key}-${line.key}`, line.basis).whitespace_normal())] : [])))
 
 export const threadDecided = (t: Palette, told: Thread): ReadonlyArray<Element> => {
   const { owner, agent } = threadDecisions(told)

@@ -94,7 +94,7 @@ const sendBackBody = (t: Palette, card: Card, back: SendBackShown, withLink: boo
   const sent = back.sent
   const said = sent === null ? [] : [sent.kind === "failed"
     ? alert(t, "send-back-failed", { tone: "error", title: "Could not send it back", body: sent.reason })
-    : div().text_size(12).text_color(t.muted).whitespace_normal().child(sent.kind === "reading" ? "Sending it back" : sent.value.trim())]
+    : linkedText("send-back-result", sent.kind === "reading" ? "Sending it back" : sent.value.trim()).text_size(12).text_color(t.muted).whitespace_normal()]
   if (card.sendBack === null) return sent?.kind === "ok" ? said : []
   const ready = sendBackArgs(card, back.review.value()) !== null && sent?.kind !== "reading"
   const label = sent?.kind === "reading" ? "Sending back" : "Send back"
@@ -119,7 +119,7 @@ const logBody = (t: Palette, reading: Reading<string>, scroll: ScrollHandle): El
   if (reading.value === "") return note(t, "log-empty", { tone: "neutral", title: "Nothing written yet" })
   return v_flex().id("log").flex_1().min_h_0().overflow_y_scrollbar().track_scroll(scroll).px(20).py(12)
     .font_family(monospace()).text_size(12)
-    .children(logLines(reading.value).map((text) => div().child(text === "" ? " " : text)))
+    .children(logLines(reading.value).map((text, index) => linkedText(`log-${index}`, text === "" ? " " : text)))
 }
 
 const askedLine = (t: Palette, card: Card, act: AgentsActions): ReadonlyArray<Element> =>

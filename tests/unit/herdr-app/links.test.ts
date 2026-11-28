@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test"
 import { buildCards } from "../../../packages/herdr-app/src/agents"
 import { lineWords, textParts } from "../../../packages/herdr-app/src/links"
+import type { InboxItem } from "../../../packages/herdr-app/src/inbox"
 import { type TaskDetail, infoRows } from "../../../packages/herdr-app/src/task"
+import { type Node, appAppearance, cx, node, nodes } from "./gpui-fakes"
 
 const address = "https://github.com/avi2d/orc/pull/219"
 
@@ -30,19 +32,120 @@ test("draws a PR address inside a decision card's text with an open action inste
   expect(parts).toEqual([{ text: "Approve PR #219 at ", opens: null }, { text: address, opens: address }, { text: ".", opens: null }])
 })
 
-test("opens exactly the address it shows instead of another one", () => {
-  const text = `Merged https://github.com/o/r/pull/12 and ${address}/files after review`
-  const parts = textParts(text)
-  expect(parts.map((part) => part.text).join("")).toBe(text)
-  expect(parts.filter((part) => part.opens !== null).map((part) => [part.text, part.opens])).toEqual([
-    ["https://github.com/o/r/pull/12", "https://github.com/o/r/pull/12"],
-    [address, address]
+const pull = "https://github.com/example/project/pull/461"
+const run = "https://github.com/example/project/actions/runs/46077057199"
+const job = `${run}/job/140772971862`
+const otherJob = `${run}/job/140773513101`
+const report = `${pull}: the check ci/e2e (1) ${job}, ci/checks ${otherJob} is red`
+
+test("detects the pull request and both jobs in a Beat report without swallowing the colon or comma", () => {
+  expect(textParts(report)).toEqual([
+    { text: pull, opens: pull },
+    { text: ": the check ci/e2e (1) ", opens: null },
+    { text: job, opens: job },
+    { text: ", ci/checks ", opens: null },
+    { text: otherJob, opens: otherJob },
+    { text: " is red", opens: null }
   ])
 })
 
-test("gives text with no PR address no open action instead of linking it", () => {
-  expect(textParts("Reading the task")).toEqual([{ text: "Reading the task", opens: null }])
-  expect(textParts("see https://github.com/avi2d/orc/issues/3")).toEqual([{ text: "see https://github.com/avi2d/orc/issues/3", opens: null }])
+test("detects an Actions run without its sentence-ending period", () => {
+  expect(textParts(`Run: ${run}.`)).toEqual([
+    { text: "Run: ", opens: null }, { text: run, opens: run }, { text: ".", opens: null }
+  ])
+})
+
+test("keeps ports, path suffixes, balanced parentheses, query punctuation, and fragments in the target", () => {
+  const url = "http://example.org:8080/file(v2)?colors=blue,red&view=all#details"
+  expect(textParts(`See (${url}).`)).toEqual([
+    { text: "See (", opens: null }, { text: url, opens: url }, { text: ").", opens: null }
+  ])
+  const files = `${address}/files`
+  expect(textParts(files)).toEqual([{ text: files, opens: files }])
+})
+
+test("does not offer to open plain text or a bare scheme", () => {
+  const text = "Reading the task with no target at https://."
+  expect(textParts(text)).toEqual([{ text, opens: null }])
+})
+
+const nativeLinks = (element: object | string): ReadonlyArray<Node> => {
+  const view = typeof element === "string" ? undefined : nodes.get(element)
+  if (view === undefined) return []
+  return [...(view.calls.some((call) => call.name === "href") ? [view] : []), ...view.kids.flatMap(nativeLinks)]
+}
+
+const argument = (view: Node, call: string): unknown => view.calls.find(({ name }) => name === call)?.args[0]
+
+const styled = (link: Node, state: "hover" | "focus"): Node => {
+  const apply = argument(link, state)
+  const style = node()
+  if (typeof apply === "function") apply(style)
+  const result = nodes.get(style)
+  if (result === undefined) throw new Error("Missing link style")
+  return result
+}
+
+test("passes exact report URLs to the native open action instead of plain text or punctuated targets", async () => {
+  const { InboxAnswers } = await import("../../../packages/herdr-app/src/inbox-view")
+  const { palette } = await import("../../../packages/herdr-app/src/palette")
+  const item: InboxItem = {
+    key: "example/report", task: "example", title: "Example", kind: "event", who: "beat", asked: null, recommendation: null,
+    ask: { question: `The PR ${pull}`, context: `${report}. Run: ${run}.`, options: [] },
+    action: { kind: "event", id: "example" }
+  }
+  const answers = new InboxAnswers(() => undefined)
+  for (const view of [answers.item(palette(), item, () => undefined), answers.askCard(palette(), item, () => undefined)]) {
+    expect(nativeLinks(view).map((link) => argument(link, "href"))).toEqual([pull, pull, job, otherJob, run])
+  }
+})
+
+test("uses blue link colours in each appearance instead of a status colour", async () => {
+  const { linkedText } = await import("../../../packages/herdr-app/src/links-view")
+  for (const look of [
+    { dark: true, rest: "#74ade8", hover: "#a8d1ff", focusText: "#0d1117" },
+    { dark: false, rest: "#00458f", hover: "#002f66", focusText: "#ffffff" }
+  ]) {
+    appAppearance.dark = look.dark
+    try {
+      const [link] = nativeLinks(linkedText("job", job))
+      if (link === undefined) throw new Error("Missing job link")
+      expect(argument(link, "text_color")).toBe(look.rest)
+      expect(link.calls.map(({ name }) => name)).toContain("underline")
+      expect(link.calls.map(({ name }) => name)).toContain("cursor_pointer")
+      expect(argument(link, "tab_stop")).toBe(true)
+      expect(argument(styled(link, "hover"), "text_color")).toBe(look.hover)
+      const focus = styled(link, "focus")
+      expect(argument(focus, "bg")).toBe(look.rest)
+      expect(argument(focus, "text_color")).toBe(look.focusText)
+    } finally {
+      appAppearance.dark = true
+    }
+  }
+})
+
+test("a pointer press does not leave the job link highlighted and tabbing back restores visible focus", async () => {
+  const { linkedText } = await import("../../../packages/herdr-app/src/links-view")
+  const jobLink = () => {
+    const [link] = nativeLinks(linkedText("focus-job", job))
+    if (link === undefined) throw new Error("Missing job link")
+    return link
+  }
+  const press = jobLink().calls.find(({ name }) => name === "on_mouse_down")
+  const onPress = press?.args[1]
+  expect(press?.args[0]).toBe("left")
+  if (typeof onPress !== "function") throw new Error("Missing pointer handler")
+  onPress({ button: "left" }, cx)
+
+  const pointerLink = jobLink()
+  expect(argument(pointerLink, "focus")).toBeUndefined()
+  expect(argument(pointerLink, "href")).toBe(job)
+  expect(argument(pointerLink, "tab_stop")).toBe(true)
+
+  const onTabRelease = argument(pointerLink, "on_key_up")
+  if (typeof onTabRelease !== "function") throw new Error("Missing keyboard handler")
+  onTabRelease({ key: "tab" }, cx)
+  expect(argument(jobLink(), "focus")).toBeFunction()
 })
 
 test("draws the Approve step's PR address with an open action instead of plain text", () => {

@@ -3,6 +3,7 @@ import { InputState, h_flex, v_flex } from "gpui-base"
 import { type Sent, failureLine, optionView, section, sendOrc } from "./ask-view"
 import { button, card, fieldWithButton, kbd, radio, zinc } from "./kit"
 import { type InboxApproval, type InboxItem, choice, inboxArgv, optionByNumber } from "./inbox"
+import { hasLinks } from "./links"
 import { linkedText } from "./links-view"
 import type { palette } from "./palette"
 import { shortTime } from "./task"
@@ -189,16 +190,23 @@ export class InboxAnswers {
   optionRow(t: Palette, item: InboxItem, option: AskOption, index: number, askMerge: AskMerge): Element {
     const enabled = !this.busy(item.key) && choice(item, option).kind !== "unavailable"
     const checked = this.isPicked(item, option)
-    const row = h_flex().id(`option-${item.key}-${option.letter}`).gap(10).items_start().px(8).py(6).rounded(6).min_w_0()
-      .child(div().h(20).flex().items_center().child(radio(checked)))
+    const id = `option-${item.key}-${option.letter}`
+    const outcome = option.outcome ?? "No outcome recorded"
+    const pick = (target: Element): Element =>
+      enabled ? target.cursor_pointer().hover((style) => style.bg(zinc.s2)).on_click((_event, cx) => this.pick(cx, item, option, askMerge)) : target
+    const hasOptionLinks = [option.text, outcome, option.picture ?? ""].some(hasLinks)
+    const radioTarget = div().id(`${id}-select`).h(20).flex().items_center().child(radio(checked))
+    const number = kbd(t, String(index + 1))
+    const row = h_flex().id(id).gap(10).items_start().px(8).py(6).rounded(6).min_w_0()
+      .child(hasOptionLinks ? pick(radioTarget) : radioTarget)
       .child(v_flex().flex_1().min_w_0().gap(2)
         .child(h_flex().gap(8).items_center()
-          .child(div().text_size(13).font_weight(500).text_color(checked ? t.foreground : zinc.muted).whitespace_normal().child(option.text))
+          .child(linkedText(`${id}-text`, option.text).text_size(13).font_weight(500).text_color(checked ? t.foreground : zinc.muted).whitespace_normal())
           .children(option.text === item.recommendation ? [div().text_size(12).text_color(t.muted).child("Recommended")] : []))
-        .child(div().text_size(12).text_color(t.muted).whitespace_normal().child(option.outcome ?? "No outcome recorded"))
-        .children(option.picture === null ? [] : [div().text_size(12).text_color(t.dim).whitespace_normal().child(`Picture: ${option.picture}`)]))
-      .children(index < keyedOptions ? [kbd(t, String(index + 1))] : [])
-    return enabled ? row.cursor_pointer().hover((style) => style.bg(zinc.s2)).on_click((_event, cx) => this.pick(cx, item, option, askMerge)) : row.opacity(0.5)
+        .child(linkedText(`${id}-outcome`, outcome).text_size(12).text_color(t.muted).whitespace_normal())
+        .children(option.picture === null ? [] : [linkedText(`${id}-picture`, `Picture: ${option.picture}`).text_size(12).text_color(t.dim).whitespace_normal()]))
+      .children(index < keyedOptions ? [hasOptionLinks ? pick(number.id(`${id}-number`)) : number] : [])
+    return !enabled ? row.opacity(0.5) : hasOptionLinks ? row : pick(row)
   }
 
   askActions(t: Palette, item: InboxItem): ReadonlyArray<Element> {
@@ -233,13 +241,15 @@ export class InboxAnswers {
   }
 
   option(t: Palette, item: InboxItem, option: AskOption, askMerge: AskMerge): Element {
-    const display = optionView(t, `option-${item.key}-${option.letter}`, option).max_w_full().whitespace_normal()
-    const shown = option.text === item.recommendation ? display.border_color(t.accent) : display
     const enabled = !this.busy(item.key) && choice(item, option).kind !== "unavailable"
+    const display = optionView(t, `option-${item.key}-${option.letter}`, option, (control) => {
+      const shown = control.max_w_full().whitespace_normal().when(option.text === item.recommendation, (tile) => tile.border_color(t.accent))
+      return enabled ? shown.cursor_pointer().hover((style) => style.bg(t.hover))
+        .on_click((_event, cx) => this.choose(cx, item, option, askMerge)) : shown.text_color(t.dim)
+    })
     return v_flex().gap(3).min_w_0().items_start()
-      .child(enabled ? shown.cursor_pointer().hover((style) => style.bg(t.hover))
-        .on_click((_event, cx) => this.choose(cx, item, option, askMerge)) : shown.text_color(t.dim))
-      .child(div().text_color(t.muted).whitespace_normal().child(option.outcome ?? "No outcome recorded"))
+      .child(display)
+      .child(linkedText(`option-outcome-${item.key}-${option.letter}`, option.outcome ?? "No outcome recorded").text_color(t.muted).whitespace_normal())
   }
 
   actions(t: Palette, item: InboxItem, askMerge: AskMerge): ReadonlyArray<Element> {
@@ -258,7 +268,7 @@ export class InboxAnswers {
     return card().id(`item-${item.key}`).gap(6).p(12).min_w_0().flex_shrink_0()
       .child(h_flex().gap(8).flex_wrap()
         .child(div().font_semibold().child(item.task))
-        .child(div().min_w_0().text_color(t.muted).whitespace_normal().child(item.title)))
+        .child(linkedText(`title-${item.key}`, item.title).min_w_0().text_color(t.muted).whitespace_normal()))
       .child(h_flex().gap(6).text_size(12).flex_wrap()
         .child(div().font_semibold().child(whoLabel(item)))
         .child(div().text_color(t.muted).child(inboxKind[item.kind]))
