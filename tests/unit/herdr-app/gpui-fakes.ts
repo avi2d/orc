@@ -233,7 +233,8 @@ void mock.module("herdr", () => ({
     return line === "orc attention --json" && stalledAttention.pending !== null ? stalledAttention.pending : reply(line)
   },
   shared: (key: string) => sharedValues.get(key) ?? null, setShared: (key: string, value: unknown) => { sharedValues.set(key, value) }, layout: () => null, theme: () => installedColors[resolvedTheme.name ?? String(appSettings["theme"])] ?? {},
-  settings: () => appSettings, openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined, themes: () => []
+  settings: () => appSettings, openOverlay: () => undefined, nextCommand: () => undefined, notify: () => undefined,
+  themes: () => [{ name: "graphite", light: false, colors: graphite }, { name: "paper", light: true, colors: paper }]
 }))
 
 interface OpenTask {

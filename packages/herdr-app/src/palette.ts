@@ -7,6 +7,8 @@ const linkColors = {
   light: { link: "#00458f", linkHover: "#002f66", linkFocusForeground: "#ffffff" }
 } as const satisfies Record<"dark" | "light", Record<"link" | "linkHover" | "linkFocusForeground", Color>>
 
+export type LinkPalette = (typeof linkColors)["dark" | "light"]
+
 const channel = (color: string, at: number): number => {
   const value = Number.parseInt(color.slice(at, at + 2), 16) / 255
   return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
@@ -19,17 +21,16 @@ const contrast = (first: number, second: number): number =>
 
 const isRgb = (value: string | undefined): value is string => value !== undefined && /^#[0-9a-f]{6}$/i.test(value)
 
-const weakestContrast = (colors: (typeof linkColors)["dark" | "light"], background: number): number =>
+const weakestContrast = (colors: LinkPalette, background: number): number =>
   Math.min(contrast(luminance(colors.link), background), contrast(luminance(colors.linkHover), background))
 
-const themeLinks = (): (typeof linkColors)["dark" | "light"] => {
-  const background = theme()["background"]
+export const linksOn = (background: string | undefined): LinkPalette => {
   if (!isRgb(background)) return linkColors.dark
   const surface = luminance(background)
   return weakestContrast(linkColors.light, surface) > weakestContrast(linkColors.dark, surface) ? linkColors.light : linkColors.dark
 }
 
-export const linkPalette = (surface: "theme" | "card"): (typeof linkColors)["dark" | "light"] =>
-  surface === "theme" ? themeLinks() : linkColors.dark
+export const linkPalette = (surface: "theme" | "card"): LinkPalette =>
+  surface === "theme" ? linksOn(theme()["background"]) : linkColors.dark
 
 export const palette = (): Palette => resolvePalette(theme())

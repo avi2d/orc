@@ -8,7 +8,7 @@ import { type GalleryStory, galleryControlHeights, galleryStories } from "../../
 import { button, field, tab } from "../../src/kit"
 import { alertColors, dotColour, tw, zinc } from "../../src/kit-colors"
 import { type Palette, resolvePalette } from "../../src/palette-values"
-import { palette } from "../../src/palette"
+import { type LinkPalette, linkPalette, linksOn, palette } from "../../src/palette"
 
 const pages = ["Examples", "Colours", "Type and spacing"] as const
 type Page = typeof pages[number]
@@ -16,6 +16,7 @@ type Page = typeof pages[number]
 const presets = ["graphite", "paper"] as const
 type Preset = typeof presets[number]
 type Preview = "active" | Preset
+type Shown = { readonly colours: Palette; readonly links: LinkPalette }
 
 const previewLabels = { active: "Active theme", graphite: "Graphite", paper: "Paper" } as const satisfies Record<Preview, string>
 
@@ -51,10 +52,11 @@ const swatchSet = (t: Palette, label: string, values: ReadonlyArray<readonly [st
       .child(div().text_size(12).whitespace_normal().child(name))
       .child(div().text_size(12).font_family(monospace()).text_color(t.muted).child(value)))))
 
-const colours = (t: Palette): Element =>
+const colours = (t: Palette, links: LinkPalette): Element =>
   v_flex().gap(16)
     .child(muted(t, "Translucent swatches are drawn over the example surface."))
     .child(swatchSet(t, "Herdr theme roles", Object.entries(t)))
+    .child(swatchSet(t, "Links on this theme", Object.entries(links)))
     .child(swatchSet(t, "Orc zinc colours", Object.entries(zinc)))
     .child(swatchSet(t, "Run status dots", Object.entries(dotColour)))
     .child(swatchSet(t, "Fixed icon colours", Object.entries(tw)))
@@ -85,7 +87,7 @@ export default class OrcDesignSystem extends View {
   private story: GalleryStory = galleryStories[0]
   private readonly search = InputState.new({ placeholder: "Find an example" })
   private readonly fixture = new GalleryExample()
-  private readonly presetColours = new Map<Preset, Palette>()
+  private readonly presetThemes = new Map<Preset, Shown>()
   private focusHandle: FocusHandle | null = null
 
   override init(_props: unknown, cx: AsyncContext): void {
@@ -94,7 +96,7 @@ export default class OrcDesignSystem extends View {
     const available = themes()
     for (const name of presets) {
       const preset = available.find((value) => value.name === name)
-      if (preset !== undefined) this.presetColours.set(name, resolvePalette(preset.colors))
+      if (preset !== undefined) this.presetThemes.set(name, { colours: resolvePalette(preset.colors), links: linksOn(preset.colors["background"]) })
     }
     this.search.on("change", (_event, changed) => changed.notify())
     this.fixture.input.on("submit", (_event, submitted) => {
@@ -110,7 +112,7 @@ export default class OrcDesignSystem extends View {
   }
 
   private toolbar(t: Palette): Element {
-    const previews: ReadonlyArray<Preview> = ["active", ...this.presetColours.keys()]
+    const previews: ReadonlyArray<Preview> = ["active", ...this.presetThemes.keys()]
     return v_flex().flex_none().gap(8).px(12).py(8).bg(t.chrome).border_b(1).border_color(t.border)
       .child(h_flex().gap(16).flex_wrap()
         .child(h_flex().gap(4).children(pages.map((page, index) =>
@@ -134,11 +136,11 @@ export default class OrcDesignSystem extends View {
           }))))
   }
 
-  private example(t: Palette): Element {
+  private example(t: Palette, links: LinkPalette): Element {
     const story = this.story
     const frame = v_flex().id("gallery-specimen").items_start().p(12).gap(8).bg(t.surface)
       .rounded(8).border(1).border_color(t.border).overflow_x_scrollbar()
-      .child(this.fixture.render(t, story))
+      .child(this.fixture.render(t, links, story))
     const tools = h_flex().gap(16).flex_wrap()
       .child(h_flex().gap(4).children(widths.map((width) =>
         tab(t, width.id, width.label, this.narrow === width.narrow, (cx) => { this.narrow = width.narrow; cx.notify() }))))
@@ -150,12 +152,13 @@ export default class OrcDesignSystem extends View {
   }
 
   render(): Element {
-    const active = palette()
-    const t = this.preview === "active" ? active : this.presetColours.get(this.preview) ?? active
+    const preset = this.preview === "active" ? undefined : this.presetThemes.get(this.preview)
+    const t = preset?.colours ?? palette()
+    const links = preset?.links ?? linkPalette("theme")
     const content = this.page === "Examples"
-      ? h_flex().flex_1().min_h_0().min_w_0().items_start().child(this.catalog(t)).child(this.example(t))
+      ? h_flex().flex_1().min_h_0().min_w_0().items_start().child(this.catalog(t)).child(this.example(t, links))
       : v_flex().id("gallery-reference").flex_1().min_h_0().overflow_y_scrollbar().p(12)
-        .child(this.page === "Colours" ? colours(t) : typeAndSpacing(t, this.pressedHeight, (height, cx) => {
+        .child(this.page === "Colours" ? colours(t, links) : typeAndSpacing(t, this.pressedHeight, (height, cx) => {
           this.pressedHeight = height
           cx.notify()
         }))

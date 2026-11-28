@@ -1,9 +1,8 @@
 import { type Context, type Element, div } from "gpui-kit"
 import { Link, h_flex, v_flex } from "gpui-base"
 import { hasLinks, lineWords } from "./links"
-import { linkPalette } from "./palette"
+import { type LinkPalette, linkPalette } from "./palette"
 
-type LinkPalette = ReturnType<typeof linkPalette>
 type OpenLink = (url: string, cx: Context) => void
 
 let pointerFocusedId: string | null = null
@@ -43,11 +42,12 @@ const linkedLine = (t: LinkPalette, id: string, line: string, open: OpenLink | u
   return h_flex().flex_wrap().items_start().min_w_0().children(words)
 }
 
-const linkedTextOn = (surface: Parameters<typeof linkPalette>[0], id: string, text: string, open?: OpenLink): Element => {
+const linkedTextOn = (links: () => LinkPalette, id: string, text: string, open?: OpenLink): Element => {
   if (!hasLinks(text)) return div().child(text)
-  const t = linkPalette(surface)
+  const t = links()
   return v_flex().min_w_0().children(text.split("\n").map((line, index) => linkedLine(t, `${id}-link-${index}`, line, open)))
 }
 
-export const linkedText = (id: string, text: string, open?: OpenLink): Element => linkedTextOn("theme", id, text, open)
-export const linkedCardText = (id: string, text: string): Element => linkedTextOn("card", id, text)
+export const linkedText = (id: string, text: string, open?: OpenLink, links?: LinkPalette): Element =>
+  linkedTextOn(() => links ?? linkPalette("theme"), id, text, open)
+export const linkedCardText = (id: string, text: string): Element => linkedTextOn(() => linkPalette("card"), id, text)

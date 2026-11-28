@@ -4,6 +4,7 @@ import { visibleGalleryRows } from "./gallery-selection"
 import type { GalleryStory } from "./gallery-stories"
 import { type MenuChoice, alert, button, card, checkIcon, field, fieldWithButton, groupRow, kbd, menuPanel, radio, runRow, selectTrigger, statusDot, tab, vendorLogo } from "./kit"
 import { linkedText } from "./links-view"
+import type { LinkPalette } from "./palette"
 import type { Palette } from "./palette-values"
 import { uniformRows } from "./rows-list"
 import { runsHeader } from "./run-menus"
@@ -106,25 +107,25 @@ export class GalleryExample {
       }))
   }
 
-  private thread(t: Palette, story: Extract<GalleryStory, { component: "threadEntry" }>): Element {
+  private thread(t: Palette, links: LinkPalette, story: Extract<GalleryStory, { component: "threadEntry" }>): Element {
     const send = this.sendAction(story)
-    if (send === null) return threadEntry(t, story.card, readOnlyThread)
+    if (send === null) return threadEntry(t, story.card, readOnlyThread, links)
     const reply = story.reply
     const controls: ThreadControls = {
       option: (_card, option, shown) => shown.cursor_pointer().on_click((_event, cx) => this.record(`Sample option: ${option.text}`, cx)),
       reply: () => [fieldWithButton(this.input, button(t, "gallery-thread-send", "Send", "primary", 32, send))],
       failure: () => reply.kind === "failed" ? [div().text_color(t.blocked).whitespace_normal().child(reply.reason)] : []
     }
-    return threadEntry(t, story.card, controls)
+    return threadEntry(t, story.card, controls, links)
   }
 
-  render(t: Palette, story: GalleryStory): Element {
-    const drawn = this.draw(t, story)
+  render(t: Palette, links: LinkPalette, story: GalleryStory): Element {
+    const drawn = this.draw(t, links, story)
     const width = specimenWidths[story.component]
     return width === null ? drawn : v_flex().w_full().max_w(width).child(drawn)
   }
 
-  private draw(t: Palette, story: GalleryStory): Element {
+  private draw(t: Palette, links: LinkPalette, story: GalleryStory): Element {
     switch (story.component) {
       case "button": return button(t, story.id, "Run example", story.look, story.size,
         story.disabled ? null : (cx) => this.record("Example button pressed.", cx))
@@ -157,9 +158,9 @@ export class GalleryExample {
         press: (cx) => this.record(`Sample action: ${label}`, cx)
       })) })
       case "uniformRows": return this.rows(t, story)
-      case "linkedText": return linkedText(story.id, story.text, (url, cx) => this.record(`Sample link: ${url}`, cx))
-      case "threadEntry": return this.thread(t, story)
-      case "threadDecided": return v_flex().gap(8).children(threadDecided(t, story.thread))
+      case "linkedText": return linkedText(story.id, story.text, (url, cx) => this.record(`Sample link: ${url}`, cx), links)
+      case "threadEntry": return this.thread(t, links, story)
+      case "threadDecided": return v_flex().gap(8).children(threadDecided(t, story.thread, links))
     }
   }
 }

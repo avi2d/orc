@@ -5,6 +5,7 @@ import { click, cx, find, typeIn } from "./gpui-fakes"
 
 test("sample submission cannot send busy fields, read-only threads, or unrelated examples", async () => {
   const { GalleryExample } = await import("../../../packages/herdr-app/src/gallery-example")
+  const { linkPalette } = await import("../../../packages/herdr-app/src/palette")
   const fixture = new GalleryExample()
   const t = resolvePalette({})
   const sendable = new Set(["field-with-button.empty", "field-with-button.ready", "thread.question", "thread.reply-failed"])
@@ -17,7 +18,7 @@ test("sample submission cannot send busy fields, read-only threads, or unrelated
     if (story.component === "fieldWithButton") {
       fixture.reset(story, cx)
       typeIn(fixture.input, "  Compare the colours.  ")
-      const send = find(fixture.render(t, story), story.id)
+      const send = find(fixture.render(t, linkPalette("theme"), story), story.id)
       expect(send).not.toBeNull()
       click(send)
       expect({ id: story.id, receipt: fixture.receipt }).toEqual({ id: story.id, receipt: expected })

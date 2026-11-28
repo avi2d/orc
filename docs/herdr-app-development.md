@@ -36,12 +36,12 @@ Every other command runs the installed orc.
 
 ## Check the design system gallery
 
-Open the Orc layout in your test App and select **Design system** in the top bar, or run `herdr-app do layout.switch --name orc-design-system`.
+Open the Orc layout in your test App and select **Design system** in the top bar, or run `"$SCRATCH_APP_BIN" do layout.switch --name orc-design-system`.
 The gallery fills the App as its own `orc-design-system` layout.
 It reads host theme values and uses sample data for all actions.
-To return, select **Back to Orc**, press Escape, or run `herdr-app do layout.switch --name orc`.
+To return, select **Back to Orc**, press Escape, or run `"$SCRATCH_APP_BIN" do layout.switch --name orc`.
 
-1. Search **Examples** for `button.32.primary.enabled`, press the button, and check for a receipt.
+1. Search **Examples** for `button.32.primary`, select `button.32.primary.enabled`, press the button, and check for a receipt.
    Select `button.32.primary.disabled` and check that it produces no receipt.
 1. Search for `field-with-button.ready`.
    Change the sample answer, press Enter, and check that the receipt contains the new text.
