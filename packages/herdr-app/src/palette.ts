@@ -10,7 +10,7 @@ const linkColors = {
   light: { link: "#00458f", linkHover: "#002f66", linkFocusForeground: "#ffffff" }
 } as const satisfies Record<"dark" | "light", Record<"link" | "linkHover" | "linkFocusForeground", Color>>
 
-export const linkPalette = () => settings().dark === false ? linkColors.light : linkColors.dark
+export const linkPalette = (): (typeof linkColors)["dark" | "light"] => settings().dark === false ? linkColors.light : linkColors.dark
 
 const isColor = (value: string | undefined): value is Color => value?.startsWith("#") === true
 

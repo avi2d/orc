@@ -131,7 +131,7 @@ test("draws readable link colours in each appearance instead of a status colour 
   for (const look of [{ dark: true, background: "#282c34" }, { dark: false, background: "#fafafa" }]) {
     appAppearance.dark = look.dark
     try {
-      const [link] = nativeLinks(linkedText("job", job))
+      const link = nativeLinks(linkedText("job", job)).at(0)
       if (link === undefined) throw new Error("Missing job link")
       const rest = colorOf(link, "text_color")
       if (look.dark) expect(rest).toBe("#74ade8")
@@ -155,7 +155,7 @@ test("draws readable link colours in each appearance instead of a status colour 
 test("a pointer press does not leave the job link highlighted and tabbing back restores visible focus", async () => {
   const { linkedText } = await import("../../../packages/herdr-app/src/links-view")
   const jobLink = () => {
-    const [link] = nativeLinks(linkedText("focus-job", job))
+    const link = nativeLinks(linkedText("focus-job", job)).at(0)
     if (link === undefined) throw new Error("Missing job link")
     return link
   }
