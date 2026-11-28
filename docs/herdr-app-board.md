@@ -54,6 +54,7 @@ For an open PR, select **Merge** and confirm to run `orc merge <task> --basis ca
 Subscriptions shows each account's quota windows.
 An account with no window shows the reason it has none in place of its windows, such as [quota-axi](https://github.com/kunchenguid/quota-axi) reading it as `auth_required`.
 When the reason is another machine's failure, it starts with that machine's name.
+A remote machine whose quota could not be read, or whose reading is more than 5 minutes older than this machine's, shows a line below the table that starts with its name, such as `other-host: quota reading is stale`.
 The Used bar compares usage with elapsed time and turns red when usage is ahead.
 A window with no known cycle shows its usage with no elapsed-time mark.
 Runs out shows an estimate only when the quota will run out before reset.
@@ -65,5 +66,8 @@ An unreadable machine shows dashes and a reason below the table.
 
 Subscriptions and Machines read separately, so machines show before the slower quota read ends.
 Both refresh every minute, whichever tab is open.
+Each table shows when it was read and keeps its last rows during a refresh.
+When a refresh fails, the read time ends with `Refresh failed:` and the reason, and the last rows stay.
+The tab reads the [overview reports](dash-resources.md#print-the-resources-tab-reports).
 
 ![Resources tab with the second machine unreachable](images/herdr-resources-unreachable.png)

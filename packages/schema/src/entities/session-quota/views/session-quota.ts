@@ -208,7 +208,7 @@ const modelShares = (
 const windowView = (
   metered: MeteredWindow,
   calls: ReadonlyArray<CountedCall>,
-  inputs: SessionQuotaInputs,
+  inputs: Pick<SessionQuotaInputs, "now" | "sessionOfFile">,
   sessionsById: ReadonlyMap<string, Session>,
   availability: ReadonlyArray<QuotaAvailability>,
 ): WindowView => {
@@ -285,7 +285,7 @@ const windowView = (
 
 interface AccountContext {
   readonly entries: ReadonlyArray<SourcedEntry>;
-  readonly inputs: SessionQuotaInputs;
+  readonly inputs: Pick<SessionQuotaInputs, "now" | "sessionOfFile" | "quota" | "orcQuota">;
   readonly sessionsById: ReadonlyMap<string, Session>;
 }
 
@@ -294,7 +294,7 @@ const unreadStates = new Set<SourcedProvider["state"]["status"]>(["unavailable",
 const unreadBody = ({ provider, state }: SourcedProvider): Failed =>
   unreachable(`quota-axi reads ${provider} as ${state.status}${state.error === undefined ? "" : `: ${state.error}`}`);
 
-const accountView = (
+export const accountView = (
   entry: SourcedEntry,
   joined: ReadonlyArray<{ readonly call: CountedCall; readonly join: AccountJoin }>,
   { entries, inputs, sessionsById }: AccountContext,

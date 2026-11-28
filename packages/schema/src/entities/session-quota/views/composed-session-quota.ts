@@ -1,5 +1,6 @@
 import { DateTime } from "effect";
 import type { Failed, Outcome } from "../../../shared/lib";
+import { groupLogins, keysCarried } from "./group-logins";
 import type { Session } from "../sources/live";
 import { addTokens, priceRatios, sumTokens, type Tokens, type Weighting, weightings } from "../contract/tokens";
 import { byPricedShare, estimate, rateSpanHours, spendGate } from "./estimate";
@@ -30,10 +31,7 @@ import {
   windowsOf,
 } from "./session-quota-report";
 
-const staleAfterMillis = 5 * 60_000;
-
-// quota-axi reads the vendor's reset instant on each machine, so one cycle of one account agrees to well inside a minute.
-const sameCycleMillis = 60_000;
+import { sameCycleMillis, staleAfterMillis } from "./remote-quota-rules";
 
 export interface RemoteReading {
   readonly name: string;
@@ -165,48 +163,6 @@ const windowOfGroup = ({ members, otherCycle }: WindowGroup): ReadonlyArray<Wind
   return [{ ...(members.length === 1 ? anchor : combinedWindow(anchor, members)), otherCycle }];
 };
 
-// A log account carries no accountKey and a peer's report may carry no credentialKey or accountKeys, so no one key names the login on both.
-const keysCarried = (account: AccountView): ReadonlyArray<string> => [
-  ...(account.accountKey === undefined ? [] : [account.accountKey]),
-  ...(account.credentialKey === undefined ? [] : [account.credentialKey]),
-  ...account.accountKeys,
-  ...account.joins.flatMap((join) => (join.kind === "credential-key" ? [join.key] : [])),
-];
-
-interface Found {
-  readonly order: number;
-  readonly machine: Machine;
-  readonly account: AccountView;
-}
-
-type Login = ReadonlyArray<Found>;
-
-const sharesKey = (login: Login, account: AccountView): boolean =>
-  login.some(
-    (member) =>
-      member.account.provider === account.provider && keysCarried(member.account).some((key) => keysCarried(account).includes(key)),
-  );
-
-// Accounts sharing any key are one login, transitively. quota-axi leaves a provider's one account unkeyed, so an account with
-// no key joins the provider's one keyed login, or the other keyless ones when none is keyed, and stands alone beside two.
-const logins = (found: ReadonlyArray<Found>): ReadonlyArray<Login> => {
-  const keyed = found.reduce<ReadonlyArray<Login>>((known, member) => {
-    if (keysCarried(member.account).length === 0) return known;
-    const shared = known.filter((login) => sharesKey(login, member.account));
-    return [...known.filter((login) => !shared.includes(login)), [...shared.flat(), member]];
-  }, []);
-  const all = [...new Set(found.map(({ account }) => account.provider))].flatMap((provider): ReadonlyArray<Login> => {
-    const own = keyed.filter((login) => login.at(0)?.account.provider === provider);
-    const keyless = found.filter(({ account }) => account.provider === provider && keysCarried(account).length === 0);
-    const only = own.length === 1 ? own.at(0) : undefined;
-    if (keyless.length === 0) return own;
-    if (only !== undefined) return [[...only, ...keyless]];
-    return own.length === 0 ? [keyless] : [...own, ...keyless.map((member) => [member])];
-  });
-  const firstOf = (login: Login): number => Math.min(...login.map(({ order }) => order));
-  return all.map((login) => login.toSorted((left, right) => left.order - right.order)).toSorted((left, right) => firstOf(left) - firstOf(right));
-};
-
 const joinsOf = (accounts: ReadonlyArray<AccountView>): ReadonlyArray<AccountJoin> =>
   distinctJoins(accounts.flatMap((account) => account.joins));
 
@@ -222,8 +178,8 @@ interface MergedAccount {
 const mergedAccounts = (machines: ReadonlyArray<Machine>): ReadonlyArray<MergedAccount> => {
   const everyAccount = machines
     .flatMap((machine) => machine.view.accounts.map((account) => ({ machine, account })))
-    .map((member, order) => ({ ...member, order }));
-  return logins(everyAccount).flatMap((found) => {
+    .map((member, order) => ({ ...member, order, provider: member.account.provider, keys: keysCarried(member.account) }));
+  return groupLogins(everyAccount).flatMap((found) => {
     const head = found.at(0)?.account;
     if (head === undefined) return [];
     const metered = found.flatMap(({ machine, account }) =>

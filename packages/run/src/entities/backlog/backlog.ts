@@ -4,7 +4,7 @@ import { fullPrUrl } from "./task-record-text"
 import { type CiRerun, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { answerWait, type DeciderOwns } from "./task-wait"
 import { renderTaskFile } from "./task-record-render"
-import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, readNames, recoverGrabs, scratchName, takenGrab } from "./backlog-write"
+import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, readIfPresent, readNames, recoverGrabs, scratchName, takenGrab } from "./backlog-write"
 
 export { BacklogError, readNames } from "./backlog-write"
 export { TaskId }
@@ -32,40 +32,34 @@ const byCreated = (left: TaskRecord, right: TaskRecord): number =>
 // A beat may move a listed file to the next folder before it is read, so a vanished file is skipped rather than failed.
 const readFolder = (
   root: string,
-  folder: TaskFolder
+  folder: TaskFolder,
+  named?: string
 ): Effect.Effect<ReadonlyArray<TaskRecord>, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
-    const records: Array<TaskRecord> = []
-    for (const name of yield* readNames(paths.folder(folder))) {
-      if (!taskFilePattern.test(name)) {
-        continue
-      }
+    const names = named === undefined ? yield* readNames(paths.folder(folder)) : [named]
+    const records = yield* Effect.forEach(names.filter((name) => taskFilePattern.test(name)), (name) => {
       const file = paths.folder(folder) + "/" + name
-      const text = yield* fs.readFileString(file).pipe(
-        Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
-        Effect.mapError(platformFailure("read " + file))
-      )
-      if (text !== null) {
-        records.push(yield* parseTaskFile(file, folder, text))
-      }
-    }
-    return records
+      return Effect.flatMap(readIfPresent(file), (text) => text === null ? Effect.succeed(null) : parseTaskFile(file, folder, text))
+    }, { concurrency: 8 })
+    return records.filter((record) => record !== null)
   })
 
 // A close links the closed copy before it removes the taken one, so for a moment both are listed and the closed copy wins.
-export const listTasks = (
-  root: string
+const readTasks = (
+  root: string,
+  named?: string
 ): Effect.Effect<ReadonlyArray<TaskRecord>, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   recoverGrabs(root).pipe(
-    Effect.andThen(Effect.forEach(taskFolders, (folder) => readFolder(root, folder))),
+    Effect.andThen(Effect.forEach(taskFolders, (folder) => readFolder(root, folder, named))),
     Effect.map((folders) => {
       const all = folders.flat()
       const closed = new Set(all.filter((record) => record.state.kind === "closed").map((record) => record.spec.id))
       return all.filter((record) => record.state.kind === "closed" || !closed.has(record.spec.id)).sort(byCreated)
     })
   )
+
+export const listTasks = (root: string): ReturnType<typeof readTasks> => readTasks(root)
 
 // An old task-<n> id names no project, so its task file says which project it counts for.
 const reserveId = (root: string, project: string): Effect.Effect<string, BacklogError, FileSystem.FileSystem> =>
@@ -199,10 +193,7 @@ const missedClose = (
     if (closedExists) {
       return yield* new BacklogError({ detail: id + " was closed by another command" })
     }
-    const record = (yield* listTasks(root)).find((candidate) => candidate.spec.id === id)
-    if (record === undefined) {
-      return yield* new BacklogError({ detail: "the backlog holds no " + id })
-    }
+    const record = yield* findTask(root, id)
     if (record.state.kind !== "started") {
       return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task closes" })
     }
@@ -333,7 +324,7 @@ export const markCiRerun = (root: string, id: string, rerun: CiRerun): Effect.Ef
 export const rewriteClosed = rewriteIn("closed")
 
 export const findTask = (root: string, id: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  listTasks(root).pipe(
+  readTasks(root, id + ".md").pipe(
     Effect.map((tasks) => tasks.find((candidate) => candidate.spec.id === id)),
     Effect.filterOrFail((record) => record !== undefined, () => new BacklogError({ detail: "the backlog holds no " + id }))
   )

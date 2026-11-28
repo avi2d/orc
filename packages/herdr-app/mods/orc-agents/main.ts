@@ -5,7 +5,7 @@ import { AgentAttentionSection } from "../../src/agent-attention-view"
 import type { AgentAttention } from "../../src/inbox-read"
 import { type Card, type CardStatus, type Filter, approvalOf, cardAttention, filterCards, goesOn, openedFilter, recordedStatus, unfoldedCards } from "../../src/agents"
 import { type RunFacts, runFacts } from "../../src/run-agent"
-import { type LocalAgents, agentsDocuments, readAgentQuestions, readLocalAgents } from "../../src/agents-read"
+import { type LocalAgents, agentsDocuments, readAgentQuestions, readLocalAgents, sameLocalAgents } from "../../src/agents-read"
 import type { AttentionQueue } from "../../src/guard-attention"
 import { type AgentsActions, type Chosen, type DetailShown, type Keyed, askMerge, detailView, submitSendBack } from "../../src/agents-view"
 import { type ListReading, type Reread, runsColumn } from "../../src/runs-view"
@@ -15,6 +15,7 @@ import { readChanges } from "../../src/changes-read"
 import { show, type Show, type ShownStep } from "../../src/guard"
 import { InboxAnswers, threadBoxes } from "../../src/inbox-view"
 import { type Reading, readJson } from "../../src/orc-read"
+import { readRunFacts } from "../../src/run-facts-read"
 import { palette } from "../../src/palette"
 import { StepOutput } from "../../src/step-output"
 import { thread } from "../../src/task-guard"
@@ -27,7 +28,6 @@ type Palette = ReturnType<typeof palette>
 const everyMs = 4000
 const thisView = "orc-agents"
 const changesBlock = "orc-changes"
-const showsAtOnce = 4
 
 const shown = (): boolean => {
   const active = activeChild(layout(), viewsStack)
@@ -115,7 +115,7 @@ export default class OrcAgents extends View {
     this.questionsBusy = true
     cx.spawn((task) => readAgentQuestions().then((reading) => {
       this.questionsBusy = false
-      if (reading.kind === "ok") {
+      if (reading.kind === "ok" && reading.value !== this.questions) {
         this.questions = reading.value
         this.showCards(task, this.list.kind === "ok" ? this.list.reread : null)
       }
@@ -134,21 +134,33 @@ export default class OrcAgents extends View {
   readAll(cx: Context): Promise<void> {
     return readLocalAgents().then((reading) => {
       if (reading.kind === "ok") {
-        this.local = reading.value
         this.listed = new Date().toISOString()
-        this.showCards(cx, null)
+        if (this.list.kind === "ok" && sameLocalAgents(this.local, reading.value)) {
+          this.list = { ...this.list, reread: null }
+        } else {
+          // Parsing a changed backlog fills most of a frame, so the cards are built after the next frame draws.
+          return cx.sleep(0).then(() => {
+            this.local = reading.value
+            this.showCards(cx, null)
+            return this.readSelected(cx)
+          })
+        }
       } else if (this.list.kind === "ok") {
         this.list = { ...this.list, reread: reading.kind === "failed" ? { reason: reading.reason, listed: this.listed } : null }
       } else {
         this.local = null
         this.list = reading
       }
-      cx.notify()
-      if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {
-        this.review.set_value("")
-      }
-      return Promise.all([this.readSelectedRun(), this.readSelectedThread(), this.readSelectedChanges()]).then(() => undefined)
+      return this.readSelected(cx)
     })
+  }
+
+  readSelected(cx: Context): Promise<void> {
+    cx.notify()
+    if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {
+      this.review.set_value("")
+    }
+    return Promise.all([this.readSelectedRun(), this.readSelectedThread(), this.readSelectedChanges()]).then(() => undefined)
   }
 
   readSelectedThread(): Promise<void> {
@@ -216,20 +228,7 @@ export default class OrcAgents extends View {
     const wanted = this.allCards().flatMap((card) => card.runId !== null && (!this.facts.has(card.runId) || goesOn(card.standing)) ? [card.runId] : [])
     if (this.labelling || wanted.length === 0) return
     this.labelling = true
-    const label = (runId: string): Promise<void> =>
-      readJson("orc", ["show", runId, "--json"], show).then((reading) => {
-        if (reading.kind === "ok") {
-          this.facts.set(runId, runFacts(reading.value))
-        }
-      })
-    const from = (start: number, task: AsyncContext): Promise<void> =>
-      start >= wanted.length
-        ? Promise.resolve()
-        : Promise.all(wanted.slice(start, start + showsAtOnce).map(label)).then(() => {
-          task.notify()
-          return from(start + showsAtOnce, task)
-        })
-    cx.spawn((task) => from(0, task).then(() => {
+    cx.spawn((task) => readRunFacts(wanted, this.facts, () => task.notify()).then(() => {
       this.labelling = false
     }))
   }

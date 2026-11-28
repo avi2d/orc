@@ -122,7 +122,7 @@ export const cx: Context = Object.assign(IdleEntity, {
     return idleTask()
   },
   bind_keys: unused, propagate: unused, phase: unused, theme: unused, open_url: unused,
-  read_from_clipboard: unused, write_to_clipboard: unused, focus_handle: focusHandle, sleep: unused,
+  read_from_clipboard: unused, write_to_clipboard: unused, focus_handle: focusHandle, sleep: () => Promise.resolve(),
   timer: { after: unused, every: unused }
 }) satisfies Context
 
