@@ -61,7 +61,7 @@
     "@avi2dg/orc-tasks": "workspace:*",
     "@avi2dg/orc-ui": "workspace:*",
     "@dagrejs/dagre": "3.1.3",
-    "@effect/platform-bun": "4.1.4",
+    "@effect/platform-bun": "4.1.6",
     "@effect/tsgo": "0.45.0",
     "@hughescr/stryker-bun-runner": "1.6.0",
     "@opentui/core": "0.6.5",
@@ -82,8 +82,7 @@
     "vue-tsc": "3.3.14"
   },
   "overrides": {
-    "@effect/platform-node-shared": "4.1.4",
-    "minimatch": "11.0.3",
+    "minimatch": "11.0.9",
     "qs": "6.16.1",
     "vite": "6.4.6"
   },
