@@ -40,6 +40,7 @@ The command writes only names beginning with `orc`, leaving Herdr's own mods and
 
 The Resources tab refreshes in the background, and the other tabs refresh while visible.
 Each tab shows a reason when a command fails.
+Click an underlined link in any tab to open it in your browser.
 
 ## Answer in the Inbox
 

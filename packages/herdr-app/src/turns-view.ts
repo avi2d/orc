@@ -1,6 +1,7 @@
 import { type Context, type Element, div } from "gpui-kit"
 import { type ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { monospace } from "./fonts"
+import { linkedText } from "./links-view"
 import type { Reading } from "./orc-read"
 import type { palette } from "./palette"
 import { type Turn, type TurnCall, callMark, outputSize, outputStart, turnHeader } from "./turns"
@@ -29,7 +30,8 @@ const clock = (at: number): string => {
   return `${time.getHours().toString().padStart(2, "0")}:${time.getMinutes().toString().padStart(2, "0")}`
 }
 
-const lines = (text: string): ReadonlyArray<string> => text.split("\n").map((line) => line === "" ? " " : line)
+const turnLines = (id: string, text: string): ReadonlyArray<Element> =>
+  text.split("\n").map((line, index) => linkedText(`${id}-${index}`, line === "" ? " " : line))
 
 const callView = (t: Palette, call: TurnCall, open: boolean, act: TurnsActions): Element => {
   const mark = callMark(call.result)
@@ -47,7 +49,7 @@ const callView = (t: Palette, call: TurnCall, open: boolean, act: TurnsActions):
   return v_flex().child(row)
     .child(v_flex().ml(26).my(4).px(10).py(6).rounded(4).bg(t.chrome).font_family(monospace()).text_size(12)
       .text_color(call.result.kind === "failed" ? t.ansi1 : t.foreground)
-      .children(lines(output).map((line) => div().child(line))))
+      .children(turnLines(`call-output-${call.id}`, output)))
 }
 
 const turnView = (t: Palette, turn: Turn, open: TurnsOpen, act: TurnsActions): Element => {
@@ -63,8 +65,8 @@ const turnView = (t: Palette, turn: Turn, open: TurnsOpen, act: TurnsActions): E
         .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
         .on_click((_event, cx) => act.toggleThinking(turn.id, cx))
         .child(`${thinkingOpen ? "▾" : "▸"} Thinking`))
-      .when(thinkingOpen, (column) => column.child(v_flex().pl(14).text_color(t.muted).italic().children(lines(turn.thinking).map((line) => div().child(line)))))))
-    .when(turn.text !== "", (block) => block.child(v_flex().children(lines(turn.text).map((line) => div().child(line)))))
+      .when(thinkingOpen, (column) => column.child(v_flex().pl(14).text_color(t.muted).italic().children(turnLines(`thinking-text-${turn.id}`, turn.thinking))))))
+    .when(turn.text !== "", (block) => block.child(v_flex().children(turnLines(`turn-text-${turn.id}`, turn.text))))
     .when(turn.calls.length > 0, (block) => block.child(v_flex().gap(2).children(turn.calls.map((call) => callView(t, call, open.calls.has(call.id), act)))))
 }
 
