@@ -5,7 +5,7 @@ import { type RowFacts, rowFacts } from "./agent-row"
 import { type AlertAction, type AlertShown, alert, button, field, selectTrigger, statusDot, vendorLogo, zinc } from "./kit"
 import type { palette } from "./palette"
 import type { RunFacts } from "./run-agent"
-import { projectMenu } from "./run-menus"
+import { projectMenu, runsHeader } from "./run-menus"
 import { uniformRows } from "./rows-list"
 import { shortTime } from "./task"
 
@@ -64,11 +64,16 @@ interface ListBody {
   readonly rows: ReadonlyArray<ListRow>
 }
 
-const listWidth = 360
+const listWidth = runsHeader.width
 const railWidth = 112
 const rowHeight = 26
-const menuWidth = 200
-const headerPadding = 12
+const { menuWidth, controlHeight, selectorWidth, foldWidth } = runsHeader
+const headerPadding = runsHeader.padding
+const headerTop = runsHeader.top
+const headerGap = runsHeader.gap
+const panelBorder = 1
+const menuLeft = listWidth - panelBorder - headerPadding - foldWidth - headerGap - menuWidth
+const menuTop = headerTop + controlHeight + 4
 
 const findWords = (shown: RunsShown): string => shown.find.value().trim()
 
@@ -144,37 +149,32 @@ const notesView = (t: Palette, notes: ReadonlyArray<Note>): ReadonlyArray<Elemen
 const attentionView = (t: Palette, shown: RunsShown): ReadonlyArray<Element> =>
   shown.agentAttention === undefined ? [] : [v_flex().id("agent-attention-scroll").flex_none().max_h(320).overflow_y_scroll().px(12).py(8).border_t(1).border_color(t.border).children(shown.agentAttention())]
 
-const menuList = (t: Palette, all: ReadonlyArray<Card>, filter: Filter, top: number, act: RunsActions): Element => {
+const menuList = (t: Palette, all: ReadonlyArray<Card>, filter: Filter, act: RunsActions): Element => {
   const menu = projectMenu(all, filter)
-  return v_flex().id("filter-project-menu").absolute().top(top).right(headerPadding).w(menuWidth).max_h(320).overflow_y_scrollbar()
-    .on_mouse_down("left", (_event, cx) => cx.stop_propagation())
-    .on_mouse_down_out((_event, cx) => act.openMenu(cx, false))
-    .p(4).gap(2).rounded(12).border(1).border_color(zinc.borderAccent).bg(zinc.s1).shadow_md()
-    .children(menu.choices.map((choice) => {
-      const chosen = choice === menu.chosen
-      return h_flex().id(`filter-project-${choice.name}`).h(28).px(8).gap(8).items_center().rounded(8).justify_between().cursor_pointer()
-        .text_color(chosen ? t.foreground : zinc.muted)
-        .when(chosen, (row) => row.bg(zinc.s2))
-        .hover((style) => style.bg(zinc.s2).text_color(t.foreground))
-        .on_click((_event, cx) => act.setFilter(cx, choice.value))
-        .child(div().min_w_0().truncate().child(choice.name))
-        .child(div().flex_shrink_0().text_color(zinc.muted).child(choice.count.toString()))
-    }))
+  return div().absolute().top(menuTop).left(menuLeft).w(menuWidth)
+    .child(v_flex().id("filter-project-menu").w_full().max_h(320).overflow_y_scrollbar()
+      .on_mouse_down("left", (_event, cx) => cx.stop_propagation())
+      .on_mouse_down_out((_event, cx) => act.openMenu(cx, false))
+      .p(4).gap(2).rounded(12).border(1).border_color(zinc.borderAccent).bg(zinc.s1).shadow_md()
+      .children(menu.choices.map((choice) => {
+        const chosen = choice === menu.chosen
+        return h_flex().id(`filter-project-${choice.name}`).h(28).px(8).gap(8).items_center().rounded(8).justify_between().cursor_pointer()
+          .text_color(chosen ? t.foreground : zinc.muted)
+          .when(chosen, (row) => row.bg(zinc.s2))
+          .hover((style) => style.bg(zinc.s2).text_color(t.foreground))
+          .on_click((_event, cx) => act.setFilter(cx, choice.value))
+          .child(div().min_w_0().truncate().child(choice.name))
+          .child(div().flex_shrink_0().text_color(zinc.muted).child(choice.count.toString()))
+      })))
 }
 
-const controlHeight = 32
 const titleRow = 28
-const headerTop = 10
-const headerGap = 8
 
 const header = (t: Palette, all: ReadonlyArray<Card>, shown: RunsShown, act: RunsActions): Element =>
-  v_flex().px(headerPadding).pt(headerTop).pb(8).gap(headerGap).border_b(1).border_color(t.border)
-    .child(h_flex().h(titleRow).items_center().justify_between()
-      .child(div().text_size(15).font_semibold().child("Runs"))
-      .child(button(t, "fold", "«", "ghost", 24, act.toggleFold)))
-    .child(h_flex().gap(8).items_center()
-      .child(field(shown.find, controlHeight))
-      .child(selectTrigger(t, "filter-project", `Project: ${projectMenu(all, shown.filter).chosen.name}`, controlHeight, (cx) => act.openMenu(cx, !shown.menuOpen))))
+  h_flex().px(headerPadding).pt(headerTop).pb(8).gap(headerGap).items_center().border_b(1).border_color(t.border)
+    .child(field(shown.find, controlHeight))
+    .child(selectTrigger(t, "filter-project", projectMenu(all, shown.filter).chosen.name, controlHeight, selectorWidth, (cx) => act.openMenu(cx, !shown.menuOpen)))
+    .child(button(t, "fold", "«", "ghost", 24, act.toggleFold).w(foldWidth))
 
 const rail = (t: Palette, shown: RunsShown, act: RunsActions): Element => {
   const cards = shown.list.kind === "ok" ? unfoldedCards(filterCards(shown.list.cards, shown.filter, findWords(shown)), shown.foldedGroups) : []
@@ -192,10 +192,10 @@ export const runsColumn = (t: Palette, shown: RunsShown, act: RunsActions): Elem
   if (shown.folded) return rail(t, shown, act)
   const all = shown.list.kind === "ok" ? shown.list.cards : []
   const body = listBody(shown, act)
-  return v_flex().relative().w(listWidth).h_full().flex_shrink_0().bg(t.chrome).border_r(1).border_color(t.border)
+  return v_flex().relative().w(listWidth).h_full().flex_shrink_0().bg(t.chrome).border_r(panelBorder).border_color(t.border)
     .child(header(t, all, shown, act))
     .children(notesView(t, body.notes))
     .child(uniformRows("cards", body.rows.map(shownRow(shown)), rowKey, (row) => listRow(t, shown, row), { x: 6, y: 6 }, pickRow(act)))
     .children(attentionView(t, shown))
-    .children(shown.menuOpen ? [menuList(t, all, shown.filter, headerTop + titleRow + headerGap + controlHeight + 4, act)] : [])
+    .children(shown.menuOpen ? [menuList(t, all, shown.filter, act)] : [])
 }

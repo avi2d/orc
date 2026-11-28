@@ -85,11 +85,11 @@ export const field = (state: InputState, size: ControlSize): Element =>
 export const fieldWithButton = (state: InputState, action: Element): Element =>
   h_flex().gap(8).items_center().min_w_0().child(field(state, 32)).child(action)
 
-export const selectTrigger = (t: Palette, id: string, label: string, size: ControlSize, press: Press): Element =>
-  h_flex().id(id).h(size).px(size === 32 ? 12 : 10).flex_none().items_center().gap(6).rounded(8).bg(zinc.s2).text_size(size === 32 ? 13 : 12).text_color(t.foreground)
+export const selectTrigger = (t: Palette, id: string, label: string, size: ControlSize, width: number, press: Press): Element =>
+  h_flex().id(id).w(width).h(size).px(size === 32 ? 12 : 10).flex_none().items_center().gap(6).rounded(8).bg(zinc.s2).text_size(size === 32 ? 13 : 12).text_color(t.foreground)
     .cursor_pointer().hover((style) => style.bg(zinc.s3))
     .on_mouse_down("left", (_event, cx) => press(cx))
-    .child(label).child(div().text_color(zinc.muted).child("▾"))
+    .child(div().flex_1().min_w_0().truncate().child(label)).child(div().text_color(zinc.muted).child("▾"))
 
 export const card = (): Element => v_flex().rounded(12).border(1).border_color(zinc.border).bg(zinc.s1)
 
