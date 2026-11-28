@@ -1,3 +1,5 @@
+export { peerReport, preferPeerReport } from "./peer-report";
+export { localRunningOrc } from "./running-orc";
 export { liveReaders, printSnapshotJson, type SnapshotSources } from "./app";
 export { type AlertReaders, streamAlerts } from "./alerts";
 export { snapshotSourcesLive } from "./live/layer";

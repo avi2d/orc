@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { DateTime, Schema } from "effect"
-import { composedSessionQuota, composedSessionQuotaReport, decodeQuota, overlaySubquo, type QuotaReport, SessionQuotaReport, sessionQuotaReport, sessionQuotaViewOf, SessionsCodec, type SnapshotFields, SnapshotReport, sessionQuotaView } from "@avi2dg/orc-schema"
+import { composedSessionQuota, composedSessionQuotaReport, decodeQuota, overlaySubquo, type QuotaReport, SessionQuotaReport, sessionQuotaReport, sessionQuotaViewOf, SessionsCodec, subscriptionOverview, subscriptionReport, type SnapshotFields, SnapshotReport, sessionQuotaView } from "@avi2dg/orc-schema"
 import { fixture as fixtureText } from "../../lib/fixtures"
 import { noOrcAccounts } from "../../lib/orc-quota"
 import { ledgerOf } from "../../lib/quota-view-fixture"
@@ -248,6 +248,11 @@ describe("the subscriptions table over a subquo reading", () => {
       })
     }, [])
     const composed = composedSessionQuota(local, "mac", [{ name: "remote", reading: { kind: "ok", value: remote } }])
+    const compact = subscriptionOverview(subscriptionReport(local.accounts, local.now), [
+      { name: "remote", reading: { kind: "ok", value: subscriptionReport(remote.accounts, remote.now) } }
+    ])
+    expect(compact.windows.find((window) => window.label === "month")?.startsAt)
+      .toBe("2026-11-07T10:59:08.000Z")
     const monthly = composed.accounts
       .flatMap((account) => account.body.kind === "windows" ? account.body.windows : [])
       .filter((window) => window.id === "monthly")

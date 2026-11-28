@@ -172,7 +172,7 @@ const readAllItems = (root: string, keep?: (name: string) => boolean): Effect.Ef
     const ids = (yield* readNames(attentionFolder(root)))
       .filter((name) => name.endsWith(fileSuffix) && !name.startsWith(".") && (keep === undefined || keep(name)))
       .map((name) => name.slice(0, -fileSuffix.length))
-    const read = yield* Effect.forEach(ids, (id) => readItem(root, id).pipe(Effect.map((item) => (item === null ? null : { id, item }))))
+    const read = yield* Effect.forEach(ids, (id) => readItem(root, id).pipe(Effect.map((item) => (item === null ? null : { id, item }))), { concurrency: 8 })
     return read
       .filter((entry): entry is OpenItem => entry !== null)
       .toSorted((left, right) => Date.parse(left.item.asked) - Date.parse(right.item.asked) || left.id.localeCompare(right.id))

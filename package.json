@@ -29,6 +29,7 @@
     "test:unit": "checks-test --tier=unit",
     "test:e2e": "checks-test --tier=e2e",
     "test:live": "checks-test --tier=live",
+    "bench:app-reads": "bun scripts/bench-app-reads.ts",
     "bench:start": "bun scripts/bench-start.ts",
     "docs:diagrams": "bun scripts/docs-diagrams.ts",
     "docs:dev": "vitepress dev docs",
